@@ -207,6 +207,33 @@ export const useFacilityData = () => {
     return filteredLeads.filter((lead) => lead.childIds.includes(childId));
   };
 
+  // スタッフ管理機能
+  const addStaff = (staffData: Omit<Staff, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
+    const newStaff: Staff = {
+      ...staffData,
+      id: `staff-${Date.now()}`,
+      facilityId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setStaff([...staff, newStaff]);
+    return newStaff;
+  };
+
+  const updateStaff = (staffId: string, staffData: Partial<Staff>) => {
+    setStaff(
+      staff.map((s) =>
+        s.id === staffId
+          ? { ...s, ...staffData, updatedAt: new Date().toISOString() }
+          : s
+      )
+    );
+  };
+
+  const deleteStaff = (staffId: string) => {
+    setStaff(staff.filter((s) => s.id !== staffId));
+  };
+
   return {
     children: filteredChildren,
     staff: filteredStaff,
@@ -232,6 +259,9 @@ export const useFacilityData = () => {
     updateLead,
     deleteLead,
     getLeadsByChildId,
+    addStaff,
+    updateStaff,
+    deleteStaff,
   };
 };
 

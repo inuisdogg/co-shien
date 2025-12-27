@@ -96,8 +96,27 @@ export type Staff = {
   id: string;
   facilityId: string; // 施設ID（マルチテナント対応）
   name: string;
-  role: '保育士' | '児童指導員' | '指導員' | '管理者';
+  nameKana?: string; // フリガナ
+  role: '一般スタッフ' | 'マネージャー';
   type: '常勤' | '非常勤';
+  // 基本情報
+  birthDate?: string; // 生年月日 (YYYY-MM-DD)
+  gender?: '男性' | '女性' | 'その他';
+  address?: string; // 住所
+  phone?: string; // 電話番号
+  email?: string; // メールアドレス
+  // 資格・経験
+  qualifications?: string; // 資格（複数可、カンマ区切りなど）
+  yearsOfExperience?: number; // 経験年数
+  qualificationCertificate?: string; // 資格証画像（Base64またはURL）
+  experienceCertificate?: string; // 実務経験証明書画像（Base64またはURL）
+  // その他
+  emergencyContact?: string; // 緊急連絡先
+  emergencyContactPhone?: string; // 緊急連絡先電話番号
+  memo?: string; // 備考
+  // 給与
+  monthlySalary?: number; // 月給（常勤の場合）
+  hourlyWage?: number; // 時給（非常勤の場合）
   createdAt: string;
   updatedAt: string;
 };
