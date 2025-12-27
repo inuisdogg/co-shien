@@ -3,7 +3,7 @@
  * 将来的にはAPIから取得するデータ
  */
 
-import { Child, Staff, ScheduleItem, BookingRequest, Facility, User } from './index';
+import { Child, Staff, ScheduleItem, BookingRequest, Facility, User, FacilitySettings } from './index';
 
 // デモ用施設データ
 export const mockFacility: Facility = {
@@ -263,4 +263,22 @@ export const initialRequests: BookingRequest[] = [
     updatedAt: '2024-01-01T00:00:00Z',
   },
 ];
+
+// 初期施設情報設定
+export const initialFacilitySettings: FacilitySettings = {
+  id: 'settings-1',
+  facilityId: 'facility-1',
+  regularHolidays: [0], // 日曜日を定休日
+  customHolidays: [], // カスタム休業日
+  businessHours: {
+    AM: { start: '09:00', end: '12:00' },
+    PM: { start: '13:00', end: '18:00' },
+  },
+  capacity: {
+    AM: 10,
+    PM: 10,
+  },
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
 

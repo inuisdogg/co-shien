@@ -12,9 +12,10 @@ import ScheduleView from '@/components/schedule/ScheduleView';
 import ChildrenView from '@/components/children/ChildrenView';
 import StaffView from '@/components/staff/StaffView';
 import FinanceView from '@/components/finance/FinanceView';
+import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('schedule');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const renderContent = () => {
     switch (activeTab) {
@@ -28,6 +29,8 @@ export default function Home() {
         return <StaffView />;
       case 'finance':
         return <FinanceView />;
+      case 'facility':
+        return <FacilitySettingsView />;
       default:
         return null;
     }

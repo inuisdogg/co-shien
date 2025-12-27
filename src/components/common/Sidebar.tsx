@@ -11,6 +11,7 @@ import {
   Users,
   Briefcase,
   PieChart,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -28,15 +29,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'children', label: '児童管理', icon: Users },
     { id: 'staff', label: '勤怠・シフト', icon: Briefcase },
     { id: 'finance', label: '収支管理', icon: PieChart },
+    { id: 'facility', label: '施設情報', icon: Settings },
   ];
 
   return (
     <div className="w-64 bg-[#232b37] text-white flex flex-col h-full hidden md:flex shrink-0">
       <div className="p-6 flex items-center space-x-3">
-        <div className="w-8 h-8 bg-[#00c4cc] rounded-md flex items-center justify-center text-white shadow-lg">
-          <span className="font-bold text-xl">K</span>
-        </div>
-        <span className="text-xl font-bold tracking-tight text-white">KidOS</span>
+        <img src="/logo-white.svg" alt="co-shien" className="h-8" />
       </div>
 
       <div className="px-3 py-4">
