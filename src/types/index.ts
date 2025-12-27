@@ -12,6 +12,27 @@ export type Facility = {
   updatedAt: string;
 };
 
+// 施設情報設定
+export type FacilitySettings = {
+  id: string;
+  facilityId: string; // 施設ID（マルチテナント対応）
+  // 営業日設定
+  regularHolidays: number[]; // 定休日（0=日, 1=月, ..., 6=土）
+  customHolidays: string[]; // カスタム休業日（YYYY-MM-DD形式の配列）
+  // 営業時間
+  businessHours: {
+    AM: { start: string; end: string }; // 例: { start: '09:00', end: '12:00' }
+    PM: { start: string; end: string }; // 例: { start: '13:00', end: '18:00' }
+  };
+  // 受け入れ人数
+  capacity: {
+    AM: number; // 午前の定員
+    PM: number; // 午後の定員
+  };
+  createdAt: string;
+  updatedAt: string;
+};
+
 // ユーザーロール
 export type UserRole = 'admin' | 'staff';
 
@@ -122,4 +143,57 @@ export type Shift = {
   createdAt: string;
   updatedAt: string;
 };
+
+// 利用実績データ
+export type UsageRecord = {
+  id: string;
+  facilityId: string; // 施設ID（マルチテナント対応）
+  scheduleId: number; // スケジュールIDへの参照
+  childId: string; // 児童ID
+  childName: string; // 児童名（非正規化）
+  date: string; // YYYY-MM-DD
+  // サービス提供の状況
+  serviceStatus: '利用' | '欠席(加算なし)' | '加算のみ';
+  // 提供形態
+  provisionForm?: string;
+  // 計画時間
+  plannedStartTime?: string; // HH:mm
+  plannedEndTime?: string; // HH:mm
+  plannedTimeOneMinuteInterval: boolean; // 1分間隔で入力する
+  // 開始終了時間
+  actualStartTime?: string; // HH:mm
+  actualEndTime?: string; // HH:mm
+  actualTimeOneMinuteInterval: boolean; // 1分間隔で入力する
+  // 算定時間数
+  calculatedTime: number; // 時間数
+  calculatedTimeMethod: '計画時間から算出' | '開始終了時間から算出' | '手動入力';
+  // 時間区分
+  timeCategory?: string; // 例: "区分2 (1時間30分超3時間以下)"
+  // 送迎迎え
+  pickup: 'なし' | 'あり';
+  pickupSamePremises: boolean; // 同一敷地内
+  // 送迎送り
+  dropoff: 'なし' | 'あり';
+  dropoffSamePremises: boolean; // 同一敷地内
+  // 部屋
+  room?: string;
+  // 指導形態
+  instructionForm?: string; // 例: "小集団"
+  // 請求対象
+  billingTarget: '請求する' | '請求しない';
+  // 自費項目
+  selfPayItem?: string;
+  // メモ
+  memo?: string; // 最大2000文字
+  // 実績記録票備考
+  recordSheetRemarks?: string; // 最大50文字
+  // 加算情報
+  addonItems: string[]; // 選択された加算項目の配列
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 利用実績フォームデータ
+export type UsageRecordFormData = Omit<UsageRecord, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
 

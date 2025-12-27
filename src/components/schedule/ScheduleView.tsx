@@ -4,50 +4,226 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { CalendarDays, Bell, Plus } from 'lucide-react';
-import { TimeSlot, ScheduleItem, BookingRequest, Child } from '@/types';
+import React, { useState, useMemo } from 'react';
+import { CalendarDays, X, Plus, Trash2 } from 'lucide-react';
+import { TimeSlot, ScheduleItem, Child } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import UsageRecordForm from './UsageRecordForm';
 
 const ScheduleView: React.FC = () => {
   const {
     schedules,
-    setSchedules,
     children,
-    requests,
-    setRequests,
     addSchedule,
+    facilitySettings,
+    deleteSchedule,
+    addUsageRecord,
+    updateUsageRecord,
+    deleteUsageRecord,
+    getUsageRecordByScheduleId,
   } = useFacilityData();
 
-  const [viewFormat, setViewFormat] = useState<'month' | 'week'>('week');
-  const [selectedDate, setSelectedDate] = useState('2024-05-15');
+  const [viewFormat, setViewFormat] = useState<'month' | 'week'>('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDateForBooking, setSelectedDateForBooking] = useState('');
+  const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<TimeSlot>('PM');
+  const [selectedScheduleItem, setSelectedScheduleItem] = useState<ScheduleItem | null>(null);
+  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
+  const [isUsageRecordFormOpen, setIsUsageRecordFormOpen] = useState(false);
 
   const [newBooking, setNewBooking] = useState({
     childId: '',
-    date: '2024-05-15',
+    date: '',
     slot: 'PM' as TimeSlot,
-    pickup: true,
-    dropoff: true,
+    pickup: false,
+    dropoff: false,
   });
 
-  const capacity = { AM: 5, PM: 10 };
-  const weekDates = [
-    { date: '2024-05-13', day: '月' },
-    { date: '2024-05-14', day: '火' },
-    { date: '2024-05-15', day: '水' },
-    { date: '2024-05-16', day: '木' },
-    { date: '2024-05-17', day: '金' },
-    { date: '2024-05-18', day: '土' },
-    { date: '2024-05-19', day: '日' },
-  ];
+  // 施設設定から受け入れ人数を取得（リアクティブに更新される）
+  // facilitySettingsが更新されると自動的に再計算される
+  const capacity = useMemo(() => facilitySettings.capacity, [facilitySettings]);
 
-  const handleApproveRequest = (reqId: number) => {
-    setRequests(requests.filter((r) => r.id !== reqId));
-    alert('承認しました（デモ：リストから消去）');
+  // 当月の日付を生成
+  const monthDates = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+
+    const dates: Array<{ date: string; day: number; isCurrentMonth: boolean }> = [];
+
+    // 前月の末尾日を追加（カレンダー表示用）
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const date = new Date(year, month, -i);
+      dates.push({
+        date: date.toISOString().split('T')[0],
+        day: date.getDate(),
+        isCurrentMonth: false,
+      });
+    }
+
+    // 当月の日付を追加
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      dates.push({
+        date: date.toISOString().split('T')[0],
+        day,
+        isCurrentMonth: true,
+      });
+    }
+
+    // 次月の初めの日を追加（カレンダー表示用）
+    const remainingDays = 42 - dates.length; // 6週間分
+    for (let day = 1; day <= remainingDays; day++) {
+      const date = new Date(year, month + 1, day);
+      dates.push({
+        date: date.toISOString().split('T')[0],
+        day,
+        isCurrentMonth: false,
+      });
+    }
+
+    return dates;
+  }, [currentDate]);
+
+  // 週間カレンダーの日付を生成
+  const weekDates = useMemo(() => {
+    const baseDate = new Date(currentDate);
+    const currentDay = baseDate.getDay();
+    const startOfWeek = new Date(baseDate);
+    startOfWeek.setDate(baseDate.getDate() - currentDay + 1); // 月曜日を開始日とする
+
+    const dates: Array<{ date: string; day: string }> = [];
+    const days = ['月', '火', '水', '木', '金', '土', '日'];
+
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      dates.push({
+        date: date.toISOString().split('T')[0],
+        day: days[i],
+      });
+    }
+
+    return dates;
+  }, [currentDate]);
+
+  // 休業日かどうかを判定
+  const isHoliday = (dateStr: string): boolean => {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay();
+    
+    // 定休日チェック
+    if (facilitySettings.regularHolidays.includes(dayOfWeek)) {
+      return true;
+    }
+    
+    // カスタム休業日チェック
+    if (facilitySettings.customHolidays.includes(dateStr)) {
+      return true;
+    }
+    
+    return false;
   };
 
+  // 月間カレンダーの統計を計算
+  const monthlyStats = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+
+    let totalCapacity = 0;
+    let totalUsed = 0;
+    const uniqueChildren = new Set<string>();
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // 休業日は除外
+      if (isHoliday(dateStr)) continue;
+      
+      const amCount = schedules.filter((s) => s.date === dateStr && s.slot === 'AM').length;
+      const pmCount = schedules.filter((s) => s.date === dateStr && s.slot === 'PM').length;
+      
+      // ユニーク利用児童数を集計
+      schedules
+        .filter((s) => s.date === dateStr)
+        .forEach((s) => uniqueChildren.add(s.childId));
+
+      totalCapacity += capacity.AM + capacity.PM;
+      totalUsed += amCount + pmCount;
+    }
+
+    return {
+      totalCapacity,
+      totalUsed,
+      utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
+      uniqueChildrenCount: uniqueChildren.size,
+    };
+  }, [schedules, currentDate, capacity, facilitySettings]);
+
+  // 週間カレンダーの統計を計算
+  const weeklyStats = useMemo(() => {
+    let totalCapacity = 0;
+    let totalUsed = 0;
+    const uniqueChildren = new Set<string>();
+
+    weekDates.forEach((d) => {
+      // 休業日チェック
+      const date = new Date(d.date);
+      const dayOfWeek = date.getDay();
+      const isHolidayDay =
+        facilitySettings.regularHolidays.includes(dayOfWeek) ||
+        facilitySettings.customHolidays.includes(d.date);
+      
+      if (isHolidayDay) return;
+      
+      const amCount = schedules.filter((s) => s.date === d.date && s.slot === 'AM').length;
+      const pmCount = schedules.filter((s) => s.date === d.date && s.slot === 'PM').length;
+      
+      schedules
+        .filter((s) => s.date === d.date)
+        .forEach((s) => uniqueChildren.add(s.childId));
+
+      totalCapacity += capacity.AM + capacity.PM;
+      totalUsed += amCount + pmCount;
+    });
+
+    return {
+      totalCapacity,
+      totalUsed,
+      utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
+      uniqueChildrenCount: uniqueChildren.size,
+    };
+  }, [schedules, weekDates, capacity, facilitySettings]);
+
+  // 日付をクリックしてモーダルを開く
+  const handleDateClick = (date: string, slot?: TimeSlot) => {
+    setSelectedDateForBooking(date);
+    const selectedSlot = slot || 'PM';
+    setSelectedSlotForBooking(selectedSlot);
+    setNewBooking({
+      childId: '',
+      date,
+      slot: selectedSlot,
+      pickup: false,
+      dropoff: false,
+    });
+    setIsModalOpen(true);
+  };
+
+  // 予約を追加
   const handleAddBooking = () => {
-    if (!newBooking.childId) return;
+    if (!newBooking.childId) {
+      alert('児童を選択してください');
+      return;
+    }
     const child = children.find((c) => c.id === newBooking.childId);
     if (!child) return;
 
@@ -61,70 +237,82 @@ const ScheduleView: React.FC = () => {
     });
 
     alert(`${child.name}さんの予約を追加しました`);
+    setIsModalOpen(false);
     setNewBooking({
       childId: '',
-      date: newBooking.date,
+      date: '',
       slot: 'PM',
-      pickup: true,
-      dropoff: true,
+      pickup: false,
+      dropoff: false,
     });
   };
 
-  return (
-    <div className="flex h-[calc(100vh-100px)] gap-6 animate-in fade-in duration-500">
-      {/* Left Panel: Booking Requests */}
-      <div className="w-64 bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col overflow-hidden shrink-0">
-        <div className="p-4 border-b border-gray-100 bg-orange-50">
-          <h3 className="font-bold text-orange-800 flex items-center text-sm">
-            <Bell size={16} className="mr-2" />
-            承認待ち ({requests.length})
-          </h3>
-        </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
-          {requests.length === 0 && (
-            <div className="text-center text-xs text-gray-400 py-4">
-              現在リクエストはありません
-            </div>
-          )}
-          {requests.map((req) => (
-            <div
-              key={req.id}
-              className="bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-bold text-gray-800">{req.childName}</span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    req.type === '欠席連絡'
-                      ? 'bg-red-100 text-red-600'
-                      : 'bg-blue-100 text-[#00c4cc]'
-                  }`}
-                >
-                  {req.type}
-                </span>
-              </div>
-              <div className="text-xs text-gray-500 mb-3 flex items-center">
-                <CalendarDays size={12} className="mr-1 text-gray-400" />
-                {req.date} {req.time}
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleApproveRequest(req.id)}
-                  className="flex-1 bg-[#00c4cc] text-white hover:bg-[#00b0b8] py-1.5 rounded text-xs font-bold transition-colors shadow-sm"
-                >
-                  承認
-                </button>
-                <button className="px-3 bg-gray-100 text-gray-600 hover:bg-gray-200 py-1.5 rounded text-xs font-bold transition-colors">
-                  却下
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+  // 登録児童をクリックしたときの処理
+  const handleScheduleItemClick = (item: ScheduleItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedScheduleItem(item);
+    setIsActionDialogOpen(true);
+  };
 
-      {/* Middle Panel: Calendar */}
-      <div className="flex-1 flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+  // 実績登録を選択
+  const handleSelectRecord = () => {
+    setIsActionDialogOpen(false);
+    setIsUsageRecordFormOpen(true);
+  };
+
+  // 削除を選択
+  const handleSelectDelete = () => {
+    if (selectedScheduleItem && confirm(`${selectedScheduleItem.childName}さんの予約を削除しますか？`)) {
+      deleteSchedule(selectedScheduleItem.id);
+      setIsActionDialogOpen(false);
+      setSelectedScheduleItem(null);
+    }
+  };
+
+  // 実績を保存
+  const handleSaveUsageRecord = (data: any) => {
+    if (selectedScheduleItem) {
+      const existingRecord = getUsageRecordByScheduleId(selectedScheduleItem.id);
+      if (existingRecord) {
+        updateUsageRecord(existingRecord.id, data);
+      } else {
+        addUsageRecord(data);
+      }
+      setIsUsageRecordFormOpen(false);
+      setSelectedScheduleItem(null);
+      alert('実績を保存しました');
+    }
+  };
+
+  // 実績を削除
+  const handleDeleteUsageRecord = () => {
+    if (selectedScheduleItem) {
+      const existingRecord = getUsageRecordByScheduleId(selectedScheduleItem.id);
+      if (existingRecord && confirm('実績を削除しますか？')) {
+        deleteUsageRecord(existingRecord.id);
+        setIsUsageRecordFormOpen(false);
+        setSelectedScheduleItem(null);
+        alert('実績を削除しました');
+      }
+    }
+  };
+
+  // 月を変更
+  const changeMonth = (offset: number) => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1));
+  };
+
+  // 週を変更
+  const changeWeek = (offset: number) => {
+    const newDate = new Date(weekDates[0].date);
+    newDate.setDate(newDate.getDate() + offset * 7);
+    setCurrentDate(newDate);
+  };
+
+  return (
+    <div className="h-[calc(100vh-100px)] animate-in fade-in duration-500">
+      {/* Calendar Panel */}
+      <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white z-10">
           <div className="flex items-center space-x-4">
             <div className="flex bg-gray-100 p-1 rounded">
@@ -149,30 +337,230 @@ const ScheduleView: React.FC = () => {
                 週間
               </button>
             </div>
-            <h3 className="font-bold text-lg text-gray-800">2024年 5月</h3>
+            {viewFormat === 'month' && (
+              <>
+                <button
+                  onClick={() => changeMonth(-1)}
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                >
+                  ←
+                </button>
+                <h3 className="font-bold text-lg text-gray-800">
+                  {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
+                </h3>
+                <button
+                  onClick={() => changeMonth(1)}
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                >
+                  →
+                </button>
+              </>
+            )}
+            {viewFormat === 'week' && (
+              <>
+                <button
+                  onClick={() => changeWeek(-1)}
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                >
+                  ←
+                </button>
+                <h3 className="font-bold text-lg text-gray-800">
+                  {weekDates[0].date.split('-')[1]}月 {weekDates[0].date.split('-')[2]}日 ～ {weekDates[6].date.split('-')[1]}月 {weekDates[6].date.split('-')[2]}日
+                </h3>
+                <button
+                  onClick={() => changeWeek(1)}
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                >
+                  →
+                </button>
+              </>
+            )}
           </div>
-          <div className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
-            稼働率: <span className="font-bold text-gray-800 text-sm ml-1">82%</span>
-          </div>
+          {viewFormat === 'month' && (
+            <div className="flex items-center space-x-4 text-xs">
+              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
+                登録数/枠数: <span className="font-bold text-gray-800 text-sm ml-1">{monthlyStats.totalUsed}/{monthlyStats.totalCapacity}</span>
+              </div>
+              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
+                稼働率: <span className="font-bold text-gray-800 text-sm ml-1">{monthlyStats.utilization}%</span>
+              </div>
+              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
+                利用児童数: <span className="font-bold text-gray-800 text-sm ml-1">{monthlyStats.uniqueChildrenCount}名</span>
+              </div>
+            </div>
+          )}
+          {viewFormat === 'week' && (
+            <div className="flex items-center space-x-4 text-xs">
+              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
+                登録数/枠数: <span className="font-bold text-gray-800 text-sm ml-1">{weeklyStats.totalUsed}/{weeklyStats.totalCapacity}</span>
+              </div>
+              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
+                稼働率: <span className="font-bold text-gray-800 text-sm ml-1">{weeklyStats.utilization}%</span>
+              </div>
+              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
+                利用児童数: <span className="font-bold text-gray-800 text-sm ml-1">{weeklyStats.uniqueChildrenCount}名</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-auto bg-white relative p-0">
+        <div className="flex-1 overflow-auto bg-white relative p-4">
+          {viewFormat === 'month' && (
+            <div className="w-full">
+              {/* 曜日ヘッダー */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['日', '月', '火', '水', '木', '金', '土'].map((day, i) => (
+                  <div
+                    key={i}
+                    className={`p-2 text-center text-xs font-bold ${
+                      i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-600'
+                    }`}
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
+              {/* カレンダーグリッド */}
+              <div className="grid grid-cols-7 gap-1">
+                {monthDates.map((dateInfo, index) => {
+                  const isHolidayDay = isHoliday(dateInfo.date);
+                  const amCount = schedules.filter(
+                    (s) => s.date === dateInfo.date && s.slot === 'AM'
+                  ).length;
+                  const pmCount = schedules.filter(
+                    (s) => s.date === dateInfo.date && s.slot === 'PM'
+                  ).length;
+                  const amUtilization = capacity.AM > 0 ? Math.round((amCount / capacity.AM) * 100) : 0;
+                  const pmUtilization = capacity.PM > 0 ? Math.round((pmCount / capacity.PM) * 100) : 0;
+                  const isToday =
+                    dateInfo.date === new Date().toISOString().split('T')[0];
+                  
+                  // ユニーク利用児童数
+                  const uniqueChildrenForDay = new Set(
+                    schedules.filter((s) => s.date === dateInfo.date).map((s) => s.childId)
+                  ).size;
+
+                  return (
+                    <div
+                      key={index}
+                      className={`min-h-[120px] border rounded-lg p-2 transition-colors ${
+                        isHolidayDay
+                          ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
+                          : !dateInfo.isCurrentMonth
+                          ? 'bg-gray-50 opacity-50 border-gray-200 cursor-pointer hover:bg-gray-100'
+                          : 'bg-white border-gray-200 cursor-pointer hover:bg-gray-50'
+                      } ${isToday ? 'ring-2 ring-[#00c4cc]' : ''}`}
+                      onClick={() => !isHolidayDay && handleDateClick(dateInfo.date)}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <div
+                          className={`text-xs font-bold ${
+                            !dateInfo.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'
+                          }`}
+                        >
+                          {dateInfo.day}
+                        </div>
+                        {isHolidayDay && (
+                          <span className="text-[9px] bg-red-200 text-red-700 px-1.5 py-0.5 rounded font-bold">
+                            休業
+                          </span>
+                        )}
+                      </div>
+                      {!isHolidayDay ? (
+                        <div className="space-y-1">
+                          {/* 午前 */}
+                          <div className="bg-[#e0f7fa] rounded px-2 py-1 text-[10px]">
+                            <div className="flex justify-between items-center mb-0.5">
+                              <span className="font-bold text-[#006064]">午前</span>
+                              <span className="text-[#006064] font-bold">
+                                {amCount}/{capacity.AM}
+                              </span>
+                            </div>
+                            <div className="w-full bg-white/50 rounded-full h-1.5">
+                              <div
+                                className={`h-1.5 rounded-full ${
+                                  amUtilization >= 100
+                                    ? 'bg-red-500'
+                                    : amUtilization >= 80
+                                    ? 'bg-orange-400'
+                                    : 'bg-[#00c4cc]'
+                                }`}
+                                style={{ width: `${Math.min(amUtilization, 100)}%` }}
+                              />
+                            </div>
+                            <div className="text-[9px] text-[#006064] mt-0.5">
+                              {amUtilization}%
+                            </div>
+                          </div>
+                          {/* 午後 */}
+                          <div className="bg-orange-50 rounded px-2 py-1 text-[10px]">
+                            <div className="flex justify-between items-center mb-0.5">
+                              <span className="font-bold text-orange-900">午後</span>
+                              <span className="text-orange-900 font-bold">
+                                {pmCount}/{capacity.PM}
+                              </span>
+                            </div>
+                            <div className="w-full bg-white/50 rounded-full h-1.5">
+                              <div
+                                className={`h-1.5 rounded-full ${
+                                  pmUtilization >= 100
+                                    ? 'bg-red-500'
+                                    : pmUtilization >= 80
+                                    ? 'bg-orange-400'
+                                    : 'bg-orange-500'
+                                }`}
+                                style={{ width: `${Math.min(pmUtilization, 100)}%` }}
+                              />
+                            </div>
+                            <div className="text-[9px] text-orange-900 mt-0.5">
+                              {pmUtilization}%
+                            </div>
+                          </div>
+                          {/* ユニーク利用児童数 */}
+                          {uniqueChildrenForDay > 0 && (
+                            <div className="text-[9px] text-gray-600 mt-1 text-center">
+                              利用: {uniqueChildrenForDay}名
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-red-600 text-center mt-2">
+                          休業日
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {viewFormat === 'week' && (
             <div className="min-w-[700px]">
               <div className="flex border-b border-gray-200 sticky top-0 bg-gray-50 z-10">
                 <div className="w-16 p-2 shrink-0 border-r border-gray-200 text-xs text-center font-bold text-gray-500 flex items-center justify-center">
                   区分
                 </div>
-                {weekDates.map((d, i) => (
-                  <div
-                    key={i}
-                    className={`flex-1 p-2 text-center border-r border-gray-200 text-sm font-bold ${
-                      i >= 5 ? 'text-red-500' : 'text-gray-700'
-                    }`}
-                  >
-                    {d.date.split('-')[2]} ({d.day})
-                  </div>
-                ))}
+                {weekDates.map((d, i) => {
+                  const isHolidayDay = isHoliday(d.date);
+                  return (
+                    <div
+                      key={i}
+                      className={`flex-1 p-2 text-center border-r border-gray-200 text-sm font-bold ${
+                        isHolidayDay
+                          ? 'text-red-600 bg-red-50'
+                          : i >= 5
+                          ? 'text-red-500'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      <div>{d.date.split('-')[2]} ({d.day})</div>
+                      {isHolidayDay && (
+                        <div className="text-[9px] text-red-600 mt-0.5">休業</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               {/* AM Row */}
               <div className="flex border-b border-gray-200 min-h-[120px]">
@@ -182,19 +570,60 @@ const ScheduleView: React.FC = () => {
                 </div>
                 {weekDates.map((d, i) => {
                   const items = schedules.filter((s) => s.date === d.date && s.slot === 'AM');
+                  const isHolidayDay = isHoliday(d.date);
                   return (
                     <div
                       key={i}
-                      className="flex-1 p-1 border-r border-gray-100 bg-white hover:bg-gray-50 transition-colors"
+                      className={`flex-1 p-1 border-r border-gray-100 transition-colors ${
+                        isHolidayDay
+                          ? 'bg-red-50 cursor-not-allowed opacity-60'
+                          : 'bg-white hover:bg-gray-50 cursor-pointer'
+                      }`}
+                      onClick={() => !isHolidayDay && handleDateClick(d.date, 'AM')}
                     >
-                      {items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="mb-1 bg-[#e0f7fa] border border-[#b2ebf2] rounded px-2 py-1.5 text-xs text-[#006064] font-medium truncate shadow-sm"
-                        >
-                          {item.childName}
-                        </div>
-                      ))}
+                      {isHolidayDay ? (
+                        <div className="text-[10px] text-red-600 text-center mt-2">休業</div>
+                      ) : (
+                        items.map((item) => {
+                          const hasRecord = getUsageRecordByScheduleId(item.id) !== undefined;
+                          return (
+                            <div
+                              key={item.id}
+                              className={`mb-1 border rounded px-2 py-1.5 text-xs font-medium shadow-sm group relative transition-colors cursor-pointer ${
+                                hasRecord
+                                  ? 'bg-green-50 border-green-200 text-green-900 hover:border-green-300'
+                                  : 'bg-[#e0f7fa] border-[#b2ebf2] text-[#006064] hover:border-[#00c4cc]'
+                              }`}
+                              onClick={(e) => handleScheduleItemClick(item, e)}
+                            >
+                              <div className="font-bold truncate">{item.childName}</div>
+                              {hasRecord && (
+                                <div className="text-[9px] text-green-700 mt-0.5">実績登録済</div>
+                              )}
+                              <div className="flex gap-1 mt-1">
+                                {item.hasPickup && (
+                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                    hasRecord
+                                      ? 'bg-white/80 text-green-700 border-green-200'
+                                      : 'bg-white/80 text-[#006064] border-[#b2ebf2]'
+                                  }`}>
+                                    迎
+                                  </span>
+                                )}
+                                {item.hasDropoff && (
+                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                    hasRecord
+                                      ? 'bg-white/80 text-green-700 border-green-200'
+                                      : 'bg-white/80 text-[#006064] border-[#b2ebf2]'
+                                  }`}>
+                                    送
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   );
                 })}
@@ -207,134 +636,223 @@ const ScheduleView: React.FC = () => {
                 </div>
                 {weekDates.map((d, i) => {
                   const items = schedules.filter((s) => s.date === d.date && s.slot === 'PM');
+                  const isHolidayDay = isHoliday(d.date);
                   return (
                     <div
                       key={i}
-                      className="flex-1 p-1 border-r border-gray-100 bg-white hover:bg-gray-50 transition-colors"
+                      className={`flex-1 p-1 border-r border-gray-100 transition-colors ${
+                        isHolidayDay
+                          ? 'bg-red-50 cursor-not-allowed opacity-60'
+                          : 'bg-white hover:bg-gray-50 cursor-pointer'
+                      }`}
+                      onClick={() => !isHolidayDay && handleDateClick(d.date, 'PM')}
                     >
-                      {items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="mb-1 bg-orange-50 border border-orange-100 rounded px-2 py-1.5 text-xs text-orange-900 shadow-sm group relative hover:border-orange-300 transition-colors"
-                        >
-                          <div className="font-bold truncate text-[11px]">{item.childName}</div>
-                          <div className="flex gap-1 mt-1">
-                            {item.hasPickup && (
-                              <span className="bg-white/80 px-1 rounded-[2px] text-[9px] text-orange-600 font-bold border border-orange-100">
-                                迎
-                              </span>
-                            )}
-                            {item.hasDropoff && (
-                              <span className="bg-white/80 px-1 rounded-[2px] text-[9px] text-orange-600 font-bold border border-orange-100">
-                                送
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                      {isHolidayDay ? (
+                        <div className="text-[10px] text-red-600 text-center mt-2">休業</div>
+                      ) : (
+                        items.map((item) => {
+                          const hasRecord = getUsageRecordByScheduleId(item.id) !== undefined;
+                          return (
+                            <div
+                              key={item.id}
+                              className={`mb-1 border rounded px-2 py-1.5 text-xs shadow-sm group relative transition-colors cursor-pointer ${
+                                hasRecord
+                                  ? 'bg-green-50 border-green-200 text-green-900 hover:border-green-300'
+                                  : 'bg-orange-50 border-orange-100 text-orange-900 hover:border-orange-300'
+                              }`}
+                              onClick={(e) => handleScheduleItemClick(item, e)}
+                            >
+                              <div className="font-bold truncate text-[11px]">{item.childName}</div>
+                              {hasRecord && (
+                                <div className="text-[9px] text-green-700 mt-0.5">実績登録済</div>
+                              )}
+                              <div className="flex gap-1 mt-1">
+                                {item.hasPickup && (
+                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                    hasRecord
+                                      ? 'bg-white/80 text-green-700 border-green-200'
+                                      : 'bg-white/80 text-orange-600 border-orange-100'
+                                  }`}>
+                                    迎
+                                  </span>
+                                )}
+                                {item.hasDropoff && (
+                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                    hasRecord
+                                      ? 'bg-white/80 text-green-700 border-green-200'
+                                      : 'bg-white/80 text-orange-600 border-orange-100'
+                                  }`}>
+                                    送
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
           )}
-          {viewFormat === 'month' && (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <div className="text-center">
-                <CalendarDays size={48} className="mx-auto mb-2 text-gray-200" />
-                <p className="text-sm">月間カレンダー表示エリア</p>
+        </div>
+      </div>
+
+      {/* 予約追加モーダル */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center">
+                <Plus size={20} className="mr-2 text-[#00c4cc]" />
+                利用予定を追加
+              </h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">児童を選択</label>
+                <select
+                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] transition-all"
+                  value={newBooking.childId}
+                  onChange={(e) => setNewBooking({ ...newBooking, childId: e.target.value })}
+                >
+                  <option value="">選択してください</option>
+                  {children.map((child) => (
+                    <option key={child.id} value={child.id}>
+                      {child.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="text-[10px] text-gray-400 mt-1 text-right">
+                  ※児童管理マスタより参照
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">利用日</label>
+                <input
+                  type="date"
+                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                  value={newBooking.date}
+                  onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">時間帯</label>
+                <select
+                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                  value={newBooking.slot}
+                  onChange={(e) =>
+                    setNewBooking({ ...newBooking, slot: e.target.value as TimeSlot })
+                  }
+                >
+                  <option value="PM">午後 (放課後)</option>
+                  <option value="AM">午前</option>
+                </select>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-md border border-gray-200 space-y-3">
+                <label className="text-xs font-bold text-gray-500 block">送迎オプション</label>
+                <label className="flex items-center space-x-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={newBooking.pickup}
+                    onChange={(e) => setNewBooking({ ...newBooking, pickup: e.target.checked })}
+                    className="accent-[#00c4cc] w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                    お迎え (学校→事業所)
+                  </span>
+                </label>
+                <label className="flex items-center space-x-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={newBooking.dropoff}
+                    onChange={(e) => setNewBooking({ ...newBooking, dropoff: e.target.checked })}
+                    className="accent-[#00c4cc] w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                    お送り (事業所→自宅)
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleAddBooking}
+                  className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all"
+                >
+                  登録する
+                </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Right Panel: Quick Register */}
-      <div className="w-72 bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col shrink-0">
-        <div className="p-4 border-b border-gray-100 bg-gray-50">
-          <h3 className="font-bold text-gray-800 flex items-center text-sm">
-            <Plus size={16} className="mr-2 text-[#00c4cc]" />
-            新規利用登録
-          </h3>
-        </div>
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1.5">児童を選択</label>
-            <select
-              className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] transition-all"
-              value={newBooking.childId}
-              onChange={(e) => setNewBooking({ ...newBooking, childId: e.target.value })}
-            >
-              <option value="">選択してください</option>
-              {children.map((child) => (
-                <option key={child.id} value={child.id}>
-                  {child.name}
-                </option>
-              ))}
-            </select>
-            <div className="text-[10px] text-gray-400 mt-1 text-right">
-              ※児童管理マスタより参照
+      {/* アクション選択ダイアログ */}
+      {isActionDialogOpen && selectedScheduleItem && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-800">
+                {selectedScheduleItem.childName}さん
+              </h3>
+              <button
+                onClick={() => {
+                  setIsActionDialogOpen(false);
+                  setSelectedScheduleItem(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              <button
+                onClick={handleSelectRecord}
+                className="w-full py-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all"
+              >
+                実績登録
+              </button>
+              <button
+                onClick={handleSelectDelete}
+                className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-md text-sm transition-all"
+              >
+                削除
+              </button>
             </div>
           </div>
-
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1.5">利用日</label>
-            <input
-              type="date"
-              className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-              value={newBooking.date}
-              onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1.5">時間帯</label>
-            <select
-              className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-              value={newBooking.slot}
-              onChange={(e) =>
-                setNewBooking({ ...newBooking, slot: e.target.value as TimeSlot })
-              }
-            >
-              <option value="PM">午後 (放課後)</option>
-              <option value="AM">午前</option>
-            </select>
-          </div>
-
-          <div className="bg-gray-50 p-4 rounded-md border border-gray-200 space-y-3">
-            <label className="text-xs font-bold text-gray-500 block">送迎オプション</label>
-            <label className="flex items-center space-x-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={newBooking.pickup}
-                onChange={(e) => setNewBooking({ ...newBooking, pickup: e.target.checked })}
-                className="accent-[#00c4cc] w-4 h-4"
-              />
-              <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                お迎え (学校→事業所)
-              </span>
-            </label>
-            <label className="flex items-center space-x-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={newBooking.dropoff}
-                onChange={(e) => setNewBooking({ ...newBooking, dropoff: e.target.checked })}
-                className="accent-[#00c4cc] w-4 h-4"
-              />
-              <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                お送り (事業所→自宅)
-              </span>
-            </label>
-          </div>
-
-          <button
-            onClick={handleAddBooking}
-            className="w-full py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all transform hover:-translate-y-0.5"
-          >
-            登録する
-          </button>
         </div>
-      </div>
+      )}
+
+      {/* 実績登録フォーム */}
+      {isUsageRecordFormOpen && selectedScheduleItem && (
+        <UsageRecordForm
+          scheduleItem={selectedScheduleItem}
+          initialData={getUsageRecordByScheduleId(selectedScheduleItem.id) || undefined}
+          onClose={() => {
+            setIsUsageRecordFormOpen(false);
+            setSelectedScheduleItem(null);
+          }}
+          onSave={handleSaveUsageRecord}
+          onDelete={handleDeleteUsageRecord}
+        />
+      )}
     </div>
   );
 };

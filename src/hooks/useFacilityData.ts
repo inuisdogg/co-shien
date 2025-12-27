@@ -10,12 +10,16 @@ import {
   Staff,
   ScheduleItem,
   BookingRequest,
+  FacilitySettings,
+  UsageRecord,
+  UsageRecordFormData,
 } from '@/types';
 import {
   initialChildren,
   initialStaff,
   initialSchedules,
   initialRequests,
+  initialFacilitySettings,
 } from '@/types/mockData';
 
 export const useFacilityData = () => {
@@ -35,6 +39,27 @@ export const useFacilityData = () => {
   const [requests, setRequests] = useState<BookingRequest[]>(
     initialRequests.filter((r) => r.facilityId === facilityId)
   );
+  const [facilitySettings, setFacilitySettings] = useState<FacilitySettings>(
+    initialFacilitySettings.facilityId === facilityId
+      ? initialFacilitySettings
+      : {
+          id: `settings-${Date.now()}`,
+          facilityId,
+          regularHolidays: [0],
+          customHolidays: [],
+          businessHours: {
+            AM: { start: '09:00', end: '12:00' },
+            PM: { start: '13:00', end: '18:00' },
+          },
+          capacity: {
+            AM: 10,
+            PM: 10,
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+  );
+  const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
 
   // 施設IDでフィルタリングされたデータのみを返す
   const filteredChildren = useMemo(
@@ -94,11 +119,62 @@ export const useFacilityData = () => {
     return newRequest;
   };
 
+  const updateFacilitySettings = (settings: Partial<FacilitySettings>) => {
+    setFacilitySettings({
+      ...facilitySettings,
+      ...settings,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const deleteSchedule = (scheduleId: number) => {
+    setSchedules(schedules.filter((s) => s.id !== scheduleId));
+    // 関連する実績も削除
+    setUsageRecords(usageRecords.filter((r) => r.scheduleId !== scheduleId));
+  };
+
+  const addUsageRecord = (recordData: UsageRecordFormData) => {
+    const newRecord: UsageRecord = {
+      ...recordData,
+      id: `record-${Date.now()}`,
+      facilityId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setUsageRecords([...usageRecords, newRecord]);
+    return newRecord;
+  };
+
+  const updateUsageRecord = (recordId: string, recordData: Partial<UsageRecordFormData>) => {
+    setUsageRecords(
+      usageRecords.map((r) =>
+        r.id === recordId
+          ? { ...r, ...recordData, updatedAt: new Date().toISOString() }
+          : r
+      )
+    );
+  };
+
+  const deleteUsageRecord = (recordId: string) => {
+    setUsageRecords(usageRecords.filter((r) => r.id !== recordId));
+  };
+
+  const getUsageRecordByScheduleId = (scheduleId: number): UsageRecord | undefined => {
+    return usageRecords.find((r) => r.scheduleId === scheduleId);
+  };
+
+  const filteredUsageRecords = useMemo(
+    () => usageRecords.filter((r) => r.facilityId === facilityId),
+    [usageRecords, facilityId]
+  );
+
   return {
     children: filteredChildren,
     staff: filteredStaff,
     schedules: filteredSchedules,
     requests: filteredRequests,
+    facilitySettings,
+    usageRecords: filteredUsageRecords,
     setChildren,
     setStaff,
     setSchedules,
@@ -106,6 +182,12 @@ export const useFacilityData = () => {
     addChild,
     addSchedule,
     addRequest,
+    updateFacilitySettings,
+    deleteSchedule,
+    addUsageRecord,
+    updateUsageRecord,
+    deleteUsageRecord,
+    getUsageRecordByScheduleId,
   };
 };
 
