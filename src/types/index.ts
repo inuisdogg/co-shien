@@ -197,3 +197,41 @@ export type UsageRecord = {
 // 利用実績フォームデータ
 export type UsageRecordFormData = Omit<UsageRecord, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
 
+// リードステータス
+export type LeadStatus = 'new-inquiry' | 'visit-scheduled' | 'considering' | 'waiting-benefit' | 'contract-progress' | 'contracted' | 'lost';
+
+// 希望オプション
+export type PreferenceOption = 'required' | 'preferred' | 'not-needed';
+
+// リードデータ
+export type Lead = {
+  id: string;
+  facilityId: string; // 施設ID（マルチテナント対応）
+  // 基本情報
+  name: string; // リード名（保護者名や案件名）
+  childName?: string; // 児童名
+  status: LeadStatus; // リードステータス
+  // 連絡先
+  phone?: string;
+  email?: string;
+  address?: string;
+  // 見込み情報
+  expectedStartDate?: string; // 見込み開始日
+  // 利用希望
+  preferredDays?: string[]; // 利用希望曜日（例: ["月", "水", "金"]）
+  pickupOption?: PreferenceOption; // 送迎の必須度
+  // 問い合わせ経路
+  inquirySource?: 'devnavi' | 'homepage' | 'support-office' | 'other'; // 問い合わせ経路
+  inquirySourceDetail?: string; // 問い合わせ経路の詳細（相談支援事業所名やその他の内容）
+  // 関連児童ID
+  childIds: string[]; // 関連する児童IDの配列
+  // メモ
+  memo?: string;
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// リードフォームデータ
+export type LeadFormData = Omit<Lead, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
+

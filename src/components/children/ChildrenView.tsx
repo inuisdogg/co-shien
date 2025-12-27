@@ -19,12 +19,17 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { Child, ChildFormData, ContractStatus } from '@/types';
+import { Child, ChildFormData, ContractStatus, Lead } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { saveDraft, getDrafts, deleteDraft, loadDraft } from '@/utils/draftStorage';
+import { Target, ChevronRight } from 'lucide-react';
 
-const ChildrenView: React.FC = () => {
-  const { children, setChildren, addChild } = useFacilityData();
+interface ChildrenViewProps {
+  setActiveTab?: (tab: string) => void;
+}
+
+const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
+  const { children, setChildren, addChild, getLeadsByChildId } = useFacilityData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
@@ -1070,6 +1075,63 @@ const ChildrenView: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* リード案件 */}
+                {(() => {
+                  const relatedLeads = getLeadsByChildId(selectedChild.id);
+                  if (relatedLeads.length > 0) {
+                    const getStatusLabel = (status: string) => {
+                      const labels: Record<string, { label: string; color: string }> = {
+                        'new-inquiry': { label: '新規問い合わせ', color: 'bg-blue-100 text-blue-700' },
+                        'visit-scheduled': { label: '見学/面談予定', color: 'bg-yellow-100 text-yellow-700' },
+                        'considering': { label: '検討中', color: 'bg-orange-100 text-orange-700' },
+                        'waiting-benefit': { label: '受給者証待ち', color: 'bg-purple-100 text-purple-700' },
+                        'contract-progress': { label: '契約手続き中', color: 'bg-cyan-100 text-cyan-700' },
+                        'contracted': { label: '契約済み', color: 'bg-green-100 text-green-700' },
+                        'lost': { label: '失注', color: 'bg-red-100 text-red-700' },
+                      };
+                      return labels[status] || { label: status, color: 'bg-gray-100 text-gray-700' };
+                    };
+                    return (
+                      <div className="border-b border-gray-200 pb-4">
+                        <h4 className="font-bold text-sm text-gray-700 mb-4 flex items-center">
+                          <Target size={14} className="mr-2" />
+                          関連リード案件
+                        </h4>
+                        <div className="space-y-2">
+                          {relatedLeads.map((lead) => {
+                            const statusInfo = getStatusLabel(lead.status);
+                            return (
+                              <button
+                                key={lead.id}
+                                onClick={() => {
+                                  setIsDetailModalOpen(false);
+                                  if (setActiveTab) {
+                                    setActiveTab('lead');
+                                  }
+                                }}
+                                className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 transition-colors group"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="font-bold text-sm text-gray-800 mb-1">{lead.name}</div>
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${statusInfo.color}`}>
+                                        {statusInfo.label}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <ChevronRight size={16} className="text-gray-400 group-hover:text-[#00c4cc]" />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* 契約情報 */}
                 <div>

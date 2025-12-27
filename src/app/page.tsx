@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import Sidebar from '@/components/common/Sidebar';
 import Header from '@/components/common/Header';
 import DashboardView from '@/components/dashboard/DashboardView';
+import LeadView from '@/components/lead/LeadView';
 import ScheduleView from '@/components/schedule/ScheduleView';
 import ChildrenView from '@/components/children/ChildrenView';
 import StaffView from '@/components/staff/StaffView';
@@ -21,10 +22,12 @@ export default function Home() {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardView setActiveTab={setActiveTab} />;
+      case 'lead':
+        return <LeadView setActiveTab={setActiveTab} />;
       case 'schedule':
         return <ScheduleView />;
       case 'children':
-        return <ChildrenView />;
+        return <ChildrenView setActiveTab={setActiveTab} />;
       case 'staff':
         return <StaffView />;
       case 'finance':

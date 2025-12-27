@@ -12,6 +12,7 @@ import {
   Briefcase,
   PieChart,
   Settings,
+  Target,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -25,6 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
   const menuItems = [
     { id: 'dashboard', label: 'ホーム', icon: LayoutDashboard },
+    { id: 'lead', label: 'リード管理', icon: Target },
     { id: 'schedule', label: '利用調整・予約', icon: CalendarDays },
     { id: 'children', label: '児童管理', icon: Users },
     { id: 'staff', label: '勤怠・シフト', icon: Briefcase },

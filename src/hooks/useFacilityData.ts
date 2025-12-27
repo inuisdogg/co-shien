@@ -13,6 +13,8 @@ import {
   FacilitySettings,
   UsageRecord,
   UsageRecordFormData,
+  Lead,
+  LeadFormData,
 } from '@/types';
 import {
   initialChildren,
@@ -60,6 +62,7 @@ export const useFacilityData = () => {
         }
   );
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
 
   // 施設IDでフィルタリングされたデータのみを返す
   const filteredChildren = useMemo(
@@ -168,6 +171,42 @@ export const useFacilityData = () => {
     [usageRecords, facilityId]
   );
 
+  const filteredLeads = useMemo(
+    () => leads.filter((l) => l.facilityId === facilityId),
+    [leads, facilityId]
+  );
+
+  // リード管理機能
+  const addLead = (leadData: LeadFormData) => {
+    const newLead: Lead = {
+      ...leadData,
+      id: `lead-${Date.now()}`,
+      facilityId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setLeads([...leads, newLead]);
+    return newLead;
+  };
+
+  const updateLead = (leadId: string, leadData: Partial<LeadFormData>) => {
+    setLeads(
+      leads.map((l) =>
+        l.id === leadId
+          ? { ...l, ...leadData, updatedAt: new Date().toISOString() }
+          : l
+      )
+    );
+  };
+
+  const deleteLead = (leadId: string) => {
+    setLeads(leads.filter((l) => l.id !== leadId));
+  };
+
+  const getLeadsByChildId = (childId: string): Lead[] => {
+    return filteredLeads.filter((lead) => lead.childIds.includes(childId));
+  };
+
   return {
     children: filteredChildren,
     staff: filteredStaff,
@@ -175,6 +214,7 @@ export const useFacilityData = () => {
     requests: filteredRequests,
     facilitySettings,
     usageRecords: filteredUsageRecords,
+    leads: filteredLeads,
     setChildren,
     setStaff,
     setSchedules,
@@ -188,6 +228,10 @@ export const useFacilityData = () => {
     updateUsageRecord,
     deleteUsageRecord,
     getUsageRecordByScheduleId,
+    addLead,
+    updateLead,
+    deleteLead,
+    getLeadsByChildId,
   };
 };
 
