@@ -585,7 +585,7 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
                     )}
                   </div>
                   <button
-                    onClick={handleGoToChildren}
+                    onClick={() => handleGoToChildren()}
                     className="mt-2 text-xs text-[#00c4cc] hover:text-[#00b0b8] font-bold flex items-center"
                   >
                     児童管理で新規登録
