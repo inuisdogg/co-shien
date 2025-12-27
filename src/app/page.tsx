@@ -7,21 +7,17 @@
 import React, { useState } from 'react';
 import Sidebar from '@/components/common/Sidebar';
 import Header from '@/components/common/Header';
-import DashboardView from '@/components/dashboard/DashboardView';
 import LeadView from '@/components/lead/LeadView';
 import ScheduleView from '@/components/schedule/ScheduleView';
 import ChildrenView from '@/components/children/ChildrenView';
 import StaffView from '@/components/staff/StaffView';
-import FinanceView from '@/components/finance/FinanceView';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('lead');
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <DashboardView setActiveTab={setActiveTab} />;
       case 'lead':
         return <LeadView setActiveTab={setActiveTab} />;
       case 'schedule':
@@ -30,8 +26,6 @@ export default function Home() {
         return <ChildrenView setActiveTab={setActiveTab} />;
       case 'staff':
         return <StaffView />;
-      case 'finance':
-        return <FinanceView />;
       case 'facility':
         return <FacilitySettingsView />;
       default:

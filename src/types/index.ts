@@ -16,6 +16,7 @@ export type Facility = {
 export type FacilitySettings = {
   id: string;
   facilityId: string; // 施設ID（マルチテナント対応）
+  facilityName?: string; // 施設名
   // 営業日設定
   regularHolidays: number[]; // 定休日（0=日, 1=月, ..., 6=土）
   customHolidays: string[]; // カスタム休業日（YYYY-MM-DD形式の配列）

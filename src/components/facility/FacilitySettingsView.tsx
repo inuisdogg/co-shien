@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, Clock, Users } from 'lucide-react';
+import { Settings, Save, Calendar, Clock, Users, Building2 } from 'lucide-react';
 import { FacilitySettings } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 
@@ -30,8 +30,8 @@ const FacilitySettingsView: React.FC = () => {
     { value: 6, label: '土' },
   ];
 
-  const handleSave = () => {
-    updateFacilitySettings(settings);
+  const handleSave = async () => {
+    await updateFacilitySettings(settings);
     alert('施設情報を保存しました');
   };
 
@@ -78,6 +78,34 @@ const FacilitySettingsView: React.FC = () => {
           <Save size={16} className="mr-2" />
           保存
         </button>
+      </div>
+
+      {/* 施設名設定 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+          <Building2 size={20} className="mr-2 text-[#00c4cc]" />
+          施設名設定
+        </h3>
+        <div>
+          <label className="text-sm font-bold text-gray-700 block mb-2">
+            施設名
+          </label>
+          <input
+            type="text"
+            value={settings.facilityName || ''}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                facilityName: e.target.value,
+              })
+            }
+            placeholder="施設名を入力してください"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            この施設名はサイドバーの下部に表示されます
+          </p>
+        </div>
       </div>
 
       {/* 定休日設定 */}

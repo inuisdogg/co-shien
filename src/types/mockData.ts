@@ -268,6 +268,7 @@ export const initialRequests: BookingRequest[] = [
 export const initialFacilitySettings: FacilitySettings = {
   id: 'settings-1',
   facilityId: 'facility-1',
+  facilityName: 'ひまわり教室',
   regularHolidays: [0], // 日曜日を定休日
   customHolidays: [], // カスタム休業日
   businessHours: {

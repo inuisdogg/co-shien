@@ -39,9 +39,6 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
           )}
         </div>
-        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#00c4cc] to-[#00b0b8] text-white flex items-center justify-center font-bold text-sm shadow border-2 border-white cursor-pointer hover:shadow-md transition-shadow">
-          T
-        </div>
       </div>
     </header>
   );

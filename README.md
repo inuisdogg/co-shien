@@ -61,22 +61,51 @@ src/
 npm install
 ```
 
-2. 開発サーバーの起動:
+2. 環境変数の設定:
+プロジェクトルートに `.env.local` ファイルを作成し、以下の内容を追加してください:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://iskgcqzozsemlmbvubna.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlza2djcXpvenNlbWxtYnZ1Ym5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4NDYxODcsImV4cCI6MjA4MjQyMjE4N30.6LiAmoCLyZbAA1QfytTDTFKnnXu-ndfG57KW-tKEiAE
+```
+
+3. Supabaseデータベースのセットアップ:
+SupabaseダッシュボードのSQL Editorで `supabase_setup.sql` の内容を実行して、`facility_settings` テーブルを作成してください。
+
+4. 開発サーバーの起動:
 ```bash
 npm run dev
 ```
 
-3. ブラウザで `http://localhost:3000` を開く
+5. ブラウザで `http://localhost:3000` を開く
+
+## Supabase連携
+
+本システムはSupabaseを使用してデータを保存します。
+
+### データベーステーブル
+
+- `facility_settings`: 施設情報設定（施設名、定休日、営業時間、受け入れ人数など）
+
+### 施設名の設定
+
+1. アプリケーションの「施設情報」メニューを開く
+2. 「施設名設定」セクションで施設名を入力
+3. 「保存」ボタンをクリック
+4. サイドバーの下部に施設名が表示されます
 
 ## 今後の拡張予定
 
 - [ ] バックエンドAPI連携
-- [ ] 認証システムの実装（JWT等）
-- [ ] データベース連携（PostgreSQL等）
+- [ ] ログイン機能の実装（JWT等）
+- [ ] その他のデータベース連携（児童、スタッフ、スケジュールなど）
 - [ ] 保護者向けポータル
 - [ ] レポート機能の拡充
 - [ ] 通知機能
 - [ ] ファイルアップロード機能
+
+## 注意事項
+
+- アカウント作成機能は現段階では実装していません。ログイン機能のみを実装予定です。
 
 ## ライセンス
 

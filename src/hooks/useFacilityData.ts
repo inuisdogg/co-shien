@@ -3,8 +3,9 @@
  * マルチテナント対応：現在の施設に紐づくデータのみを取得・管理
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import {
   Child,
   Staff,
@@ -47,6 +48,7 @@ export const useFacilityData = () => {
       : {
           id: `settings-${Date.now()}`,
           facilityId,
+          facilityName: '',
           regularHolidays: [0],
           customHolidays: [],
           businessHours: {
@@ -61,6 +63,59 @@ export const useFacilityData = () => {
           updatedAt: new Date().toISOString(),
         }
   );
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
+  // Supabaseから施設設定を取得
+  useEffect(() => {
+    if (!facilityId) {
+      setLoadingSettings(false);
+      return;
+    }
+
+    const fetchFacilitySettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('facility_settings')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116は「行が見つからない」エラー（正常）
+          console.error('Error fetching facility settings:', error);
+          setLoadingSettings(false);
+          return;
+        }
+
+        if (data) {
+          // データベースのスネークケースをキャメルケースに変換
+          setFacilitySettings({
+            id: data.id,
+            facilityId: data.facility_id,
+            facilityName: data.facility_name || '',
+            regularHolidays: data.regular_holidays || [0],
+            customHolidays: data.custom_holidays || [],
+            businessHours: data.business_hours || {
+              AM: { start: '09:00', end: '12:00' },
+              PM: { start: '13:00', end: '18:00' },
+            },
+            capacity: data.capacity || {
+              AM: 10,
+              PM: 10,
+            },
+            createdAt: data.created_at || new Date().toISOString(),
+            updatedAt: data.updated_at || new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        console.error('Error in fetchFacilitySettings:', error);
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
+    fetchFacilitySettings();
+  }, [facilityId]);
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
 
@@ -122,12 +177,59 @@ export const useFacilityData = () => {
     return newRequest;
   };
 
-  const updateFacilitySettings = (settings: Partial<FacilitySettings>) => {
-    setFacilitySettings({
+  const updateFacilitySettings = async (settings: Partial<FacilitySettings>) => {
+    const updatedSettings = {
       ...facilitySettings,
       ...settings,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    
+    setFacilitySettings(updatedSettings);
+
+    // Supabaseに保存
+    if (facilityId) {
+      try {
+        const { data, error } = await supabase
+          .from('facility_settings')
+          .upsert({
+            id: updatedSettings.id,
+            facility_id: facilityId,
+            facility_name: updatedSettings.facilityName || null,
+            regular_holidays: updatedSettings.regularHolidays,
+            custom_holidays: updatedSettings.customHolidays,
+            business_hours: updatedSettings.businessHours,
+            capacity: updatedSettings.capacity,
+            updated_at: updatedSettings.updatedAt,
+            created_at: updatedSettings.createdAt,
+          })
+          .eq('facility_id', facilityId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error updating facility settings:', error);
+          // エラーが発生した場合はローカル状態を元に戻す
+          setFacilitySettings(facilitySettings);
+        } else if (data) {
+          // データベースから取得したデータで状態を更新
+          setFacilitySettings({
+            id: data.id,
+            facilityId: data.facility_id,
+            facilityName: data.facility_name || '',
+            regularHolidays: data.regular_holidays,
+            customHolidays: data.custom_holidays,
+            businessHours: data.business_hours,
+            capacity: data.capacity,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+          });
+        }
+      } catch (error) {
+        console.error('Error in updateFacilitySettings:', error);
+        // エラーが発生した場合はローカル状態を元に戻す
+        setFacilitySettings(facilitySettings);
+      }
+    }
   };
 
   const deleteSchedule = (scheduleId: number) => {
@@ -240,6 +342,7 @@ export const useFacilityData = () => {
     schedules: filteredSchedules,
     requests: filteredRequests,
     facilitySettings,
+    loadingSettings,
     usageRecords: filteredUsageRecords,
     leads: filteredLeads,
     setChildren,
