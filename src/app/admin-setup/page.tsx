@@ -66,6 +66,7 @@ export default function AdminSetupPage() {
       }
       
       // 施設IDを生成
+      const timestamp = Date.now();
       const facilityId = `facility-${timestamp}`;
       const adminId = `admin-${facilityId}`;
 
