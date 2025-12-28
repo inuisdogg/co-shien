@@ -23,7 +23,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick }) => {
 
   const handleLogout = () => {
     logout();
-    router.push('/login');
+    router.push('/');
   };
 
   return (
