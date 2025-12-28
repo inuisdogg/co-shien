@@ -50,9 +50,9 @@ export default function AdminSetupPage() {
       }
 
       // 施設コードを自動発番（5桁のランダムな番号、重複チェック付き）
-      let facilityCode: string;
+      let facilityCode: string = '';
       let isUnique = false;
-      while (!isUnique) {
+      do {
         facilityCode = Math.floor(10000 + Math.random() * 90000).toString().padStart(5, '0');
         // 重複チェック
         const { data: existingFacility } = await supabase
@@ -63,7 +63,7 @@ export default function AdminSetupPage() {
         if (!existingFacility) {
           isUnique = true;
         }
-      }
+      } while (!isUnique);
       
       // 施設IDを生成
       const timestamp = Date.now();
