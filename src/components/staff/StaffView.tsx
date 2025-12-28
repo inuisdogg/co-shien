@@ -237,7 +237,7 @@ const StaffView: React.FC = () => {
   };
 
   // スタッフを更新
-  const handleUpdateStaff = () => {
+  const handleUpdateStaff = async () => {
     if (!editingStaff) return;
     if (!formData.name || !formData.name.trim()) {
       alert('氏名を入力してください');
@@ -252,35 +252,40 @@ const StaffView: React.FC = () => {
       return;
     }
 
-    updateStaff(editingStaff.id, {
-      name: formData.name.trim(),
-      nameKana: formData.nameKana?.trim() || undefined,
-      role: formData.role as Staff['role'],
-      type: formData.type as Staff['type'],
-      birthDate: formData.birthDate || undefined,
-      gender: formData.gender,
-      address: formData.address?.trim() || undefined,
-      phone: formData.phone?.trim() || undefined,
-      email: formData.email?.trim() || undefined,
-      qualifications: formData.qualifications?.trim() || undefined,
-      yearsOfExperience: formData.yearsOfExperience,
-      qualificationCertificate: formData.qualificationCertificate,
-      experienceCertificate: formData.experienceCertificate,
-      emergencyContact: formData.emergencyContact?.trim() || undefined,
-      emergencyContactPhone: formData.emergencyContactPhone?.trim() || undefined,
-      memo: formData.memo?.trim() || undefined,
-      monthlySalary: formData.monthlySalary,
-      hourlyWage: formData.hourlyWage,
-    });
+    try {
+      await updateStaff(editingStaff.id, {
+        name: formData.name.trim(),
+        nameKana: formData.nameKana?.trim() || undefined,
+        role: formData.role as Staff['role'],
+        type: formData.type as Staff['type'],
+        birthDate: formData.birthDate || undefined,
+        gender: formData.gender,
+        address: formData.address?.trim() || undefined,
+        phone: formData.phone?.trim() || undefined,
+        email: formData.email?.trim() || undefined,
+        qualifications: formData.qualifications?.trim() || undefined,
+        yearsOfExperience: formData.yearsOfExperience,
+        qualificationCertificate: formData.qualificationCertificate,
+        experienceCertificate: formData.experienceCertificate,
+        emergencyContact: formData.emergencyContact?.trim() || undefined,
+        emergencyContactPhone: formData.emergencyContactPhone?.trim() || undefined,
+        memo: formData.memo?.trim() || undefined,
+        monthlySalary: formData.monthlySalary,
+        hourlyWage: formData.hourlyWage,
+      });
 
-    setIsEditModalOpen(false);
-    setEditingStaff(null);
-    resetForm();
-    alert('スタッフ情報を更新しました');
+      setIsEditModalOpen(false);
+      setEditingStaff(null);
+      resetForm();
+      alert('スタッフ情報を更新しました');
+    } catch (error) {
+      console.error('Error updating staff:', error);
+      alert('スタッフ情報の更新に失敗しました');
+    }
   };
 
   // スタッフを追加
-  const handleAddStaff = () => {
+  const handleAddStaff = async () => {
     if (!formData.name || !formData.name.trim()) {
       alert('氏名を入力してください');
       return;
@@ -294,36 +299,47 @@ const StaffView: React.FC = () => {
       return;
     }
 
-    addStaff({
-      name: formData.name.trim(),
-      nameKana: formData.nameKana?.trim() || undefined,
-      role: formData.role as Staff['role'],
-      type: formData.type as Staff['type'],
-      birthDate: formData.birthDate || undefined,
-      gender: formData.gender,
-      address: formData.address?.trim() || undefined,
-      phone: formData.phone?.trim() || undefined,
-      email: formData.email?.trim() || undefined,
-      qualifications: formData.qualifications?.trim() || undefined,
-      yearsOfExperience: formData.yearsOfExperience,
-      qualificationCertificate: formData.qualificationCertificate,
-      experienceCertificate: formData.experienceCertificate,
-      emergencyContact: formData.emergencyContact?.trim() || undefined,
-      emergencyContactPhone: formData.emergencyContactPhone?.trim() || undefined,
-      memo: formData.memo?.trim() || undefined,
-      monthlySalary: formData.monthlySalary,
-      hourlyWage: formData.hourlyWage,
-    });
+    try {
+      await addStaff({
+        name: formData.name.trim(),
+        nameKana: formData.nameKana?.trim() || undefined,
+        role: formData.role as Staff['role'],
+        type: formData.type as Staff['type'],
+        birthDate: formData.birthDate || undefined,
+        gender: formData.gender,
+        address: formData.address?.trim() || undefined,
+        phone: formData.phone?.trim() || undefined,
+        email: formData.email?.trim() || undefined,
+        qualifications: formData.qualifications?.trim() || undefined,
+        yearsOfExperience: formData.yearsOfExperience,
+        qualificationCertificate: formData.qualificationCertificate,
+        experienceCertificate: formData.experienceCertificate,
+        emergencyContact: formData.emergencyContact?.trim() || undefined,
+        emergencyContactPhone: formData.emergencyContactPhone?.trim() || undefined,
+        memo: formData.memo?.trim() || undefined,
+        monthlySalary: formData.monthlySalary,
+        hourlyWage: formData.hourlyWage,
+      });
 
-    resetForm();
-    setIsAddModalOpen(false);
-    alert('スタッフを追加しました');
+      resetForm();
+      setIsAddModalOpen(false);
+      alert('スタッフを追加しました');
+    } catch (error) {
+      console.error('Error adding staff:', error);
+      alert('スタッフの追加に失敗しました');
+    }
   };
 
   // スタッフを削除
-  const handleDeleteStaff = (staffId: string, staffName: string) => {
+  const handleDeleteStaff = async (staffId: string, staffName: string) => {
     if (confirm(`${staffName}さんを削除しますか？`)) {
-      deleteStaff(staffId);
+      try {
+        await deleteStaff(staffId);
+        alert('スタッフを削除しました');
+      } catch (error) {
+        console.error('Error deleting staff:', error);
+        alert('スタッフの削除に失敗しました');
+      }
     }
   };
 

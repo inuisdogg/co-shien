@@ -17,53 +17,39 @@ import {
   Lead,
   LeadFormData,
 } from '@/types';
-import {
-  initialChildren,
-  initialStaff,
-  initialSchedules,
-  initialRequests,
-  initialFacilitySettings,
-} from '@/types/mockData';
 
 export const useFacilityData = () => {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
 
-  // 施設に紐づくデータのみをフィルタリング
-  const [children, setChildren] = useState<Child[]>(
-    initialChildren.filter((c) => c.facilityId === facilityId)
-  );
-  const [staff, setStaff] = useState<Staff[]>(
-    initialStaff.filter((s) => s.facilityId === facilityId)
-  );
-  const [schedules, setSchedules] = useState<ScheduleItem[]>(
-    initialSchedules.filter((s) => s.facilityId === facilityId)
-  );
-  const [requests, setRequests] = useState<BookingRequest[]>(
-    initialRequests.filter((r) => r.facilityId === facilityId)
-  );
-  const [facilitySettings, setFacilitySettings] = useState<FacilitySettings>(
-    initialFacilitySettings.facilityId === facilityId
-      ? initialFacilitySettings
-      : {
-          id: `settings-${Date.now()}`,
-          facilityId,
-          facilityName: '',
-          regularHolidays: [0],
-          customHolidays: [],
-          businessHours: {
-            AM: { start: '09:00', end: '12:00' },
-            PM: { start: '13:00', end: '18:00' },
-          },
-          capacity: {
-            AM: 10,
-            PM: 10,
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-  );
+  // データの状態管理
+  const [children, setChildren] = useState<Child[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [requests, setRequests] = useState<BookingRequest[]>([]);
+  const [facilitySettings, setFacilitySettings] = useState<FacilitySettings>({
+    id: `settings-${Date.now()}`,
+    facilityId,
+    facilityName: '',
+    regularHolidays: [0],
+    customHolidays: [],
+    businessHours: {
+      AM: { start: '09:00', end: '12:00' },
+      PM: { start: '13:00', end: '18:00' },
+    },
+    capacity: {
+      AM: 10,
+      PM: 10,
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [loadingChildren, setLoadingChildren] = useState(true);
+  const [loadingStaff, setLoadingStaff] = useState(true);
+
+  const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
 
   // Supabaseから施設設定を取得
   useEffect(() => {
@@ -116,8 +102,127 @@ export const useFacilityData = () => {
 
     fetchFacilitySettings();
   }, [facilityId]);
-  const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
+
+  // Supabaseから児童データを取得
+  useEffect(() => {
+    if (!facilityId) {
+      setLoadingChildren(false);
+      return;
+    }
+
+    const fetchChildren = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('children')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching children:', error);
+          setLoadingChildren(false);
+          return;
+        }
+
+        if (data) {
+          // データベースのスネークケースをキャメルケースに変換
+          const childrenData: Child[] = data.map((row) => ({
+            id: row.id,
+            facilityId: row.facility_id,
+            name: row.name,
+            age: row.age,
+            guardianName: row.guardian_name,
+            guardianRelationship: row.guardian_relationship,
+            beneficiaryNumber: row.beneficiary_number,
+            grantDays: row.grant_days,
+            contractDays: row.contract_days,
+            address: row.address,
+            phone: row.phone,
+            email: row.email,
+            doctorName: row.doctor_name,
+            doctorClinic: row.doctor_clinic,
+            schoolName: row.school_name,
+            pattern: row.pattern,
+            needsPickup: row.needs_pickup || false,
+            needsDropoff: row.needs_dropoff || false,
+            pickupLocation: row.pickup_location,
+            dropoffLocation: row.dropoff_location,
+            contractStatus: row.contract_status,
+            contractStartDate: row.contract_start_date,
+            contractEndDate: row.contract_end_date,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }));
+          setChildren(childrenData);
+        }
+      } catch (error) {
+        console.error('Error in fetchChildren:', error);
+      } finally {
+        setLoadingChildren(false);
+      }
+    };
+
+    fetchChildren();
+  }, [facilityId]);
+
+  // Supabaseからスタッフデータを取得
+  useEffect(() => {
+    if (!facilityId) {
+      setLoadingStaff(false);
+      return;
+    }
+
+    const fetchStaff = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching staff:', error);
+          setLoadingStaff(false);
+          return;
+        }
+
+        if (data) {
+          // データベースのスネークケースをキャメルケースに変換
+          const staffData: Staff[] = data.map((row) => ({
+            id: row.id,
+            facilityId: row.facility_id,
+            name: row.name,
+            nameKana: row.name_kana,
+            role: row.role,
+            type: row.type,
+            birthDate: row.birth_date,
+            gender: row.gender,
+            address: row.address,
+            phone: row.phone,
+            email: row.email,
+            qualifications: row.qualifications,
+            yearsOfExperience: row.years_of_experience,
+            qualificationCertificate: row.qualification_certificate,
+            experienceCertificate: row.experience_certificate,
+            emergencyContact: row.emergency_contact,
+            emergencyContactPhone: row.emergency_contact_phone,
+            memo: row.memo,
+            monthlySalary: row.monthly_salary,
+            hourlyWage: row.hourly_wage,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }));
+          setStaff(staffData);
+        }
+      } catch (error) {
+        console.error('Error in fetchStaff:', error);
+      } finally {
+        setLoadingStaff(false);
+      }
+    };
+
+    fetchStaff();
+  }, [facilityId]);
 
   // 施設IDでフィルタリングされたデータのみを返す
   const filteredChildren = useMemo(
@@ -141,16 +246,128 @@ export const useFacilityData = () => {
   );
 
   // 新しいデータを追加する際は自動的にfacilityIdを付与
-  const addChild = (child: Omit<Child, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
-    const newChild: Child = {
-      ...child,
-      id: `c${Date.now()}`,
-      facilityId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setChildren([...children, newChild]);
-    return newChild;
+  const addChild = async (child: Omit<Child, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
+    const newChildId = `c${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    try {
+      // Supabaseに保存
+      const { data, error } = await supabase
+        .from('children')
+        .insert({
+          id: newChildId,
+          facility_id: facilityId,
+          name: child.name,
+          age: child.age,
+          guardian_name: child.guardianName,
+          guardian_relationship: child.guardianRelationship,
+          beneficiary_number: child.beneficiaryNumber,
+          grant_days: child.grantDays,
+          contract_days: child.contractDays,
+          address: child.address,
+          phone: child.phone,
+          email: child.email,
+          doctor_name: child.doctorName,
+          doctor_clinic: child.doctorClinic,
+          school_name: child.schoolName,
+          pattern: child.pattern,
+          needs_pickup: child.needsPickup || false,
+          needs_dropoff: child.needsDropoff || false,
+          pickup_location: child.pickupLocation,
+          dropoff_location: child.dropoffLocation,
+          contract_status: child.contractStatus,
+          contract_start_date: child.contractStartDate,
+          contract_end_date: child.contractEndDate,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding child to Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      const newChild: Child = {
+        ...child,
+        id: newChildId,
+        facilityId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setChildren([...children, newChild]);
+      return newChild;
+    } catch (error) {
+      console.error('Error in addChild:', error);
+      throw error;
+    }
+  };
+
+  const updateChild = async (child: Child) => {
+    try {
+      // Supabaseを更新
+      const { error } = await supabase
+        .from('children')
+        .update({
+          name: child.name,
+          age: child.age,
+          guardian_name: child.guardianName,
+          guardian_relationship: child.guardianRelationship,
+          beneficiary_number: child.beneficiaryNumber,
+          grant_days: child.grantDays,
+          contract_days: child.contractDays,
+          address: child.address,
+          phone: child.phone,
+          email: child.email,
+          doctor_name: child.doctorName,
+          doctor_clinic: child.doctorClinic,
+          school_name: child.schoolName,
+          pattern: child.pattern,
+          needs_pickup: child.needsPickup || false,
+          needs_dropoff: child.needsDropoff || false,
+          pickup_location: child.pickupLocation,
+          dropoff_location: child.dropoffLocation,
+          contract_status: child.contractStatus,
+          contract_start_date: child.contractStartDate,
+          contract_end_date: child.contractEndDate,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', child.id);
+
+      if (error) {
+        console.error('Error updating child in Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setChildren(children.map((c) => (c.id === child.id ? { ...child, updatedAt: new Date().toISOString() } : c)));
+    } catch (error) {
+      console.error('Error in updateChild:', error);
+      throw error;
+    }
+  };
+
+  const deleteChild = async (childId: string) => {
+    try {
+      // Supabaseから削除
+      const { error } = await supabase
+        .from('children')
+        .delete()
+        .eq('id', childId);
+
+      if (error) {
+        console.error('Error deleting child from Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setChildren(children.filter((c) => c.id !== childId));
+    } catch (error) {
+      console.error('Error in deleteChild:', error);
+      throw error;
+    }
   };
 
   const addSchedule = (schedule: Omit<ScheduleItem, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
@@ -189,19 +406,32 @@ export const useFacilityData = () => {
     // Supabaseに保存
     if (facilityId) {
       try {
+        // 既存のレコードを確認
+        const { data: existingData } = await supabase
+          .from('facility_settings')
+          .select('id')
+          .eq('facility_id', facilityId)
+          .single();
+
+        const upsertData: any = {
+          facility_id: facilityId,
+          facility_name: updatedSettings.facilityName || null,
+          regular_holidays: updatedSettings.regularHolidays,
+          custom_holidays: updatedSettings.customHolidays,
+          business_hours: updatedSettings.businessHours,
+          capacity: updatedSettings.capacity,
+          updated_at: updatedSettings.updatedAt,
+        };
+
+        // 既存レコードがある場合はidを指定、ない場合はidを指定しない（自動生成）
+        if (existingData) {
+          upsertData.id = existingData.id;
+          upsertData.created_at = updatedSettings.createdAt;
+        }
+
         const { data, error } = await supabase
           .from('facility_settings')
-          .upsert({
-            id: updatedSettings.id,
-            facility_id: facilityId,
-            facility_name: updatedSettings.facilityName || null,
-            regular_holidays: updatedSettings.regularHolidays,
-            custom_holidays: updatedSettings.customHolidays,
-            business_hours: updatedSettings.businessHours,
-            capacity: updatedSettings.capacity,
-            updated_at: updatedSettings.updatedAt,
-            created_at: updatedSettings.createdAt,
-          })
+          .upsert(upsertData)
           .eq('facility_id', facilityId)
           .select()
           .single();
@@ -310,30 +540,131 @@ export const useFacilityData = () => {
   };
 
   // スタッフ管理機能
-  const addStaff = (staffData: Omit<Staff, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
-    const newStaff: Staff = {
-      ...staffData,
-      id: `staff-${Date.now()}`,
-      facilityId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setStaff([...staff, newStaff]);
-    return newStaff;
+  const addStaff = async (staffData: Omit<Staff, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
+    const newStaffId = `staff-${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    try {
+      // Supabaseに保存
+      const { data, error } = await supabase
+        .from('staff')
+        .insert({
+          id: newStaffId,
+          facility_id: facilityId,
+          name: staffData.name,
+          name_kana: staffData.nameKana,
+          role: staffData.role,
+          type: staffData.type,
+          birth_date: staffData.birthDate,
+          gender: staffData.gender,
+          address: staffData.address,
+          phone: staffData.phone,
+          email: staffData.email,
+          qualifications: staffData.qualifications,
+          years_of_experience: staffData.yearsOfExperience,
+          qualification_certificate: staffData.qualificationCertificate,
+          experience_certificate: staffData.experienceCertificate,
+          emergency_contact: staffData.emergencyContact,
+          emergency_contact_phone: staffData.emergencyContactPhone,
+          memo: staffData.memo,
+          monthly_salary: staffData.monthlySalary,
+          hourly_wage: staffData.hourlyWage,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding staff to Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      const newStaff: Staff = {
+        ...staffData,
+        id: newStaffId,
+        facilityId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setStaff([...staff, newStaff]);
+      return newStaff;
+    } catch (error) {
+      console.error('Error in addStaff:', error);
+      throw error;
+    }
   };
 
-  const updateStaff = (staffId: string, staffData: Partial<Staff>) => {
-    setStaff(
-      staff.map((s) =>
-        s.id === staffId
-          ? { ...s, ...staffData, updatedAt: new Date().toISOString() }
-          : s
-      )
-    );
+  const updateStaff = async (staffId: string, staffData: Partial<Staff>) => {
+    try {
+      // Supabaseを更新
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (staffData.name !== undefined) updateData.name = staffData.name;
+      if (staffData.nameKana !== undefined) updateData.name_kana = staffData.nameKana;
+      if (staffData.role !== undefined) updateData.role = staffData.role;
+      if (staffData.type !== undefined) updateData.type = staffData.type;
+      if (staffData.birthDate !== undefined) updateData.birth_date = staffData.birthDate;
+      if (staffData.gender !== undefined) updateData.gender = staffData.gender;
+      if (staffData.address !== undefined) updateData.address = staffData.address;
+      if (staffData.phone !== undefined) updateData.phone = staffData.phone;
+      if (staffData.email !== undefined) updateData.email = staffData.email;
+      if (staffData.qualifications !== undefined) updateData.qualifications = staffData.qualifications;
+      if (staffData.yearsOfExperience !== undefined) updateData.years_of_experience = staffData.yearsOfExperience;
+      if (staffData.qualificationCertificate !== undefined) updateData.qualification_certificate = staffData.qualificationCertificate;
+      if (staffData.experienceCertificate !== undefined) updateData.experience_certificate = staffData.experienceCertificate;
+      if (staffData.emergencyContact !== undefined) updateData.emergency_contact = staffData.emergencyContact;
+      if (staffData.emergencyContactPhone !== undefined) updateData.emergency_contact_phone = staffData.emergencyContactPhone;
+      if (staffData.memo !== undefined) updateData.memo = staffData.memo;
+      if (staffData.monthlySalary !== undefined) updateData.monthly_salary = staffData.monthlySalary;
+      if (staffData.hourlyWage !== undefined) updateData.hourly_wage = staffData.hourlyWage;
+
+      const { error } = await supabase
+        .from('staff')
+        .update(updateData)
+        .eq('id', staffId);
+
+      if (error) {
+        console.error('Error updating staff in Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setStaff(
+        staff.map((s) =>
+          s.id === staffId
+            ? { ...s, ...staffData, updatedAt: new Date().toISOString() }
+            : s
+        )
+      );
+    } catch (error) {
+      console.error('Error in updateStaff:', error);
+      throw error;
+    }
   };
 
-  const deleteStaff = (staffId: string) => {
-    setStaff(staff.filter((s) => s.id !== staffId));
+  const deleteStaff = async (staffId: string) => {
+    try {
+      // Supabaseから削除
+      const { error } = await supabase
+        .from('staff')
+        .delete()
+        .eq('id', staffId);
+
+      if (error) {
+        console.error('Error deleting staff from Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setStaff(staff.filter((s) => s.id !== staffId));
+    } catch (error) {
+      console.error('Error in deleteStaff:', error);
+      throw error;
+    }
   };
 
   return {
@@ -343,6 +674,8 @@ export const useFacilityData = () => {
     requests: filteredRequests,
     facilitySettings,
     loadingSettings,
+    loadingChildren,
+    loadingStaff,
     usageRecords: filteredUsageRecords,
     leads: filteredLeads,
     setChildren,
@@ -350,6 +683,8 @@ export const useFacilityData = () => {
     setSchedules,
     setRequests,
     addChild,
+    updateChild,
+    deleteChild,
     addSchedule,
     addRequest,
     updateFacilitySettings,

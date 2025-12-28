@@ -29,7 +29,7 @@ interface ChildrenViewProps {
 }
 
 const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
-  const { children, setChildren, addChild, getLeadsByChildId } = useFacilityData();
+  const { children, addChild, updateChild, getLeadsByChildId } = useFacilityData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
@@ -104,7 +104,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   };
 
   // フォーム送信
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name.trim()) {
       alert('児童名を入力してください');
       return;
@@ -112,24 +112,29 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
 
     // 編集モードの場合は更新
     if (selectedChild) {
-      handleUpdateChild();
+      await handleUpdateChild();
       return;
     }
 
-    // 新規登録
-    addChild(formData);
+    try {
+      // 新規登録
+      await addChild(formData);
 
-    // 下書きを削除
-    if (formData.name) {
-      deleteDraft(formData.name);
-      setDrafts(getDrafts());
+      // 下書きを削除
+      if (formData.name) {
+        deleteDraft(formData.name);
+        setDrafts(getDrafts());
+      }
+
+      setIsModalOpen(false);
+      setFormData(initialFormData);
+      setSelectedDraft(null);
+      setSelectedChild(null);
+      alert('児童を登録しました');
+    } catch (error) {
+      console.error('Error adding child:', error);
+      alert('児童の登録に失敗しました');
     }
-
-    setIsModalOpen(false);
-    setFormData(initialFormData);
-    setSelectedDraft(null);
-    setSelectedChild(null);
-    alert('児童を登録しました');
   };
 
   // モーダルを開く
@@ -231,25 +236,30 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   };
 
   // 児童情報を更新
-  const handleUpdateChild = () => {
+  const handleUpdateChild = async () => {
     if (!selectedChild || !formData.name.trim()) {
       alert('児童名を入力してください');
       return;
     }
 
-    const updatedChild: Child = {
-      ...formData,
-      id: selectedChild.id,
-      facilityId: selectedChild.facilityId,
-      createdAt: selectedChild.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      const updatedChild: Child = {
+        ...formData,
+        id: selectedChild.id,
+        facilityId: selectedChild.facilityId,
+        createdAt: selectedChild.createdAt,
+        updatedAt: new Date().toISOString(),
+      };
 
-    setChildren(children.map((c) => (c.id === selectedChild.id ? updatedChild : c)));
-    setIsModalOpen(false);
-    setFormData(initialFormData);
-    setSelectedChild(null);
-    alert('児童情報を更新しました');
+      await updateChild(updatedChild);
+      setIsModalOpen(false);
+      setFormData(initialFormData);
+      setSelectedChild(null);
+      alert('児童情報を更新しました');
+    } catch (error) {
+      console.error('Error updating child:', error);
+      alert('児童情報の更新に失敗しました');
+    }
   };
 
   return (
