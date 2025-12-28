@@ -16,6 +16,8 @@ import {
   UsageRecordFormData,
   Lead,
   LeadFormData,
+  ManagementTarget,
+  ManagementTargetFormData,
 } from '@/types';
 
 export const useFacilityData = () => {
@@ -51,6 +53,7 @@ export const useFacilityData = () => {
 
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [managementTargets, setManagementTargets] = useState<ManagementTarget[]>([]);
 
   // Supabaseから施設設定を取得
   useEffect(() => {
@@ -530,6 +533,11 @@ export const useFacilityData = () => {
     [leads, facilityId]
   );
 
+  const filteredManagementTargets = useMemo(
+    () => managementTargets.filter((t) => t.facilityId === facilityId),
+    [managementTargets, facilityId]
+  );
+
   // リード管理機能
   const addLead = (leadData: LeadFormData) => {
     const newLead: Lead = {
@@ -691,6 +699,184 @@ export const useFacilityData = () => {
     }
   };
 
+  // 経営目標管理機能
+  const addManagementTarget = async (targetData: ManagementTargetFormData) => {
+    const newTargetId = `target-${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    try {
+      // Supabaseに保存
+      const { data, error } = await supabase
+        .from('management_targets')
+        .insert({
+          id: newTargetId,
+          facility_id: facilityId,
+          year: targetData.year,
+          month: targetData.month,
+          staff_salaries: targetData.staffSalaries || [],
+          fixed_cost_items: targetData.fixedCostItems || [],
+          variable_cost_items: targetData.variableCostItems || [],
+          total_fixed_cost: targetData.totalFixedCost || 0,
+          total_variable_cost: targetData.totalVariableCost || 0,
+          target_revenue: targetData.targetRevenue,
+          target_occupancy_rate: targetData.targetOccupancyRate,
+          daily_price_per_child: targetData.dailyPricePerChild,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding management target to Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      const newTarget: ManagementTarget = {
+        ...targetData,
+        id: newTargetId,
+        facilityId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setManagementTargets([...managementTargets, newTarget]);
+      return newTarget;
+    } catch (error) {
+      console.error('Error in addManagementTarget:', error);
+      // エラー時もローカル状態に追加（オフライン対応）
+      const newTarget: ManagementTarget = {
+        ...targetData,
+        id: newTargetId,
+        facilityId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setManagementTargets([...managementTargets, newTarget]);
+      return newTarget;
+    }
+  };
+
+  const updateManagementTarget = async (targetId: string, targetData: Partial<ManagementTargetFormData>) => {
+    try {
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (targetData.year !== undefined) updateData.year = targetData.year;
+      if (targetData.month !== undefined) updateData.month = targetData.month;
+      if (targetData.staffSalaries !== undefined) updateData.staff_salaries = targetData.staffSalaries;
+      if (targetData.fixedCostItems !== undefined) updateData.fixed_cost_items = targetData.fixedCostItems;
+      if (targetData.variableCostItems !== undefined) updateData.variable_cost_items = targetData.variableCostItems;
+      if (targetData.totalFixedCost !== undefined) updateData.total_fixed_cost = targetData.totalFixedCost;
+      if (targetData.totalVariableCost !== undefined) updateData.total_variable_cost = targetData.totalVariableCost;
+      if (targetData.targetRevenue !== undefined) updateData.target_revenue = targetData.targetRevenue;
+      if (targetData.targetOccupancyRate !== undefined) updateData.target_occupancy_rate = targetData.targetOccupancyRate;
+      if (targetData.dailyPricePerChild !== undefined) updateData.daily_price_per_child = targetData.dailyPricePerChild;
+
+      const { error } = await supabase
+        .from('management_targets')
+        .update(updateData)
+        .eq('id', targetId);
+
+      if (error) {
+        console.error('Error updating management target in Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setManagementTargets(
+        managementTargets.map((t) =>
+          t.id === targetId
+            ? { ...t, ...targetData, updatedAt: new Date().toISOString() }
+            : t
+        )
+      );
+    } catch (error) {
+      console.error('Error in updateManagementTarget:', error);
+      // エラー時もローカル状態を更新
+      setManagementTargets(
+        managementTargets.map((t) =>
+          t.id === targetId
+            ? { ...t, ...targetData, updatedAt: new Date().toISOString() }
+            : t
+        )
+      );
+    }
+  };
+
+  const deleteManagementTarget = async (targetId: string) => {
+    try {
+      const { error } = await supabase
+        .from('management_targets')
+        .delete()
+        .eq('id', targetId);
+
+      if (error) {
+        console.error('Error deleting management target from Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setManagementTargets(managementTargets.filter((t) => t.id !== targetId));
+    } catch (error) {
+      console.error('Error in deleteManagementTarget:', error);
+      // エラー時もローカル状態から削除
+      setManagementTargets(managementTargets.filter((t) => t.id !== targetId));
+    }
+  };
+
+  const getManagementTarget = (year: number, month: number): ManagementTarget | undefined => {
+    return filteredManagementTargets.find(
+      (t) => t.year === year && t.month === month
+    );
+  };
+
+  // Supabaseから経営目標を取得
+  useEffect(() => {
+    if (!facilityId) return;
+
+    const fetchManagementTargets = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('management_targets')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .order('year', { ascending: false })
+          .order('month', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching management targets:', error);
+          return;
+        }
+
+        if (data) {
+          const targetsData: ManagementTarget[] = data.map((row) => ({
+            id: row.id,
+            facilityId: row.facility_id,
+            year: row.year,
+            month: row.month,
+            staffSalaries: row.staff_salaries || [],
+            fixedCostItems: row.fixed_cost_items || [],
+            variableCostItems: row.variable_cost_items || [],
+            totalFixedCost: row.total_fixed_cost || 0,
+            totalVariableCost: row.total_variable_cost || 0,
+            targetRevenue: row.target_revenue || 0,
+            targetOccupancyRate: row.target_occupancy_rate || 0,
+            dailyPricePerChild: row.daily_price_per_child || 0,
+            createdAt: row.created_at || new Date().toISOString(),
+            updatedAt: row.updated_at || new Date().toISOString(),
+          }));
+          setManagementTargets(targetsData);
+        }
+      } catch (error) {
+        console.error('Error in fetchManagementTargets:', error);
+      }
+    };
+
+    fetchManagementTargets();
+  }, [facilityId]);
+
   return {
     children: filteredChildren,
     staff: filteredStaff,
@@ -702,6 +888,7 @@ export const useFacilityData = () => {
     loadingStaff,
     usageRecords: filteredUsageRecords,
     leads: filteredLeads,
+    managementTargets: filteredManagementTargets,
     setChildren,
     setStaff,
     setSchedules,
@@ -724,6 +911,10 @@ export const useFacilityData = () => {
     addStaff,
     updateStaff,
     deleteStaff,
+    addManagementTarget,
+    updateManagementTarget,
+    deleteManagementTarget,
+    getManagementTarget,
   };
 };
 

@@ -116,6 +116,7 @@ const FacilitySettingsView: React.FC = () => {
     updateHolidayPeriod(periodId, { regularHolidays: newHolidays });
   };
 
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">

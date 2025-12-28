@@ -2,7 +2,7 @@
  * ダッシュボード用の計算ロジック
  */
 
-import { ScheduleItem, UsageRecord, Child, Staff, BookingRequest } from '@/types';
+import { ScheduleItem, UsageRecord, Child, Staff, BookingRequest, Lead } from '@/types';
 
 // 目標値
 const TARGET_PROFIT = 1000000; // 100万円
@@ -441,4 +441,580 @@ export const calculateLTV = (
     totalLTV: averageLTV * activeChildren.length,
   };
 };
+
+// 週別見込み売り上げを計算
+export const calculateWeeklyRevenue = (
+  schedules: ScheduleItem[],
+  usageRecords: UsageRecord[],
+  currentMonth: Date = new Date(),
+  dailyPricePerChild: number = 15000
+): { week: number; revenue: number; scheduledCount: number; actualCount: number }[] => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const monthlySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date);
+    return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
+  });
+
+  const monthlyRecords = usageRecords.filter((record) => {
+    const recordDate = new Date(record.date);
+    return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+  });
+
+  const weeks: { week: number; revenue: number; scheduledCount: number; actualCount: number }[] = [];
+  
+  // 月の最初の日を取得
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  
+  // 週ごとに集計（1週目、2週目、3週目、4週目、5週目）
+  for (let week = 1; week <= 5; week++) {
+    const weekStart = (week - 1) * 7 + 1;
+    const weekEnd = Math.min(week * 7, daysInMonth);
+    
+    if (weekStart > daysInMonth) break;
+    
+    const weekSchedules = monthlySchedules.filter((s) => {
+      const scheduleDate = new Date(s.date);
+      const day = scheduleDate.getDate();
+      return day >= weekStart && day <= weekEnd;
+    });
+    
+    const weekRecords = monthlyRecords.filter((r) => {
+      const recordDate = new Date(r.date);
+      const day = recordDate.getDate();
+      return day >= weekStart && day <= weekEnd;
+    });
+    
+    const actualCount = weekRecords.filter(
+      (r) => r.serviceStatus === '利用' && r.billingTarget === '請求する'
+    ).length;
+    
+    const revenue = actualCount * dailyPricePerChild;
+    
+    weeks.push({
+      week,
+      revenue,
+      scheduledCount: weekSchedules.length,
+      actualCount,
+    });
+  }
+  
+  return weeks;
+};
+
+// 利用枠の統計を計算
+export const calculateSlotStatistics = (
+  schedules: ScheduleItem[],
+  usageRecords: UsageRecord[],
+  capacity: { AM: number; PM: number },
+  currentMonth: Date = new Date()
+): {
+  scheduledSlots: number;
+  usedSlots: number;
+  cancelledSlots: number;
+  cancellationRate: number;
+  occupancyRate: number;
+} => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const monthlySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date);
+    return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
+  });
+
+  const monthlyRecords = usageRecords.filter((record) => {
+    const recordDate = new Date(record.date);
+    return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+  });
+
+  const scheduledSlots = monthlySchedules.length;
+  const usedSlots = monthlyRecords.filter(
+    (r) => r.serviceStatus === '利用' && r.billingTarget === '請求する'
+  ).length;
+  const cancelledSlots = monthlyRecords.filter(
+    (r) => r.serviceStatus === '欠席(加算なし)'
+  ).length;
+  
+  const cancellationRate = scheduledSlots > 0 ? (cancelledSlots / scheduledSlots) * 100 : 0;
+  
+  // 営業日数を計算
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const businessDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const date = new Date(year, month, i + 1);
+    return date.getDay() !== 0; // 日曜日を除外
+  }).filter(Boolean).length;
+  
+  const totalCapacity = businessDays * (capacity.AM + capacity.PM);
+  const occupancyRate = totalCapacity > 0 ? (usedSlots / totalCapacity) * 100 : 0;
+  
+  return {
+    scheduledSlots,
+    usedSlots,
+    cancelledSlots,
+    cancellationRate,
+    occupancyRate,
+  };
+};
+
+// リード管理の進捗を計算
+export const calculateLeadProgress = (
+  leads: Lead[],
+  currentMonth: Date = new Date(),
+  previousMonth?: Date
+): {
+  current: {
+    newInquiries: number;
+    visits: number;
+    considering: number;
+    contracts: number;
+    lost: number;
+  };
+  previous?: {
+    newInquiries: number;
+    visits: number;
+    considering: number;
+    contracts: number;
+    lost: number;
+  };
+  trends: {
+    newInquiries: number; // 前月比（%）
+    visits: number;
+    contracts: number;
+  };
+} => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const currentLeads = leads.filter((lead) => {
+    const leadDate = new Date(lead.createdAt);
+    return leadDate.getFullYear() === year && leadDate.getMonth() === month;
+  });
+  
+  const current = {
+    newInquiries: currentLeads.filter((l) => l.status === 'new-inquiry').length,
+    visits: currentLeads.filter((l) => l.status === 'visit-scheduled').length,
+    considering: currentLeads.filter((l) => l.status === 'considering').length,
+    contracts: currentLeads.filter((l) => l.status === 'contracted').length,
+    lost: currentLeads.filter((l) => l.status === 'lost').length,
+  };
+  
+  let previous: typeof current | undefined;
+  let trends = {
+    newInquiries: 0,
+    visits: 0,
+    contracts: 0,
+  };
+  
+  if (previousMonth) {
+    const prevYear = previousMonth.getFullYear();
+    const prevMonth = previousMonth.getMonth();
+    
+    const prevLeads = leads.filter((lead) => {
+      const leadDate = new Date(lead.createdAt);
+      return leadDate.getFullYear() === prevYear && leadDate.getMonth() === prevMonth;
+    });
+    
+    previous = {
+      newInquiries: prevLeads.filter((l) => l.status === 'new-inquiry').length,
+      visits: prevLeads.filter((l) => l.status === 'visit-scheduled').length,
+      considering: prevLeads.filter((l) => l.status === 'considering').length,
+      contracts: prevLeads.filter((l) => l.status === 'contracted').length,
+      lost: prevLeads.filter((l) => l.status === 'lost').length,
+    };
+    
+    trends = {
+      newInquiries: previous.newInquiries > 0
+        ? ((current.newInquiries - previous.newInquiries) / previous.newInquiries) * 100
+        : current.newInquiries > 0 ? 100 : 0,
+      visits: previous.visits > 0
+        ? ((current.visits - previous.visits) / previous.visits) * 100
+        : current.visits > 0 ? 100 : 0,
+      contracts: previous.contracts > 0
+        ? ((current.contracts - previous.contracts) / previous.contracts) * 100
+        : current.contracts > 0 ? 100 : 0,
+    };
+  }
+  
+  return {
+    current,
+    previous,
+    trends,
+  };
+};
+
+// 契約数推移を計算
+export const calculateContractTrend = (
+  children: Child[],
+  leads: Lead[],
+  months: number = 6
+): {
+  month: string;
+  contracts: number;
+  expectedContracts: number; // 見込み契約数（リードから）
+}[] => {
+  const now = new Date();
+  const trend: { month: string; contracts: number; expectedContracts: number }[] = [];
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const date = new Date(now);
+    date.setMonth(date.getMonth() - i);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    // 実際の契約数（契約開始日がその月の児童）
+    const contracts = children.filter((c) => {
+      if (!c.contractStartDate) return false;
+      const startDate = new Date(c.contractStartDate);
+      return startDate.getFullYear() === year && startDate.getMonth() === month;
+    }).length;
+    
+    // 見込み契約数（リードの見込み開始日がその月）
+    const expectedContracts = leads.filter((l) => {
+      if (!l.expectedStartDate) return false;
+      const expectedDate = new Date(l.expectedStartDate);
+      return (
+        expectedDate.getFullYear() === year &&
+        expectedDate.getMonth() === month &&
+        (l.status === 'contract-progress' || l.status === 'waiting-benefit' || l.status === 'considering')
+      );
+    }).length;
+    
+    trend.push({
+      month: `${year}年${month + 1}月`,
+      contracts,
+      expectedContracts,
+    });
+  }
+  
+  return trend;
+};
+
+// 年齢別利用児童を計算
+export const calculateAgeDistribution = (
+  children: Child[],
+  schedules: ScheduleItem[],
+  currentMonth: Date = new Date()
+): { age: string; count: number; percentage: number }[] => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const monthlySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date);
+    return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
+  });
+  
+  const activeChildIds = new Set(monthlySchedules.map((s) => s.childId));
+  const activeChildren = children.filter((c) => activeChildIds.has(c.id));
+  
+  const ageGroups: Record<string, number> = {};
+  
+  activeChildren.forEach((child) => {
+    if (child.age !== undefined) {
+      const ageGroup = child.age < 3 ? '0-2歳' :
+                      child.age < 6 ? '3-5歳' :
+                      child.age < 9 ? '6-8歳' :
+                      child.age < 12 ? '9-11歳' :
+                      child.age < 15 ? '12-14歳' :
+                      '15歳以上';
+      ageGroups[ageGroup] = (ageGroups[ageGroup] || 0) + 1;
+    } else {
+      ageGroups['未設定'] = (ageGroups['未設定'] || 0) + 1;
+    }
+  });
+  
+  const total = activeChildren.length;
+  
+  return Object.entries(ageGroups)
+    .map(([age, count]) => ({
+      age,
+      count,
+      percentage: total > 0 ? (count / total) * 100 : 0,
+    }))
+    .sort((a, b) => {
+      const order = ['0-2歳', '3-5歳', '6-8歳', '9-11歳', '12-14歳', '15歳以上', '未設定'];
+      return order.indexOf(a.age) - order.indexOf(b.age);
+    });
+};
+
+// 利用児童の居住地区を計算
+export const calculateAreaDistribution = (
+  children: Child[],
+  schedules: ScheduleItem[],
+  currentMonth: Date = new Date()
+): { area: string; count: number; percentage: number }[] => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const monthlySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date);
+    return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
+  });
+  
+  const activeChildIds = new Set(monthlySchedules.map((s) => s.childId));
+  const activeChildren = children.filter((c) => activeChildIds.has(c.id));
+  
+  const areaGroups: Record<string, number> = {};
+  
+  activeChildren.forEach((child) => {
+    if (child.address) {
+      // 住所から市区町村を抽出（簡易版）
+      // 例: "東京都渋谷区..." -> "渋谷区"
+      const match = child.address.match(/(都|道|府|県)([^市区町村]+[市区町村])/);
+      if (match && match[2]) {
+        const area = match[2];
+        areaGroups[area] = (areaGroups[area] || 0) + 1;
+      } else {
+        // マッチしない場合は最初の部分を使用
+        const parts = child.address.split(/[都道府県市区町村]/);
+        if (parts.length > 0 && parts[0]) {
+          areaGroups[parts[0] + '（不明）'] = (areaGroups[parts[0] + '（不明）'] || 0) + 1;
+        } else {
+          areaGroups['未設定'] = (areaGroups['未設定'] || 0) + 1;
+        }
+      }
+    } else {
+      areaGroups['未設定'] = (areaGroups['未設定'] || 0) + 1;
+    }
+  });
+  
+  const total = activeChildren.length;
+  
+  return Object.entries(areaGroups)
+    .map(([area, count]) => ({
+      area,
+      count,
+      percentage: total > 0 ? (count / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+};
+
+// 送迎利用率を計算
+export const calculatePickupDropoffRate = (
+  schedules: ScheduleItem[],
+  currentMonth: Date = new Date()
+): {
+  pickupRate: number;
+  dropoffRate: number;
+  bothRate: number;
+  totalSchedules: number;
+  pickupCount: number;
+  dropoffCount: number;
+  bothCount: number;
+} => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const monthlySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date);
+    return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
+  });
+
+  const totalSchedules = monthlySchedules.length;
+  const pickupCount = monthlySchedules.filter((s) => s.hasPickup).length;
+  const dropoffCount = monthlySchedules.filter((s) => s.hasDropoff).length;
+  const bothCount = monthlySchedules.filter((s) => s.hasPickup && s.hasDropoff).length;
+
+  return {
+    pickupRate: totalSchedules > 0 ? (pickupCount / totalSchedules) * 100 : 0,
+    dropoffRate: totalSchedules > 0 ? (dropoffCount / totalSchedules) * 100 : 0,
+    bothRate: totalSchedules > 0 ? (bothCount / totalSchedules) * 100 : 0,
+    totalSchedules,
+    pickupCount,
+    dropoffCount,
+    bothCount,
+  };
+};
+
+// 問い合わせ経路別の新規問い合わせ数を計算
+export const calculateInquiriesBySource = (
+  children: Child[],
+  leads: Lead[],
+  months: number = 6
+): {
+  month: string;
+  year: number;
+  monthNum: number;
+  contracts: number;
+  inquiries: {
+    devnavi: number;
+    homepage: number;
+    'support-office': number;
+    other: number;
+    total: number;
+  };
+}[] => {
+  const now = new Date();
+  const trend: {
+    month: string;
+    year: number;
+    monthNum: number;
+    contracts: number;
+    inquiries: {
+      devnavi: number;
+      homepage: number;
+      'support-office': number;
+      other: number;
+      total: number;
+    };
+  }[] = [];
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const date = new Date(now);
+    date.setMonth(date.getMonth() - i);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    // 実際の契約数（契約開始日がその月の児童）
+    const contracts = children.filter((c) => {
+      if (!c.contractStartDate) return false;
+      const startDate = new Date(c.contractStartDate);
+      return startDate.getFullYear() === year && startDate.getMonth() === month;
+    }).length;
+    
+    // 新規問い合わせ数（問い合わせ経路別）
+    const monthLeads = leads.filter((l) => {
+      const leadDate = new Date(l.createdAt);
+      return leadDate.getFullYear() === year && leadDate.getMonth() === month && l.status === 'new-inquiry';
+    });
+    
+    const inquiries = {
+      devnavi: monthLeads.filter((l) => l.inquirySource === 'devnavi').length,
+      homepage: monthLeads.filter((l) => l.inquirySource === 'homepage').length,
+      'support-office': monthLeads.filter((l) => l.inquirySource === 'support-office').length,
+      other: monthLeads.filter((l) => l.inquirySource === 'other' || !l.inquirySource).length,
+      total: monthLeads.length,
+    };
+    
+    trend.push({
+      month: `${year}年${month + 1}月`,
+      year,
+      monthNum: month + 1,
+      contracts,
+      inquiries,
+    });
+  }
+  
+  return trend;
+};
+
+// 曜日別利用率を計算
+export const calculateDayOfWeekUtilization = (
+  schedules: ScheduleItem[],
+  capacity: { AM: number; PM: number },
+  currentMonth: Date = new Date()
+): {
+  dayOfWeek: string;
+  dayIndex: number;
+  amCount: number;
+  pmCount: number;
+  amUtilization: number;
+  pmUtilization: number;
+  totalUtilization: number;
+}[] => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const monthlySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date);
+    return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
+  });
+
+  const daysOfWeek = ['日', '月', '火', '水', '木', '金', '土'];
+  const dayStats: {
+    dayOfWeek: string;
+    dayIndex: number;
+    amCount: number;
+    pmCount: number;
+    amUtilization: number;
+    pmUtilization: number;
+    totalUtilization: number;
+  }[] = [];
+
+  daysOfWeek.forEach((day, dayIndex) => {
+    const daySchedules = monthlySchedules.filter((s) => {
+      const scheduleDate = new Date(s.date);
+      return scheduleDate.getDay() === dayIndex;
+    });
+
+    const amCount = daySchedules.filter((s) => s.slot === 'AM').length;
+    const pmCount = daySchedules.filter((s) => s.slot === 'PM').length;
+    
+    // 月のその曜日の日数を計算
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const dayOccurrences = Array.from({ length: daysInMonth }, (_, i) => {
+      const date = new Date(year, month, i + 1);
+      return date.getDay() === dayIndex;
+    }).filter(Boolean).length;
+
+    const amCapacity = dayOccurrences * capacity.AM;
+    const pmCapacity = dayOccurrences * capacity.PM;
+    
+    const amUtilization = amCapacity > 0 ? (amCount / amCapacity) * 100 : 0;
+    const pmUtilization = pmCapacity > 0 ? (pmCount / pmCapacity) * 100 : 0;
+    const totalUtilization = (amCapacity + pmCapacity) > 0 
+      ? ((amCount + pmCount) / (amCapacity + pmCapacity)) * 100 
+      : 0;
+
+    dayStats.push({
+      dayOfWeek: day,
+      dayIndex,
+      amCount,
+      pmCount,
+      amUtilization,
+      pmUtilization,
+      totalUtilization,
+    });
+  });
+
+  return dayStats;
+};
+
+// 午前・午後の稼働率を計算
+export const calculateAMPMOccupancyRate = (
+  schedules: ScheduleItem[],
+  capacity: { AM: number; PM: number },
+  currentMonth: Date = new Date()
+): {
+  amRate: number;
+  pmRate: number;
+  amCount: number;
+  pmCount: number;
+  amCapacity: number;
+  pmCapacity: number;
+} => {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  
+  const monthlySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date);
+    return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
+  });
+
+  // 営業日数を計算
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const businessDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const date = new Date(year, month, i + 1);
+    return date.getDay() !== 0; // 日曜日を除外
+  }).filter(Boolean).length;
+
+  const amCapacity = businessDays * capacity.AM;
+  const pmCapacity = businessDays * capacity.PM;
+  
+  const amCount = monthlySchedules.filter((s) => s.slot === 'AM').length;
+  const pmCount = monthlySchedules.filter((s) => s.slot === 'PM').length;
+
+  return {
+    amRate: amCapacity > 0 ? (amCount / amCapacity) * 100 : 0,
+    pmRate: pmCapacity > 0 ? (pmCount / pmCapacity) * 100 : 0,
+    amCount,
+    pmCount,
+    amCapacity,
+    pmCapacity,
+  };
+};
+
 

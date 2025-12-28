@@ -267,3 +267,57 @@ export type Lead = {
 // リードフォームデータ
 export type LeadFormData = Omit<Lead, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
 
+// 人件費設定（スタッフごと）
+export type StaffSalary = {
+  staffId: string;
+  staffName: string;
+  monthlySalary?: number; // 月給（常勤の場合）
+  hourlyWage?: number; // 時給（非常勤の場合）
+  workingHours?: number; // 月間労働時間（非常勤の場合）
+  totalAmount: number; // 合計金額（自動計算）
+};
+
+// 固定費項目
+export type FixedCostItem = {
+  id: string;
+  category: string; // カテゴリ（家賃、光熱費、保険料など）
+  name: string; // 項目名
+  amount: number; // 金額
+  memo?: string; // メモ
+};
+
+// 変動費項目
+export type VariableCostItem = {
+  id: string;
+  category: string; // カテゴリ（材料費、消耗品費など）
+  name: string; // 項目名
+  amount: number; // 金額
+  memo?: string; // メモ
+};
+
+// 月ごとの経営目標設定
+export type ManagementTarget = {
+  id: string;
+  facilityId: string; // 施設ID（マルチテナント対応）
+  year: number; // 年
+  month: number; // 月（1-12）
+  // コスト設定（詳細）
+  staffSalaries: StaffSalary[]; // 人件費（スタッフごと）
+  fixedCostItems: FixedCostItem[]; // 固定費項目（家賃、光熱費など）
+  variableCostItems: VariableCostItem[]; // 変動費項目
+  // 計算された合計（自動計算）
+  totalFixedCost: number; // 固定費合計
+  totalVariableCost: number; // 変動費合計
+  // 目標設定
+  targetRevenue: number; // 売上目標（円）
+  targetOccupancyRate: number; // 稼働率目標（%）
+  // 単価設定
+  dailyPricePerChild: number; // 児童一人当たりの1日あたりの単価（円）
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 経営目標フォームデータ
+export type ManagementTargetFormData = Omit<ManagementTarget, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
+

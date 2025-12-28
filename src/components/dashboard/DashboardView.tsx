@@ -1,0 +1,663 @@
+/**
+ * 経営ダッシュボードビュー
+ */
+
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Calendar,
+  DollarSign,
+  Target,
+  BarChart3,
+  MapPin,
+  AlertCircle,
+  ArrowUp,
+  ArrowDown,
+  Car,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
+import { useFacilityData } from '@/hooks/useFacilityData';
+import {
+  calculateWeeklyRevenue,
+  calculateSlotStatistics,
+  calculateLeadProgress,
+  calculateContractTrend,
+  calculateAgeDistribution,
+  calculateAreaDistribution,
+  calculateMonthlyProfit,
+  calculateOccupancyRate,
+  calculateARPU,
+  calculateLaborRatio,
+  calculatePickupDropoffRate,
+  calculateInquiriesBySource,
+  calculateDayOfWeekUtilization,
+  calculateAMPMOccupancyRate,
+} from '@/utils/dashboardCalculations';
+
+const DashboardView: React.FC = () => {
+  const {
+    schedules,
+    usageRecords,
+    children,
+    leads,
+    facilitySettings,
+    staff,
+    managementTargets,
+    getManagementTarget,
+  } = useFacilityData();
+
+  const [viewPeriod, setViewPeriod] = useState<'week' | 'month'>('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isContractTrendExpanded, setIsContractTrendExpanded] = useState(false);
+
+  // 前月の日付を計算
+  const previousMonth = useMemo(() => {
+    const prev = new Date(currentDate);
+    prev.setMonth(prev.getMonth() - 1);
+    return prev;
+  }, [currentDate]);
+
+  // 当月の経営目標を取得
+  const currentManagementTarget = useMemo(() => {
+    return getManagementTarget(currentDate.getFullYear(), currentDate.getMonth() + 1);
+  }, [getManagementTarget, currentDate]);
+
+  // 経営目標を使用した計算
+  const targetRevenue = currentManagementTarget?.targetRevenue || 1000000; // デフォルト値
+  const targetOccupancyRate = currentManagementTarget?.targetOccupancyRate || 90; // デフォルト値
+  const dailyPricePerChild = currentManagementTarget?.dailyPricePerChild || 15000; // デフォルト値
+
+  // 週別見込み売り上げ（経営設定の単価を使用）
+  const weeklyRevenue = useMemo(
+    () => calculateWeeklyRevenue(schedules, usageRecords, currentDate, dailyPricePerChild),
+    [schedules, usageRecords, currentDate, dailyPricePerChild]
+  );
+
+  // 利用枠統計
+  const slotStats = useMemo(
+    () => calculateSlotStatistics(schedules, usageRecords, facilitySettings.capacity, currentDate),
+    [schedules, usageRecords, facilitySettings.capacity, currentDate]
+  );
+
+  // リード進捗
+  const leadProgress = useMemo(
+    () => calculateLeadProgress(leads, currentDate, previousMonth),
+    [leads, currentDate, previousMonth]
+  );
+
+  // 契約数推移
+  const contractTrend = useMemo(
+    () => calculateContractTrend(children, leads, 6),
+    [children, leads]
+  );
+
+  // 問い合わせ経路別の新規問い合わせ数
+  const inquiriesBySource = useMemo(
+    () => calculateInquiriesBySource(children, leads, 6),
+    [children, leads]
+  );
+
+  // 送迎利用率
+  const pickupDropoffRate = useMemo(
+    () => calculatePickupDropoffRate(schedules, currentDate),
+    [schedules, currentDate]
+  );
+
+  // 曜日別利用率
+  const dayOfWeekUtilization = useMemo(
+    () => calculateDayOfWeekUtilization(schedules, facilitySettings.capacity, currentDate),
+    [schedules, facilitySettings.capacity, currentDate]
+  );
+
+  // 午前・午後の稼働率
+  const ampmOccupancyRate = useMemo(
+    () => calculateAMPMOccupancyRate(schedules, facilitySettings.capacity, currentDate),
+    [schedules, facilitySettings.capacity, currentDate]
+  );
+
+  // 年齢別利用児童
+  const ageDistribution = useMemo(
+    () => calculateAgeDistribution(children, schedules, currentDate),
+    [children, schedules, currentDate]
+  );
+
+  // 居住地区別利用児童
+  const areaDistribution = useMemo(
+    () => calculateAreaDistribution(children, schedules, currentDate),
+    [children, schedules, currentDate]
+  );
+
+  // 稼働率
+  const occupancyRate = useMemo(
+    () => calculateOccupancyRate(schedules, facilitySettings.capacity, currentDate),
+    [schedules, facilitySettings.capacity, currentDate]
+  );
+
+  // 月次利益（経営設定の単価を使用）
+  const monthlyProfit = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    const monthlyRecords = usageRecords.filter((record) => {
+      const recordDate = new Date(record.date);
+      return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+    });
+
+    const actualProfit = monthlyRecords
+      .filter((r) => r.serviceStatus === '利用' && r.billingTarget === '請求する')
+      .length * dailyPricePerChild;
+
+    return {
+      profit: actualProfit,
+      target: targetRevenue,
+      achievementRate: targetRevenue > 0 ? (actualProfit / targetRevenue) * 100 : 0,
+    };
+  }, [usageRecords, currentDate, dailyPricePerChild, targetRevenue]);
+
+  // ARPU
+  const arpu = useMemo(
+    () => calculateARPU(usageRecords, children, currentDate),
+    [usageRecords, children, currentDate]
+  );
+
+  // 人件費率
+  const laborRatio = useMemo(
+    () => calculateLaborRatio(staff, usageRecords, currentDate),
+    [staff, usageRecords, currentDate]
+  );
+
+  // 当月の総見込み売り上げ
+  const totalMonthlyRevenue = useMemo(() => {
+    return weeklyRevenue.reduce((sum, week) => sum + week.revenue, 0);
+  }, [weeklyRevenue]);
+
+  // 月を変更
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + offset);
+    setCurrentDate(newDate);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* ヘッダー */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">経営ダッシュボード</h2>
+          <p className="text-gray-500 text-xs mt-1">
+            経営指標を週単位・月単位で確認できます。
+          </p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <div className="flex bg-gray-100 p-1 rounded">
+            <button
+              onClick={() => setViewPeriod('week')}
+              className={`px-4 py-1.5 text-xs font-bold rounded transition-all ${
+                viewPeriod === 'week'
+                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              週単位
+            </button>
+            <button
+              onClick={() => setViewPeriod('month')}
+              className={`px-4 py-1.5 text-xs font-bold rounded transition-all ${
+                viewPeriod === 'month'
+                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              月単位
+            </button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => changeMonth(-1)}
+              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            >
+              ←
+            </button>
+            <span className="text-sm font-bold text-gray-800 min-w-[120px] text-center">
+              {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
+            </span>
+            <button
+              onClick={() => changeMonth(1)}
+              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            >
+              →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 主要指標カード */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 当月見込み売り上げ */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold text-gray-500">当月見込み売り上げ</div>
+            <DollarSign size={16} className="text-[#00c4cc]" />
+          </div>
+          <div className="text-2xl font-bold text-gray-800">
+            ¥{totalMonthlyRevenue.toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            目標: ¥{targetRevenue.toLocaleString()} / 達成率: {targetRevenue > 0 ? ((totalMonthlyRevenue / targetRevenue) * 100).toFixed(1) : 0}%
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div
+              className="bg-[#00c4cc] h-2 rounded-full transition-all"
+              style={{ width: `${Math.min(targetRevenue > 0 ? (totalMonthlyRevenue / targetRevenue) * 100 : 0, 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* 稼働率 */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold text-gray-500">稼働率</div>
+            <BarChart3 size={16} className="text-[#00c4cc]" />
+          </div>
+          <div className="text-2xl font-bold text-gray-800">
+            {occupancyRate.rate.toFixed(1)}%
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            目標: {targetOccupancyRate}%
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div
+              className={`h-2 rounded-full transition-all ${
+                occupancyRate.rate >= targetOccupancyRate
+                  ? 'bg-green-500'
+                  : occupancyRate.rate >= targetOccupancyRate * 0.8
+                  ? 'bg-yellow-500'
+                  : 'bg-red-500'
+              }`}
+              style={{ width: `${Math.min(occupancyRate.rate, 100)}%` }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-gray-600">
+            <div>午前: {ampmOccupancyRate.amRate.toFixed(1)}% ({ampmOccupancyRate.amCount}/{ampmOccupancyRate.amCapacity})</div>
+            <div>午後: {ampmOccupancyRate.pmRate.toFixed(1)}% ({ampmOccupancyRate.pmCount}/{ampmOccupancyRate.pmCapacity})</div>
+          </div>
+        </div>
+
+        {/* 利用枠消化率 */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold text-gray-500">利用枠消化率</div>
+            <Calendar size={16} className="text-[#00c4cc]" />
+          </div>
+          <div className="text-2xl font-bold text-gray-800">
+            {slotStats.occupancyRate.toFixed(1)}%
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            予定: {slotStats.scheduledSlots} / 消化: {slotStats.usedSlots}
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div
+              className="bg-[#00c4cc] h-2 rounded-full transition-all"
+              style={{ width: `${Math.min(slotStats.occupancyRate, 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* キャンセル率 */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold text-gray-500">キャンセル率</div>
+            <AlertCircle size={16} className="text-[#00c4cc]" />
+          </div>
+          <div className="text-2xl font-bold text-gray-800">
+            {slotStats.cancellationRate.toFixed(1)}%
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            キャンセル数: {slotStats.cancelledSlots}件
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div
+              className={`h-2 rounded-full transition-all ${
+                slotStats.cancellationRate > 20
+                  ? 'bg-red-500'
+                  : slotStats.cancellationRate > 10
+                  ? 'bg-yellow-500'
+                  : 'bg-green-500'
+              }`}
+              style={{ width: `${Math.min(slotStats.cancellationRate, 100)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 週別見込み売り上げ */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <TrendingUp size={20} className="mr-2 text-[#00c4cc]" />
+          週別見込み売り上げ
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {weeklyRevenue.map((week) => (
+            <div
+              key={week.week}
+              className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+            >
+              <div className="text-xs font-bold text-gray-500 mb-2">
+                {week.week}週目
+              </div>
+              <div className="text-xl font-bold text-gray-800 mb-1">
+                ¥{week.revenue.toLocaleString()}
+              </div>
+              <div className="text-xs text-gray-500">
+                予定: {week.scheduledCount} / 実績: {week.actualCount}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* リード管理進捗 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <Target size={20} className="mr-2 text-[#00c4cc]" />
+          リード管理進捗
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="text-xs font-bold text-blue-700 mb-1">新規問い合わせ</div>
+            <div className="text-2xl font-bold text-blue-800">{leadProgress.current.newInquiries}</div>
+            {leadProgress.previous && (
+              <div className="flex items-center text-xs mt-1">
+                {leadProgress.trends.newInquiries >= 0 ? (
+                  <ArrowUp size={12} className="text-green-600 mr-1" />
+                ) : (
+                  <ArrowDown size={12} className="text-red-600 mr-1" />
+                )}
+                <span className={leadProgress.trends.newInquiries >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {Math.abs(leadProgress.trends.newInquiries).toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+            <div className="text-xs font-bold text-yellow-700 mb-1">見学/面談予定</div>
+            <div className="text-2xl font-bold text-yellow-800">{leadProgress.current.visits}</div>
+            {leadProgress.previous && (
+              <div className="flex items-center text-xs mt-1">
+                {leadProgress.trends.visits >= 0 ? (
+                  <ArrowUp size={12} className="text-green-600 mr-1" />
+                ) : (
+                  <ArrowDown size={12} className="text-red-600 mr-1" />
+                )}
+                <span className={leadProgress.trends.visits >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {Math.abs(leadProgress.trends.visits).toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+            <div className="text-xs font-bold text-orange-700 mb-1">検討中</div>
+            <div className="text-2xl font-bold text-orange-800">{leadProgress.current.considering}</div>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+            <div className="text-xs font-bold text-green-700 mb-1">契約済み</div>
+            <div className="text-2xl font-bold text-green-800">{leadProgress.current.contracts}</div>
+            {leadProgress.previous && (
+              <div className="flex items-center text-xs mt-1">
+                {leadProgress.trends.contracts >= 0 ? (
+                  <ArrowUp size={12} className="text-green-600 mr-1" />
+                ) : (
+                  <ArrowDown size={12} className="text-red-600 mr-1" />
+                )}
+                <span className={leadProgress.trends.contracts >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {Math.abs(leadProgress.trends.contracts).toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+            <div className="text-xs font-bold text-red-700 mb-1">失注</div>
+            <div className="text-2xl font-bold text-red-800">{leadProgress.current.lost}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 契約数・問い合わせ数推移 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center">
+            <Users size={20} className="mr-2 text-[#00c4cc]" />
+            契約数・問い合わせ数推移（過去6ヶ月）
+          </h3>
+          <button
+            onClick={() => setIsContractTrendExpanded(!isContractTrendExpanded)}
+            className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-bold flex items-center"
+          >
+            {isContractTrendExpanded ? (
+              <>
+                <ChevronUp size={14} className="mr-1" />
+                折りたたむ
+              </>
+            ) : (
+              <>
+                <ChevronDown size={14} className="mr-1" />
+                展開する
+              </>
+            )}
+          </button>
+        </div>
+        <div className={`grid gap-4 transition-all ${isContractTrendExpanded ? 'grid-cols-1 md:grid-cols-6' : 'grid-cols-1 md:grid-cols-3'}`}>
+          {(isContractTrendExpanded ? inquiriesBySource : inquiriesBySource.slice(-3)).map((item, index) => (
+            <div key={index} className="text-center">
+              <div className="text-xs font-bold text-gray-500 mb-2">{item.month}</div>
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 mb-2">
+                <div className="text-xs text-blue-700 mb-1">契約数</div>
+                <div className="text-xl font-bold text-blue-800">{item.contracts}</div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-3 border border-green-200 mb-2">
+                <div className="text-xs text-green-700 mb-1">新規問い合わせ</div>
+                <div className="text-xl font-bold text-green-800">{item.inquiries.total}</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-2 border border-gray-200 text-xs">
+                <div className="text-gray-600 mb-1">問い合わせ経路別</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between">
+                    <span>発達ナビ:</span>
+                    <span className="font-bold">{item.inquiries.devnavi}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>HP:</span>
+                    <span className="font-bold">{item.inquiries.homepage}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>相談支援:</span>
+                    <span className="font-bold">{item.inquiries['support-office']}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>その他:</span>
+                    <span className="font-bold">{item.inquiries.other}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 送迎利用率 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <Car size={20} className="mr-2 text-[#00c4cc]" />
+          送迎利用率
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="text-xs font-bold text-blue-700 mb-1">お迎え利用率</div>
+            <div className="text-2xl font-bold text-blue-800">
+              {pickupDropoffRate.pickupRate.toFixed(1)}%
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              {pickupDropoffRate.pickupCount}件 / {pickupDropoffRate.totalSchedules}件
+            </div>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+            <div className="text-xs font-bold text-green-700 mb-1">お送り利用率</div>
+            <div className="text-2xl font-bold text-green-800">
+              {pickupDropoffRate.dropoffRate.toFixed(1)}%
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              {pickupDropoffRate.dropoffCount}件 / {pickupDropoffRate.totalSchedules}件
+            </div>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+            <div className="text-xs font-bold text-purple-700 mb-1">両方利用</div>
+            <div className="text-2xl font-bold text-purple-800">
+              {pickupDropoffRate.bothRate.toFixed(1)}%
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              {pickupDropoffRate.bothCount}件 / {pickupDropoffRate.totalSchedules}件
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 曜日別利用率 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <Calendar size={20} className="mr-2 text-[#00c4cc]" />
+          曜日別利用率
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-2 px-3 text-xs font-bold text-gray-600">曜日</th>
+                <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午前</th>
+                <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午後</th>
+                <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">合計利用率</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dayOfWeekUtilization.map((day) => (
+                <tr key={day.dayIndex} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-2 px-3 font-bold text-gray-800">{day.dayOfWeek}</td>
+                  <td className="py-2 px-3 text-right">
+                    <div className="text-sm font-bold text-gray-800">
+                      {day.amUtilization.toFixed(1)}%
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {day.amCount}件
+                    </div>
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <div className="text-sm font-bold text-gray-800">
+                      {day.pmUtilization.toFixed(1)}%
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {day.pmCount}件
+                    </div>
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <div className="text-sm font-bold text-[#00c4cc]">
+                      {day.totalUtilization.toFixed(1)}%
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 年齢別・地区別利用児童 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 年齢別利用児童 */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <Users size={20} className="mr-2 text-[#00c4cc]" />
+            年齢別利用児童
+          </h3>
+          <div className="space-y-3">
+            {ageDistribution.map((item) => (
+              <div key={item.age}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm font-bold text-gray-700">{item.age}</span>
+                  <span className="text-sm font-bold text-gray-800">
+                    {item.count}名 ({item.percentage.toFixed(1)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-[#00c4cc] h-2 rounded-full transition-all"
+                    style={{ width: `${item.percentage}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 居住地区別利用児童 */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <MapPin size={20} className="mr-2 text-[#00c4cc]" />
+            利用児童の居住地区
+          </h3>
+          <div className="space-y-3">
+            {areaDistribution.slice(0, 10).map((item) => (
+              <div key={item.area}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm font-bold text-gray-700">{item.area}</span>
+                  <span className="text-sm font-bold text-gray-800">
+                    {item.count}名 ({item.percentage.toFixed(1)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-[#00c4cc] h-2 rounded-full transition-all"
+                    style={{ width: `${item.percentage}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* その他の経営指標 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="text-xs font-bold text-gray-500 mb-2">平均単価（ARPU）</div>
+          <div className="text-2xl font-bold text-gray-800">
+            ¥{arpu.arpu.toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">目標: ¥{arpu.target.toLocaleString()}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="text-xs font-bold text-gray-500 mb-2">人件費率（L/R比）</div>
+          <div className="text-2xl font-bold text-gray-800">
+            {laborRatio.ratio.toFixed(1)}%
+          </div>
+          <div className="text-xs text-gray-500 mt-1">目標: {laborRatio.target}%</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="text-xs font-bold text-gray-500 mb-2">アクティブ児童数</div>
+          <div className="text-2xl font-bold text-gray-800">
+            {children.filter((c) => c.contractStatus === 'active').length}名
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            総児童数: {children.length}名
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DashboardView;
+
