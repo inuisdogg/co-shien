@@ -8,10 +8,33 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2 } from 'lucide-react';
 import { FacilitySettings, HolidayPeriod } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
 
 const FacilitySettingsView: React.FC = () => {
   const { facilitySettings, updateFacilitySettings } = useFacilityData();
+  const { facility } = useAuth();
+  const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
+
+  // 最新の施設コードを取得
+  useEffect(() => {
+    const fetchFacilityCode = async () => {
+      if (facility?.id) {
+        const { data, error } = await supabase
+          .from('facilities')
+          .select('code')
+          .eq('id', facility.id)
+          .single();
+        
+        if (!error && data) {
+          setCurrentFacilityCode(data.code || '');
+        }
+      }
+    };
+    
+    fetchFacilityCode();
+  }, [facility?.id]);
 
   const [settings, setSettings] = useState<FacilitySettings>(facilitySettings);
   const [newHoliday, setNewHoliday] = useState('');
@@ -137,25 +160,38 @@ const FacilitySettingsView: React.FC = () => {
           <Building2 size={20} className="mr-2 text-[#00c4cc]" />
           施設名設定
         </h3>
-        <div>
-          <label className="text-sm font-bold text-gray-700 block mb-2">
-            施設名
-          </label>
-          <input
-            type="text"
-            value={settings.facilityName || ''}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                facilityName: e.target.value,
-              })
-            }
-            placeholder="施設名を入力してください"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            この施設名はサイドバーの下部に表示されます
-          </p>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">
+              施設ID
+            </label>
+            <div className="bg-gray-50 border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-700 font-mono">
+              {currentFacilityCode || facility?.code || '未設定'}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              この施設IDはログイン時に使用します
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">
+              施設名
+            </label>
+            <input
+              type="text"
+              value={settings.facilityName || ''}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  facilityName: e.target.value,
+                })
+              }
+              placeholder="施設名を入力してください"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              この施設名はサイドバーの下部に表示されます
+            </p>
+          </div>
         </div>
       </div>
 

@@ -6,9 +6,11 @@
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw } from 'lucide-react';
-import { Staff, ScheduleItem } from '@/types';
+import { Staff, ScheduleItem, UserPermissions } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
+import { hashPassword } from '@/utils/password';
+import { supabase } from '@/lib/supabase';
 
 const StaffView: React.FC = () => {
   const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings } = useFacilityData();
@@ -34,6 +36,20 @@ const StaffView: React.FC = () => {
   const [shifts, setShifts] = useState<Record<string, Record<string, boolean>>>({}); // {staffId: {date: boolean}}
   const [isShiftPatternModalOpen, setIsShiftPatternModalOpen] = useState(false);
   const [shiftPatterns, setShiftPatterns] = useState<Record<string, boolean[]>>({}); // {staffId: [月, 火, 水, 木, 金, 土]}
+  const [loginId, setLoginId] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [permissions, setPermissions] = useState<UserPermissions>({
+    dashboard: false,
+    management: false,
+    lead: false,
+    schedule: false,
+    children: false,
+    staff: false,
+    facility: false,
+  });
 
   // 週間カレンダーの日付を生成
   const weekDates = useMemo(() => {
@@ -255,6 +271,20 @@ const StaffView: React.FC = () => {
       monthlySalary: undefined,
       hourlyWage: undefined,
     });
+    setLoginId('');
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setPermissions({
+      dashboard: false,
+      management: false,
+      lead: false,
+      schedule: false,
+      children: false,
+      staff: false,
+      facility: false,
+    });
     setQualificationPreview(null);
     setExperiencePreview(null);
     if (qualificationFileInputRef.current) {
@@ -266,7 +296,7 @@ const StaffView: React.FC = () => {
   };
 
   // スタッフを編集開始
-  const handleEditStaff = (staff: Staff) => {
+  const handleEditStaff = async (staff: Staff) => {
     setEditingStaff(staff);
     setFormData({
       name: staff.name,
@@ -290,6 +320,74 @@ const StaffView: React.FC = () => {
     });
     setQualificationPreview(staff.qualificationCertificate || null);
     setExperiencePreview(staff.experienceCertificate || null);
+    
+    // 既存のユーザーアカウント情報を取得
+    if (staff.user_id) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('login_id, permissions')
+        .eq('id', staff.user_id)
+        .single();
+      
+      if (userData) {
+        setLoginId(userData.login_id || '');
+        setPermissions((userData.permissions as UserPermissions) || {
+          dashboard: false,
+          management: false,
+          lead: false,
+          schedule: false,
+          children: false,
+          staff: false,
+          facility: false,
+        });
+      } else {
+        // user_idはあるがusersテーブルに存在しない場合
+        setLoginId('');
+        setPermissions({
+          dashboard: false,
+          management: false,
+          lead: false,
+          schedule: false,
+          children: false,
+          staff: false,
+          facility: false,
+        });
+      }
+    } else {
+      // user_idがない場合、スタッフ名でusersテーブルを検索（後方互換性）
+      const { data: userDataByName } = await supabase
+        .from('users')
+        .select('login_id, permissions')
+        .eq('facility_id', staff.facilityId)
+        .eq('name', staff.name)
+        .eq('role', 'staff')
+        .maybeSingle();
+      
+      if (userDataByName) {
+        setLoginId(userDataByName.login_id || '');
+        setPermissions((userDataByName.permissions as UserPermissions) || {
+          dashboard: false,
+          management: false,
+          lead: false,
+          schedule: false,
+          children: false,
+          staff: false,
+          facility: false,
+        });
+      } else {
+        setLoginId('');
+        setPermissions({
+          dashboard: false,
+          management: false,
+          lead: false,
+          schedule: false,
+          children: false,
+          staff: false,
+          facility: false,
+        });
+      }
+    }
+    
     setIsEditModalOpen(true);
   };
 
@@ -309,8 +407,27 @@ const StaffView: React.FC = () => {
       return;
     }
 
+    // ログインIDとパスワードが入力されている場合は検証
+    if (loginId.trim() || password || confirmPassword) {
+      if (!loginId.trim()) {
+        alert('ログインIDを入力してください');
+        return;
+      }
+      // パスワードが入力されている場合のみ検証
+      if (password) {
+        if (password.length < 6) {
+          alert('パスワードは6文字以上で入力してください');
+          return;
+        }
+        if (password !== confirmPassword) {
+          alert('パスワードが一致しません');
+          return;
+        }
+      }
+    }
+
     try {
-      await updateStaff(editingStaff.id, {
+      const updateData: any = {
         name: formData.name.trim(),
         nameKana: formData.nameKana?.trim() || undefined,
         role: formData.role as Staff['role'],
@@ -329,7 +446,94 @@ const StaffView: React.FC = () => {
         memo: formData.memo?.trim() || undefined,
         monthlySalary: formData.monthlySalary,
         hourlyWage: formData.hourlyWage,
-      });
+      };
+
+      // ログインIDが入力されている場合はusersテーブルにアカウントを作成/更新
+      if (loginId.trim()) {
+        // 既存のユーザーアカウントを検索（staff.user_idまたはlogin_idで検索）
+        let userId: string | null = null;
+        
+        if (editingStaff.user_id) {
+          const { data: existingUserById } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', editingStaff.user_id)
+            .single();
+          userId = existingUserById?.id || null;
+        }
+        
+        // user_idで見つからない場合、login_idで検索
+        if (!userId) {
+          const { data: existingUserByLoginId } = await supabase
+            .from('users')
+            .select('id')
+            .eq('facility_id', editingStaff.facilityId)
+            .eq('login_id', loginId.trim())
+            .single();
+          userId = existingUserByLoginId?.id || null;
+        }
+
+        // 新しいIDを生成
+        if (!userId) {
+          userId = `user-${Date.now()}`;
+        }
+
+        const updateData: any = {
+          facility_id: editingStaff.facilityId,
+          name: editingStaff.name,
+          login_id: loginId.trim(),
+          email: editingStaff.email || null,
+          role: 'staff',
+          has_account: true,
+          permissions: permissions,
+          updated_at: new Date().toISOString(),
+        };
+
+        // パスワードが入力されている場合はハッシュ化して設定
+        if (password) {
+          const passwordHash = await hashPassword(password);
+          updateData.password_hash = passwordHash;
+        }
+
+        // 既存のアカウントがある場合は更新
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', userId)
+          .single();
+
+        if (existingUser) {
+          // 既存のアカウントを更新
+          const { error: userError } = await supabase
+            .from('users')
+            .update(updateData)
+            .eq('id', userId);
+
+          if (userError) {
+            throw new Error(`アカウントの更新に失敗しました: ${userError.message}`);
+          }
+        } else {
+          // 新しいアカウントを作成
+          updateData.id = userId;
+          updateData.created_at = new Date().toISOString();
+          
+          const { error: userError } = await supabase
+            .from('users')
+            .insert(updateData);
+
+          if (userError) {
+            throw new Error(`アカウントの作成に失敗しました: ${userError.message}`);
+          }
+
+          // staffテーブルにuser_idを紐付け
+          await supabase
+            .from('staff')
+            .update({ user_id: userId })
+            .eq('id', editingStaff.id);
+        }
+      }
+
+      await updateStaff(editingStaff.id, updateData);
 
       setIsEditModalOpen(false);
       setEditingStaff(null);
@@ -466,7 +670,7 @@ const StaffView: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">勤怠・シフト管理</h2>
+          <h2 className="text-xl font-bold text-gray-800">スタッフ・シフト管理</h2>
           <p className="text-gray-500 text-xs mt-1">
             スタッフのマスタ管理と、配置基準を満たすためのシフト作成を行います。
           </p>
@@ -1627,6 +1831,170 @@ const StaffView: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
                     placeholder="その他の情報やメモを入力してください"
                   />
+                </div>
+              </div>
+
+              {/* アカウント設定 */}
+              <div className="space-y-4">
+                <h4 className="font-bold text-sm text-gray-700 border-b border-gray-200 pb-2">
+                  アカウント設定
+                </h4>
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                  <p className="text-xs text-blue-800">
+                    ログインIDとパスワードを設定すると、このスタッフはログインできるようになります。
+                    変更する場合は、新しいログインIDとパスワードを入力してください。
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                    ログインID
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
+                    placeholder="ログインIDを入力"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                      パスワード
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 pr-10 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="6文字以上"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                      パスワード（確認）
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 pr-10 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="パスワードを再入力"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showConfirmPassword ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 閲覧権限設定 */}
+              <div className="space-y-4">
+                <h4 className="font-bold text-sm text-gray-700 border-b border-gray-200 pb-2">
+                  閲覧権限設定
+                </h4>
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                  <p className="text-xs text-blue-800">
+                    このスタッフが閲覧できるメニューを選択してください。チェックを入れたメニューのみ閲覧可能です。
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.dashboard || false}
+                      onChange={(e) => setPermissions({ ...permissions, dashboard: e.target.checked })}
+                      className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-700">ダッシュボード</span>
+                  </label>
+                  <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.management || false}
+                      onChange={(e) => setPermissions({ ...permissions, management: e.target.checked })}
+                      className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-700">経営設定</span>
+                  </label>
+                  <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.lead || false}
+                      onChange={(e) => setPermissions({ ...permissions, lead: e.target.checked })}
+                      className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-700">リード管理</span>
+                  </label>
+                  <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.schedule || false}
+                      onChange={(e) => setPermissions({ ...permissions, schedule: e.target.checked })}
+                      className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-700">利用調整・予約</span>
+                  </label>
+                  <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.children || false}
+                      onChange={(e) => setPermissions({ ...permissions, children: e.target.checked })}
+                      className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-700">児童管理</span>
+                  </label>
+                  <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.staff || false}
+                      onChange={(e) => setPermissions({ ...permissions, staff: e.target.checked })}
+                      className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-700">スタッフ・シフト管理</span>
+                  </label>
+                  <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.facility || false}
+                      onChange={(e) => setPermissions({ ...permissions, facility: e.target.checked })}
+                      className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-700">施設情報</span>
+                  </label>
                 </div>
               </div>
 

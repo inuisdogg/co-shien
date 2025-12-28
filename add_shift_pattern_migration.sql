@@ -9,3 +9,4 @@ ADD COLUMN IF NOT EXISTS default_shift_pattern BOOLEAN[] DEFAULT ARRAY[]::BOOLEA
 
 COMMENT ON COLUMN staff.default_shift_pattern IS '基本シフトパターン（週の曜日ごとのシフト有無、月～土の6日分）[月, 火, 水, 木, 金, 土]の順（true=シフトあり、false=シフトなし）';
 
+

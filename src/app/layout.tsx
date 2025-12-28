@@ -12,6 +12,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'co-shien - 児童発達支援管理システム',
   description: '児童発達支援事業所向けの管理システム',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({

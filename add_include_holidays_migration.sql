@@ -2,3 +2,4 @@
 ALTER TABLE facility_settings 
 ADD COLUMN IF NOT EXISTS include_holidays BOOLEAN DEFAULT false;
 
+

@@ -215,6 +215,7 @@ export const useFacilityData = () => {
             memo: row.memo,
             monthlySalary: row.monthly_salary,
             hourlyWage: row.hourly_wage,
+            user_id: row.user_id,
             defaultShiftPattern: row.default_shift_pattern && Array.isArray(row.default_shift_pattern) 
               ? row.default_shift_pattern as boolean[] 
               : undefined,
@@ -627,7 +628,7 @@ export const useFacilityData = () => {
     }
   };
 
-  const updateStaff = async (staffId: string, staffData: Partial<Staff>) => {
+  const updateStaff = async (staffId: string, staffData: Partial<Staff & { passwordHash?: string; hasAccount?: boolean }>) => {
     try {
       // Supabaseを更新
       const updateData: any = {
@@ -653,6 +654,10 @@ export const useFacilityData = () => {
       if (staffData.monthlySalary !== undefined) updateData.monthly_salary = staffData.monthlySalary;
       if (staffData.hourlyWage !== undefined) updateData.hourly_wage = staffData.hourlyWage;
       if (staffData.defaultShiftPattern !== undefined) updateData.default_shift_pattern = staffData.defaultShiftPattern || null;
+      
+      // パスワード関連のフィールド
+      if (staffData.passwordHash !== undefined) updateData.password_hash = staffData.passwordHash;
+      if (staffData.hasAccount !== undefined) updateData.has_account = staffData.hasAccount;
 
       const { error } = await supabase
         .from('staff')
