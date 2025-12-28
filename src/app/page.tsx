@@ -16,6 +16,7 @@ import ChildrenView from '@/components/children/ChildrenView';
 import StaffView from '@/components/staff/StaffView';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 import { useAuth } from '@/contexts/AuthContext';
+import { UserPermissions } from '@/types';
 
 export default function Home() {
   const { isAuthenticated, isAdmin, hasPermission } = useAuth();
@@ -34,7 +35,7 @@ export default function Home() {
   // 認証後に初期タブを設定（管理者はdashboard、それ以外はschedule）
   useEffect(() => {
     if (isAuthenticated && !initialTabSet) {
-      const permissionMap: Record<string, keyof import('@/types').UserPermissions> = {
+      const permissionMap: Record<string, keyof UserPermissions> = {
         dashboard: 'dashboard',
         management: 'management',
         lead: 'lead',
@@ -68,7 +69,7 @@ export default function Home() {
   // 権限に基づいてアクセス制御
   useEffect(() => {
     if (isAuthenticated && initialTabSet && activeTab) {
-      const permissionMap: Record<string, keyof import('@/types').UserPermissions> = {
+      const permissionMap: Record<string, keyof UserPermissions> = {
         dashboard: 'dashboard',
         management: 'management',
         lead: 'lead',
