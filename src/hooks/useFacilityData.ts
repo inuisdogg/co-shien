@@ -209,6 +209,9 @@ export const useFacilityData = () => {
             memo: row.memo,
             monthlySalary: row.monthly_salary,
             hourlyWage: row.hourly_wage,
+            defaultShiftPattern: row.default_shift_pattern && Array.isArray(row.default_shift_pattern) 
+              ? row.default_shift_pattern as boolean[] 
+              : undefined,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
           }));
@@ -569,6 +572,7 @@ export const useFacilityData = () => {
           memo: staffData.memo,
           monthly_salary: staffData.monthlySalary,
           hourly_wage: staffData.hourlyWage,
+          default_shift_pattern: staffData.defaultShiftPattern || null,
           created_at: now,
           updated_at: now,
         })
@@ -621,6 +625,7 @@ export const useFacilityData = () => {
       if (staffData.memo !== undefined) updateData.memo = staffData.memo;
       if (staffData.monthlySalary !== undefined) updateData.monthly_salary = staffData.monthlySalary;
       if (staffData.hourlyWage !== undefined) updateData.hourly_wage = staffData.hourlyWage;
+      if (staffData.defaultShiftPattern !== undefined) updateData.default_shift_pattern = staffData.defaultShiftPattern || null;
 
       const { error } = await supabase
         .from('staff')

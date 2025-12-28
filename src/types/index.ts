@@ -118,6 +118,8 @@ export type Staff = {
   // 給与
   monthlySalary?: number; // 月給（常勤の場合）
   hourlyWage?: number; // 時給（非常勤の場合）
+  // 基本シフトパターン（週の曜日ごとのシフト有無、月～土の6日分）
+  defaultShiftPattern?: boolean[]; // [月, 火, 水, 木, 金, 土]の順（true=シフトあり、false=シフトなし）
   createdAt: string;
   updatedAt: string;
 };

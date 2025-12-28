@@ -89,6 +89,8 @@ CREATE TABLE IF NOT EXISTS staff (
   -- 給与
   monthly_salary NUMERIC,
   hourly_wage NUMERIC,
+  -- 基本シフトパターン（週の曜日ごとのシフト有無、月～土の6日分）
+  default_shift_pattern BOOLEAN[] DEFAULT ARRAY[]::BOOLEAN[],
   -- メタデータ
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

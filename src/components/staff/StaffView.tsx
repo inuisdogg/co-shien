@@ -5,18 +5,34 @@
 'use client';
 
 import React, { useState, useMemo, useRef } from 'react';
-import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle } from 'lucide-react';
+import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw } from 'lucide-react';
 import { Staff, ScheduleItem } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 
 const StaffView: React.FC = () => {
   const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings } = useFacilityData();
   const [subTab, setSubTab] = useState<'shift' | 'list'>('shift');
+  
+  // スタッフを並び順でソート（マネージャー→常勤→非常勤）
+  const sortedStaff = useMemo(() => {
+    return [...staff].sort((a, b) => {
+      // 1. マネージャー優先
+      if (a.role === 'マネージャー' && b.role !== 'マネージャー') return -1;
+      if (a.role !== 'マネージャー' && b.role === 'マネージャー') return 1;
+      // 2. 役職が同じ場合、常勤優先
+      if (a.type === '常勤' && b.type === '非常勤') return -1;
+      if (a.type === '非常勤' && b.type === '常勤') return 1;
+      // 3. それ以外は名前順
+      return a.name.localeCompare(b.name, 'ja');
+    });
+  }, [staff]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [shifts, setShifts] = useState<Record<string, Record<string, boolean>>>({}); // {staffId: {date: boolean}}
+  const [isShiftPatternModalOpen, setIsShiftPatternModalOpen] = useState(false);
+  const [shiftPatterns, setShiftPatterns] = useState<Record<string, boolean[]>>({}); // {staffId: [月, 火, 水, 木, 金, 土]}
 
   // 週間カレンダーの日付を生成
   const weekDates = useMemo(() => {
@@ -343,6 +359,67 @@ const StaffView: React.FC = () => {
     }
   };
 
+  // 基本シフトパターンモーダルを開く
+  const handleOpenShiftPatternModal = () => {
+    // 既存のパターンを読み込む
+    const patterns: Record<string, boolean[]> = {};
+    sortedStaff.forEach((s) => {
+      patterns[s.id] = s.defaultShiftPattern || [false, false, false, false, false, false];
+    });
+    setShiftPatterns(patterns);
+    setIsShiftPatternModalOpen(true);
+  };
+
+  // シフトパターンを更新
+  const handleUpdateShiftPattern = (staffId: string, dayIndex: number) => {
+    setShiftPatterns((prev) => {
+      const newPattern = [...(prev[staffId] || [false, false, false, false, false, false])];
+      newPattern[dayIndex] = !newPattern[dayIndex];
+      return {
+        ...prev,
+        [staffId]: newPattern,
+      };
+    });
+  };
+
+  // シフトパターンを保存
+  const handleSaveShiftPatterns = async () => {
+    try {
+      for (const [staffId, pattern] of Object.entries(shiftPatterns)) {
+        await updateStaff(staffId, { defaultShiftPattern: pattern });
+      }
+      setIsShiftPatternModalOpen(false);
+      alert('基本シフトパターンを保存しました');
+    } catch (error) {
+      console.error('Error saving shift patterns:', error);
+      alert('基本シフトパターンの保存に失敗しました');
+    }
+  };
+
+  // 基本シフトパターンを一括反映
+  const handleApplyShiftPatterns = () => {
+    const newShifts: Record<string, Record<string, boolean>> = { ...shifts };
+    
+    sortedStaff.forEach((s) => {
+      const pattern = s.defaultShiftPattern || [false, false, false, false, false, false];
+      if (!newShifts[s.id]) {
+        newShifts[s.id] = {};
+      }
+      
+      weekDates.forEach((d, index) => {
+        if (index < pattern.length) {
+          // 休業日でない場合のみ適用
+          if (!isHoliday(d.date)) {
+            newShifts[s.id][d.date] = pattern[index];
+          }
+        }
+      });
+    });
+    
+    setShifts(newShifts);
+    alert('基本シフトパターンを一括反映しました');
+  };
+
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -412,6 +489,22 @@ const StaffView: React.FC = () => {
                   →
                 </button>
               </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleOpenShiftPatternModal}
+                  className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-sm font-bold transition-colors flex items-center"
+                >
+                  <Settings size={16} className="mr-2" />
+                  基本シフトパターン設定
+                </button>
+                <button
+                  onClick={handleApplyShiftPatterns}
+                  className="px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors flex items-center"
+                >
+                  <RotateCw size={16} className="mr-2" />
+                  パターン一括反映
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -445,7 +538,7 @@ const StaffView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {staff.map((s: Staff) => (
+                  {sortedStaff.map((s: Staff) => (
                     <tr key={s.id} className="hover:bg-gray-50">
                       <td className="p-3 border-b border-r border-gray-100 bg-white">
                         <div className="font-bold text-gray-800">{s.name}</div>
@@ -484,7 +577,7 @@ const StaffView: React.FC = () => {
                       配置人数合計
                     </td>
                     {weekDates.map((d) => {
-                      const count = staff.filter((s) => shifts[s.id]?.[d.date]).length;
+                      const count = sortedStaff.filter((s) => shifts[s.id]?.[d.date]).length;
                       return (
                         <td
                           key={`total-${d.date}`}
@@ -649,7 +742,7 @@ const StaffView: React.FC = () => {
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {staff.map((s: Staff) => (
+            {sortedStaff.map((s: Staff) => (
               <div
                 key={s.id}
                 className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow bg-white"
@@ -1491,6 +1584,101 @@ const StaffView: React.FC = () => {
                   className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all"
                 >
                   更新する
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 基本シフトパターン設定モーダル */}
+      {isShiftPatternModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg w-full max-w-4xl shadow-2xl border border-gray-100 my-8">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center">
+                <Settings size={20} className="mr-2 text-[#00c4cc]" />
+                基本シフトパターン設定
+              </h3>
+              <button
+                onClick={() => setIsShiftPatternModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                各スタッフの週の基本シフトパターンを設定します。月～土の6日間について、シフトがある日を選択してください。
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="p-3 border-b border-r border-gray-200 bg-gray-50 text-left font-bold text-gray-700 min-w-[150px]">
+                        スタッフ名
+                      </th>
+                      <th className="p-3 border-b border-r border-gray-200 bg-gray-50 text-center font-bold text-gray-700">
+                        月
+                      </th>
+                      <th className="p-3 border-b border-r border-gray-200 bg-gray-50 text-center font-bold text-gray-700">
+                        火
+                      </th>
+                      <th className="p-3 border-b border-r border-gray-200 bg-gray-50 text-center font-bold text-gray-700">
+                        水
+                      </th>
+                      <th className="p-3 border-b border-r border-gray-200 bg-gray-50 text-center font-bold text-gray-700">
+                        木
+                      </th>
+                      <th className="p-3 border-b border-r border-gray-200 bg-gray-50 text-center font-bold text-gray-700">
+                        金
+                      </th>
+                      <th className="p-3 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700">
+                        土
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedStaff.map((s) => {
+                      const pattern = shiftPatterns[s.id] || [false, false, false, false, false, false];
+                      return (
+                        <tr key={s.id} className="hover:bg-gray-50">
+                          <td className="p-3 border-b border-r border-gray-200">
+                            <div className="font-bold text-gray-800">{s.name}</div>
+                            <div className="text-xs text-gray-500">{s.role} ({s.type})</div>
+                          </td>
+                          {pattern.map((hasShift, dayIndex) => (
+                            <td key={dayIndex} className="p-2 border-b border-r border-gray-200 text-center">
+                              <button
+                                onClick={() => handleUpdateShiftPattern(s.id, dayIndex)}
+                                className={`w-full py-2 px-1 rounded transition-all ${
+                                  hasShift
+                                    ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                }`}
+                              >
+                                {hasShift ? '◯' : '-'}
+                              </button>
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex space-x-3 pt-4 mt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setIsShiftPatternModalOpen(false)}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleSaveShiftPatterns}
+                  className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all"
+                >
+                  保存する
                 </button>
               </div>
             </div>
