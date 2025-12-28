@@ -67,10 +67,10 @@ const DashboardView: React.FC = () => {
     return getManagementTarget(currentDate.getFullYear(), currentDate.getMonth() + 1);
   }, [getManagementTarget, currentDate]);
 
-  // 経営目標を使用した計算
-  const targetRevenue = currentManagementTarget?.targetRevenue || 1000000; // デフォルト値
-  const targetOccupancyRate = currentManagementTarget?.targetOccupancyRate || 90; // デフォルト値
-  const dailyPricePerChild = currentManagementTarget?.dailyPricePerChild || 15000; // デフォルト値
+  // 経営目標を使用した計算（未設定の場合はnull）
+  const targetRevenue = currentManagementTarget?.targetRevenue || null;
+  const targetOccupancyRate = currentManagementTarget?.targetOccupancyRate || null;
+  const dailyPricePerChild = currentManagementTarget?.dailyPricePerChild || 15000; // デフォルト値（単価は必須）
 
   // 週別見込み売り上げ（経営設定の単価を使用）
   const weeklyRevenue = useMemo(
@@ -116,8 +116,8 @@ const DashboardView: React.FC = () => {
 
   // 午前・午後の稼働率
   const ampmOccupancyRate = useMemo(
-    () => calculateAMPMOccupancyRate(schedules, facilitySettings.capacity, currentDate),
-    [schedules, facilitySettings.capacity, currentDate]
+    () => calculateAMPMOccupancyRate(schedules, facilitySettings.capacity, facilitySettings, currentDate),
+    [schedules, facilitySettings, currentDate]
   );
 
   // 年齢別利用児童
@@ -134,8 +134,8 @@ const DashboardView: React.FC = () => {
 
   // 稼働率
   const occupancyRate = useMemo(
-    () => calculateOccupancyRate(schedules, facilitySettings.capacity, currentDate),
-    [schedules, facilitySettings.capacity, currentDate]
+    () => calculateOccupancyRate(schedules, facilitySettings.capacity, facilitySettings, currentDate),
+    [schedules, facilitySettings, currentDate]
   );
 
   // 月次利益（経営設定の単価を使用）
@@ -154,8 +154,8 @@ const DashboardView: React.FC = () => {
 
     return {
       profit: actualProfit,
-      target: targetRevenue,
-      achievementRate: targetRevenue > 0 ? (actualProfit / targetRevenue) * 100 : 0,
+      target: targetRevenue || 0,
+      achievementRate: targetRevenue !== null && targetRevenue > 0 ? (actualProfit / targetRevenue) * 100 : 0,
     };
   }, [usageRecords, currentDate, dailyPricePerChild, targetRevenue]);
 
@@ -237,7 +237,7 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 主要指標カード */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* 当月見込み売り上げ */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
           <div className="flex items-center justify-between mb-2">
@@ -248,14 +248,19 @@ const DashboardView: React.FC = () => {
             ¥{totalMonthlyRevenue.toLocaleString()}
           </div>
           <div className="text-xs text-gray-500 mt-1">
-            目標: ¥{targetRevenue.toLocaleString()} / 達成率: {targetRevenue > 0 ? ((totalMonthlyRevenue / targetRevenue) * 100).toFixed(1) : 0}%
+            目標: {targetRevenue !== null ? `¥${targetRevenue.toLocaleString()}` : '未設定'}
+            {targetRevenue !== null && (
+              <> / 達成率: {((totalMonthlyRevenue / targetRevenue) * 100).toFixed(1)}%</>
+            )}
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-            <div
-              className="bg-[#00c4cc] h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(targetRevenue > 0 ? (totalMonthlyRevenue / targetRevenue) * 100 : 0, 100)}%` }}
-            />
-          </div>
+          {targetRevenue !== null && (
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div
+                className="bg-[#00c4cc] h-2 rounded-full transition-all"
+                style={{ width: `${Math.min((totalMonthlyRevenue / targetRevenue) * 100, 100)}%` }}
+              />
+            </div>
+          )}
         </div>
 
         {/* 稼働率 */}
@@ -268,43 +273,25 @@ const DashboardView: React.FC = () => {
             {occupancyRate.rate.toFixed(1)}%
           </div>
           <div className="text-xs text-gray-500 mt-1">
-            目標: {targetOccupancyRate}%
+            目標: {targetOccupancyRate !== null ? `${targetOccupancyRate}%` : '未設定'}
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-            <div
-              className={`h-2 rounded-full transition-all ${
-                occupancyRate.rate >= targetOccupancyRate
-                  ? 'bg-green-500'
-                  : occupancyRate.rate >= targetOccupancyRate * 0.8
-                  ? 'bg-yellow-500'
-                  : 'bg-red-500'
-              }`}
-              style={{ width: `${Math.min(occupancyRate.rate, 100)}%` }}
-            />
-          </div>
+          {targetOccupancyRate !== null && (
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div
+                className={`h-2 rounded-full transition-all ${
+                  occupancyRate.rate >= targetOccupancyRate
+                    ? 'bg-green-500'
+                    : occupancyRate.rate >= targetOccupancyRate * 0.8
+                    ? 'bg-yellow-500'
+                    : 'bg-red-500'
+                }`}
+                style={{ width: `${Math.min(occupancyRate.rate, 100)}%` }}
+              />
+            </div>
+          )}
           <div className="mt-2 text-xs text-gray-600">
             <div>午前: {ampmOccupancyRate.amRate.toFixed(1)}% ({ampmOccupancyRate.amCount}/{ampmOccupancyRate.amCapacity})</div>
             <div>午後: {ampmOccupancyRate.pmRate.toFixed(1)}% ({ampmOccupancyRate.pmCount}/{ampmOccupancyRate.pmCapacity})</div>
-          </div>
-        </div>
-
-        {/* 利用枠消化率 */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-bold text-gray-500">利用枠消化率</div>
-            <Calendar size={16} className="text-[#00c4cc]" />
-          </div>
-          <div className="text-2xl font-bold text-gray-800">
-            {slotStats.occupancyRate.toFixed(1)}%
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            予定: {slotStats.scheduledSlots} / 消化: {slotStats.usedSlots}
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-            <div
-              className="bg-[#00c4cc] h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(slotStats.occupancyRate, 100)}%` }}
-            />
           </div>
         </div>
 
@@ -365,9 +352,9 @@ const DashboardView: React.FC = () => {
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
           <Target size={20} className="mr-2 text-[#00c4cc]" />
-          リード管理進捗
+          リード管理進捗（当月新規）
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
             <div className="text-xs font-bold text-blue-700 mb-1">新規問い合わせ</div>
             <div className="text-2xl font-bold text-blue-800">{leadProgress.current.newInquiries}</div>
@@ -379,7 +366,7 @@ const DashboardView: React.FC = () => {
                   <ArrowDown size={12} className="text-red-600 mr-1" />
                 )}
                 <span className={leadProgress.trends.newInquiries >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  {Math.abs(leadProgress.trends.newInquiries).toFixed(1)}%
+                  {leadProgress.trends.newInquiries >= 0 ? '+' : ''}{leadProgress.trends.newInquiries.toFixed(1)}%
                 </span>
               </div>
             )}
@@ -395,7 +382,7 @@ const DashboardView: React.FC = () => {
                   <ArrowDown size={12} className="text-red-600 mr-1" />
                 )}
                 <span className={leadProgress.trends.visits >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  {Math.abs(leadProgress.trends.visits).toFixed(1)}%
+                  {leadProgress.trends.visits >= 0 ? '+' : ''}{leadProgress.trends.visits.toFixed(1)}%
                 </span>
               </div>
             )}
@@ -403,6 +390,50 @@ const DashboardView: React.FC = () => {
           <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
             <div className="text-xs font-bold text-orange-700 mb-1">検討中</div>
             <div className="text-2xl font-bold text-orange-800">{leadProgress.current.considering}</div>
+            {leadProgress.previous && (
+              <div className="flex items-center text-xs mt-1">
+                {leadProgress.trends.considering >= 0 ? (
+                  <ArrowUp size={12} className="text-green-600 mr-1" />
+                ) : (
+                  <ArrowDown size={12} className="text-red-600 mr-1" />
+                )}
+                <span className={leadProgress.trends.considering >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {leadProgress.trends.considering >= 0 ? '+' : ''}{leadProgress.trends.considering.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+            <div className="text-xs font-bold text-purple-700 mb-1">受給者証待ち</div>
+            <div className="text-2xl font-bold text-purple-800">{leadProgress.current.waitingBenefit}</div>
+            {leadProgress.previous && (
+              <div className="flex items-center text-xs mt-1">
+                {leadProgress.trends.waitingBenefit >= 0 ? (
+                  <ArrowUp size={12} className="text-green-600 mr-1" />
+                ) : (
+                  <ArrowDown size={12} className="text-red-600 mr-1" />
+                )}
+                <span className={leadProgress.trends.waitingBenefit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {leadProgress.trends.waitingBenefit >= 0 ? '+' : ''}{leadProgress.trends.waitingBenefit.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+            <div className="text-xs font-bold text-indigo-700 mb-1">契約進行中</div>
+            <div className="text-2xl font-bold text-indigo-800">{leadProgress.current.contractProgress}</div>
+            {leadProgress.previous && (
+              <div className="flex items-center text-xs mt-1">
+                {leadProgress.trends.contractProgress >= 0 ? (
+                  <ArrowUp size={12} className="text-green-600 mr-1" />
+                ) : (
+                  <ArrowDown size={12} className="text-red-600 mr-1" />
+                )}
+                <span className={leadProgress.trends.contractProgress >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {leadProgress.trends.contractProgress >= 0 ? '+' : ''}{leadProgress.trends.contractProgress.toFixed(1)}%
+                </span>
+              </div>
+            )}
           </div>
           <div className="bg-green-50 rounded-lg p-4 border border-green-200">
             <div className="text-xs font-bold text-green-700 mb-1">契約済み</div>
@@ -415,7 +446,7 @@ const DashboardView: React.FC = () => {
                   <ArrowDown size={12} className="text-red-600 mr-1" />
                 )}
                 <span className={leadProgress.trends.contracts >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  {Math.abs(leadProgress.trends.contracts).toFixed(1)}%
+                  {leadProgress.trends.contracts >= 0 ? '+' : ''}{leadProgress.trends.contracts.toFixed(1)}%
                 </span>
               </div>
             )}
@@ -423,6 +454,18 @@ const DashboardView: React.FC = () => {
           <div className="bg-red-50 rounded-lg p-4 border border-red-200">
             <div className="text-xs font-bold text-red-700 mb-1">失注</div>
             <div className="text-2xl font-bold text-red-800">{leadProgress.current.lost}</div>
+            {leadProgress.previous && (
+              <div className="flex items-center text-xs mt-1">
+                {leadProgress.trends.lost >= 0 ? (
+                  <ArrowUp size={12} className="text-green-600 mr-1" />
+                ) : (
+                  <ArrowDown size={12} className="text-red-600 mr-1" />
+                )}
+                <span className={leadProgress.trends.lost >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {leadProgress.trends.lost >= 0 ? '+' : ''}{leadProgress.trends.lost.toFixed(1)}%
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

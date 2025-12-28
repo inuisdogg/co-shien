@@ -2,13 +2,74 @@
  * ダッシュボード用の計算ロジック
  */
 
-import { ScheduleItem, UsageRecord, Child, Staff, BookingRequest, Lead } from '@/types';
+import { ScheduleItem, UsageRecord, Child, Staff, BookingRequest, Lead, FacilitySettings } from '@/types';
+import { getJapaneseHolidays, isJapaneseHoliday } from './japaneseHolidays';
 
-// 目標値
+// 目標値（デフォルト値、実際の値はmanagementTargetsから取得）
 const TARGET_PROFIT = 1000000; // 100万円
 const TARGET_OCCUPANCY_RATE = 90; // 90%
 const TARGET_ARPU = 15000; // 15,000円
 const TARGET_LABOR_RATIO = 47; // 47%
+
+/**
+ * 施設設定に基づいて営業日数を計算
+ */
+export const calculateBusinessDays = (
+  facilitySettings: FacilitySettings,
+  year: number,
+  month: number
+): number => {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  let businessDays = 0;
+
+  // その月の祝日を取得
+  const holidays = facilitySettings.includeHolidays ? getJapaneseHolidays(year) : [];
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const dayOfWeek = date.getDay();
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    // 期間ごとの定休日を確認
+    let isHoliday = false;
+    if (facilitySettings.holidayPeriods) {
+      for (const period of facilitySettings.holidayPeriods) {
+        const periodStart = new Date(period.startDate);
+        const periodEnd = period.endDate ? new Date(period.endDate) : new Date(9999, 11, 31);
+        const currentDate = new Date(year, month, day);
+
+        if (currentDate >= periodStart && currentDate <= periodEnd) {
+          if (period.regularHolidays.includes(dayOfWeek)) {
+            isHoliday = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // 期間に該当しない場合はデフォルトの定休日を確認
+    if (!isHoliday && facilitySettings.regularHolidays.includes(dayOfWeek)) {
+      isHoliday = true;
+    }
+
+    // カスタム休業日を確認
+    if (facilitySettings.customHolidays.includes(dateStr)) {
+      isHoliday = true;
+    }
+
+    // 祝日を確認
+    if (facilitySettings.includeHolidays && isJapaneseHoliday(dateStr)) {
+      isHoliday = true;
+    }
+
+    // 営業日の場合のみカウント
+    if (!isHoliday) {
+      businessDays++;
+    }
+  }
+
+  return businessDays;
+};
 
 // 月次想定利益（見込み）を計算
 export const calculateMonthlyProfit = (
@@ -39,6 +100,7 @@ export const calculateMonthlyProfit = (
 export const calculateOccupancyRate = (
   schedules: ScheduleItem[],
   capacity: { AM: number; PM: number },
+  facilitySettings: FacilitySettings,
   currentMonth: Date = new Date()
 ): { rate: number; target: number } => {
   const year = currentMonth.getFullYear();
@@ -49,12 +111,8 @@ export const calculateOccupancyRate = (
     return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
   });
 
-  // 営業日数を計算（簡易版：月の日数から日曜日を除外）
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const businessDays = Array.from({ length: daysInMonth }, (_, i) => {
-    const date = new Date(year, month, i + 1);
-    return date.getDay() !== 0; // 日曜日を除外
-  }).filter(Boolean).length;
+  // 施設設定に基づいて営業日数を計算
+  const businessDays = calculateBusinessDays(facilitySettings, year, month);
 
   const totalCapacity = businessDays * (capacity.AM + capacity.PM);
   const actualUsage = monthlySchedules.length;
@@ -560,7 +618,7 @@ export const calculateSlotStatistics = (
   };
 };
 
-// リード管理の進捗を計算
+// リード管理の進捗を計算（リード管理のデータから、created_atを基準に集計）
 export const calculateLeadProgress = (
   leads: Lead[],
   currentMonth: Date = new Date(),
@@ -570,6 +628,8 @@ export const calculateLeadProgress = (
     newInquiries: number;
     visits: number;
     considering: number;
+    waitingBenefit: number;
+    contractProgress: number;
     contracts: number;
     lost: number;
   };
@@ -577,18 +637,25 @@ export const calculateLeadProgress = (
     newInquiries: number;
     visits: number;
     considering: number;
+    waitingBenefit: number;
+    contractProgress: number;
     contracts: number;
     lost: number;
   };
   trends: {
     newInquiries: number; // 前月比（%）
     visits: number;
+    considering: number;
+    waitingBenefit: number;
+    contractProgress: number;
     contracts: number;
+    lost: number;
   };
 } => {
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
   
+  // 当月に作成されたリード（created_atを基準）
   const currentLeads = leads.filter((lead) => {
     const leadDate = new Date(lead.createdAt);
     return leadDate.getFullYear() === year && leadDate.getMonth() === month;
@@ -598,6 +665,8 @@ export const calculateLeadProgress = (
     newInquiries: currentLeads.filter((l) => l.status === 'new-inquiry').length,
     visits: currentLeads.filter((l) => l.status === 'visit-scheduled').length,
     considering: currentLeads.filter((l) => l.status === 'considering').length,
+    waitingBenefit: currentLeads.filter((l) => l.status === 'waiting-benefit').length,
+    contractProgress: currentLeads.filter((l) => l.status === 'contract-progress').length,
     contracts: currentLeads.filter((l) => l.status === 'contracted').length,
     lost: currentLeads.filter((l) => l.status === 'lost').length,
   };
@@ -606,13 +675,18 @@ export const calculateLeadProgress = (
   let trends = {
     newInquiries: 0,
     visits: 0,
+    considering: 0,
+    waitingBenefit: 0,
+    contractProgress: 0,
     contracts: 0,
+    lost: 0,
   };
   
   if (previousMonth) {
     const prevYear = previousMonth.getFullYear();
     const prevMonth = previousMonth.getMonth();
     
+    // 前月に作成されたリード（created_atを基準）
     const prevLeads = leads.filter((lead) => {
       const leadDate = new Date(lead.createdAt);
       return leadDate.getFullYear() === prevYear && leadDate.getMonth() === prevMonth;
@@ -622,20 +696,28 @@ export const calculateLeadProgress = (
       newInquiries: prevLeads.filter((l) => l.status === 'new-inquiry').length,
       visits: prevLeads.filter((l) => l.status === 'visit-scheduled').length,
       considering: prevLeads.filter((l) => l.status === 'considering').length,
+      waitingBenefit: prevLeads.filter((l) => l.status === 'waiting-benefit').length,
+      contractProgress: prevLeads.filter((l) => l.status === 'contract-progress').length,
       contracts: prevLeads.filter((l) => l.status === 'contracted').length,
       lost: prevLeads.filter((l) => l.status === 'lost').length,
     };
     
+    // 前月比を計算（前月が0の場合は増分を表示）
+    const calculateTrend = (current: number, prev: number): number => {
+      if (prev > 0) {
+        return ((current - prev) / prev) * 100;
+      }
+      return current > 0 ? 100 : 0;
+    };
+    
     trends = {
-      newInquiries: previous.newInquiries > 0
-        ? ((current.newInquiries - previous.newInquiries) / previous.newInquiries) * 100
-        : current.newInquiries > 0 ? 100 : 0,
-      visits: previous.visits > 0
-        ? ((current.visits - previous.visits) / previous.visits) * 100
-        : current.visits > 0 ? 100 : 0,
-      contracts: previous.contracts > 0
-        ? ((current.contracts - previous.contracts) / previous.contracts) * 100
-        : current.contracts > 0 ? 100 : 0,
+      newInquiries: calculateTrend(current.newInquiries, previous.newInquiries),
+      visits: calculateTrend(current.visits, previous.visits),
+      considering: calculateTrend(current.considering, previous.considering),
+      waitingBenefit: calculateTrend(current.waitingBenefit, previous.waitingBenefit),
+      contractProgress: calculateTrend(current.contractProgress, previous.contractProgress),
+      contracts: calculateTrend(current.contracts, previous.contracts),
+      lost: calculateTrend(current.lost, previous.lost),
     };
   }
   
@@ -977,6 +1059,7 @@ export const calculateDayOfWeekUtilization = (
 export const calculateAMPMOccupancyRate = (
   schedules: ScheduleItem[],
   capacity: { AM: number; PM: number },
+  facilitySettings: FacilitySettings,
   currentMonth: Date = new Date()
 ): {
   amRate: number;
@@ -994,12 +1077,8 @@ export const calculateAMPMOccupancyRate = (
     return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
   });
 
-  // 営業日数を計算
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const businessDays = Array.from({ length: daysInMonth }, (_, i) => {
-    const date = new Date(year, month, i + 1);
-    return date.getDay() !== 0; // 日曜日を除外
-  }).filter(Boolean).length;
+  // 施設設定に基づいて営業日数を計算
+  const businessDays = calculateBusinessDays(facilitySettings, year, month);
 
   const amCapacity = businessDays * capacity.AM;
   const pmCapacity = businessDays * capacity.PM;
