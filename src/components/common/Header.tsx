@@ -22,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         <button onClick={onMenuClick} className="text-gray-500 mr-4">
           <Menu size={24} />
         </button>
-        <img src="/logo.svg" alt="co-shien" className="h-7" />
+        <img src="/logo-resized.png" alt="co-shien" className="h-10" />
       </div>
       <div className="hidden md:flex items-center text-gray-400 bg-gray-100 rounded-md px-3 py-2 w-72 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-[#00c4cc]/20 focus-within:border-[#00c4cc]">
         <Search size={16} className="mr-2" />

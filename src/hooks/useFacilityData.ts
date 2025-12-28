@@ -33,6 +33,7 @@ export const useFacilityData = () => {
     facilityName: '',
     regularHolidays: [0],
     customHolidays: [],
+    includeHolidays: false,
     businessHours: {
       AM: { start: '09:00', end: '12:00' },
       PM: { start: '13:00', end: '18:00' },
@@ -80,7 +81,9 @@ export const useFacilityData = () => {
             facilityId: data.facility_id,
             facilityName: data.facility_name || '',
             regularHolidays: data.regular_holidays || [0],
+            holidayPeriods: data.holiday_periods || [],
             customHolidays: data.custom_holidays || [],
+            includeHolidays: data.include_holidays || false,
             businessHours: data.business_hours || {
               AM: { start: '09:00', end: '12:00' },
               PM: { start: '13:00', end: '18:00' },
@@ -420,11 +423,19 @@ export const useFacilityData = () => {
           facility_id: facilityId,
           facility_name: updatedSettings.facilityName || null,
           regular_holidays: updatedSettings.regularHolidays,
+          holiday_periods: updatedSettings.holidayPeriods || [],
           custom_holidays: updatedSettings.customHolidays,
+          include_holidays: updatedSettings.includeHolidays ?? false,
           business_hours: updatedSettings.businessHours,
           capacity: updatedSettings.capacity,
           updated_at: updatedSettings.updatedAt,
         };
+
+        // デバッグ用: 保存するデータをログに出力
+        console.log('Saving facility settings:', {
+          includeHolidays: updatedSettings.includeHolidays,
+          upsertDataIncludeHolidays: upsertData.include_holidays,
+        });
 
         // 既存レコードがある場合はidを指定、ない場合はidを指定しない（自動生成）
         if (existingData) {
@@ -432,10 +443,10 @@ export const useFacilityData = () => {
           upsertData.created_at = updatedSettings.createdAt;
         }
 
+        // facility_idにUNIQUE制約があるため、upsertを使用
         const { data, error } = await supabase
           .from('facility_settings')
           .upsert(upsertData)
-          .eq('facility_id', facilityId)
           .select()
           .single();
 
@@ -444,13 +455,21 @@ export const useFacilityData = () => {
           // エラーが発生した場合はローカル状態を元に戻す
           setFacilitySettings(facilitySettings);
         } else if (data) {
+          // デバッグ用: 取得したデータをログに出力
+          console.log('Retrieved facility settings from DB:', {
+            include_holidays: data.include_holidays,
+            includeHolidays: data.include_holidays ?? false,
+          });
+          
           // データベースから取得したデータで状態を更新
           setFacilitySettings({
             id: data.id,
             facilityId: data.facility_id,
             facilityName: data.facility_name || '',
             regularHolidays: data.regular_holidays,
+            holidayPeriods: data.holiday_periods || [],
             customHolidays: data.custom_holidays,
+            includeHolidays: data.include_holidays ?? false,
             businessHours: data.business_hours,
             capacity: data.capacity,
             createdAt: data.created_at,

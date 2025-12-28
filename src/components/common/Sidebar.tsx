@@ -36,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full hidden md:flex shrink-0">
       <div className="p-6 flex items-center space-x-3">
-        <img src="/logo.svg" alt="co-shien" className="h-8" />
+        <img src="/logo-resized.png" alt="co-shien" className="h-12" />
       </div>
 
       <div className="px-3 py-4">

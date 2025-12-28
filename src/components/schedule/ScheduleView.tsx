@@ -4,11 +4,12 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { CalendarDays, X, Plus, Trash2 } from 'lucide-react';
 import { TimeSlot, ScheduleItem, Child } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import UsageRecordForm from './UsageRecordForm';
+import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
 const ScheduleView: React.FC = () => {
   const {
@@ -55,11 +56,19 @@ const ScheduleView: React.FC = () => {
 
     const dates: Array<{ date: string; day: number; isCurrentMonth: boolean }> = [];
 
+    // 日付をYYYY-MM-DD形式に変換するヘルパー関数（タイムゾーン問題を回避）
+    const formatDate = (date: Date): string => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
     // 前月の末尾日を追加（カレンダー表示用）
     for (let i = startDayOfWeek - 1; i >= 0; i--) {
       const date = new Date(year, month, -i);
       dates.push({
-        date: date.toISOString().split('T')[0],
+        date: formatDate(date),
         day: date.getDate(),
         isCurrentMonth: false,
       });
@@ -69,7 +78,7 @@ const ScheduleView: React.FC = () => {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
       dates.push({
-        date: date.toISOString().split('T')[0],
+        date: formatDate(date),
         day,
         isCurrentMonth: true,
       });
@@ -80,7 +89,7 @@ const ScheduleView: React.FC = () => {
     for (let day = 1; day <= remainingDays; day++) {
       const date = new Date(year, month + 1, day);
       dates.push({
-        date: date.toISOString().split('T')[0],
+        date: formatDate(date),
         day,
         isCurrentMonth: false,
       });
@@ -96,6 +105,14 @@ const ScheduleView: React.FC = () => {
     const startOfWeek = new Date(baseDate);
     startOfWeek.setDate(baseDate.getDate() - currentDay + 1); // 月曜日を開始日とする
 
+    // 日付をYYYY-MM-DD形式に変換するヘルパー関数（タイムゾーン問題を回避）
+    const formatDate = (date: Date): string => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
     const dates: Array<{ date: string; day: string }> = [];
     const days = ['月', '火', '水', '木', '金', '土', '日'];
 
@@ -103,7 +120,7 @@ const ScheduleView: React.FC = () => {
       const date = new Date(startOfWeek);
       date.setDate(startOfWeek.getDate() + i);
       dates.push({
-        date: date.toISOString().split('T')[0],
+        date: formatDate(date),
         day: days[i],
       });
     }
@@ -112,13 +129,40 @@ const ScheduleView: React.FC = () => {
   }, [currentDate]);
 
   // 休業日かどうかを判定
-  const isHoliday = (dateStr: string): boolean => {
-    const date = new Date(dateStr);
+  const isHoliday = useCallback((dateStr: string): boolean => {
+    // 日付を正しくパース（ローカルタイムゾーンで解釈）
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     const dayOfWeek = date.getDay();
     
-    // 定休日チェック
-    if (facilitySettings.regularHolidays.includes(dayOfWeek)) {
-      return true;
+    // 期間ごとの定休日設定をチェック
+    const holidayPeriods = facilitySettings.holidayPeriods || [];
+    let matchedPeriod = null;
+    
+    for (const period of holidayPeriods) {
+      if (!period.startDate) continue; // 開始日が設定されていない場合はスキップ
+      
+      // 日付文字列を直接比較（タイムゾーン問題を回避）
+      const startDateStr = period.startDate;
+      const endDateStr = period.endDate || '';
+      
+      // 期間内かどうかをチェック（文字列比較）
+      if (dateStr >= startDateStr && (!endDateStr || dateStr <= endDateStr)) {
+        matchedPeriod = period;
+        break;
+      }
+    }
+    
+    // 期間設定がある場合は、その期間の定休日をチェック
+    if (matchedPeriod) {
+      if (matchedPeriod.regularHolidays.includes(dayOfWeek)) {
+        return true;
+      }
+    } else {
+      // 期間設定がない場合は、デフォルトの定休日をチェック
+      if (facilitySettings.regularHolidays.includes(dayOfWeek)) {
+        return true;
+      }
     }
     
     // カスタム休業日チェック
@@ -126,8 +170,13 @@ const ScheduleView: React.FC = () => {
       return true;
     }
     
+    // 祝日チェック（設定されている場合）
+    if (facilitySettings.includeHolidays && isJapaneseHoliday(dateStr)) {
+      return true;
+    }
+    
     return false;
-  };
+  }, [facilitySettings.regularHolidays, facilitySettings.holidayPeriods, facilitySettings.customHolidays, facilitySettings.includeHolidays]);
 
   // 月間カレンダーの統計を計算
   const monthlyStats = useMemo(() => {
@@ -137,13 +186,21 @@ const ScheduleView: React.FC = () => {
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
 
+    // 日付をYYYY-MM-DD形式に変換するヘルパー関数（タイムゾーン問題を回避）
+    const formatDate = (date: Date): string => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
     let totalCapacity = 0;
     let totalUsed = 0;
     const uniqueChildren = new Set<string>();
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatDate(date);
       
       // 休業日は除外
       if (isHoliday(dateStr)) continue;
@@ -166,7 +223,7 @@ const ScheduleView: React.FC = () => {
       utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
       uniqueChildrenCount: uniqueChildren.size,
     };
-  }, [schedules, currentDate, capacity, facilitySettings]);
+  }, [schedules, currentDate, capacity, facilitySettings, isHoliday]);
 
   // 週間カレンダーの統計を計算
   const weeklyStats = useMemo(() => {
@@ -175,14 +232,8 @@ const ScheduleView: React.FC = () => {
     const uniqueChildren = new Set<string>();
 
     weekDates.forEach((d) => {
-      // 休業日チェック
-      const date = new Date(d.date);
-      const dayOfWeek = date.getDay();
-      const isHolidayDay =
-        facilitySettings.regularHolidays.includes(dayOfWeek) ||
-        facilitySettings.customHolidays.includes(d.date);
-      
-      if (isHolidayDay) return;
+      // 休業日チェック（isHoliday関数を使用）
+      if (isHoliday(d.date)) return;
       
       const amCount = schedules.filter((s) => s.date === d.date && s.slot === 'AM').length;
       const pmCount = schedules.filter((s) => s.date === d.date && s.slot === 'PM').length;
@@ -201,7 +252,7 @@ const ScheduleView: React.FC = () => {
       utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
       uniqueChildrenCount: uniqueChildren.size,
     };
-  }, [schedules, weekDates, capacity, facilitySettings]);
+  }, [schedules, weekDates, capacity, facilitySettings, isHoliday]);
 
   // 日付をクリックしてモーダルを開く
   const handleDateClick = (date: string, slot?: TimeSlot) => {
@@ -432,8 +483,10 @@ const ScheduleView: React.FC = () => {
                   ).length;
                   const amUtilization = capacity.AM > 0 ? Math.round((amCount / capacity.AM) * 100) : 0;
                   const pmUtilization = capacity.PM > 0 ? Math.round((pmCount / capacity.PM) * 100) : 0;
-                  const isToday =
-                    dateInfo.date === new Date().toISOString().split('T')[0];
+                  // 今日の日付をYYYY-MM-DD形式で取得（タイムゾーン問題を回避）
+                  const today = new Date();
+                  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                  const isToday = dateInfo.date === todayStr;
                   
                   // ユニーク利用児童数
                   const uniqueChildrenForDay = new Set(

@@ -12,14 +12,24 @@ export type Facility = {
   updatedAt: string;
 };
 
+// 期間ごとの定休日設定
+export type HolidayPeriod = {
+  id: string; // 期間ID
+  startDate: string; // 開始日（YYYY-MM-DD形式）
+  endDate: string; // 終了日（YYYY-MM-DD形式、空文字の場合は無期限）
+  regularHolidays: number[]; // 定休日（0=日, 1=月, ..., 6=土）
+};
+
 // 施設情報設定
 export type FacilitySettings = {
   id: string;
   facilityId: string; // 施設ID（マルチテナント対応）
   facilityName?: string; // 施設名
   // 営業日設定
-  regularHolidays: number[]; // 定休日（0=日, 1=月, ..., 6=土）
+  regularHolidays: number[]; // デフォルトの定休日（0=日, 1=月, ..., 6=土）
+  holidayPeriods?: HolidayPeriod[]; // 期間ごとの定休日設定
   customHolidays: string[]; // カスタム休業日（YYYY-MM-DD形式の配列）
+  includeHolidays?: boolean; // 祝日を休業日に含めるかどうか
   // 営業時間
   businessHours: {
     AM: { start: string; end: string }; // 例: { start: '09:00', end: '12:00' }

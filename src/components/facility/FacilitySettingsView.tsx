@@ -5,9 +5,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2 } from 'lucide-react';
-import { FacilitySettings } from '@/types';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2 } from 'lucide-react';
+import { FacilitySettings, HolidayPeriod } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
 
 const FacilitySettingsView: React.FC = () => {
   const { facilitySettings, updateFacilitySettings } = useFacilityData();
@@ -42,6 +43,18 @@ const FacilitySettingsView: React.FC = () => {
     setSettings({ ...settings, regularHolidays: newHolidays });
   };
 
+  const toggleIncludeHolidays = () => {
+    const newIncludeHolidays = !settings.includeHolidays;
+    
+    // includeHolidaysフラグを切り替えるだけ
+    // isHoliday関数でincludeHolidaysがtrueの場合、isJapaneseHolidayで判定されるため、
+    // customHolidaysに追加する必要はない
+    setSettings({ 
+      ...settings, 
+      includeHolidays: newIncludeHolidays,
+    });
+  };
+
   const addCustomHoliday = () => {
     if (newHoliday && !settings.customHolidays.includes(newHoliday)) {
       setSettings({
@@ -59,9 +72,53 @@ const FacilitySettingsView: React.FC = () => {
     });
   };
 
+  // 期間ごとの定休日設定を追加
+  const addHolidayPeriod = () => {
+    const newPeriod: HolidayPeriod = {
+      id: `period-${Date.now()}`,
+      startDate: '',
+      endDate: '',
+      regularHolidays: [],
+    };
+    setSettings({
+      ...settings,
+      holidayPeriods: [...(settings.holidayPeriods || []), newPeriod],
+    });
+  };
+
+  // 期間ごとの定休日設定を更新
+  const updateHolidayPeriod = (periodId: string, updates: Partial<HolidayPeriod>) => {
+    setSettings({
+      ...settings,
+      holidayPeriods: (settings.holidayPeriods || []).map((period) =>
+        period.id === periodId ? { ...period, ...updates } : period
+      ),
+    });
+  };
+
+  // 期間ごとの定休日設定を削除
+  const removeHolidayPeriod = (periodId: string) => {
+    setSettings({
+      ...settings,
+      holidayPeriods: (settings.holidayPeriods || []).filter((period) => period.id !== periodId),
+    });
+  };
+
+  // 期間内の定休日を切り替え
+  const togglePeriodHoliday = (periodId: string, day: number) => {
+    const period = (settings.holidayPeriods || []).find((p) => p.id === periodId);
+    if (!period) return;
+
+    const newHolidays = period.regularHolidays.includes(day)
+      ? period.regularHolidays.filter((d) => d !== day)
+      : [...period.regularHolidays, day];
+    
+    updateHolidayPeriod(periodId, { regularHolidays: newHolidays });
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+      <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center">
             <Settings size={24} className="mr-2 text-[#00c4cc]" />
@@ -71,13 +128,6 @@ const FacilitySettingsView: React.FC = () => {
             定休日、営業時間、受け入れ人数などの施設情報を設定します。
           </p>
         </div>
-        <button
-          onClick={handleSave}
-          className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
-        >
-          <Save size={16} className="mr-2" />
-          保存
-        </button>
       </div>
 
       {/* 施設名設定 */}
@@ -117,7 +167,7 @@ const FacilitySettingsView: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-bold text-gray-700 block mb-3">
-              週次定休日
+              デフォルトの週次定休日（期間指定がない場合）
             </label>
             <div className="flex flex-wrap gap-2">
               {weekDays.map((day) => (
@@ -137,8 +187,112 @@ const FacilitySettingsView: React.FC = () => {
           </div>
 
           <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-bold text-gray-700 block">
+                期間ごとの定休日設定
+              </label>
+              <button
+                onClick={addHolidayPeriod}
+                className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 py-1.5 rounded-md text-xs font-bold flex items-center transition-colors"
+              >
+                <Plus size={14} className="mr-1" />
+                期間を追加
+              </button>
+            </div>
+            <div className="space-y-4">
+              {(settings.holidayPeriods || []).map((period) => (
+                <div
+                  key={period.id}
+                  className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-gray-600">期間設定</span>
+                    <button
+                      onClick={() => removeHolidayPeriod(period.id)}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-600 block mb-1">
+                        開始日
+                      </label>
+                      <input
+                        type="date"
+                        value={period.startDate}
+                        onChange={(e) =>
+                          updateHolidayPeriod(period.id, { startDate: e.target.value })
+                        }
+                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-600 block mb-1">
+                        終了日（空欄の場合は無期限）
+                      </label>
+                      <input
+                        type="date"
+                        value={period.endDate}
+                        onChange={(e) =>
+                          updateHolidayPeriod(period.id, { endDate: e.target.value })
+                        }
+                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-600 block mb-2">
+                      この期間の定休日
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {weekDays.map((day) => (
+                        <button
+                          key={day.value}
+                          onClick={() => togglePeriodHoliday(period.id, day.value)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
+                            period.regularHolidays.includes(day.value)
+                              ? 'bg-red-100 text-red-700 border-2 border-red-300'
+                              : 'bg-white text-gray-700 hover:bg-gray-100 border-2 border-transparent'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {(settings.holidayPeriods || []).length === 0 && (
+                <p className="text-xs text-gray-500 text-center py-4">
+                  期間ごとの定休日設定がありません。期間を追加して設定してください。
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
             <label className="text-sm font-bold text-gray-700 block mb-3">
-              カスタム休業日（祝日など）
+              祝日設定
+            </label>
+            <div className="mb-4">
+              <button
+                onClick={toggleIncludeHolidays}
+                className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                  settings.includeHolidays
+                    ? 'bg-red-100 text-red-700 border-2 border-red-300'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-transparent'
+                }`}
+              >
+                祝日を休業日に含める
+              </button>
+              <p className="text-xs text-gray-500 mt-2">
+                選択すると、一般的な祝日が自動的に休業日として追加されます
+              </p>
+            </div>
+            <label className="text-sm font-bold text-gray-700 block mb-3">
+              カスタム休業日（追加の休業日など）
             </label>
             <div className="flex gap-2 mb-3">
               <input
@@ -303,6 +457,19 @@ const FacilitySettingsView: React.FC = () => {
             />
             <p className="text-xs text-gray-500 mt-1">名</p>
           </div>
+        </div>
+      </div>
+
+      {/* 保存ボタン */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
+          >
+            <Save size={16} className="mr-2" />
+            保存
+          </button>
         </div>
       </div>
     </div>
