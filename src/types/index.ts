@@ -45,15 +45,28 @@ export type FacilitySettings = {
 };
 
 // ユーザーロール
-export type UserRole = 'admin' | 'staff';
+export type UserRole = 'admin' | 'manager' | 'staff';
+
+// 権限設定（マネージャーとスタッフ用）
+export type UserPermissions = {
+  dashboard?: boolean;
+  management?: boolean;
+  lead?: boolean;
+  schedule?: boolean;
+  children?: boolean;
+  staff?: boolean;
+  facility?: boolean;
+};
 
 // ユーザーデータ（認証・認可用）
 export type User = {
   id: string;
   email: string;
   name: string;
+  loginId?: string; // ログイン用ID（管理者・マネージャー・スタッフ用）
   role: UserRole;
   facilityId: string; // 所属施設ID
+  permissions?: UserPermissions; // マネージャーとスタッフの権限設定
   createdAt: string;
   updatedAt: string;
 };
@@ -110,6 +123,7 @@ export type Staff = {
   nameKana?: string; // フリガナ
   role: '一般スタッフ' | 'マネージャー';
   type: '常勤' | '非常勤';
+  user_id?: string; // ユーザーアカウントID（usersテーブルへの参照）
   // 基本情報
   birthDate?: string; // 生年月日 (YYYY-MM-DD)
   gender?: '男性' | '女性' | 'その他';
