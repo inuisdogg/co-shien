@@ -4,10 +4,11 @@
 
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw } from 'lucide-react';
 import { Staff, ScheduleItem } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
 const StaffView: React.FC = () => {
   const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings } = useFacilityData();
@@ -41,6 +42,14 @@ const StaffView: React.FC = () => {
     const startOfWeek = new Date(baseDate);
     startOfWeek.setDate(baseDate.getDate() - currentDay + 1); // 月曜日を開始日とする
 
+    // 日付をYYYY-MM-DD形式に変換するヘルパー関数（タイムゾーン問題を回避）
+    const formatDate = (date: Date): string => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
     const dates: Array<{ date: string; label: string; day: string }> = [];
     const days = ['月', '火', '水', '木', '金', '土'];
 
@@ -50,7 +59,7 @@ const StaffView: React.FC = () => {
       const month = date.getMonth() + 1;
       const day = date.getDate();
       dates.push({
-        date: date.toISOString().split('T')[0],
+        date: formatDate(date),
         label: `${day}(${days[i]})`,
         day: days[i],
       });
@@ -75,13 +84,40 @@ const StaffView: React.FC = () => {
   };
 
   // 休業日かどうかを判定
-  const isHoliday = (dateStr: string): boolean => {
-    const date = new Date(dateStr);
+  const isHoliday = useCallback((dateStr: string): boolean => {
+    // 日付を正しくパース（ローカルタイムゾーンで解釈）
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     const dayOfWeek = date.getDay();
     
-    // 定休日チェック
-    if (facilitySettings.regularHolidays.includes(dayOfWeek)) {
-      return true;
+    // 期間ごとの定休日設定をチェック
+    const holidayPeriods = facilitySettings.holidayPeriods || [];
+    let matchedPeriod = null;
+    
+    for (const period of holidayPeriods) {
+      if (!period.startDate) continue; // 開始日が設定されていない場合はスキップ
+      
+      // 日付文字列を直接比較（タイムゾーン問題を回避）
+      const startDateStr = period.startDate;
+      const endDateStr = period.endDate || '';
+      
+      // 期間内かどうかをチェック（文字列比較）
+      if (dateStr >= startDateStr && (!endDateStr || dateStr <= endDateStr)) {
+        matchedPeriod = period;
+        break;
+      }
+    }
+    
+    // 期間設定がある場合は、その期間の定休日をチェック
+    if (matchedPeriod) {
+      if (matchedPeriod.regularHolidays.includes(dayOfWeek)) {
+        return true;
+      }
+    } else {
+      // 期間設定がない場合は、デフォルトの定休日をチェック
+      if (facilitySettings.regularHolidays.includes(dayOfWeek)) {
+        return true;
+      }
     }
     
     // カスタム休業日チェック
@@ -89,8 +125,13 @@ const StaffView: React.FC = () => {
       return true;
     }
     
+    // 祝日チェック（設定されている場合）
+    if (facilitySettings.includeHolidays && isJapaneseHoliday(dateStr)) {
+      return true;
+    }
+    
     return false;
-  };
+  }, [facilitySettings.regularHolidays, facilitySettings.holidayPeriods, facilitySettings.customHolidays, facilitySettings.includeHolidays]);
 
   // シフトをトグル
   const toggleShift = (staffId: string, date: string) => {
@@ -517,21 +558,32 @@ const StaffView: React.FC = () => {
                     {weekDates.map((d) => {
                       const childCount = getChildCountByDate(d.date);
                       const isBusy = childCount >= 8;
+                      const isHolidayDay = isHoliday(d.date);
 
                       return (
                         <th
                           key={d.date}
                           className={`p-2 border-b border-r border-gray-100 text-center min-w-[100px] ${
-                            isBusy ? 'bg-orange-50' : 'bg-gray-50'
+                            isHolidayDay
+                              ? 'bg-red-50'
+                              : isBusy
+                              ? 'bg-orange-50'
+                              : 'bg-gray-50'
                           }`}
                         >
-                          <div className="font-bold text-gray-700">{d.label}</div>
-                          <div className="text-[10px] mt-1 font-normal text-gray-500">
-                            児童:{' '}
-                            <span className={`font-bold ${isBusy ? 'text-orange-600' : ''}`}>
-                              {childCount}名
-                            </span>
+                          <div className={`font-bold ${isHolidayDay ? 'text-red-600' : 'text-gray-700'}`}>
+                            {d.label}
                           </div>
+                          {isHolidayDay ? (
+                            <div className="text-[9px] mt-1 font-normal text-red-600">休業</div>
+                          ) : (
+                            <div className="text-[10px] mt-1 font-normal text-gray-500">
+                              児童:{' '}
+                              <span className={`font-bold ${isBusy ? 'text-orange-600' : ''}`}>
+                                {childCount}名
+                              </span>
+                            </div>
+                          )}
                         </th>
                       );
                     })}
@@ -548,24 +600,34 @@ const StaffView: React.FC = () => {
                       </td>
                       {weekDates.map((d) => {
                         const hasShift = shifts[s.id]?.[d.date] || false;
+                        const isHolidayDay = isHoliday(d.date);
                         return (
                           <td
                             key={`${s.id}-${d.date}`}
-                            className="p-1 border-b border-r border-gray-100 text-center bg-white"
+                            className={`p-1 border-b border-r border-gray-100 text-center ${
+                              isHolidayDay ? 'bg-red-50' : 'bg-white'
+                            }`}
                           >
-                            <button
-                              onClick={() => toggleShift(s.id, d.date)}
-                              className={`w-full py-2 px-1 rounded transition-all ${
-                                hasShift
-                                  ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
-                                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                              }`}
-                            >
-                              <div className="text-lg font-bold">{hasShift ? '◯' : '-'}</div>
-                              {hasShift && (
-                                <div className="text-[9px] mt-0.5 opacity-90">9:00~17:00</div>
-                              )}
-                            </button>
+                            {isHolidayDay ? (
+                              <div className="w-full py-2 px-1 rounded bg-red-100 text-red-600 cursor-not-allowed opacity-60">
+                                <div className="text-lg font-bold">-</div>
+                                <div className="text-[9px] mt-0.5">休業</div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => toggleShift(s.id, d.date)}
+                                className={`w-full py-2 px-1 rounded transition-all ${
+                                  hasShift
+                                    ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                }`}
+                              >
+                                <div className="text-lg font-bold">{hasShift ? '◯' : '-'}</div>
+                                {hasShift && (
+                                  <div className="text-[9px] mt-0.5 opacity-90">9:00~17:00</div>
+                                )}
+                              </button>
+                            )}
                           </td>
                         );
                       })}
