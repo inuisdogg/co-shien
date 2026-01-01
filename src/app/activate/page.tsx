@@ -350,18 +350,33 @@ export default function ActivatePage() {
 
     setLoading(true);
     try {
-      // 1. employment_recordsテーブルに所属関係を作成
-      const invitationStartDate = new Date().toISOString().split('T')[0]; // 招待時の開始日を使用
-      
+      // 1. ユーザー情報から招待時の雇用情報を取得
+      const { data: userInfo, error: userInfoError } = await supabase
+        .from('users')
+        .select('invitation_start_date, invitation_role, invitation_employment_type, invitation_permissions')
+        .eq('id', userId)
+        .single();
+
+      if (userInfoError) {
+        throw new Error(`ユーザー情報取得エラー: ${userInfoError.message}`);
+      }
+
+      // 招待時の雇用情報があればそれを使用、なければデフォルト値
+      const invitationStartDate = userInfo?.invitation_start_date || new Date().toISOString().split('T')[0];
+      const role = userInfo?.invitation_role || invitedRole || '一般スタッフ';
+      const employmentType = userInfo?.invitation_employment_type || '常勤';
+      const permissions = userInfo?.invitation_permissions || {};
+
+      // 2. employment_recordsテーブルに所属関係を作成
       const { data: employmentRecord, error: employmentError } = await supabase
         .from('employment_records')
         .insert({
           user_id: userId,
           facility_id: facilityId,
           start_date: invitationStartDate,
-          role: invitedRole || '一般スタッフ',
-          employment_type: '常勤', // デフォルト値（後で修正可能）
-          permissions: {},
+          role: role,
+          employment_type: employmentType,
+          permissions: permissions,
           experience_verification_status: 'not_requested',
         })
         .select()
@@ -1412,7 +1427,7 @@ export default function ActivatePage() {
                 {facilityName}との連携を開始しました
               </p>
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/staff-dashboard')}
                 className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
               >
                 ダッシュボードへ
