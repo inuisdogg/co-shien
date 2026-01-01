@@ -5,15 +5,18 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw } from 'lucide-react';
-import { Staff, ScheduleItem, UserPermissions } from '@/types';
+import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw, Mail, Send } from 'lucide-react';
+import { Staff, ScheduleItem, UserPermissions, StaffInvitation } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import { hashPassword } from '@/utils/password';
 import { supabase } from '@/lib/supabase';
+import { inviteStaff } from '@/utils/staffInvitationService';
+import { useAuth } from '@/contexts/AuthContext';
 
 const StaffView: React.FC = () => {
   const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings } = useFacilityData();
+  const { facility } = useAuth();
   const [subTab, setSubTab] = useState<'shift' | 'list'>('shift');
   
   // スタッフを並び順でソート（マネージャー→常勤→非常勤）
@@ -31,7 +34,38 @@ const StaffView: React.FC = () => {
   }, [staff]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  
+  // 招待フォーム用の状態
+  const [inviteFormData, setInviteFormData] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    role: '一般スタッフ' | 'マネージャー' | '管理者';
+    employmentType: '常勤' | '非常勤';
+    startDate: string;
+    permissions: UserPermissions;
+  }>({
+    name: '',
+    email: '',
+    phone: '',
+    role: '一般スタッフ',
+    employmentType: '常勤',
+    startDate: new Date().toISOString().split('T')[0],
+    permissions: {
+      dashboard: false,
+      management: false,
+      lead: false,
+      schedule: false,
+      children: false,
+      staff: false,
+      facility: false,
+    },
+  });
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteToken, setInviteToken] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [shifts, setShifts] = useState<Record<string, Record<string, boolean>>>({}); // {staffId: {date: boolean}}
   const [isShiftPatternModalOpen, setIsShiftPatternModalOpen] = useState(false);
@@ -1002,12 +1036,20 @@ const StaffView: React.FC = () => {
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
           <div className="flex justify-between mb-4">
             <h3 className="font-bold text-lg text-gray-800">登録スタッフ一覧</h3>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors flex items-center"
-            >
-              <Plus size={16} className="mr-2" /> 追加
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsInviteModalOpen(true)}
+                className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors flex items-center"
+              >
+                <Send size={16} className="mr-2" /> 招待
+              </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors flex items-center"
+              >
+                <Plus size={16} className="mr-2" /> 追加
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sortedStaff.map((s: Staff) => (
@@ -2113,6 +2155,408 @@ const StaffView: React.FC = () => {
                   保存する
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* スタッフ招待モーダル */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg w-full max-w-2xl shadow-2xl border border-gray-100 my-8">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center">
+                <Send size={20} className="mr-2 text-[#00c4cc]" />
+                スタッフ招待
+              </h3>
+              <button
+                onClick={() => {
+                  setIsInviteModalOpen(false);
+                  setInviteSuccess(false);
+                  setInviteToken('');
+                  setInviteFormData({
+                    name: '',
+                    email: '',
+                    phone: '',
+                    role: '一般スタッフ',
+                    employmentType: '常勤',
+                    startDate: new Date().toISOString().split('T')[0],
+                    permissions: {
+                      dashboard: false,
+                      management: false,
+                      lead: false,
+                      schedule: false,
+                      children: false,
+                      staff: false,
+                      facility: false,
+                    },
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+              {inviteSuccess ? (
+                <div className="space-y-4 py-4">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Mail className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">招待リンクを作成しました</h4>
+                    <p className="text-gray-600 text-sm">
+                      {facility?.name || '事業所'}からの招待リンクが生成されました。<br />
+                      以下のリンクをコピーしてスタッフに送付してください。
+                    </p>
+                  </div>
+                  
+                  <div className="bg-gray-50 border border-gray-200 rounded-md p-4 space-y-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-2">
+                        招待リンク
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/activate?token=${inviteToken}`}
+                          className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-mono text-xs"
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <button
+                          onClick={() => {
+                            const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/activate?token=${inviteToken}`;
+                            navigator.clipboard.writeText(link);
+                            alert('リンクをコピーしました');
+                          }}
+                          className="px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold whitespace-nowrap transition-colors"
+                        >
+                          コピー
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                      <p className="text-xs text-blue-800">
+                        <strong>送付方法:</strong> メール、SMS、チャットツールなど、お好みの方法でスタッフにリンクを送付してください。
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setIsInviteModalOpen(false);
+                        setInviteSuccess(false);
+                        setInviteToken('');
+                        setInviteFormData({
+                          name: '',
+                          email: '',
+                          phone: '',
+                          role: '一般スタッフ',
+                          employmentType: '常勤',
+                          startDate: new Date().toISOString().split('T')[0],
+                          permissions: {
+                            dashboard: false,
+                            management: false,
+                            lead: false,
+                            schedule: false,
+                            children: false,
+                            staff: false,
+                            facility: false,
+                          },
+                        });
+                      }}
+                      className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                    >
+                      閉じる
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInviteSuccess(false);
+                        setInviteToken('');
+                        setInviteFormData({
+                          name: '',
+                          email: '',
+                          phone: '',
+                          role: '一般スタッフ',
+                          employmentType: '常勤',
+                          startDate: new Date().toISOString().split('T')[0],
+                          permissions: {
+                            dashboard: false,
+                            management: false,
+                            lead: false,
+                            schedule: false,
+                            children: false,
+                            staff: false,
+                            facility: false,
+                          },
+                        });
+                      }}
+                      className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors"
+                    >
+                      もう1人招待
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                    <p className="text-xs text-blue-800">
+                      スタッフを招待すると、招待リンクが自動生成されます。<br />
+                      リンクをコピーしてスタッフに送付してください。スタッフがリンクからアカウントを作成し、基本情報を入力すると、自動的に事業所のスタッフとして登録されます。
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-sm text-gray-700 border-b border-gray-200 pb-2">
+                      基本情報
+                    </h4>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                        氏名 <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        value={inviteFormData.name}
+                        onChange={(e) => setInviteFormData({ ...inviteFormData, name: e.target.value })}
+                        placeholder="山田 太郎"
+                        disabled={inviteLoading}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-sm text-gray-700 border-b border-gray-200 pb-2">
+                      雇用情報
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                          役職 <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                          value={inviteFormData.role}
+                          onChange={(e) => setInviteFormData({ ...inviteFormData, role: e.target.value as any })}
+                          disabled={inviteLoading}
+                        >
+                          <option value="一般スタッフ">一般スタッフ</option>
+                          <option value="マネージャー">マネージャー</option>
+                          <option value="管理者">管理者</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                          雇用形態 <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                          value={inviteFormData.employmentType}
+                          onChange={(e) => setInviteFormData({ ...inviteFormData, employmentType: e.target.value as any })}
+                          disabled={inviteLoading}
+                        >
+                          <option value="常勤">常勤</option>
+                          <option value="非常勤">非常勤</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                        雇用開始日 <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        value={inviteFormData.startDate}
+                        onChange={(e) => setInviteFormData({ ...inviteFormData, startDate: e.target.value })}
+                        disabled={inviteLoading}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        この日付からスタッフとして登録されます
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-sm text-gray-700 border-b border-gray-200 pb-2">
+                      閲覧権限設定
+                    </h4>
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                      <p className="text-xs text-blue-800">
+                        このスタッフが閲覧できるメニューを選択してください。
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFormData.permissions.dashboard || false}
+                          onChange={(e) => setInviteFormData({
+                            ...inviteFormData,
+                            permissions: { ...inviteFormData.permissions, dashboard: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                          disabled={inviteLoading}
+                        />
+                        <span className="text-sm text-gray-700">ダッシュボード</span>
+                      </label>
+                      <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFormData.permissions.management || false}
+                          onChange={(e) => setInviteFormData({
+                            ...inviteFormData,
+                            permissions: { ...inviteFormData.permissions, management: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                          disabled={inviteLoading}
+                        />
+                        <span className="text-sm text-gray-700">経営設定</span>
+                      </label>
+                      <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFormData.permissions.lead || false}
+                          onChange={(e) => setInviteFormData({
+                            ...inviteFormData,
+                            permissions: { ...inviteFormData.permissions, lead: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                          disabled={inviteLoading}
+                        />
+                        <span className="text-sm text-gray-700">リード管理</span>
+                      </label>
+                      <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFormData.permissions.schedule || false}
+                          onChange={(e) => setInviteFormData({
+                            ...inviteFormData,
+                            permissions: { ...inviteFormData.permissions, schedule: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                          disabled={inviteLoading}
+                        />
+                        <span className="text-sm text-gray-700">利用調整・予約</span>
+                      </label>
+                      <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFormData.permissions.children || false}
+                          onChange={(e) => setInviteFormData({
+                            ...inviteFormData,
+                            permissions: { ...inviteFormData.permissions, children: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                          disabled={inviteLoading}
+                        />
+                        <span className="text-sm text-gray-700">児童管理</span>
+                      </label>
+                      <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFormData.permissions.staff || false}
+                          onChange={(e) => setInviteFormData({
+                            ...inviteFormData,
+                            permissions: { ...inviteFormData.permissions, staff: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                          disabled={inviteLoading}
+                        />
+                        <span className="text-sm text-gray-700">スタッフ・シフト管理</span>
+                      </label>
+                      <label className="flex items-center space-x-2 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFormData.permissions.facility || false}
+                          onChange={(e) => setInviteFormData({
+                            ...inviteFormData,
+                            permissions: { ...inviteFormData.permissions, facility: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                          disabled={inviteLoading}
+                        />
+                        <span className="text-sm text-gray-700">施設情報</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        setIsInviteModalOpen(false);
+                        setInviteFormData({
+                          name: '',
+                          email: '',
+                          phone: '',
+                          role: '一般スタッフ',
+                          employmentType: '常勤',
+                          startDate: new Date().toISOString().split('T')[0],
+                          permissions: {
+                            dashboard: false,
+                            management: false,
+                            lead: false,
+                            schedule: false,
+                            children: false,
+                            staff: false,
+                            facility: false,
+                          },
+                        });
+                      }}
+                      className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                      disabled={inviteLoading}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!inviteFormData.name.trim()) {
+                          alert('氏名を入力してください');
+                          return;
+                        }
+                        if (!facility?.id) {
+                          alert('事業所情報が取得できませんでした');
+                          return;
+                        }
+
+                        setInviteLoading(true);
+                        try {
+                          const invitation: StaffInvitation = {
+                            facilityId: facility.id,
+                            name: inviteFormData.name.trim(),
+                            email: undefined,
+                            phone: undefined,
+                            role: inviteFormData.role,
+                            employmentType: inviteFormData.employmentType,
+                            startDate: inviteFormData.startDate,
+                            permissions: inviteFormData.permissions,
+                          };
+
+                          const { invitationToken } = await inviteStaff(
+                            facility.id,
+                            invitation,
+                            false // 即座に所属関係を作成しない
+                          );
+
+                          setInviteToken(invitationToken);
+                          setInviteSuccess(true);
+                        } catch (error: any) {
+                          alert(error.message || '招待の送信に失敗しました');
+                        } finally {
+                          setInviteLoading(false);
+                        }
+                      }}
+                      className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={inviteLoading}
+                    >
+                      {inviteLoading ? '作成中...' : '招待リンクを作成'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

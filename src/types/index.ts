@@ -58,17 +58,134 @@ export type UserPermissions = {
   facility?: boolean;
 };
 
-// ユーザーデータ（認証・認可用）
+// アカウントステータス
+export type AccountStatus = 'pending' | 'active' | 'suspended';
+
+// ユーザーデータ（個人アカウント - 施設に依存しない）
 export type User = {
   id: string;
   email: string;
   name: string;
-  loginId?: string; // ログイン用ID（管理者・マネージャー・スタッフ用）
-  role: UserRole;
-  facilityId: string; // 所属施設ID
-  permissions?: UserPermissions; // マネージャーとスタッフの権限設定
+  phone?: string;
+  loginId?: string; // ログイン用ID
+  accountStatus: AccountStatus; // アカウントステータス
+  invitedByFacilityId?: string; // 招待した事業所ID
+  invitedAt?: string; // 招待日時
+  activatedAt?: string; // アクティベーション日時
   createdAt: string;
   updatedAt: string;
+};
+
+// 所属関係の役割
+export type EmploymentRole = '一般スタッフ' | 'マネージャー' | '管理者';
+
+// 雇用形態
+export type EmploymentType = '常勤' | '非常勤';
+
+// 実務経験証明ステータス
+export type ExperienceVerificationStatus = 
+  | 'not_requested'  // 未申請
+  | 'requested'       // 申請中
+  | 'approved'        // 承認済み
+  | 'rejected'        // 却下
+  | 'expired';        // 期限切れ
+
+// 所属関係（EmploymentRecord）
+export type EmploymentRecord = {
+  id: string;
+  userId: string; // ユーザーID
+  facilityId: string; // 事業所ID
+  // 所属期間
+  startDate: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD（NULLの場合は現在も在籍中）
+  // 役割・職位
+  role: EmploymentRole;
+  employmentType: EmploymentType;
+  // 権限設定（この事業所での権限）
+  permissions?: UserPermissions;
+  // 実務経験証明のステータス
+  experienceVerificationStatus: ExperienceVerificationStatus;
+  experienceVerificationRequestedAt?: string;
+  experienceVerificationApprovedAt?: string;
+  experienceVerificationApprovedBy?: string; // 承認者のuser_id
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  facilityName?: string;
+  facilityCode?: string;
+  userName?: string;
+};
+
+// 実務経験証明依頼ステータス
+export type VerificationRequestStatus = 
+  | 'pending'    // 申請中
+  | 'approved'   // 承認済み
+  | 'rejected'   // 却下
+  | 'expired';   // 期限切れ
+
+// 実務経験証明依頼（ExperienceVerificationRequest）
+export type ExperienceVerificationRequest = {
+  id: string;
+  // 申請者（スタッフ）
+  requesterUserId: string;
+  // 対象の所属記録
+  employmentRecordId: string;
+  // 承認者（元職場の管理者）
+  approverFacilityId: string;
+  approverUserId?: string; // 承認者のuser_id（承認時に設定）
+  // 申請内容
+  requestedPeriodStart: string; // YYYY-MM-DD
+  requestedPeriodEnd?: string; // YYYY-MM-DD
+  requestedRole?: string; // 申請時の役割
+  // ステータス
+  status: VerificationRequestStatus;
+  // メッセージ
+  requestMessage?: string; // 申請者からのメッセージ
+  responseMessage?: string; // 承認者からのメッセージ
+  rejectionReason?: string; // 却下理由
+  // デジタル署名
+  digitalSignature?: string; // 承認者のデジタル署名（ハッシュ）
+  signedAt?: string;
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string; // 期限
+  // 拡張情報（JOINで取得）
+  requesterName?: string;
+  facilityName?: string;
+  approverName?: string;
+};
+
+// 個人キャリアデータ（資格、認証済み職歴など）
+export type UserCareer = {
+  id: string;
+  userId: string;
+  // 資格情報
+  qualificationName: string;
+  qualificationType?: string; // 例: "国家資格", "民間資格"
+  issuedBy?: string; // 発行機関
+  issuedDate?: string; // YYYY-MM-DD
+  expiryDate?: string; // YYYY-MM-DD（有効期限）
+  certificateUrl?: string; // 資格証のURL（ストレージ）
+  // 認証済み職歴（employment_recordsから承認済みのものを参照）
+  verifiedEmploymentRecordId?: string;
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 招待データ（事業所がスタッフを招待する際のデータ）
+export type StaffInvitation = {
+  id?: string;
+  facilityId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role: EmploymentRole;
+  employmentType: EmploymentType;
+  startDate: string; // YYYY-MM-DD
+  permissions?: UserPermissions;
 };
 
 // 契約ステータス
@@ -115,7 +232,7 @@ export type Child = {
 // 児童登録フォームデータ（下書き保存用）
 export type ChildFormData = Omit<Child, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
 
-// スタッフデータ
+// スタッフデータ（後方互換性のため保持、将来的にはEmploymentRecordに統合）
 export type Staff = {
   id: string;
   facilityId: string; // 施設ID（マルチテナント対応）
