@@ -16,6 +16,28 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+  /* スマホでの文字サイズを適切に */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* スマホでの最小フォントサイズを設定 */
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+  
+  /* 小さすぎるテキストを防ぐ */
+  body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  /* テーブルやカレンダーのテキストを読みやすく */
+  table, .calendar-cell {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
 }
 
 @layer utilities {

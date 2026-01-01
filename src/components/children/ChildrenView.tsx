@@ -264,18 +264,18 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">児童管理</h2>
-          <p className="text-gray-500 text-xs mt-1">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">児童管理</h2>
+          <p className="text-gray-500 text-xs sm:text-sm mt-1">
             利用児童の台帳管理、受給者証情報の更新を行います。
           </p>
         </div>
         <button
           onClick={handleOpenModal}
-          className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-4 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
+          className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all w-full sm:w-auto justify-center"
         >
-          <UserPlus size={16} className="mr-2" />
+          <UserPlus size={16} className="mr-2 shrink-0" />
           新規児童登録
         </button>
       </div>
@@ -382,22 +382,22 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       {/* 児童一覧テーブル */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-xs sm:text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200 uppercase text-xs tracking-wider">
               <tr>
-                <th className="px-6 py-4">氏名</th>
-                <th className="px-6 py-4">年齢</th>
-                <th className="px-6 py-4">保護者名</th>
-                <th className="px-6 py-4">受給者証番号</th>
-                <th className="px-6 py-4">契約ステータス</th>
-                <th className="px-6 py-4">契約日数</th>
-                <th className="px-6 py-4">送迎</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">氏名</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">年齢</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">保護者名</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">受給者証番号</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">契約ステータス</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">契約日数</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">送迎</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {sortedChildren.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-400">
+                  <td colSpan={7} className="px-3 sm:px-6 py-6 sm:py-8 text-center text-gray-400 text-xs sm:text-sm">
                     {sortStatus === 'all'
                       ? '登録されている児童はいません'
                       : '該当する児童はいません'}
@@ -412,45 +412,45 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       key={child.id}
                       className="hover:bg-[#f0fdfe] transition-colors group"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
                         <button
                           onClick={() => handleOpenDetail(child)}
-                          className="font-bold text-gray-800 group-hover:text-[#00c4cc] hover:underline transition-colors text-left"
+                          className="font-bold text-gray-800 group-hover:text-[#00c4cc] hover:underline transition-colors text-left text-xs sm:text-sm"
                         >
                           {child.name}
                         </button>
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 text-xs sm:text-sm">
                         {child.age ? `${child.age}歳` : '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 text-xs sm:text-sm hidden sm:table-cell">
                         {child.guardianName || '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600 font-mono">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 font-mono text-xs sm:text-sm hidden md:table-cell">
                         {child.beneficiaryNumber || '-'}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
                         <span
-                          className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs font-bold ${statusInfo.color}`}
+                          className={`inline-flex items-center space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-bold ${statusInfo.color}`}
                         >
-                          <StatusIcon size={12} />
+                          <StatusIcon size={10} className="sm:w-3 sm:h-3" />
                           <span>{statusInfo.label}</span>
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs border border-gray-200 font-medium">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                        <span className="bg-gray-100 text-gray-600 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs border border-gray-200 font-medium">
                           {child.contractDays ? `${child.contractDays}日` : '-'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <div className="flex space-x-2">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600">
+                        <div className="flex space-x-1 sm:space-x-2">
                           {child.needsPickup && (
-                            <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-0.5 rounded font-bold">
+                            <span className="text-[10px] sm:text-xs bg-[#e0f7fa] text-[#006064] px-1.5 sm:px-2 py-0.5 rounded font-bold">
                               迎
                             </span>
                           )}
                           {child.needsDropoff && (
-                            <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-0.5 rounded font-bold">
+                            <span className="text-[10px] sm:text-xs bg-[#e0f7fa] text-[#006064] px-1.5 sm:px-2 py-0.5 rounded font-bold">
                               送
                             </span>
                           )}

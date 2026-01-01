@@ -668,35 +668,35 @@ const StaffView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">スタッフ・シフト管理</h2>
-          <p className="text-gray-500 text-xs mt-1">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">スタッフ・シフト管理</h2>
+          <p className="text-gray-500 text-xs sm:text-sm mt-1">
             スタッフのマスタ管理と、配置基準を満たすためのシフト作成を行います。
           </p>
         </div>
-        <div className="bg-gray-100 p-1 rounded-md flex">
+        <div className="bg-gray-100 p-1 rounded-md flex w-full sm:w-auto">
           <button
             onClick={() => setSubTab('shift')}
-            className={`px-4 py-2 text-sm font-bold rounded transition-all flex items-center ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded transition-all flex items-center justify-center ${
               subTab === 'shift'
                 ? 'bg-white text-[#00c4cc] shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            <CalendarCheck size={16} className="mr-2" />
-            シフト管理
+            <CalendarCheck size={14} className="sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
+            <span className="whitespace-nowrap">シフト管理</span>
           </button>
           <button
             onClick={() => setSubTab('list')}
-            className={`px-4 py-2 text-sm font-bold rounded transition-all flex items-center ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded transition-all flex items-center justify-center ${
               subTab === 'list'
                 ? 'bg-white text-[#00c4cc] shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            <Users size={16} className="mr-2" />
-            スタッフ登録
+            <Users size={14} className="sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
+            <span className="whitespace-nowrap">スタッフ登録</span>
           </button>
         </div>
       </div>
@@ -707,56 +707,58 @@ const StaffView: React.FC = () => {
           {/* シフト設定カレンダー */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
             {/* Info Bar: Child Count Check */}
-            <div className="bg-[#e0f7fa] p-4 border-b border-[#b2ebf2] flex items-center space-x-2 text-sm text-[#006064]">
-              <AlertCircle size={18} />
-              <span>
+            <div className="bg-[#e0f7fa] p-2 sm:p-3 border-b border-[#b2ebf2] flex items-center space-x-2 text-xs sm:text-sm text-[#006064]">
+              <AlertCircle size={14} className="sm:w-[18px] sm:h-[18px] shrink-0" />
+              <span className="leading-tight">
                 各日の「利用児童数」を確認しながらシフトを配置してください。児童10名につき2名の配置が必要です。
               </span>
             </div>
 
             {/* 週選択コントロール */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-              <div className="flex items-center space-x-4">
+            <div className="p-3 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-50">
+              <div className="flex items-center space-x-2 sm:space-x-4">
                 <button
                   onClick={() => changeWeek(-1)}
-                  className="px-3 py-1 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-200 rounded transition-colors text-sm"
                 >
                   ←
                 </button>
-                <h3 className="font-bold text-lg text-gray-800">
+                <h3 className="font-bold text-sm sm:text-base text-gray-800">
                   {weekDates[0].date.split('-')[1]}月 {weekDates[0].date.split('-')[2]}日 ～{' '}
                   {weekDates[5].date.split('-')[1]}月 {weekDates[5].date.split('-')[2]}日
                 </h3>
                 <button
                   onClick={() => changeWeek(1)}
-                  className="px-3 py-1 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-200 rounded transition-colors text-sm"
                 >
                   →
                 </button>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <button
                   onClick={handleOpenShiftPatternModal}
-                  className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-sm font-bold transition-colors flex items-center"
+                  className="flex-1 sm:flex-none px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
                 >
-                  <Settings size={16} className="mr-2" />
-                  基本シフトパターン設定
+                  <Settings size={14} className="mr-1 sm:mr-2 shrink-0" />
+                  <span className="hidden sm:inline">基本シフトパターン設定</span>
+                  <span className="sm:hidden">パターン設定</span>
                 </button>
                 <button
                   onClick={handleApplyShiftPatterns}
-                  className="px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors flex items-center"
+                  className="flex-1 sm:flex-none px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
                 >
-                  <RotateCw size={16} className="mr-2" />
-                  パターン一括反映
+                  <RotateCw size={14} className="mr-1 sm:mr-2 shrink-0" />
+                  <span className="hidden sm:inline">パターン一括反映</span>
+                  <span className="sm:hidden">一括反映</span>
                 </button>
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left border-collapse">
+              <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr>
-                    <th className="p-3 border-b border-r border-gray-100 bg-gray-50 min-w-[150px] text-gray-500 font-bold">
+                    <th className="p-2 border-b border-r border-gray-100 bg-gray-50 min-w-[100px] sm:min-w-[120px] text-gray-500 font-bold text-xs sticky left-0 z-10">
                       スタッフ / 日付
                     </th>
                     {weekDates.map((d) => {
@@ -767,7 +769,7 @@ const StaffView: React.FC = () => {
                       return (
                         <th
                           key={d.date}
-                          className={`p-2 border-b border-r border-gray-100 text-center min-w-[100px] ${
+                          className={`p-1.5 border-b border-r border-gray-100 text-center min-w-[70px] sm:min-w-[85px] ${
                             isHolidayDay
                               ? 'bg-red-50'
                               : isBusy
@@ -775,13 +777,13 @@ const StaffView: React.FC = () => {
                               : 'bg-gray-50'
                           }`}
                         >
-                          <div className={`font-bold ${isHolidayDay ? 'text-red-600' : 'text-gray-700'}`}>
+                          <div className={`font-bold text-xs ${isHolidayDay ? 'text-red-600' : 'text-gray-700'} leading-tight`}>
                             {d.label}
                           </div>
                           {isHolidayDay ? (
-                            <div className="text-[9px] mt-1 font-normal text-red-600">休業</div>
+                            <div className="text-[9px] mt-0.5 font-normal text-red-600 leading-none">休業</div>
                           ) : (
-                            <div className="text-[10px] mt-1 font-normal text-gray-500">
+                            <div className="text-[9px] mt-0.5 font-normal text-gray-500 leading-none">
                               児童:{' '}
                               <span className={`font-bold ${isBusy ? 'text-orange-600' : ''}`}>
                                 {childCount}名
@@ -796,9 +798,9 @@ const StaffView: React.FC = () => {
                 <tbody>
                   {sortedStaff.map((s: Staff) => (
                     <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="p-3 border-b border-r border-gray-100 bg-white">
-                        <div className="font-bold text-gray-800">{s.name}</div>
-                        <div className="text-[10px] text-gray-500">
+                      <td className="p-2 border-b border-r border-gray-100 bg-white sticky left-0 z-10">
+                        <div className="font-bold text-gray-800 text-xs leading-tight">{s.name}</div>
+                        <div className="text-[9px] text-gray-500 leading-tight">
                           {s.role} ({s.type})
                         </div>
                       </td>
@@ -808,27 +810,27 @@ const StaffView: React.FC = () => {
                         return (
                           <td
                             key={`${s.id}-${d.date}`}
-                            className={`p-1 border-b border-r border-gray-100 text-center ${
+                            className={`p-0.5 border-b border-r border-gray-100 text-center ${
                               isHolidayDay ? 'bg-red-50' : 'bg-white'
                             }`}
                           >
                             {isHolidayDay ? (
-                              <div className="w-full py-2 px-1 rounded bg-red-100 text-red-600 cursor-not-allowed opacity-60">
-                                <div className="text-lg font-bold">-</div>
-                                <div className="text-[9px] mt-0.5">休業</div>
+                              <div className="w-full py-1 px-0.5 rounded bg-red-100 text-red-600 cursor-not-allowed opacity-60">
+                                <div className="text-sm font-bold leading-none">-</div>
+                                <div className="text-[8px] mt-0.5 leading-none">休業</div>
                               </div>
                             ) : (
                               <button
                                 onClick={() => toggleShift(s.id, d.date)}
-                                className={`w-full py-2 px-1 rounded transition-all ${
+                                className={`w-full py-1 px-0.5 rounded transition-all ${
                                   hasShift
                                     ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
                                     : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                 }`}
                               >
-                                <div className="text-lg font-bold">{hasShift ? '◯' : '-'}</div>
+                                <div className="text-sm font-bold leading-none">{hasShift ? '◯' : '-'}</div>
                                 {hasShift && (
-                                  <div className="text-[9px] mt-0.5 opacity-90">9:00~17:00</div>
+                                  <div className="text-[8px] mt-0.5 opacity-90 leading-none">9:00~17:00</div>
                                 )}
                               </button>
                             )}
@@ -839,7 +841,7 @@ const StaffView: React.FC = () => {
                   ))}
                   {/* Total Staff Count Row */}
                   <tr className="bg-gray-50 font-bold text-gray-600">
-                    <td className="p-3 border-r border-gray-100 text-xs uppercase tracking-wider">
+                    <td className="p-2 border-r border-gray-100 text-[9px] uppercase tracking-wider sticky left-0 z-10">
                       配置人数合計
                     </td>
                     {weekDates.map((d) => {
@@ -847,7 +849,7 @@ const StaffView: React.FC = () => {
                       return (
                         <td
                           key={`total-${d.date}`}
-                          className="p-2 border-r border-gray-100 text-center text-xs text-gray-400"
+                          className="p-1 border-r border-gray-100 text-center text-[9px] text-gray-400"
                         >
                           {count} 名
                         </td>
@@ -861,15 +863,15 @@ const StaffView: React.FC = () => {
 
           {/* 利用児童カレンダー */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="font-bold text-lg text-gray-800">利用児童カレンダー</h3>
-              <p className="text-xs text-gray-500 mt-1">各日の利用予定児童数を確認できます</p>
+            <div className="p-2 sm:p-3 border-b border-gray-200 bg-gray-50">
+              <h3 className="font-bold text-sm sm:text-base text-gray-800">利用児童カレンダー</h3>
+              <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">各日の利用予定児童数を確認できます</p>
             </div>
             <div className="overflow-x-auto">
-              <div className="min-w-[700px]">
+              <div className="min-w-[600px] sm:min-w-[700px]">
                 {/* ヘッダー */}
                 <div className="flex border-b border-gray-200 sticky top-0 bg-gray-50 z-10">
-                  <div className="w-16 p-2 shrink-0 border-r border-gray-200 text-xs text-center font-bold text-gray-500 flex items-center justify-center">
+                  <div className="w-12 sm:w-16 p-1.5 sm:p-2 shrink-0 border-r border-gray-200 text-xs text-center font-bold text-gray-500 flex items-center justify-center">
                     区分
                   </div>
                   {weekDates.map((d, i) => {
@@ -879,7 +881,7 @@ const StaffView: React.FC = () => {
                     return (
                       <div
                         key={i}
-                        className={`flex-1 p-2 text-center border-r border-gray-200 text-sm font-bold ${
+                        className={`flex-1 p-1.5 sm:p-2 text-center border-r border-gray-200 text-xs sm:text-sm font-bold ${
                           isHolidayDay
                             ? 'text-red-600 bg-red-50'
                             : i >= 5
@@ -887,11 +889,11 @@ const StaffView: React.FC = () => {
                             : 'text-gray-700'
                         } ${isBusy ? 'bg-orange-50' : ''}`}
                       >
-                        <div>{d.date.split('-')[2]} ({d.day})</div>
+                        <div className="leading-tight">{d.date.split('-')[2]} ({d.day})</div>
                         {isHolidayDay ? (
-                          <div className="text-[9px] text-red-600 mt-0.5">休業</div>
+                          <div className="text-[9px] text-red-600 mt-0.5 leading-none">休業</div>
                         ) : (
-                          <div className="text-[9px] text-gray-500 mt-0.5">
+                          <div className="text-[9px] text-gray-500 mt-0.5 leading-none">
                             利用: {childCount}名
                           </div>
                         )}
@@ -900,10 +902,10 @@ const StaffView: React.FC = () => {
                   })}
                 </div>
                 {/* 午前行 */}
-                <div className="flex border-b border-gray-200 min-h-[120px]">
-                  <div className="w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
+                <div className="flex border-b border-gray-200 min-h-[80px] sm:min-h-[100px]">
+                  <div className="w-12 sm:w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
                     <div className="text-xs font-bold text-gray-600">午前</div>
-                    <div className="text-[10px] text-gray-400 mt-1">定員{facilitySettings.capacity.AM}</div>
+                    <div className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 leading-none">定員{facilitySettings.capacity.AM}</div>
                   </div>
                   {weekDates.map((d, i) => {
                     const items = schedules.filter((s) => s.date === d.date && s.slot === 'AM');
@@ -911,29 +913,29 @@ const StaffView: React.FC = () => {
                     return (
                       <div
                         key={i}
-                        className={`flex-1 p-1 border-r border-gray-100 transition-colors ${
+                        className={`flex-1 p-0.5 sm:p-1 border-r border-gray-100 transition-colors ${
                           isHolidayDay
                             ? 'bg-red-50 cursor-not-allowed opacity-60'
                             : 'bg-white'
                         }`}
                       >
                         {isHolidayDay ? (
-                          <div className="text-[10px] text-red-600 text-center mt-2">休業</div>
+                          <div className="text-[9px] sm:text-[10px] text-red-600 text-center mt-1 leading-none">休業</div>
                         ) : (
                           items.map((item) => (
                             <div
                               key={item.id}
-                              className="mb-1 border rounded px-2 py-1.5 text-xs font-medium shadow-sm bg-[#e0f7fa] border-[#b2ebf2] text-[#006064]"
+                              className="mb-0.5 sm:mb-1 border rounded px-1 sm:px-1.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium shadow-sm bg-[#e0f7fa] border-[#b2ebf2] text-[#006064]"
                             >
-                              <div className="font-bold truncate">{item.childName}</div>
-                              <div className="flex gap-1 mt-1">
+                              <div className="font-bold truncate leading-tight">{item.childName}</div>
+                              <div className="flex gap-0.5 sm:gap-1 mt-0.5">
                                 {item.hasPickup && (
-                                  <span className="px-1 rounded-[2px] text-[9px] font-bold border bg-white/80 text-[#006064] border-[#b2ebf2]">
+                                  <span className="px-0.5 sm:px-1 rounded-[2px] text-[8px] sm:text-[9px] font-bold border bg-white/80 text-[#006064] border-[#b2ebf2] leading-none">
                                     迎
                                   </span>
                                 )}
                                 {item.hasDropoff && (
-                                  <span className="px-1 rounded-[2px] text-[9px] font-bold border bg-white/80 text-[#006064] border-[#b2ebf2]">
+                                  <span className="px-0.5 sm:px-1 rounded-[2px] text-[8px] sm:text-[9px] font-bold border bg-white/80 text-[#006064] border-[#b2ebf2] leading-none">
                                     送
                                   </span>
                                 )}
@@ -946,10 +948,10 @@ const StaffView: React.FC = () => {
                   })}
                 </div>
                 {/* 午後行 */}
-                <div className="flex min-h-[200px]">
-                  <div className="w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
+                <div className="flex min-h-[100px] sm:min-h-[150px]">
+                  <div className="w-12 sm:w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
                     <div className="text-xs font-bold text-gray-600">午後</div>
-                    <div className="text-[10px] text-gray-400 mt-1">定員{facilitySettings.capacity.PM}</div>
+                    <div className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 leading-none">定員{facilitySettings.capacity.PM}</div>
                   </div>
                   {weekDates.map((d, i) => {
                     const items = schedules.filter((s) => s.date === d.date && s.slot === 'PM');
@@ -957,29 +959,29 @@ const StaffView: React.FC = () => {
                     return (
                       <div
                         key={i}
-                        className={`flex-1 p-1 border-r border-gray-100 transition-colors ${
+                        className={`flex-1 p-0.5 sm:p-1 border-r border-gray-100 transition-colors ${
                           isHolidayDay
                             ? 'bg-red-50 cursor-not-allowed opacity-60'
                             : 'bg-white'
                         }`}
                       >
                         {isHolidayDay ? (
-                          <div className="text-[10px] text-red-600 text-center mt-2">休業</div>
+                          <div className="text-[9px] sm:text-[10px] text-red-600 text-center mt-1 leading-none">休業</div>
                         ) : (
                           items.map((item) => (
                             <div
                               key={item.id}
-                              className="mb-1 border rounded px-2 py-1.5 text-xs shadow-sm bg-orange-50 border-orange-100 text-orange-900"
+                              className="mb-0.5 sm:mb-1 border rounded px-1 sm:px-1.5 py-0.5 sm:py-1 text-[10px] sm:text-xs shadow-sm bg-orange-50 border-orange-100 text-orange-900"
                             >
-                              <div className="font-bold truncate text-[11px]">{item.childName}</div>
-                              <div className="flex gap-1 mt-1">
+                              <div className="font-bold truncate leading-tight">{item.childName}</div>
+                              <div className="flex gap-0.5 sm:gap-1 mt-0.5">
                                 {item.hasPickup && (
-                                  <span className="px-1 rounded-[2px] text-[9px] font-bold border bg-white/80 text-orange-600 border-orange-100">
+                                  <span className="px-0.5 sm:px-1 rounded-[2px] text-[8px] sm:text-[9px] font-bold border bg-white/80 text-orange-600 border-orange-100 leading-none">
                                     迎
                                   </span>
                                 )}
                                 {item.hasDropoff && (
-                                  <span className="px-1 rounded-[2px] text-[9px] font-bold border bg-white/80 text-orange-600 border-orange-100">
+                                  <span className="px-0.5 sm:px-1 rounded-[2px] text-[8px] sm:text-[9px] font-bold border bg-white/80 text-orange-600 border-orange-100 leading-none">
                                     送
                                   </span>
                                 )}

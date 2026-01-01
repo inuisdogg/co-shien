@@ -186,18 +186,18 @@ const DashboardView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* ヘッダー */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">経営ダッシュボード</h2>
-          <p className="text-gray-500 text-xs mt-1">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">経営ダッシュボード</h2>
+          <p className="text-gray-500 text-xs sm:text-sm mt-1">
             経営指標を週単位・月単位で確認できます。
           </p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center flex-wrap gap-2 sm:gap-4">
           <div className="flex bg-gray-100 p-1 rounded">
             <button
               onClick={() => setViewPeriod('week')}
-              className={`px-4 py-1.5 text-xs font-bold rounded transition-all ${
+              className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
                 viewPeriod === 'week'
                   ? 'bg-white text-[#00c4cc] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -207,7 +207,7 @@ const DashboardView: React.FC = () => {
             </button>
             <button
               onClick={() => setViewPeriod('month')}
-              className={`px-4 py-1.5 text-xs font-bold rounded transition-all ${
+              className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
                 viewPeriod === 'month'
                   ? 'bg-white text-[#00c4cc] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -219,16 +219,16 @@ const DashboardView: React.FC = () => {
           <div className="flex items-center space-x-2">
             <button
               onClick={() => changeMonth(-1)}
-              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
             >
               ←
             </button>
-            <span className="text-sm font-bold text-gray-800 min-w-[120px] text-center">
+            <span className="text-xs sm:text-sm font-bold text-gray-800 min-w-[100px] sm:min-w-[120px] text-center">
               {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
             </span>
             <button
               onClick={() => changeMonth(1)}
-              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
             >
               →
             </button>
@@ -237,17 +237,17 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 主要指標カード */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {/* 当月見込み売り上げ */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-bold text-gray-500">当月見込み売り上げ</div>
-            <DollarSign size={16} className="text-[#00c4cc]" />
+            <div className="text-xs sm:text-sm font-bold text-gray-500">当月見込み売り上げ</div>
+            <DollarSign size={16} className="text-[#00c4cc] shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-gray-800">
+          <div className="text-xl sm:text-2xl font-bold text-gray-800">
             ¥{totalMonthlyRevenue.toLocaleString()}
           </div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs sm:text-sm text-gray-500 mt-1 leading-tight">
             目標: {targetRevenue !== null ? `¥${targetRevenue.toLocaleString()}` : '未設定'}
             {targetRevenue !== null && (
               <> / 達成率: {((totalMonthlyRevenue / targetRevenue) * 100).toFixed(1)}%</>
@@ -264,15 +264,15 @@ const DashboardView: React.FC = () => {
         </div>
 
         {/* 稼働率 */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-bold text-gray-500">稼働率</div>
-            <BarChart3 size={16} className="text-[#00c4cc]" />
+            <div className="text-xs sm:text-sm font-bold text-gray-500">稼働率</div>
+            <BarChart3 size={16} className="text-[#00c4cc] shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-gray-800">
+          <div className="text-xl sm:text-2xl font-bold text-gray-800">
             {occupancyRate.rate.toFixed(1)}%
           </div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs sm:text-sm text-gray-500 mt-1 leading-tight">
             目標: {targetOccupancyRate !== null ? `${targetOccupancyRate}%` : '未設定'}
           </div>
           {targetOccupancyRate !== null && (
@@ -289,22 +289,22 @@ const DashboardView: React.FC = () => {
               />
             </div>
           )}
-          <div className="mt-2 text-xs text-gray-600">
+          <div className="mt-2 text-xs sm:text-sm text-gray-600 leading-tight">
             <div>午前: {ampmOccupancyRate.amRate.toFixed(1)}% ({ampmOccupancyRate.amCount}/{ampmOccupancyRate.amCapacity})</div>
             <div>午後: {ampmOccupancyRate.pmRate.toFixed(1)}% ({ampmOccupancyRate.pmCount}/{ampmOccupancyRate.pmCapacity})</div>
           </div>
         </div>
 
         {/* キャンセル率 */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-bold text-gray-500">キャンセル率</div>
-            <AlertCircle size={16} className="text-[#00c4cc]" />
+            <div className="text-xs sm:text-sm font-bold text-gray-500">キャンセル率</div>
+            <AlertCircle size={16} className="text-[#00c4cc] shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-gray-800">
+          <div className="text-xl sm:text-2xl font-bold text-gray-800">
             {slotStats.cancellationRate.toFixed(1)}%
           </div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs sm:text-sm text-gray-500 mt-1 leading-tight">
             キャンセル数: {slotStats.cancelledSlots}件
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
@@ -323,24 +323,24 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 週別見込み売り上げ */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-          <TrendingUp size={20} className="mr-2 text-[#00c4cc]" />
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center">
+          <TrendingUp size={18} className="sm:w-5 sm:h-5 mr-2 text-[#00c4cc] shrink-0" />
           週別見込み売り上げ
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
           {weeklyRevenue.map((week) => (
             <div
               key={week.week}
-              className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+              className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200"
             >
-              <div className="text-xs font-bold text-gray-500 mb-2">
+              <div className="text-xs sm:text-sm font-bold text-gray-500 mb-2 leading-tight">
                 {week.week}週目
               </div>
-              <div className="text-xl font-bold text-gray-800 mb-1">
+              <div className="text-lg sm:text-xl font-bold text-gray-800 mb-1 leading-tight">
                 ¥{week.revenue.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs sm:text-sm text-gray-500 leading-tight">
                 予定: {week.scheduledCount} / 実績: {week.actualCount}
               </div>
             </div>
@@ -349,15 +349,15 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* リード管理進捗 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-          <Target size={20} className="mr-2 text-[#00c4cc]" />
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center">
+          <Target size={18} className="sm:w-5 sm:h-5 mr-2 text-[#00c4cc] shrink-0" />
           リード管理進捗（当月新規）
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-            <div className="text-xs font-bold text-blue-700 mb-1">新規問い合わせ</div>
-            <div className="text-2xl font-bold text-blue-800">{leadProgress.current.newInquiries}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 sm:gap-4">
+          <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-200">
+            <div className="text-xs sm:text-sm font-bold text-blue-700 mb-1 leading-tight">新規問い合わせ</div>
+            <div className="text-xl sm:text-2xl font-bold text-blue-800 leading-tight">{leadProgress.current.newInquiries}</div>
             {leadProgress.previous && (
               <div className="flex items-center text-xs mt-1">
                 {leadProgress.trends.newInquiries >= 0 ? (
@@ -371,9 +371,9 @@ const DashboardView: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-            <div className="text-xs font-bold text-yellow-700 mb-1">見学/面談予定</div>
-            <div className="text-2xl font-bold text-yellow-800">{leadProgress.current.visits}</div>
+          <div className="bg-yellow-50 rounded-lg p-3 sm:p-4 border border-yellow-200">
+            <div className="text-xs sm:text-sm font-bold text-yellow-700 mb-1 leading-tight">見学/面談予定</div>
+            <div className="text-xl sm:text-2xl font-bold text-yellow-800 leading-tight">{leadProgress.current.visits}</div>
             {leadProgress.previous && (
               <div className="flex items-center text-xs mt-1">
                 {leadProgress.trends.visits >= 0 ? (
@@ -387,9 +387,9 @@ const DashboardView: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-            <div className="text-xs font-bold text-orange-700 mb-1">検討中</div>
-            <div className="text-2xl font-bold text-orange-800">{leadProgress.current.considering}</div>
+          <div className="bg-orange-50 rounded-lg p-3 sm:p-4 border border-orange-200">
+            <div className="text-xs sm:text-sm font-bold text-orange-700 mb-1 leading-tight">検討中</div>
+            <div className="text-xl sm:text-2xl font-bold text-orange-800 leading-tight">{leadProgress.current.considering}</div>
             {leadProgress.previous && (
               <div className="flex items-center text-xs mt-1">
                 {leadProgress.trends.considering >= 0 ? (
@@ -403,9 +403,9 @@ const DashboardView: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-            <div className="text-xs font-bold text-purple-700 mb-1">受給者証待ち</div>
-            <div className="text-2xl font-bold text-purple-800">{leadProgress.current.waitingBenefit}</div>
+          <div className="bg-purple-50 rounded-lg p-3 sm:p-4 border border-purple-200">
+            <div className="text-xs sm:text-sm font-bold text-purple-700 mb-1 leading-tight">受給者証待ち</div>
+            <div className="text-xl sm:text-2xl font-bold text-purple-800 leading-tight">{leadProgress.current.waitingBenefit}</div>
             {leadProgress.previous && (
               <div className="flex items-center text-xs mt-1">
                 {leadProgress.trends.waitingBenefit >= 0 ? (
@@ -419,9 +419,9 @@ const DashboardView: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
-            <div className="text-xs font-bold text-indigo-700 mb-1">契約進行中</div>
-            <div className="text-2xl font-bold text-indigo-800">{leadProgress.current.contractProgress}</div>
+          <div className="bg-indigo-50 rounded-lg p-3 sm:p-4 border border-indigo-200">
+            <div className="text-xs sm:text-sm font-bold text-indigo-700 mb-1 leading-tight">契約進行中</div>
+            <div className="text-xl sm:text-2xl font-bold text-indigo-800 leading-tight">{leadProgress.current.contractProgress}</div>
             {leadProgress.previous && (
               <div className="flex items-center text-xs mt-1">
                 {leadProgress.trends.contractProgress >= 0 ? (
@@ -435,9 +435,9 @@ const DashboardView: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-            <div className="text-xs font-bold text-green-700 mb-1">契約済み</div>
-            <div className="text-2xl font-bold text-green-800">{leadProgress.current.contracts}</div>
+          <div className="bg-green-50 rounded-lg p-3 sm:p-4 border border-green-200">
+            <div className="text-xs sm:text-sm font-bold text-green-700 mb-1 leading-tight">契約済み</div>
+            <div className="text-xl sm:text-2xl font-bold text-green-800 leading-tight">{leadProgress.current.contracts}</div>
             {leadProgress.previous && (
               <div className="flex items-center text-xs mt-1">
                 {leadProgress.trends.contracts >= 0 ? (
@@ -451,9 +451,9 @@ const DashboardView: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-            <div className="text-xs font-bold text-red-700 mb-1">失注</div>
-            <div className="text-2xl font-bold text-red-800">{leadProgress.current.lost}</div>
+          <div className="bg-red-50 rounded-lg p-3 sm:p-4 border border-red-200">
+            <div className="text-xs sm:text-sm font-bold text-red-700 mb-1 leading-tight">失注</div>
+            <div className="text-xl sm:text-2xl font-bold text-red-800 leading-tight">{leadProgress.current.lost}</div>
             {leadProgress.previous && (
               <div className="flex items-center text-xs mt-1">
                 {leadProgress.trends.lost >= 0 ? (

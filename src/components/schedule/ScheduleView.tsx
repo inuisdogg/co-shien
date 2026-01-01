@@ -364,12 +364,12 @@ const ScheduleView: React.FC = () => {
     <div className="h-[calc(100vh-100px)] animate-in fade-in duration-500">
       {/* Calendar Panel */}
       <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white z-10">
-          <div className="flex items-center space-x-4">
+        <div className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white z-10">
+          <div className="flex items-center space-x-2 sm:space-x-4 flex-wrap">
             <div className="flex bg-gray-100 p-1 rounded">
               <button
                 onClick={() => setViewFormat('month')}
-                className={`px-4 py-1.5 text-xs font-bold rounded transition-all ${
+                className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
                   viewFormat === 'month'
                     ? 'bg-white text-[#00c4cc] shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
@@ -379,7 +379,7 @@ const ScheduleView: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewFormat('week')}
-                className={`px-4 py-1.5 text-xs font-bold rounded transition-all ${
+                className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
                   viewFormat === 'week'
                     ? 'bg-white text-[#00c4cc] shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
@@ -392,16 +392,16 @@ const ScheduleView: React.FC = () => {
               <>
                 <button
                   onClick={() => changeMonth(-1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
                 >
                   ←
                 </button>
-                <h3 className="font-bold text-lg text-gray-800">
+                <h3 className="font-bold text-base sm:text-lg text-gray-800 whitespace-nowrap">
                   {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
                 </h3>
                 <button
                   onClick={() => changeMonth(1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
                 >
                   →
                 </button>
@@ -411,16 +411,16 @@ const ScheduleView: React.FC = () => {
               <>
                 <button
                   onClick={() => changeWeek(-1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
                 >
                   ←
                 </button>
-                <h3 className="font-bold text-lg text-gray-800">
+                <h3 className="font-bold text-sm sm:text-lg text-gray-800">
                   {weekDates[0].date.split('-')[1]}月 {weekDates[0].date.split('-')[2]}日 ～ {weekDates[6].date.split('-')[1]}月 {weekDates[6].date.split('-')[2]}日
                 </h3>
                 <button
                   onClick={() => changeWeek(1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
                 >
                   →
                 </button>
@@ -428,28 +428,28 @@ const ScheduleView: React.FC = () => {
             )}
           </div>
           {viewFormat === 'month' && (
-            <div className="flex items-center space-x-4 text-xs">
-              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
-                登録数/枠数: <span className="font-bold text-gray-800 text-sm ml-1">{monthlyStats.totalUsed}/{monthlyStats.totalCapacity}</span>
+            <div className="flex items-center flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+              <div className="bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-100">
+                登録数/枠数: <span className="font-bold text-gray-800 text-xs sm:text-sm ml-1">{monthlyStats.totalUsed}/{monthlyStats.totalCapacity}</span>
               </div>
-              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
-                稼働率: <span className="font-bold text-gray-800 text-sm ml-1">{monthlyStats.utilization}%</span>
+              <div className="bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-100">
+                稼働率: <span className="font-bold text-gray-800 text-xs sm:text-sm ml-1">{monthlyStats.utilization}%</span>
               </div>
-              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
-                利用児童数: <span className="font-bold text-gray-800 text-sm ml-1">{monthlyStats.uniqueChildrenCount}名</span>
+              <div className="bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-100">
+                利用児童数: <span className="font-bold text-gray-800 text-xs sm:text-sm ml-1">{monthlyStats.uniqueChildrenCount}名</span>
               </div>
             </div>
           )}
           {viewFormat === 'week' && (
-            <div className="flex items-center space-x-4 text-xs">
-              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
-                登録数/枠数: <span className="font-bold text-gray-800 text-sm ml-1">{weeklyStats.totalUsed}/{weeklyStats.totalCapacity}</span>
+            <div className="flex items-center flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+              <div className="bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-100">
+                登録数/枠数: <span className="font-bold text-gray-800 text-xs sm:text-sm ml-1">{weeklyStats.totalUsed}/{weeklyStats.totalCapacity}</span>
               </div>
-              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
-                稼働率: <span className="font-bold text-gray-800 text-sm ml-1">{weeklyStats.utilization}%</span>
+              <div className="bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-100">
+                稼働率: <span className="font-bold text-gray-800 text-xs sm:text-sm ml-1">{weeklyStats.utilization}%</span>
               </div>
-              <div className="bg-gray-50 px-3 py-1.5 rounded border border-gray-100">
-                利用児童数: <span className="font-bold text-gray-800 text-sm ml-1">{weeklyStats.uniqueChildrenCount}名</span>
+              <div className="bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-100">
+                利用児童数: <span className="font-bold text-gray-800 text-xs sm:text-sm ml-1">{weeklyStats.uniqueChildrenCount}名</span>
               </div>
             </div>
           )}
@@ -459,11 +459,11 @@ const ScheduleView: React.FC = () => {
           {viewFormat === 'month' && (
             <div className="w-full">
               {/* 曜日ヘッダー */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
+              <div className="grid grid-cols-7 gap-1 mb-1">
                 {['日', '月', '火', '水', '木', '金', '土'].map((day, i) => (
                   <div
                     key={i}
-                    className={`p-2 text-center text-xs font-bold ${
+                    className={`p-1 text-center text-xs font-bold ${
                       i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-600'
                     }`}
                   >
@@ -496,7 +496,7 @@ const ScheduleView: React.FC = () => {
                   return (
                     <div
                       key={index}
-                      className={`min-h-[120px] border rounded-lg p-2 transition-colors ${
+                      className={`min-h-[70px] sm:min-h-[85px] border rounded-lg p-1 transition-colors ${
                         isHolidayDay
                           ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
                           : !dateInfo.isCurrentMonth
@@ -505,33 +505,33 @@ const ScheduleView: React.FC = () => {
                       } ${isToday ? 'ring-2 ring-[#00c4cc]' : ''}`}
                       onClick={() => !isHolidayDay && handleDateClick(dateInfo.date)}
                     >
-                      <div className="flex justify-between items-center mb-1">
+                      <div className="flex justify-between items-center mb-0.5">
                         <div
-                          className={`text-xs font-bold ${
+                          className={`text-xs font-bold leading-none ${
                             !dateInfo.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'
                           }`}
                         >
                           {dateInfo.day}
                         </div>
                         {isHolidayDay && (
-                          <span className="text-[9px] bg-red-200 text-red-700 px-1.5 py-0.5 rounded font-bold">
+                          <span className="text-[9px] bg-red-200 text-red-700 px-1 py-0.5 rounded font-bold leading-none">
                             休業
                           </span>
                         )}
                       </div>
                       {!isHolidayDay ? (
-                        <div className="space-y-1">
+                        <div className="grid grid-cols-2 gap-0.5 mt-0.5">
                           {/* 午前 */}
-                          <div className="bg-[#e0f7fa] rounded px-2 py-1 text-[10px]">
+                          <div className="bg-[#e0f7fa] rounded px-1 py-0.5">
                             <div className="flex justify-between items-center mb-0.5">
-                              <span className="font-bold text-[#006064]">午前</span>
-                              <span className="text-[#006064] font-bold">
+                              <span className="font-bold text-[#006064] text-[9px] leading-none">午前</span>
+                              <span className="text-[#006064] font-bold text-[9px] leading-none">
                                 {amCount}/{capacity.AM}
                               </span>
                             </div>
-                            <div className="w-full bg-white/50 rounded-full h-1.5">
+                            <div className="w-full bg-white/50 rounded-full h-0.5 mb-0.5">
                               <div
-                                className={`h-1.5 rounded-full ${
+                                className={`h-0.5 rounded-full ${
                                   amUtilization >= 100
                                     ? 'bg-red-500'
                                     : amUtilization >= 80
@@ -541,21 +541,21 @@ const ScheduleView: React.FC = () => {
                                 style={{ width: `${Math.min(amUtilization, 100)}%` }}
                               />
                             </div>
-                            <div className="text-[9px] text-[#006064] mt-0.5">
+                            <div className="text-[8px] text-[#006064] leading-none">
                               {amUtilization}%
                             </div>
                           </div>
                           {/* 午後 */}
-                          <div className="bg-orange-50 rounded px-2 py-1 text-[10px]">
+                          <div className="bg-orange-50 rounded px-1 py-0.5">
                             <div className="flex justify-between items-center mb-0.5">
-                              <span className="font-bold text-orange-900">午後</span>
-                              <span className="text-orange-900 font-bold">
+                              <span className="font-bold text-orange-900 text-[9px] leading-none">午後</span>
+                              <span className="text-orange-900 font-bold text-[9px] leading-none">
                                 {pmCount}/{capacity.PM}
                               </span>
                             </div>
-                            <div className="w-full bg-white/50 rounded-full h-1.5">
+                            <div className="w-full bg-white/50 rounded-full h-0.5 mb-0.5">
                               <div
-                                className={`h-1.5 rounded-full ${
+                                className={`h-0.5 rounded-full ${
                                   pmUtilization >= 100
                                     ? 'bg-red-500'
                                     : pmUtilization >= 80
@@ -565,19 +565,13 @@ const ScheduleView: React.FC = () => {
                                 style={{ width: `${Math.min(pmUtilization, 100)}%` }}
                               />
                             </div>
-                            <div className="text-[9px] text-orange-900 mt-0.5">
+                            <div className="text-[8px] text-orange-900 leading-none">
                               {pmUtilization}%
                             </div>
                           </div>
-                          {/* ユニーク利用児童数 */}
-                          {uniqueChildrenForDay > 0 && (
-                            <div className="text-[9px] text-gray-600 mt-1 text-center">
-                              利用: {uniqueChildrenForDay}名
-                            </div>
-                          )}
                         </div>
                       ) : (
-                        <div className="text-[10px] text-red-600 text-center mt-2">
+                        <div className="text-[9px] text-red-600 text-center mt-1 leading-none">
                           休業日
                         </div>
                       )}
@@ -589,9 +583,9 @@ const ScheduleView: React.FC = () => {
           )}
 
           {viewFormat === 'week' && (
-            <div className="min-w-[700px]">
+            <div className="min-w-[700px] overflow-x-auto">
               <div className="flex border-b border-gray-200 sticky top-0 bg-gray-50 z-10">
-                <div className="w-16 p-2 shrink-0 border-r border-gray-200 text-xs text-center font-bold text-gray-500 flex items-center justify-center">
+                <div className="w-16 sm:w-20 p-2 shrink-0 border-r border-gray-200 text-xs sm:text-sm text-center font-bold text-gray-500 flex items-center justify-center">
                   区分
                 </div>
                 {weekDates.map((d, i) => {
@@ -599,7 +593,7 @@ const ScheduleView: React.FC = () => {
                   return (
                     <div
                       key={i}
-                      className={`flex-1 p-2 text-center border-r border-gray-200 text-sm font-bold ${
+                      className={`flex-1 p-2 text-center border-r border-gray-200 text-xs sm:text-sm font-bold ${
                         isHolidayDay
                           ? 'text-red-600 bg-red-50'
                           : i >= 5
@@ -607,9 +601,9 @@ const ScheduleView: React.FC = () => {
                           : 'text-gray-700'
                       }`}
                     >
-                      <div>{d.date.split('-')[2]} ({d.day})</div>
+                      <div className="leading-tight">{d.date.split('-')[2]} ({d.day})</div>
                       {isHolidayDay && (
-                        <div className="text-[9px] text-red-600 mt-0.5">休業</div>
+                        <div className="text-[10px] sm:text-xs text-red-600 mt-0.5 leading-tight">休業</div>
                       )}
                     </div>
                   );
@@ -617,9 +611,9 @@ const ScheduleView: React.FC = () => {
               </div>
               {/* AM Row */}
               <div className="flex border-b border-gray-200 min-h-[120px]">
-                <div className="w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                  <div className="text-xs font-bold text-gray-600">午前</div>
-                  <div className="text-[10px] text-gray-400 mt-1">定員{capacity.AM}</div>
+                <div className="w-16 sm:w-20 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
+                  <div className="text-xs sm:text-sm font-bold text-gray-600">午前</div>
+                  <div className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">定員{capacity.AM}</div>
                 </div>
                 {weekDates.map((d, i) => {
                   const items = schedules.filter((s) => s.date === d.date && s.slot === 'AM');
@@ -635,27 +629,27 @@ const ScheduleView: React.FC = () => {
                       onClick={() => !isHolidayDay && handleDateClick(d.date, 'AM')}
                     >
                       {isHolidayDay ? (
-                        <div className="text-[10px] text-red-600 text-center mt-2">休業</div>
+                        <div className="text-[11px] sm:text-xs text-red-600 text-center mt-2 leading-tight">休業</div>
                       ) : (
                         items.map((item) => {
                           const hasRecord = getUsageRecordByScheduleId(item.id) !== undefined;
                           return (
                             <div
                               key={item.id}
-                              className={`mb-1 border rounded px-2 py-1.5 text-xs font-medium shadow-sm group relative transition-colors cursor-pointer ${
+                              className={`mb-1 border rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm font-medium shadow-sm group relative transition-colors cursor-pointer ${
                                 hasRecord
                                   ? 'bg-green-50 border-green-200 text-green-900 hover:border-green-300'
                                   : 'bg-[#e0f7fa] border-[#b2ebf2] text-[#006064] hover:border-[#00c4cc]'
                               }`}
                               onClick={(e) => handleScheduleItemClick(item, e)}
                             >
-                              <div className="font-bold truncate">{item.childName}</div>
+                              <div className="font-bold truncate text-xs sm:text-sm leading-tight">{item.childName}</div>
                               {hasRecord && (
-                                <div className="text-[9px] text-green-700 mt-0.5">実績登録済</div>
+                                <div className="text-[10px] sm:text-xs text-green-700 mt-0.5 leading-tight">実績登録済</div>
                               )}
                               <div className="flex gap-1 mt-1">
                                 {item.hasPickup && (
-                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
                                     hasRecord
                                       ? 'bg-white/80 text-green-700 border-green-200'
                                       : 'bg-white/80 text-[#006064] border-[#b2ebf2]'
@@ -664,7 +658,7 @@ const ScheduleView: React.FC = () => {
                                   </span>
                                 )}
                                 {item.hasDropoff && (
-                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
                                     hasRecord
                                       ? 'bg-white/80 text-green-700 border-green-200'
                                       : 'bg-white/80 text-[#006064] border-[#b2ebf2]'
@@ -683,9 +677,9 @@ const ScheduleView: React.FC = () => {
               </div>
               {/* PM Row */}
               <div className="flex min-h-[200px]">
-                <div className="w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                  <div className="text-xs font-bold text-gray-600">午後</div>
-                  <div className="text-[10px] text-gray-400 mt-1">定員{capacity.PM}</div>
+                <div className="w-16 sm:w-20 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
+                  <div className="text-xs sm:text-sm font-bold text-gray-600">午後</div>
+                  <div className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">定員{capacity.PM}</div>
                 </div>
                 {weekDates.map((d, i) => {
                   const items = schedules.filter((s) => s.date === d.date && s.slot === 'PM');
@@ -701,27 +695,27 @@ const ScheduleView: React.FC = () => {
                       onClick={() => !isHolidayDay && handleDateClick(d.date, 'PM')}
                     >
                       {isHolidayDay ? (
-                        <div className="text-[10px] text-red-600 text-center mt-2">休業</div>
+                        <div className="text-[11px] sm:text-xs text-red-600 text-center mt-2 leading-tight">休業</div>
                       ) : (
                         items.map((item) => {
                           const hasRecord = getUsageRecordByScheduleId(item.id) !== undefined;
                           return (
                             <div
                               key={item.id}
-                              className={`mb-1 border rounded px-2 py-1.5 text-xs shadow-sm group relative transition-colors cursor-pointer ${
+                              className={`mb-1 border rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm shadow-sm group relative transition-colors cursor-pointer ${
                                 hasRecord
                                   ? 'bg-green-50 border-green-200 text-green-900 hover:border-green-300'
                                   : 'bg-orange-50 border-orange-100 text-orange-900 hover:border-orange-300'
                               }`}
                               onClick={(e) => handleScheduleItemClick(item, e)}
                             >
-                              <div className="font-bold truncate text-[11px]">{item.childName}</div>
+                              <div className="font-bold truncate text-xs sm:text-sm leading-tight">{item.childName}</div>
                               {hasRecord && (
-                                <div className="text-[9px] text-green-700 mt-0.5">実績登録済</div>
+                                <div className="text-[10px] sm:text-xs text-green-700 mt-0.5 leading-tight">実績登録済</div>
                               )}
                               <div className="flex gap-1 mt-1">
                                 {item.hasPickup && (
-                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
                                     hasRecord
                                       ? 'bg-white/80 text-green-700 border-green-200'
                                       : 'bg-white/80 text-orange-600 border-orange-100'
@@ -730,7 +724,7 @@ const ScheduleView: React.FC = () => {
                                   </span>
                                 )}
                                 {item.hasDropoff && (
-                                  <span className={`px-1 rounded-[2px] text-[9px] font-bold border ${
+                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
                                     hasRecord
                                       ? 'bg-white/80 text-green-700 border-green-200'
                                       : 'bg-white/80 text-orange-600 border-orange-100'
