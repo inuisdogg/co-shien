@@ -185,50 +185,133 @@ export const useFacilityData = () => {
 
     const fetchStaff = async () => {
       try {
-        const { data, error } = await supabase
+        // 1. staffテーブルから取得（従来の方法）
+        const { data: staffData, error: staffError } = await supabase
           .from('staff')
           .select('*')
           .eq('facility_id', facilityId)
           .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching staff:', error);
-          setLoadingStaff(false);
-          return;
+        if (staffError) {
+          console.error('Error fetching staff:', staffError);
         }
 
-        if (data) {
-          // データベースのスネークケースをキャメルケースに変換
-          const staffData: Staff[] = data.map((row) => ({
-            id: row.id,
-            facilityId: row.facility_id,
-            name: row.name,
-            nameKana: row.name_kana,
-            role: row.role,
-            type: row.type,
-            birthDate: row.birth_date,
-            gender: row.gender,
-            address: row.address,
-            phone: row.phone,
-            email: row.email,
-            qualifications: row.qualifications,
-            yearsOfExperience: row.years_of_experience,
-            qualificationCertificate: row.qualification_certificate,
-            experienceCertificate: row.experience_certificate,
-            emergencyContact: row.emergency_contact,
-            emergencyContactPhone: row.emergency_contact_phone,
-            memo: row.memo,
-            monthlySalary: row.monthly_salary,
-            hourlyWage: row.hourly_wage,
-            user_id: row.user_id,
-            defaultShiftPattern: row.default_shift_pattern && Array.isArray(row.default_shift_pattern) 
-              ? row.default_shift_pattern as boolean[] 
-              : undefined,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-          }));
-          setStaff(staffData);
+        // 2. employment_recordsから取得（新規招待されたスタッフ）
+        const { data: employmentData, error: employmentError } = await supabase
+          .from('employment_records')
+          .select('id, user_id, facility_id, role, employment_type, start_date, end_date')
+          .eq('facility_id', facilityId)
+          .is('end_date', null)
+          .order('start_date', { ascending: false });
+
+        if (employmentError) {
+          console.error('Error fetching employment records:', employmentError);
         }
+
+        const allStaff: Staff[] = [];
+        const existingUserIds = new Set<string>();
+
+        // staffテーブルのデータを追加
+        if (staffData) {
+          const staffList: Staff[] = staffData.map((row) => {
+            if (row.user_id) {
+              existingUserIds.add(row.user_id);
+            }
+            return {
+              id: row.id,
+              facilityId: row.facility_id,
+              name: row.name,
+              nameKana: row.name_kana,
+              role: row.role,
+              type: row.type,
+              birthDate: row.birth_date,
+              gender: row.gender,
+              address: row.address,
+              phone: row.phone,
+              email: row.email,
+              qualifications: row.qualifications,
+              yearsOfExperience: row.years_of_experience,
+              qualificationCertificate: row.qualification_certificate,
+              experienceCertificate: row.experience_certificate,
+              emergencyContact: row.emergency_contact,
+              emergencyContactPhone: row.emergency_contact_phone,
+              memo: row.memo,
+              monthlySalary: row.monthly_salary,
+              hourlyWage: row.hourly_wage,
+              user_id: row.user_id,
+              defaultShiftPattern: row.default_shift_pattern && Array.isArray(row.default_shift_pattern) 
+                ? row.default_shift_pattern as boolean[] 
+                : undefined,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+            };
+          });
+          allStaff.push(...staffList);
+        }
+
+        // employment_recordsのデータを追加（staffテーブルに存在しない場合のみ）
+        if (employmentData && employmentData.length > 0) {
+          // ユーザーIDのリストを取得
+          const userIds = employmentData
+            .map(emp => emp.user_id)
+            .filter((id): id is string => !!id && !existingUserIds.has(id));
+
+          if (userIds.length > 0) {
+            // usersテーブルからユーザー情報を取得
+            const { data: usersData, error: usersError } = await supabase
+              .from('users')
+              .select('id, name, email, phone, birth_date, gender, address')
+              .in('id', userIds);
+
+            if (usersError) {
+              console.error('Error fetching users:', usersError);
+            }
+
+            // employment_recordsとusersをマージ
+            if (usersData) {
+              const usersMap = new Map(usersData.map(u => [u.id, u]));
+              
+              employmentData.forEach((emp) => {
+                // staffテーブルに既に存在する場合はスキップ
+                if (emp.user_id && existingUserIds.has(emp.user_id)) {
+                  return;
+                }
+
+                const user = usersMap.get(emp.user_id || '');
+                if (user) {
+                  const staffFromEmployment: Staff = {
+                    id: emp.id, // employment_recordのIDを使用
+                    facilityId: emp.facility_id,
+                    name: user.name || '',
+                    nameKana: '',
+                    role: (emp.role as '一般スタッフ' | 'マネージャー') || '一般スタッフ',
+                    type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as '常勤' | '非常勤',
+                    birthDate: user.birth_date || '',
+                    gender: user.gender as '男性' | '女性' | 'その他' | undefined,
+                    address: user.address || '',
+                    phone: user.phone || '',
+                    email: user.email || '',
+                    qualifications: '',
+                    yearsOfExperience: 0,
+                    qualificationCertificate: '',
+                    experienceCertificate: '',
+                    emergencyContact: '',
+                    emergencyContactPhone: '',
+                    memo: '',
+                    monthlySalary: 0,
+                    hourlyWage: 0,
+                    user_id: user.id,
+                    createdAt: emp.start_date || new Date().toISOString(),
+                    updatedAt: emp.start_date || new Date().toISOString(),
+                  };
+                  allStaff.push(staffFromEmployment);
+                }
+              });
+            }
+          }
+        }
+
+        setStaff(allStaff);
       } catch (error) {
         console.error('Error in fetchStaff:', error);
       } finally {
