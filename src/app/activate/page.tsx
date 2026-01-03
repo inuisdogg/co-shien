@@ -129,6 +129,11 @@ export default function ActivatePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
+  // 生年月日の年・月・日
+  const [birthYear, setBirthYear] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
+
   // ステップBの定義
   const steps = [
     { id: 'birthDate', label: '生年月日', icon: Calendar },
@@ -686,6 +691,12 @@ export default function ActivatePage() {
     }
   };
 
+  // 生年月日の年・月・日を生成
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+
   // エラー表示
   if (!token) {
     return (
@@ -712,22 +723,12 @@ export default function ActivatePage() {
     );
   }
 
-  // 生年月日の年・月・日を生成
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-
   // 生年月日を年・月・日に分割
   const parseBirthDate = (dateString: string) => {
     if (!dateString) return { year: '', month: '', day: '' };
     const [year, month, day] = dateString.split('-');
     return { year: year || '', month: month || '', day: day || '' };
   };
-
-  const [birthYear, setBirthYear] = useState('');
-  const [birthMonth, setBirthMonth] = useState('');
-  const [birthDay, setBirthDay] = useState('');
 
   // 既存の生年月日がある場合は初期値として設定
   useEffect(() => {
@@ -737,7 +738,7 @@ export default function ActivatePage() {
       setBirthMonth(parts.month);
       setBirthDay(parts.day);
     }
-  }, []);
+  }, [careerForm.birthDate]);
 
   // 年・月・日から日付文字列を生成
   const updateBirthDate = (year: string, month: string, day: string) => {
