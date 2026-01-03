@@ -141,16 +141,24 @@ export default function ActivatePage() {
   // トークンから招待情報を取得（ユニバーサル・ゲート）
   useEffect(() => {
     if (!token) {
-      setError('ユニバーサル・ゲートのリンクが無効です');
-      setScreen('checking');
+      setError('招待リンクが無効です');
+      setScreen('welcome');
       return;
     }
 
     const verifyToken = async () => {
       try {
         setScreen('checking');
-        const decoded = atob(token);
-        const tokenData = JSON.parse(decoded);
+        setError('');
+        
+        // トークンをデコード
+        let tokenData: any;
+        try {
+          const decoded = atob(token);
+          tokenData = JSON.parse(decoded);
+        } catch (decodeError) {
+          throw new Error('招待リンクの形式が正しくありません');
+        }
         
         let fid: string;
         let uid: string | null = null;
@@ -162,6 +170,9 @@ export default function ActivatePage() {
           // 特定招待トークンの場合
           fid = tokenData.facilityId;
           uid = tokenData.userId;
+        } else if (tokenData.facilityId) {
+          // facilityIdのみの場合も公開招待として扱う
+          fid = tokenData.facilityId;
         } else {
           throw new Error('無効なリンクです');
         }
@@ -200,8 +211,10 @@ export default function ActivatePage() {
         // welcome画面へ
         setScreen('welcome');
       } catch (err: any) {
+        console.error('Token verification error:', err);
         setError(err.message || 'リンクの検証に失敗しました');
-        setScreen('checking');
+        // エラー画面を表示するため、checkingのままにしない
+        setScreen('welcome');
       }
     };
 
@@ -680,7 +693,7 @@ export default function ActivatePage() {
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-800 mb-2">エラー</h1>
-          <p className="text-gray-600">ユニバーサル・ゲートのリンクが無効です</p>
+          <p className="text-gray-600">招待リンクが無効です</p>
         </div>
       </div>
     );
@@ -863,9 +876,16 @@ export default function ActivatePage() {
                   pocopocoに招待されました！
                 </h1>
                 <p className="text-gray-600 text-sm">
-                  {facilityName}から招待が届いています
+                  {facilityName ? `${facilityName}から招待が届いています` : '招待が届いています'}
                 </p>
               </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm mb-6 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  {error}
+                </div>
+              )}
 
               <div className="space-y-3">
                 <button

@@ -18,7 +18,7 @@ const StaffManagementView: React.FC = () => {
   const { staff, facilitySettings } = useFacilityData();
   const { facility } = useAuth();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [inviteMethod, setInviteMethod] = useState<'email' | 'qr' | null>(null);
+  const [inviteMethod, setInviteMethod] = useState<'link' | 'qr' | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
@@ -295,13 +295,36 @@ const StaffManagementView: React.FC = () => {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button
-                      onClick={() => setInviteMethod('email')}
+                      onClick={async () => {
+                        setInviteMethod('link');
+                        // すぐにリンクを生成
+                        if (facility?.id) {
+                          try {
+                            setInviteLoading(true);
+                            // 公開招待用のトークンを生成
+                            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                            const publicToken = btoa(JSON.stringify({ facilityId: facility.id, type: 'public' }));
+                            const link = `${baseUrl}/activate?token=${publicToken}`;
+                            setInviteToken(publicToken);
+                            setInviteSuccess(true);
+                            
+                            // クリップボードにコピー
+                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                              await navigator.clipboard.writeText(link);
+                            }
+                          } catch (error: any) {
+                            alert(`リンク生成エラー: ${error.message || 'Unknown error'}`);
+                          } finally {
+                            setInviteLoading(false);
+                          }
+                        }
+                      }}
                       className="p-6 border-2 border-gray-200 rounded-lg hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all text-left"
                     >
                       <Mail size={32} className="text-[#00c4cc] mb-3" />
-                      <h4 className="font-bold text-gray-800 mb-2">メール・電話番号で招待</h4>
+                      <h4 className="font-bold text-gray-800 mb-2">リンクで招待</h4>
                       <p className="text-sm text-gray-600">
-                        スタッフのメールアドレスまたは電話番号を入力して招待リンクを送信します
+                        招待リンクを生成して、メールやSMSで送信できます
                       </p>
                     </button>
                     <button
@@ -386,105 +409,7 @@ const StaffManagementView: React.FC = () => {
                     閉じる
                   </button>
                 </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      名前 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={inviteFormData.name}
-                      onChange={(e) => setInviteFormData({ ...inviteFormData, name: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      placeholder="スタッフの名前"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      メールアドレス
-                    </label>
-                    <input
-                      type="email"
-                      value={inviteFormData.email}
-                      onChange={(e) => setInviteFormData({ ...inviteFormData, email: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      placeholder="example@email.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      電話番号
-                    </label>
-                    <input
-                      type="tel"
-                      value={inviteFormData.phone}
-                      onChange={(e) => setInviteFormData({ ...inviteFormData, phone: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      placeholder="090-1234-5678"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        役職
-                      </label>
-                      <select
-                        value={inviteFormData.role}
-                        onChange={(e) => setInviteFormData({ ...inviteFormData, role: e.target.value as any })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      >
-                        <option value="一般スタッフ">一般スタッフ</option>
-                        <option value="マネージャー">マネージャー</option>
-                        <option value="管理者">管理者</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        雇用形態
-                      </label>
-                      <select
-                        value={inviteFormData.employmentType}
-                        onChange={(e) => setInviteFormData({ ...inviteFormData, employmentType: e.target.value as any })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      >
-                        <option value="常勤">常勤</option>
-                        <option value="非常勤">非常勤</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      開始日
-                    </label>
-                    <input
-                      type="date"
-                      value={inviteFormData.startDate}
-                      onChange={(e) => setInviteFormData({ ...inviteFormData, startDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      onClick={() => {
-                        setIsInviteModalOpen(false);
-                        setInviteSuccess(false);
-                        setInviteToken('');
-                      }}
-                      className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      onClick={handleCreateInvitation}
-                      disabled={inviteLoading}
-                      className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50"
-                    >
-                      {inviteLoading ? '作成中...' : '招待リンクを作成'}
-                    </button>
-                  </div>
-                </>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
