@@ -64,11 +64,16 @@ export const useFacilityData = () => {
 
     const fetchFacilitySettings = async () => {
       try {
+        console.log('=== Biz側: 施設設定取得 ===');
+        console.log('facilityId:', facilityId);
+        
         const { data, error } = await supabase
           .from('facility_settings')
           .select('*')
           .eq('facility_id', facilityId)
           .single();
+        
+        console.log('Biz側: 施設設定取得結果:', { data, error });
 
         if (error && error.code !== 'PGRST116') {
           // PGRST116は「行が見つからない」エラー（正常）

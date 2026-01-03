@@ -32,3 +32,4 @@ BEGIN
   RAISE NOTICE '  - role (employment_recordsテーブルで管理)';
 END $$;
 
+

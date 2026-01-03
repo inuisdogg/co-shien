@@ -158,3 +158,4 @@ const activeEmployments = await getUserActiveEmployments(userId);
 4. **複数所属対応**: 1人のユーザーが複数の事業所に所属可能
 5. **キャリアの持ち運び**: 認証済み職歴や資格は個人アカウントに蓄積され、持ち運び可能
 
+

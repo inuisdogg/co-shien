@@ -19,3 +19,4 @@ BEGIN
   RAISE NOTICE '注意: 将来的にはfacility_idカラムを削除する予定です。';
 END $$;
 
+

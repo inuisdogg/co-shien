@@ -22,3 +22,4 @@ BEGIN
   RAISE NOTICE '  - invitation_permissions (権限設定)';
 END $$;
 
+

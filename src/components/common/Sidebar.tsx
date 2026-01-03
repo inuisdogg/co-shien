@@ -14,6 +14,7 @@ import {
   Building2,
   BarChart3,
   DollarSign,
+  CalendarCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -24,14 +25,17 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isOpen?: boolean;
   onClose?: () => void;
+  mode?: 'biz' | 'personal';
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = false, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = false, onClose, mode = 'biz' }) => {
   const { facility } = useAuth();
   const { facilitySettings } = useFacilityData();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
 
   const { isAdmin, hasPermission } = useAuth();
+  const isPersonal = mode === 'personal';
+  const primaryColor = isPersonal ? '#8b5cf6' : '#00c4cc';
 
   // 最新の施設コードを取得
   useEffect(() => {
@@ -68,7 +72,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
     {
       category: 'スタッフ管理',
       items: [
-        { id: 'staff', label: 'スタッフ・シフト管理', icon: Briefcase, permission: 'staff' as const },
+        { id: 'staff', label: 'スタッフ管理', icon: Users, permission: 'staff' as const },
+        { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'staff' as const },
       ],
     },
     {
@@ -140,7 +145,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                   }}
                   className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-md transition-all text-sm font-medium ${
                     activeTab === item.id
-                      ? 'bg-[#00c4cc] text-white shadow-md'
+                      ? `${isPersonal ? 'bg-[#8b5cf6]' : 'bg-[#00c4cc]'} text-white shadow-md`
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >

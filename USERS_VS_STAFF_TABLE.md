@@ -167,3 +167,4 @@ facilities (事業所)
 - アカウント有効化時に、`users`、`employment_records`、`staff`の3つのテーブルにデータが作成される
 - 将来的には`staff`テーブルを廃止し、`employment_records`に統一する予定
 
+

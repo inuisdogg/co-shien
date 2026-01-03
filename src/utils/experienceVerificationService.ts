@@ -385,3 +385,4 @@ async function notifyRequester(userId: string, requestId: string): Promise<void>
   console.log(`ユーザー ${userId} に通知: 実務経験証明依頼 ${requestId} のステータス更新`);
 }
 
+

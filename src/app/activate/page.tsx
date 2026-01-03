@@ -83,7 +83,7 @@ export default function ActivatePage() {
   const token = searchParams.get('token');
   
   // 画面状態管理
-  const [screen, setScreen] = useState<'A' | 'B' | 'complete'>('A');
+  const [screen, setScreen] = useState<'checking' | 'welcome' | 'login' | 'register' | 'B' | 'complete'>('checking');
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -95,7 +95,15 @@ export default function ActivatePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [facilityId, setFacilityId] = useState<string | null>(null);
   const [invitedRole, setInvitedRole] = useState<string>('');
+  const [existingUser, setExistingUser] = useState<any>(null);
+  const [isExistingAccount, setIsExistingAccount] = useState(false);
   
+  // ログインフォーム
+  const [loginForm, setLoginForm] = useState({
+    email: '',
+    password: '',
+  });
+
   // 画面A: アカウント作成フォーム
   const [accountForm, setAccountForm] = useState({
     name: '',
@@ -130,21 +138,32 @@ export default function ActivatePage() {
     { id: 'workHistory', label: '職歴・学歴', icon: Briefcase },
   ];
 
-  // トークンから招待情報を取得
+  // トークンから招待情報を取得（ユニバーサル・ゲート）
   useEffect(() => {
     if (!token) {
-      setError('招待リンクが無効です');
+      setError('ユニバーサル・ゲートのリンクが無効です');
+      setScreen('checking');
       return;
     }
 
     const verifyToken = async () => {
       try {
+        setScreen('checking');
         const decoded = atob(token);
         const tokenData = JSON.parse(decoded);
-        const { userId: uid, facilityId: fid } = tokenData;
         
-        if (!uid || !fid) {
-          throw new Error('無効な招待トークンです');
+        let fid: string;
+        let uid: string | null = null;
+
+        // 公開招待トークンの場合
+        if (tokenData.type === 'public' && tokenData.facilityId) {
+          fid = tokenData.facilityId;
+        } else if (tokenData.facilityId && tokenData.userId) {
+          // 特定招待トークンの場合
+          fid = tokenData.facilityId;
+          uid = tokenData.userId;
+        } else {
+          throw new Error('無効なリンクです');
         }
 
         // 事業所情報を取得
@@ -158,38 +177,31 @@ export default function ActivatePage() {
           throw new Error('事業所情報が見つかりません');
         }
 
-        // ユーザー情報を取得（既存の場合）
-        const { data: user, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', uid)
-          .single();
+        setFacilityName(facility.name);
+        setFacilityId(fid);
 
-        if (userError || !user) {
-          throw new Error('ユーザー情報が見つかりません');
+        // 特定招待の場合、ユーザー情報を取得
+        if (uid) {
+          const { data: invitedUser, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', uid)
+            .single();
+
+          if (!userError && invitedUser) {
+            setInvitedName(invitedUser.name);
+            setInvitedEmail(invitedUser.email || '');
+            setUserId(uid);
+            const invitationRole = (invitedUser as any).invitation_role || '一般スタッフ';
+            setInvitedRole(invitationRole);
+          }
         }
 
-        // 招待時の雇用情報を取得
-        const invitationStartDate = (user as any).invitation_start_date;
-        const invitationRole = (user as any).invitation_role || '一般スタッフ';
-
-        setFacilityName(facility.name);
-        setInvitedName(user.name);
-        setInvitedEmail(user.email || '');
-        setUserId(uid);
-        setFacilityId(fid);
-        setInvitedRole(invitationRole);
-        
-        // フォームに既存情報を反映
-        setAccountForm(prev => ({
-          ...prev,
-          name: user.name,
-          email: user.email || '',
-        }));
-        
-        // roleは削除（施設側が管理するため）
+        // welcome画面へ
+        setScreen('welcome');
       } catch (err: any) {
-        setError(err.message || '招待リンクの検証に失敗しました');
+        setError(err.message || 'リンクの検証に失敗しました');
+        setScreen('checking');
       }
     };
 
@@ -216,8 +228,13 @@ export default function ActivatePage() {
       return;
     }
 
-    if (!userId || !facilityId) {
-      setError('招待情報が不正です');
+    if (!facilityId) {
+      setError('事業所情報が不正です');
+      return;
+    }
+
+    if (!accountForm.name || !accountForm.email) {
+      setError('名前とメールアドレスを入力してください');
       return;
     }
 
@@ -226,9 +243,53 @@ export default function ActivatePage() {
       // パスワードをハッシュ化
       const passwordHash = await hashPassword(accountForm.password);
 
-      // ユーザーを更新（アカウント有効化）
-      // 注意: nameの更新はスキップ（UNIQUE制約エラーを回避）
-      // 既存のユーザーは既に名前が設定されているため、変更しない
+      // 公開招待の場合、新規ユーザーを作成
+      if (!userId) {
+        // UUIDを生成
+        const generateUUID = () => {
+          if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+          }
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+        };
+
+        const newUserId = generateUUID();
+        const newUser: any = {
+          id: newUserId,
+          name: accountForm.name,
+          email: accountForm.email,
+          password_hash: passwordHash,
+          account_status: 'active',
+          activated_at: new Date().toISOString(),
+          has_account: true,
+          role: 'staff',
+          facility_id: facilityId,
+        };
+
+        const { data: createdUser, error: createError } = await supabase
+          .from('users')
+          .insert(newUser)
+          .select()
+          .single();
+
+        if (createError || !createdUser) {
+          throw new Error(`アカウント作成エラー: ${createError?.message || 'Unknown error'}`);
+        }
+
+        setUserId(newUserId);
+        setInvitedName(accountForm.name);
+        setInvitedEmail(accountForm.email);
+        
+        // アカウント作成成功 → 画面Bへ
+        setScreen('B');
+        return;
+      }
+
+      // 特定招待の場合（既存のユーザーを更新）
       const updateData: any = {
         password_hash: passwordHash,
         account_status: 'active',
@@ -343,29 +404,39 @@ export default function ActivatePage() {
 
   // 画面B: キャリア情報の保存
   const handleCareerSubmit = async () => {
-    if (!userId || !facilityId) {
-      setError('招待情報が不正です');
+    if (!facilityId) {
+      setError('事業所情報が不正です');
+      return;
+    }
+
+    if (!userId) {
+      setError('ユーザー情報が不正です');
       return;
     }
 
     setLoading(true);
     try {
-      // 1. ユーザー情報から招待時の雇用情報を取得
-      const { data: userInfo, error: userInfoError } = await supabase
-        .from('users')
-        .select('invitation_start_date, invitation_role, invitation_employment_type, invitation_permissions')
-        .eq('id', userId)
-        .single();
+      // 1. ユーザー情報から招待時の雇用情報を取得（公開招待の場合はデフォルト値を使用）
+      let invitationStartDate = new Date().toISOString().split('T')[0];
+      let role = '一般スタッフ';
+      let employmentType = '常勤';
+      let permissions: UserPermissions = {};
 
-      if (userInfoError) {
-        throw new Error(`ユーザー情報取得エラー: ${userInfoError.message}`);
+      if (userId) {
+        const { data: userInfo, error: userInfoError } = await supabase
+          .from('users')
+          .select('invitation_start_date, invitation_role, invitation_employment_type, invitation_permissions')
+          .eq('id', userId)
+          .single();
+
+        if (!userInfoError && userInfo) {
+          // 招待時の雇用情報があればそれを使用
+          invitationStartDate = userInfo?.invitation_start_date || invitationStartDate;
+          role = userInfo?.invitation_role || invitedRole || role;
+          employmentType = userInfo?.invitation_employment_type || employmentType;
+          permissions = userInfo?.invitation_permissions || permissions;
+        }
       }
-
-      // 招待時の雇用情報があればそれを使用、なければデフォルト値
-      const invitationStartDate = userInfo?.invitation_start_date || new Date().toISOString().split('T')[0];
-      const role = userInfo?.invitation_role || invitedRole || '一般スタッフ';
-      const employmentType = userInfo?.invitation_employment_type || '常勤';
-      const permissions = userInfo?.invitation_permissions || {};
 
       // 2. employment_recordsテーブルに所属関係を作成
       const { data: employmentRecord, error: employmentError } = await supabase
@@ -485,6 +556,123 @@ export default function ActivatePage() {
     }
   };
 
+  // ログイン処理
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!loginForm.email || !loginForm.password) {
+      setError('メールアドレスとパスワードを入力してください');
+      return;
+    }
+
+    if (!facilityId) {
+      setError('事業所情報が不正です');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // メールアドレスでユーザーを検索
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', loginForm.email)
+        .eq('account_status', 'active')
+        .single();
+
+      if (userError || !user) {
+        throw new Error('メールアドレスまたはパスワードが正しくありません');
+      }
+
+      // パスワードを検証
+      const { verifyPassword } = await import('@/utils/password');
+      const isValid = await verifyPassword(loginForm.password, user.password_hash || '');
+      
+      if (!isValid) {
+        throw new Error('メールアドレスまたはパスワードが正しくありません');
+      }
+
+      // 既にこの事業所に所属しているかチェック
+      const { data: existingEmployment } = await supabase
+        .from('employment_records')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('facility_id', facilityId)
+        .is('end_date', null)
+        .single();
+
+      if (existingEmployment) {
+        // 既に所属している場合は完了画面へ
+        setScreen('complete');
+        return;
+      }
+
+      // 招待時の雇用情報を取得
+      let invitationStartDate = new Date().toISOString().split('T')[0];
+      let role = '一般スタッフ';
+      let employmentType = '常勤';
+      let permissions: UserPermissions = {};
+
+      if (userId) {
+        const { data: userInfo } = await supabase
+          .from('users')
+          .select('invitation_start_date, invitation_role, invitation_employment_type, invitation_permissions')
+          .eq('id', userId)
+          .single();
+
+        if (userInfo) {
+          invitationStartDate = userInfo?.invitation_start_date || invitationStartDate;
+          role = userInfo?.invitation_role || role;
+          employmentType = userInfo?.invitation_employment_type || employmentType;
+          permissions = userInfo?.invitation_permissions || permissions;
+        }
+      }
+
+      // employment_recordsテーブルに所属関係を作成
+      const { error: employmentError } = await supabase
+        .from('employment_records')
+        .insert({
+          user_id: user.id,
+          facility_id: facilityId,
+          start_date: invitationStartDate,
+          role: role,
+          employment_type: employmentType,
+          permissions: permissions,
+          experience_verification_status: 'not_requested',
+        });
+
+      if (employmentError) {
+        throw new Error(`所属関係作成エラー: ${employmentError.message}`);
+      }
+
+      // 完了画面へ
+      setScreen('complete');
+    } catch (err: any) {
+      setError(err.message || 'ログインに失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 既存アカウントチェック
+  const checkExistingAccount = async (email: string) => {
+    if (!email) return false;
+
+    try {
+      const { data: user } = await supabase
+        .from('users')
+        .select('id, email, account_status')
+        .eq('email', email)
+        .eq('account_status', 'active')
+        .single();
+
+      return !!user;
+    } catch {
+      return false;
+    }
+  };
+
   // エラー表示
   if (!token) {
     return (
@@ -492,7 +680,20 @@ export default function ActivatePage() {
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-800 mb-2">エラー</h1>
-          <p className="text-gray-600">招待リンクが無効です</p>
+          <p className="text-gray-600">ユニバーサル・ゲートのリンクが無効です</p>
+        </div>
+      </div>
+    );
+  }
+
+  // チェック中画面
+  if (screen === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">確認中...</h1>
+          <p className="text-gray-600">あなたのアカウント情報を確認しています</p>
         </div>
       </div>
     );
@@ -642,9 +843,151 @@ export default function ActivatePage() {
       )}
 
       <div className="max-w-md mx-auto">
-        {/* 画面A: アカウント作成 */}
         <AnimatePresence mode="wait">
-          {screen === 'A' && (
+          {/* Welcome画面 */}
+          {screen === 'welcome' && (
+            <motion.div
+              key="welcome"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-lg shadow-2xl p-8"
+            >
+              <div className="text-center mb-8">
+                <img
+                  src="/logo-cropped-center.png"
+                  alt="co-shien"
+                  className="h-16 w-auto mx-auto mb-4"
+                />
+                <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                  pocopocoに招待されました！
+                </h1>
+                <p className="text-gray-600 text-sm">
+                  {facilityName}から招待が届いています
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    // 既存アカウントがあるかチェック（メールアドレス入力画面に遷移）
+                    setScreen('login');
+                  }}
+                  className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
+                >
+                  既にアカウントをお持ちの方
+                </button>
+                <button
+                  onClick={() => setScreen('register')}
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-md transition-colors"
+                >
+                  新規アカウントを作成
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ログイン画面 */}
+          {screen === 'login' && (
+            <motion.div
+              key="login"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="bg-white rounded-lg shadow-2xl p-8"
+            >
+              <div className="text-center mb-8">
+                <img
+                  src="/logo-cropped-center.png"
+                  alt="co-shien"
+                  className="h-16 w-auto mx-auto mb-4"
+                />
+                <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                  ログイン
+                </h1>
+                <p className="text-gray-600 text-sm">
+                  {facilityName}への招待を承認します
+                </p>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm mb-6 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    メールアドレス <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={loginForm.email}
+                    onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    placeholder="example@email.com"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    パスワード <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={loginForm.password}
+                      onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      placeholder="パスワードを入力"
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setScreen('welcome')}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                  >
+                    戻る
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50"
+                  >
+                    {loading ? 'ログイン中...' : 'ログイン'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {/* 新規登録画面（アカウント作成フォーム） */}
+          {screen === 'register' && (
             <motion.div
               key="screenA"
               initial={{ opacity: 0, x: -20 }}
@@ -659,10 +1002,10 @@ export default function ActivatePage() {
                   className="h-16 w-auto mx-auto mb-4"
                 />
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                  {facilityName}へようこそ！
+                  アカウントを作成
                 </h1>
                 <p className="text-gray-600 text-sm">
-                  あなたのアカウントを作成します
+                  {facilityName}でスタッフとして登録するために、アカウントを作成してください
                 </p>
               </div>
 
@@ -794,13 +1137,22 @@ export default function ActivatePage() {
                   </label>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? '作成中...' : 'アカウントを作成して次へ'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setScreen('welcome')}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                  >
+                    戻る
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? '作成中...' : 'アカウントを作成して次へ'}
+                  </button>
+                </div>
               </form>
             </motion.div>
           )}

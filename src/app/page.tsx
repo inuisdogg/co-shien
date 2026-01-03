@@ -14,6 +14,7 @@ import LeadView from '@/components/lead/LeadView';
 import ScheduleView from '@/components/schedule/ScheduleView';
 import ChildrenView from '@/components/children/ChildrenView';
 import StaffView from '@/components/staff/StaffView';
+import StaffManagementView from '@/components/staff/StaffManagementView';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
@@ -62,6 +63,7 @@ export default function Home() {
         schedule: 'schedule',
         children: 'children',
         staff: 'staff',
+        shift: 'staff',
         facility: 'facility',
       };
 
@@ -96,6 +98,7 @@ export default function Home() {
         schedule: 'schedule',
         children: 'children',
         staff: 'staff',
+        shift: 'staff',
         facility: 'facility',
       };
 
@@ -247,6 +250,8 @@ export default function Home() {
       case 'children':
         return <ChildrenView setActiveTab={setActiveTab} />;
       case 'staff':
+        return <StaffManagementView />;
+      case 'shift':
         return <StaffView />;
       case 'facility':
         return <FacilitySettingsView />;
@@ -258,6 +263,7 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-[#f5f6f8] font-sans text-gray-800">
       <Sidebar
+        mode="biz"
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isOpen={isSidebarOpen}
@@ -265,6 +271,7 @@ export default function Home() {
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
+          mode="biz"
           onMenuClick={() => setIsSidebarOpen(true)}
           onLogoClick={() => {
             // 管理者はdashboard、それ以外はscheduleをホームに

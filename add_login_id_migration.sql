@@ -21,3 +21,4 @@ BEGIN
   RAISE NOTICE 'usersテーブルにlogin_idカラムを追加しました';
 END $$;
 
+

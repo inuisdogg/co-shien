@@ -13,13 +13,18 @@ import { useAuth } from '@/contexts/AuthContext';
 interface HeaderProps {
   onMenuClick?: () => void;
   onLogoClick?: () => void;
+  mode?: 'biz' | 'personal';
 }
 
-const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' }) => {
   const { requests } = useFacilityData();
   const { user, logout } = useAuth();
   const router = useRouter();
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
+  
+  const isPersonal = mode === 'personal';
+  const primaryColor = isPersonal ? '#8b5cf6' : '#00c4cc';
+  const primaryColorDark = isPersonal ? '#7c3aed' : '#00b0b8';
 
   const handleLogout = () => {
     logout();
@@ -34,18 +39,47 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick }) => {
         </button>
         <button
           onClick={onLogoClick}
-          className="cursor-pointer hover:opacity-80 transition-opacity"
+          className="cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2"
         >
           <img src="/logo-cropped-center.png" alt="co-shien" className="h-10 w-auto object-contain" />
+          <span 
+            className={`text-xs font-bold px-2 py-1 rounded ${
+              isPersonal 
+                ? 'bg-[#8b5cf6] text-white' 
+                : 'bg-[#00c4cc] text-white'
+            }`}
+          >
+            {isPersonal ? 'Personal' : 'Biz'}
+          </span>
         </button>
       </div>
-      <div className="hidden md:flex items-center text-gray-400 bg-gray-100 rounded-md px-3 py-2 w-72 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-[#00c4cc]/20 focus-within:border-[#00c4cc]">
-        <Search size={16} className="mr-2" />
-        <input
-          type="text"
-          placeholder="児童名、メモを検索..."
-          className="bg-transparent border-none outline-none text-sm w-full text-gray-700"
-        />
+      <div className="hidden md:flex items-center gap-4">
+        <div 
+          className={`flex items-center text-gray-400 bg-gray-100 rounded-md px-3 py-2 w-72 transition-colors focus-within:bg-white focus-within:ring-2 ${
+            isPersonal 
+              ? 'focus-within:ring-[#8b5cf6]/20 focus-within:border-[#8b5cf6]' 
+              : 'focus-within:ring-[#00c4cc]/20 focus-within:border-[#00c4cc]'
+          }`}
+        >
+          <Search size={16} className="mr-2" />
+          <input
+            type="text"
+            placeholder="児童名、メモを検索..."
+            className="bg-transparent border-none outline-none text-sm w-full text-gray-700"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <img src="/logo-cropped-center.png" alt="co-shien" className="h-8 w-auto object-contain" />
+          <span 
+            className={`text-xs font-bold px-2 py-1 rounded ${
+              isPersonal 
+                ? 'bg-[#8b5cf6] text-white' 
+                : 'bg-[#00c4cc] text-white'
+            }`}
+          >
+            {isPersonal ? 'Personal' : 'Biz'}
+          </span>
+        </div>
       </div>
       <div className="flex items-center space-x-5">
         {user && (

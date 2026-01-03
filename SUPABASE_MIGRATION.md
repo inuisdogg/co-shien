@@ -282,3 +282,4 @@ useEffect(() => {
 - [Supabase JavaScript Client](https://supabase.com/docs/reference/javascript/introduction)
 
 
+

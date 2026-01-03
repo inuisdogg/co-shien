@@ -19,3 +19,4 @@ BEGIN
   RAISE NOTICE '注意: 将来的にはroleカラムを削除し、employment_recordsテーブルのroleを使用する予定です。';
 END $$;
 
+
