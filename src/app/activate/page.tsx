@@ -134,6 +134,23 @@ export default function ActivatePage() {
   const [birthMonth, setBirthMonth] = useState('');
   const [birthDay, setBirthDay] = useState('');
 
+  // 生年月日を年・月・日に分割
+  const parseBirthDate = (dateString: string) => {
+    if (!dateString) return { year: '', month: '', day: '' };
+    const [year, month, day] = dateString.split('-');
+    return { year: year || '', month: month || '', day: day || '' };
+  };
+
+  // 既存の生年月日がある場合は初期値として設定
+  useEffect(() => {
+    if (careerForm.birthDate) {
+      const parts = parseBirthDate(careerForm.birthDate);
+      setBirthYear(parts.year);
+      setBirthMonth(parts.month);
+      setBirthDay(parts.day);
+    }
+  }, [careerForm.birthDate]);
+
   // ステップBの定義
   const steps = [
     { id: 'birthDate', label: '生年月日', icon: Calendar },
@@ -722,23 +739,6 @@ export default function ActivatePage() {
       </div>
     );
   }
-
-  // 生年月日を年・月・日に分割
-  const parseBirthDate = (dateString: string) => {
-    if (!dateString) return { year: '', month: '', day: '' };
-    const [year, month, day] = dateString.split('-');
-    return { year: year || '', month: month || '', day: day || '' };
-  };
-
-  // 既存の生年月日がある場合は初期値として設定
-  useEffect(() => {
-    if (careerForm.birthDate) {
-      const parts = parseBirthDate(careerForm.birthDate);
-      setBirthYear(parts.year);
-      setBirthMonth(parts.month);
-      setBirthDay(parts.day);
-    }
-  }, [careerForm.birthDate]);
 
   // 年・月・日から日付文字列を生成
   const updateBirthDate = (year: string, month: string, day: string) => {
