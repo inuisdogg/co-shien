@@ -2,56 +2,33 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(req: NextRequest) {
-  const url = req.nextUrl;
-  const hostname = req.headers.get('host') || '';
-  const pathname = url.pathname;
+  const { pathname } = req.nextUrl;
+  // Netlify等のプロキシ環境では x-forwarded-host を優先的に見るのが定石
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
 
-  // 【最重要：早期リターン（ガードレール）】
-  // Next.jsの静的ファイルとAPIルートは絶対に書き換えてはいけない
-  // これらは常にルートに存在するため、サブドメインに関わらずそのまま通す
-  
+  // 1. システムファイル・静的資産は「絶対に」リライトせず即座にスルー
   if (
-    pathname.startsWith('/_next') ||  // Next.jsの静的ファイル（全て）
-    pathname.startsWith('/api') ||    // APIルート
-    pathname.startsWith('/static') || // 静的ディレクトリ
-    pathname === '/favicon.ico' ||    // ファビコン
-    /\.(png|jpg|jpeg|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|otf|json|xml|txt|pdf|zip|map)$/i.test(pathname) // 拡張子付きファイル
+    pathname.startsWith('/_next') || 
+    pathname.startsWith('/api') ||
+    pathname.includes('.')
   ) {
     return NextResponse.next();
   }
 
-  // サブドメインの抽出
-  let subdomain = '';
-  
-  if (hostname.includes('.co-shien.inu.co.jp')) {
-    subdomain = hostname.replace('.co-shien.inu.co.jp', '').split(':')[0];
-  } else if (hostname.includes('.localhost')) {
-    subdomain = hostname.replace('.localhost:3000', '').replace('.localhost', '').split(':')[0];
-  } else if (hostname.includes('.netlify.app')) {
-    const firstPart = hostname.split('.')[0];
-    subdomain = firstPart.includes('biz') ? 'biz' : (firstPart.includes('my') || firstPart.includes('personal') ? 'my' : '');
-  } else {
-    subdomain = hostname.split(':')[0].split('.')[0];
-  }
+  // 2. ドメインを分解してサブドメインを取得 (例: biz.co-shien.inu.co.jp -> biz)
+  const subdomain = host.split('.')[0].toLowerCase();
 
-  // サブドメインに基づいてリライト
+  // 3. サブドメインに応じたリライト処理
   if (subdomain === 'biz') {
-    const rewritePath = pathname === '/' ? '/biz' : `/biz${pathname}`;
-    return NextResponse.rewrite(new URL(rewritePath, req.url));
+    return NextResponse.rewrite(new URL(`/biz${pathname}`, req.url));
   }
-  
   if (subdomain === 'my') {
-    const rewritePath = pathname === '/' ? '/personal' : `/personal${pathname}`;
-    return NextResponse.rewrite(new URL(rewritePath, req.url));
+    return NextResponse.rewrite(new URL(`/personal${pathname}`, req.url));
   }
 
   return NextResponse.next();
 }
 
-// Matcherを削除：すべてのパスをMiddleware関数に渡し、関数内で確実に除外する
-// これにより、ガードレールが確実に機能する
 export const config = {
-  matcher: [
-    '/(.*)',
-  ],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
