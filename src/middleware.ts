@@ -9,15 +9,31 @@ export function middleware(req: NextRequest) {
   // 1. システムファイル・静的資産は「絶対に」リライトせず即座にスルー
   // 【理由】Next.jsの静的ファイル（/_next/static, /_next/imageなど）は
   // 常にルートに存在し、サブドメインに関わらず同じパスでアクセスできる必要がある
-  if (
-    pathname.startsWith('/_next') ||  // Next.jsのシステムファイル（全て）
-    pathname.startsWith('/api') ||    // APIルート
-    pathname === '/favicon.ico' ||    // ファビコン
-    /\.(png|jpg|jpeg|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|otf|json|xml|txt|pdf|zip|map)$/i.test(pathname) // 拡張子付きファイル（末尾に拡張子がある場合のみ）
-  ) {
-    const response = NextResponse.next();
-    response.headers.set('x-debug-subdomain', 'excluded-static');
-    return response;
+  // このチェックは最優先で実行し、確実にシステムファイルを除外する
+  
+  // Next.jsのシステムファイル（全ての/_nextで始まるパス）
+  if (pathname.startsWith('/_next')) {
+    return NextResponse.next();
+  }
+  
+  // APIルート
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+  
+  // 静的ファイル（拡張子付き）
+  if (/\.(png|jpg|jpeg|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|otf|json|xml|txt|pdf|zip|map|webmanifest)$/i.test(pathname)) {
+    return NextResponse.next();
+  }
+  
+  // PWA関連ファイル
+  if (pathname === '/favicon.ico' || pathname === '/sw.js' || pathname === '/manifest.json') {
+    return NextResponse.next();
+  }
+  
+  // robots.txt, sitemap.xml など
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml') {
+    return NextResponse.next();
   }
 
   // 2. 無限ループ防止：既にリライト済みのパス（/biz, /personal）は再度リライトしない
@@ -60,18 +76,25 @@ export function middleware(req: NextRequest) {
   return response;
 }
 
-// Matcherの設定：/_nextで始まるパスは絶対にマッチさせない
+// Matcherの設定：システムファイルは絶対にマッチさせない
 // 【理由】matcherで除外することで、Middleware関数に渡される前に除外される
 // これにより、パフォーマンスの向上と確実な除外が可能
+// 注意: このmatcherは除外パターンを含むが、Middleware内でも二重チェックを行う
 export const config = {
   matcher: [
     /*
      * 以下のパスは除外（Middleware関数に渡されない）
      * - /api/... : APIルート
      * - /_next/... : Next.jsのシステムファイル（全て）
-     * - /favicon.ico : ファビコン
-     * - 拡張子付きファイル: 静的アセット
+     * - /favicon.ico, /sw.js, /manifest.json : PWA関連
+     * - 拡張子付きファイル: 静的アセット（.png, .js, .css など）
+     * 
+     * 正規表現の説明:
+     * - (?!...) : ネガティブ先読み（除外パターン）
+     * - api|_next : /api または /_next で始まるパスを除外
+     * - favicon\\.ico|sw\\.js|manifest\\.json : 特定のファイルを除外
+     * - .*\\.[a-zA-Z0-9]+$ : 末尾に拡張子があるファイルを除外
      */
-    '/((?!api|_next|favicon\\.ico|.*\\.[a-zA-Z0-9]+$).*)',
+    '/((?!api|_next|favicon\\.ico|sw\\.js|manifest\\.json|robots\\.txt|sitemap\\.xml|.*\\.[a-zA-Z0-9]+$).*)',
   ],
 };
