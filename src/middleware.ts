@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostname = request.headers.get('host') || '';
 
   // 静的ファイルとNext.js内部ファイルはスキップ
   if (
@@ -13,6 +14,21 @@ export function middleware(request: NextRequest) {
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
+  }
+
+  // サブドメインに応じたルーティング
+  // biz.co-shien.inu.co.jp → ルートページ（Biz用ログイン）
+  // my.co-shien.inu.co.jp → /login（Personal用ログイン）
+  if (pathname === '/') {
+    if (hostname.includes('biz.co-shien') || hostname === 'biz.co-shien.inu.co.jp') {
+      // Biz側: ルートページのまま（page.tsxでBizログインを表示）
+      return NextResponse.next();
+    } else if (hostname.includes('my.co-shien') || hostname === 'my.co-shien.inu.co.jp') {
+      // Personal側: /loginにリダイレクト
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
   }
 
   // 全てのページにアクセスを許可（認証チェックはクライアントサイドで行う）

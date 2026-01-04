@@ -7,4 +7,7 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# サブドメインのルーティングはミドルウェアで処理
+# Netlify側では、両方のサブドメインを同じサイトに設定してください
+
 
