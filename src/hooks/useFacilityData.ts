@@ -280,6 +280,7 @@ export const useFacilityData = () => {
         }
 
         // 2. staffテーブルのデータを追加（employment_recordsに存在しないもののみ）
+        // シャドウアカウント（user_idがNULL）も含めて取得
         if (staffData) {
           staffData.forEach((row) => {
             // 重複チェック
@@ -295,9 +296,19 @@ export const useFacilityData = () => {
               }
             }
             
-            // user_idがない場合でも、名前とメールアドレスで重複チェック
+            // user_idがない場合（シャドウアカウント）でも、名前とメールアドレスで重複チェック
             if (!shouldSkip && row.name && row.email) {
               const key = `name-email-${row.name}-${row.email}`;
+              if (existingStaffKeys.has(key)) {
+                shouldSkip = true;
+              } else {
+                existingStaffKeys.add(key);
+              }
+            }
+            
+            // user_idがない場合（シャドウアカウント）でも、名前と電話番号で重複チェック
+            if (!shouldSkip && row.name && row.phone && !row.email) {
+              const key = `name-phone-${row.name}-${row.phone}`;
               if (existingStaffKeys.has(key)) {
                 shouldSkip = true;
               } else {
@@ -328,7 +339,7 @@ export const useFacilityData = () => {
                 memo: row.memo,
                 monthlySalary: row.monthly_salary,
                 hourlyWage: row.hourly_wage,
-                user_id: row.user_id,
+                user_id: row.user_id, // NULLの場合はシャドウアカウント
                 defaultShiftPattern: row.default_shift_pattern && Array.isArray(row.default_shift_pattern) 
                   ? row.default_shift_pattern as boolean[] 
                   : undefined,

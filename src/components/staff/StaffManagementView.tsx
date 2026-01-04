@@ -680,10 +680,25 @@ const StaffManagementView: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-3xl shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-              <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                <User size={20} className="text-[#00c4cc]" />
-                {selectedStaff.name} さんの詳細情報
-              </h3>
+              <div className="flex items-center gap-3">
+                <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                  <User size={20} className="text-[#00c4cc]" />
+                  {selectedStaff.name} さんの詳細情報
+                </h3>
+                {selectedStaff.user_id && (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    本人認証済み
+                  </span>
+                )}
+                {!selectedStaff.user_id && (
+                  <span className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">
+                    未確認（代理登録）
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => {
                   setIsDetailModalOpen(false);
@@ -695,6 +710,15 @@ const StaffManagementView: React.FC = () => {
               </button>
             </div>
             <div className="p-6 space-y-6">
+              {selectedStaff.user_id && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>このスタッフの情報は本人によって管理されています（本人認証済み）</strong><br />
+                    個人のマスターデータ（氏名、生年月日、資格、住所など）は本人のみが編集できます。
+                    情報に誤りがある場合は、本人に更新をリクエストしてください。
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
@@ -702,34 +726,61 @@ const StaffManagementView: React.FC = () => {
                     基本情報
                   </h4>
                   <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">名前:</span>
-                      <span className="ml-2 font-medium text-gray-800">{selectedStaff.name}</span>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-gray-500">名前:</span>
+                        <span className="ml-2 font-medium text-gray-800">{selectedStaff.name}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
+                      </div>
+                      {selectedStaff.user_id && (
+                        <button
+                          onClick={() => {
+                            // TODO: 本人に情報の更新をリクエストする機能を実装
+                            alert('本人に情報の更新をリクエストする機能は今後実装予定です');
+                          }}
+                          className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors"
+                        >
+                          更新をリクエスト
+                        </button>
+                      )}
                     </div>
                     {selectedStaff.nameKana && (
                       <div>
                         <span className="text-gray-500">ふりがな:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.nameKana}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     <div>
                       <span className="text-gray-500">役職:</span>
                       <span className="ml-2 font-medium text-gray-800">{selectedStaff.role}</span>
+                      <span className="ml-2 text-xs text-gray-400">（事業所管理）</span>
                     </div>
                     <div>
                       <span className="text-gray-500">雇用形態:</span>
                       <span className="ml-2 font-medium text-gray-800">{selectedStaff.type}</span>
+                      <span className="ml-2 text-xs text-gray-400">（事業所管理）</span>
                     </div>
                     {selectedStaff.birthDate && (
                       <div>
                         <span className="text-gray-500">生年月日:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.birthDate}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     {selectedStaff.gender && (
                       <div>
                         <span className="text-gray-500">性別:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.gender}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -744,30 +795,45 @@ const StaffManagementView: React.FC = () => {
                       <div>
                         <span className="text-gray-500">メール:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.email}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     {selectedStaff.phone && (
                       <div>
                         <span className="text-gray-500">電話:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.phone}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     {selectedStaff.address && (
                       <div>
                         <span className="text-gray-500">住所:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.address}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     {selectedStaff.emergencyContact && (
                       <div>
                         <span className="text-gray-500">緊急連絡先:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.emergencyContact}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     {selectedStaff.emergencyContactPhone && (
                       <div>
                         <span className="text-gray-500">緊急連絡先電話:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.emergencyContactPhone}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -782,24 +848,32 @@ const StaffManagementView: React.FC = () => {
                       <div>
                         <span className="text-gray-500">資格:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.qualifications}</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     {selectedStaff.yearsOfExperience !== undefined && (
                       <div>
                         <span className="text-gray-500">経験年数:</span>
                         <span className="ml-2 font-medium text-gray-800">{selectedStaff.yearsOfExperience}年</span>
+                        {selectedStaff.user_id && (
+                          <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                        )}
                       </div>
                     )}
                     {selectedStaff.monthlySalary !== undefined && (
                       <div>
                         <span className="text-gray-500">月給:</span>
                         <span className="ml-2 font-medium text-gray-800">¥{selectedStaff.monthlySalary?.toLocaleString()}</span>
+                        <span className="ml-2 text-xs text-gray-400">（事業所管理）</span>
                       </div>
                     )}
                     {selectedStaff.hourlyWage !== undefined && (
                       <div>
                         <span className="text-gray-500">時給:</span>
                         <span className="ml-2 font-medium text-gray-800">¥{selectedStaff.hourlyWage?.toLocaleString()}</span>
+                        <span className="ml-2 text-xs text-gray-400">（事業所管理）</span>
                       </div>
                     )}
                   </div>
