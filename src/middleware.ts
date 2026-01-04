@@ -12,28 +12,40 @@ export function middleware(req: NextRequest) {
   // このチェックは最優先で実行し、確実にシステムファイルを除外する
   
   // Next.jsのシステムファイル（全ての/_nextで始まるパス）
+  // このチェックは最優先で実行し、確実にシステムファイルを除外する
   if (pathname.startsWith('/_next')) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-middleware-skip', 'true');
+    response.headers.set('x-debug-pathname', pathname);
+    return response;
   }
   
   // APIルート
-  if (pathname.startsWith('/api')) {
-    return NextResponse.next();
+  if (pathname.startsWith('/api/') || pathname === '/api') {
+    const response = NextResponse.next();
+    response.headers.set('x-middleware-skip', 'true');
+    return response;
   }
   
-  // 静的ファイル（拡張子付き）
+  // 静的ファイル（拡張子付き）- より包括的なチェック
   if (/\.(png|jpg|jpeg|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|otf|json|xml|txt|pdf|zip|map|webmanifest)$/i.test(pathname)) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-middleware-skip', 'true');
+    return response;
   }
   
   // PWA関連ファイル
   if (pathname === '/favicon.ico' || pathname === '/sw.js' || pathname === '/manifest.json') {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-middleware-skip', 'true');
+    return response;
   }
   
   // robots.txt, sitemap.xml など
   if (pathname === '/robots.txt' || pathname === '/sitemap.xml') {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-middleware-skip', 'true');
+    return response;
   }
 
   // 2. 無限ループ防止：既にリライト済みのパス（/biz, /personal）は再度リライトしない
@@ -76,25 +88,16 @@ export function middleware(req: NextRequest) {
   return response;
 }
 
-// Matcherの設定：システムファイルは絶対にマッチさせない
-// 【理由】matcherで除外することで、Middleware関数に渡される前に除外される
-// これにより、パフォーマンスの向上と確実な除外が可能
-// 注意: このmatcherは除外パターンを含むが、Middleware内でも二重チェックを行う
+// Matcherの設定：全てのパスを処理するが、Middleware内で除外する
+// 【理由】matcherの正規表現が複雑で、一部のケースで正しく機能しない可能性があるため、
+// 全てのパスをMiddlewareに渡し、Middleware内で確実に除外する方が安全
+// パフォーマンスへの影響は最小限（システムファイルのチェックは高速）
 export const config = {
   matcher: [
     /*
-     * 以下のパスは除外（Middleware関数に渡されない）
-     * - /api/... : APIルート
-     * - /_next/... : Next.jsのシステムファイル（全て）
-     * - /favicon.ico, /sw.js, /manifest.json : PWA関連
-     * - 拡張子付きファイル: 静的アセット（.png, .js, .css など）
-     * 
-     * 正規表現の説明:
-     * - (?!...) : ネガティブ先読み（除外パターン）
-     * - api|_next : /api または /_next で始まるパスを除外
-     * - favicon\\.ico|sw\\.js|manifest\\.json : 特定のファイルを除外
-     * - .*\\.[a-zA-Z0-9]+$ : 末尾に拡張子があるファイルを除外
+     * 全てのパスをマッチさせる（除外はMiddleware内で行う）
+     * これにより、/_next/static/chunks/... などのパスも確実に処理される
      */
-    '/((?!api|_next|favicon\\.ico|sw\\.js|manifest\\.json|robots\\.txt|sitemap\\.xml|.*\\.[a-zA-Z0-9]+$).*)',
+    '/(.*)',
   ],
 };
