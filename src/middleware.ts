@@ -6,6 +6,21 @@ export function middleware(req: NextRequest) {
   const url = req.nextUrl;
   const pathname = url.pathname;
   
+  // 重要: Next.jsのシステムファイルは絶対に書き換えない
+  // もしパスが /_next で始まっていたら、何もしないでそのまま通す
+  if (pathname.startsWith('/_next') || pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+  
+  // 静的ファイル（画像、ファビコンなど）も除外
+  if (
+    pathname.startsWith('/static') ||
+    pathname === '/favicon.ico' ||
+    /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)$/i.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
+  
   // デバッグ用：どのホスト名でアクセスされたかをログに出す
   // Netlifyのログ（Functionsタブ）で確認できます
   console.log("=== Middleware Debug ===");
@@ -57,17 +72,6 @@ export function middleware(req: NextRequest) {
         'Content-Type': 'application/json',
       }
     });
-  }
-
-  // 静的ファイルとNext.js内部ファイルはスキップ
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.startsWith('/static') ||
-    pathname.includes('.') || // ファイル拡張子が含まれる場合
-    pathname === '/favicon.ico'
-  ) {
-    return NextResponse.next();
   }
 
   // サブドメイン判定（複数のパターンを試す）
@@ -146,14 +150,14 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - static files (files with extensions)
+     * 以下のパスで始まるリクエストには Middleware を適用しない（除外する）
+     * - api (APIルート)
+     * - _next/static (静的ファイル: JS, CSSなど)
+     * - _next/image (画像最適化)
+     * - favicon.ico (ファビコン)
+     * - public フォルダ内の静的資産 (png, jpg, svg等)
      */
-    '/((?!api|_next/static|_next/image|_next/webpack-hmr|favicon.ico|.*\\..*|static).*)',
+    '/((?!api|_next/static|_next/image|_next/webpack-hmr|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)$).*)',
   ],
 };
 
