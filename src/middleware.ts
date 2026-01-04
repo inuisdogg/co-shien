@@ -11,6 +11,7 @@ export function middleware(req: NextRequest) {
   // 処理の最初に実行し、該当する場合は即座にNextResponse.next()を返す
   
   // Next.jsのシステムファイル（/_nextで始まるすべてのパス）
+  // /_next/static, /_next/image, /_next/webpack-hmr など全て
   if (pathname.startsWith('/_next')) {
     return NextResponse.next();
   }
@@ -21,7 +22,7 @@ export function middleware(req: NextRequest) {
   }
   
   // ファビコン
-  if (pathname === '/favicon.ico') {
+  if (pathname === '/favicon.ico' || pathname.startsWith('/favicon')) {
     return NextResponse.next();
   }
   
@@ -29,7 +30,7 @@ export function middleware(req: NextRequest) {
   // 画像、フォント、CSS、JSなどの静的アセット
   const staticFileExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', 
                                 '.css', '.js', '.woff', '.woff2', '.ttf', '.eot', '.otf',
-                                '.json', '.xml', '.txt', '.pdf', '.zip'];
+                                '.json', '.xml', '.txt', '.pdf', '.zip', '.map'];
   const hasExtension = staticFileExtensions.some(ext => pathname.toLowerCase().endsWith(ext));
   if (hasExtension) {
     return NextResponse.next();
@@ -73,14 +74,12 @@ export function middleware(req: NextRequest) {
   // リライトが必要な場合
   if (rewritePath) {
     // 【安全性チェック】リライト後のパスが/_nextを含まないことを確認
-    if (rewritePath.startsWith('/_next')) {
-      console.error('ERROR: Rewrite path contains /_next:', rewritePath);
+    if (rewritePath.includes('/_next')) {
       return NextResponse.next();
     }
     
-    // 【安全性チェック】リライト後のパスが/apiを含まないことを確認（通常は起こらないが念のため）
-    if (rewritePath.startsWith('/api')) {
-      console.error('ERROR: Rewrite path contains /api:', rewritePath);
+    // 【安全性チェック】リライト後のパスが/apiを含まないことを確認
+    if (rewritePath.includes('/api')) {
       return NextResponse.next();
     }
     
@@ -92,16 +91,14 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Matcherの設定：静的ファイルとNext.jsシステムファイルを確実に除外
+// Matcherの設定：できるだけ広範囲にマッチさせ、middleware関数内で除外する
+// これにより、middleware関数内のガードレールが確実に機能する
 export const config = {
   matcher: [
     /*
-     * 以下のパスは除外（Middlewareを適用しない）
-     * - api: APIルート
-     * - _next: Next.jsのシステムファイル（_next/static, _next/image, _next/webpack-hmrなど全て）
-     * - favicon.ico: ファビコン
-     * - 拡張子付きファイル: 画像、フォント、CSS、JSなどの静的アセット
+     * 基本的にすべてのパスにマッチするが、
+     * middleware関数内のガードレールで/_next、/api、静的ファイルを除外する
      */
-    '/((?!api|_next|favicon\\.ico|.*\\.[^/]+$).*)',
+    '/(.*)',
   ],
 };
