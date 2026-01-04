@@ -234,9 +234,31 @@ export const useFacilityData = () => {
             if (usersData) {
               const usersMap = new Map(usersData.map(u => [u.id, u]));
               
+              // staffテーブルからfacilityRoleを取得するためのマップを作成
+              const staffRoleMap = new Map<string, string>();
+              if (staffData) {
+                staffData.forEach((row) => {
+                  if (row.user_id) {
+                    let facilityRoleFromMemo = '';
+                    try {
+                      if (row.memo && typeof row.memo === 'string') {
+                        const memoData = JSON.parse(row.memo);
+                        facilityRoleFromMemo = memoData?.facilityRole || '';
+                      }
+                    } catch (e) {
+                      // memoがJSONでない場合は無視
+                    }
+                    staffRoleMap.set(row.user_id, facilityRoleFromMemo);
+                  }
+                });
+              }
+              
               employmentData.forEach((emp) => {
                 const user = usersMap.get(emp.user_id || '');
                 if (user) {
+                  // staffテーブルからfacilityRoleを取得
+                  const facilityRoleFromStaff = staffRoleMap.get(user.id) || '';
+                  
                   const staffFromEmployment: Staff = {
                     id: `emp-${emp.id}`, // employment_recordのIDを使用（重複を避けるためプレフィックス）
                     facilityId: emp.facility_id,
@@ -244,7 +266,7 @@ export const useFacilityData = () => {
                     nameKana: '',
                     role: (emp.role as '一般スタッフ' | 'マネージャー' | '管理者') || '一般スタッフ',
                     type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as '常勤' | '非常勤',
-                    facilityRole: emp.role || '一般スタッフ', // 施設での役割として使用
+                    facilityRole: facilityRoleFromStaff, // staffテーブルのmemoフィールドから取得した施設での役割
                     birthDate: user.birth_date || '',
                     gender: user.gender as '男性' | '女性' | 'その他' | undefined,
                     address: user.address || '',
@@ -317,6 +339,17 @@ export const useFacilityData = () => {
             }
             
             if (!shouldSkip) {
+              // memoフィールドからfacilityRoleを取得
+              let facilityRoleFromMemo = '';
+              try {
+                if (row.memo && typeof row.memo === 'string') {
+                  const memoData = JSON.parse(row.memo);
+                  facilityRoleFromMemo = memoData?.facilityRole || '';
+                }
+              } catch (e) {
+                // memoがJSONでない場合は無視
+              }
+              
               const staffFromTable: Staff = {
                 id: row.id,
                 facilityId: row.facility_id,
@@ -324,7 +357,7 @@ export const useFacilityData = () => {
                 nameKana: row.name_kana,
                 role: row.role as '一般スタッフ' | 'マネージャー' | '管理者',
                 type: row.type as '常勤' | '非常勤',
-                facilityRole: row.role, // 施設での役割として使用
+                facilityRole: facilityRoleFromMemo, // memoフィールドから取得した施設での役割
                 birthDate: row.birth_date,
                 gender: row.gender,
                 address: row.address,

@@ -13,7 +13,7 @@ import { hashPassword } from '@/utils/password';
 export default function AdminSetupPage() {
   const [facilityName, setFacilityName] = useState('');
   const [adminName, setAdminName] = useState('');
-  const [adminLoginId, setAdminLoginId] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(true); // デフォルトで表示
@@ -36,8 +36,13 @@ export default function AdminSetupPage() {
       if (!adminName.trim()) {
         throw new Error('管理者名を入力してください');
       }
-      if (!adminLoginId.trim()) {
-        throw new Error('ログインIDを入力してください');
+      if (!adminEmail.trim()) {
+        throw new Error('メールアドレスを入力してください');
+      }
+      // メールアドレスの形式チェック
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(adminEmail.trim())) {
+        throw new Error('正しいメールアドレスを入力してください');
       }
       if (!password) {
         throw new Error('パスワードを入力してください');
@@ -95,8 +100,8 @@ export default function AdminSetupPage() {
           id: adminId,
           facility_id: facilityId,
           name: adminName.trim(),
-          login_id: adminLoginId.trim(),
-          email: null,
+          login_id: adminEmail.trim(), // メールアドレスをログインIDとしても使用
+          email: adminEmail.trim(),
           role: 'admin',
           password_hash: passwordHash,
           has_account: true,
@@ -227,20 +232,20 @@ export default function AdminSetupPage() {
             </div>
 
             <div>
-              <label htmlFor="adminLoginId" className="block text-sm font-bold text-gray-700 mb-2">
-                ログインID <span className="text-red-500">*</span>
+              <label htmlFor="adminEmail" className="block text-sm font-bold text-gray-700 mb-2">
+                メールアドレス <span className="text-red-500">*</span>
               </label>
               <input
-                id="adminLoginId"
-                type="text"
-                value={adminLoginId}
-                onChange={(e) => setAdminLoginId(e.target.value)}
+                id="adminEmail"
+                type="email"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                placeholder="ログインIDを入力（例: admin）"
+                placeholder="メールアドレスを入力（例: admin@example.com）"
                 disabled={loading}
               />
-              <p className="text-xs text-gray-500 mt-1">※ ログイン時に使用するIDです</p>
+              <p className="text-xs text-gray-500 mt-1">※ ログイン時に使用するメールアドレスです</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -33,6 +33,20 @@ export default function Home() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // 保存されたログイン情報を読み込む
+  useEffect(() => {
+    const savedFacilityCode = localStorage.getItem('savedFacilityCode');
+    const savedLoginId = localStorage.getItem('savedLoginId');
+    if (savedFacilityCode) {
+      setFacilityCode(savedFacilityCode);
+      setRememberMe(true);
+    }
+    if (savedLoginId) {
+      setLoginId(savedLoginId);
+    }
+  }, []);
 
   // ログイン処理
   const handleLogin = async (e: React.FormEvent) => {
@@ -42,10 +56,16 @@ export default function Home() {
 
     try {
       await login(facilityCode, loginId, password);
-      // ログイン成功後、フォームをリセット
-      setFacilityCode('');
-      setLoginId('');
+      // ログイン成功後、パスワードをリセット
       setPassword('');
+      // ログイン情報を保存するかどうか
+      if (rememberMe) {
+        localStorage.setItem('savedFacilityCode', facilityCode);
+        localStorage.setItem('savedLoginId', loginId);
+      } else {
+        localStorage.removeItem('savedFacilityCode');
+        localStorage.removeItem('savedLoginId');
+      }
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
     } finally {
@@ -125,7 +145,7 @@ export default function Home() {
               className="h-16 w-auto mx-auto mb-4"
             />
             <h1 className="text-2xl font-bold text-gray-800">ログイン</h1>
-            <p className="text-gray-600 text-sm mt-2">施設ID、ログインID、パスワードを入力してください</p>
+            <p className="text-gray-600 text-sm mt-2">施設ID、メールアドレス（またはログインID）、パスワードを入力してください</p>
           </div>
 
           {error && (
@@ -153,7 +173,7 @@ export default function Home() {
 
             <div>
               <label htmlFor="loginId" className="block text-sm font-bold text-gray-700 mb-2">
-                ログインID
+                メールアドレスまたはログインID
               </label>
               <input
                 id="loginId"
@@ -162,7 +182,7 @@ export default function Home() {
                 onChange={(e) => setLoginId(e.target.value)}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                placeholder="ログインIDを入力"
+                placeholder="メールアドレスまたはログインIDを入力"
                 disabled={loading}
               />
             </div>
@@ -200,6 +220,20 @@ export default function Home() {
                   )}
                 </button>
               </div>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                disabled={loading}
+              />
+              <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
+                ログイン情報を保存する
+              </label>
             </div>
 
             <button

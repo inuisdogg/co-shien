@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     restoreSession();
   }, []);
 
-  const login = async (facilityCode: string, loginId: string, password: string) => {
+  const login = async (facilityCode: string, loginIdOrEmail: string, password: string) => {
     try {
       // 施設コードで施設を検索
       const { data: facilityData, error: facilityError } = await supabase
@@ -66,14 +66,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('施設IDが正しくありません');
       }
 
-      // まずusersテーブルから検索（施設IDとログインIDで検索）
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('facility_id', facilityData.id)
-        .eq('login_id', loginId)
-        .eq('has_account', true)
-        .single();
+      // メールアドレスかログインIDかを判定（@が含まれていればメールアドレス）
+      const isEmail = loginIdOrEmail.includes('@');
+
+      // まずusersテーブルから検索（施設IDとメールアドレスまたはログインIDで検索）
+      let userData: any = null;
+      let userError: any = null;
+
+      if (isEmail) {
+        // メールアドレスで検索
+        const result = await supabase
+          .from('users')
+          .select('*')
+          .eq('facility_id', facilityData.id)
+          .eq('email', loginIdOrEmail)
+          .eq('has_account', true)
+          .single();
+        userData = result.data;
+        userError = result.error;
+      } else {
+        // ログインIDで検索
+        const result = await supabase
+          .from('users')
+          .select('*')
+          .eq('facility_id', facilityData.id)
+          .eq('login_id', loginIdOrEmail)
+          .eq('has_account', true)
+          .single();
+        userData = result.data;
+        userError = result.error;
+      }
 
       if (!userError && userData) {
         // ユーザーテーブルにアカウントがある場合
@@ -83,7 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const isValid = await verifyPassword(password, userData.password_hash);
         if (!isValid) {
-          throw new Error('ユーザー名またはパスワードが正しくありません');
+          throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
         }
 
         // 施設情報を取得
@@ -129,21 +151,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setUser(user);
         localStorage.setItem('user', JSON.stringify(user));
+        
+        // ログイン情報を保存（パスワードは保存しない）
+        localStorage.setItem('savedFacilityCode', facilityCode);
+        localStorage.setItem('savedLoginId', loginIdOrEmail);
         return;
       }
 
       // usersテーブルにない場合、既存のstaffテーブルから検索（後方互換性）
-      // 施設IDとスタッフ名で検索（login_idが設定されていない場合のフォールバック）
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff')
-        .select('*')
-        .eq('facility_id', facilityData.id)
-        .eq('name', loginId)
-        .eq('has_account', true)
-        .single();
+      // 施設IDとスタッフ名またはメールアドレスで検索
+      let staffData: any = null;
+      let staffError: any = null;
+
+      if (isEmail) {
+        // メールアドレスで検索
+        const result = await supabase
+          .from('staff')
+          .select('*')
+          .eq('facility_id', facilityData.id)
+          .eq('email', loginIdOrEmail)
+          .eq('has_account', true)
+          .single();
+        staffData = result.data;
+        staffError = result.error;
+      } else {
+        // スタッフ名で検索
+        const result = await supabase
+          .from('staff')
+          .select('*')
+          .eq('facility_id', facilityData.id)
+          .eq('name', loginIdOrEmail)
+          .eq('has_account', true)
+          .single();
+        staffData = result.data;
+        staffError = result.error;
+      }
 
       if (staffError || !staffData) {
-        throw new Error('ユーザー名またはパスワードが正しくありません');
+        throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
       }
 
       if (!staffData.password_hash) {
@@ -152,7 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const isValid = await verifyPassword(password, staffData.password_hash);
       if (!isValid) {
-        throw new Error('ユーザー名またはパスワードが正しくありません');
+        throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
       }
 
       // 施設情報を取得
@@ -186,6 +231,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setUser(user);
       localStorage.setItem('user', JSON.stringify(user));
+      
+      // ログイン情報を保存（パスワードは保存しない）
+      localStorage.setItem('savedFacilityCode', facilityCode);
+      localStorage.setItem('savedLoginId', loginIdOrEmail);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
