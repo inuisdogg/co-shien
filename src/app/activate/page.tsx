@@ -112,6 +112,7 @@ export default function ActivatePage() {
     password: '',
     confirmPassword: '',
     agreedToTerms: false,
+    phone: '', // 電話番号（オプション）
   });
   
   // 画面B: キャリア情報フォーム
