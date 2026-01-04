@@ -12,9 +12,9 @@ export function middleware(req: NextRequest) {
   console.log("Current Hostname:", hostname);
   console.log("Pathname:", pathname);
   console.log("Full URL:", url.toString());
-  console.log("Headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
-
+  
   // もしURLに ?debug=true をつけたら、今認識しているホスト名を画面に出して止める
+  // 重要: この判定は最初に実行する（他の処理より先に）
   if (url.searchParams.get('debug') === 'true') {
     // 判定結果も含める
     let debugTargetPath = null;
@@ -32,12 +32,18 @@ export function middleware(req: NextRequest) {
       debugTargetPath = '/personal';
     }
     
+    // ヘッダー情報を取得（エラーを防ぐため）
+    const headers: Record<string, string> = {};
+    req.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    
     return NextResponse.json({ 
       detected_hostname: hostname,
       pathname: pathname,
       full_url: url.toString(),
       detected_target_path: debugTargetPath,
-      headers: Object.fromEntries(req.headers.entries()),
+      headers: headers,
       analysis: {
         includes_biz_co_shien: hostname.includes('biz.co-shien'),
         includes_my_co_shien: hostname.includes('my.co-shien'),
@@ -45,6 +51,10 @@ export function middleware(req: NextRequest) {
         starts_with_my: hostname.startsWith('my.'),
         exact_biz: hostname === 'biz.co-shien.inu.co.jp',
         exact_my: hostname === 'my.co-shien.inu.co.jp',
+      }
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
       }
     });
   }
