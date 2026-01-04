@@ -3842,7 +3842,7 @@ const StaffManagementView: React.FC = () => {
                                 qualificationCertificates: uploadedCertificates.length > 0 ? uploadedCertificates : (existingMemo.qualificationCertificates || []),
                                 experienceRecords: editFormData.experienceRecords || existingMemo.experienceRecords || [],
                                 educationHistory: editFormData.educationHistory || existingMemo.educationHistory || [],
-                                facilityRole: (editFormData.facilityRole || '').trim() || (existingMemo.facilityRole || '').trim() || '',
+                                facilityRole: String(editFormData.facilityRole || existingMemo.facilityRole || '').trim() || '',
                               }),
                               updated_at: new Date().toISOString(),
                             })
