@@ -6,46 +6,102 @@ export function middleware(req: NextRequest) {
   const hostname = req.headers.get('host') || '';
   const pathname = url.pathname;
 
-  // 【最重要：ガードレール】
+  // 【最重要：早期リターン（ガードレール）】
   // 以下のシステムパスは、サブドメインに関わらず「絶対に」書き換えてはいけない
-  if (
-    pathname.startsWith('/_next') || // Next.jsのシステムファイル（_next/static, _next/image, _next/webpack-hmrなど全て）
-    pathname.startsWith('/api') ||   // APIルート
-    pathname.includes('.')           // 画像、favicon、robots.txtなどの静的ファイル（拡張子が含まれる場合）
-  ) {
+  // 処理の最初に実行し、該当する場合は即座にNextResponse.next()を返す
+  
+  // Next.jsのシステムファイル（/_nextで始まるすべてのパス）
+  if (pathname.startsWith('/_next')) {
+    return NextResponse.next();
+  }
+  
+  // APIルート
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+  
+  // ファビコン
+  if (pathname === '/favicon.ico') {
+    return NextResponse.next();
+  }
+  
+  // 静的ファイル（拡張子が含まれる場合）
+  // 画像、フォント、CSS、JSなどの静的アセット
+  const staticFileExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', 
+                                '.css', '.js', '.woff', '.woff2', '.ttf', '.eot', '.otf',
+                                '.json', '.xml', '.txt', '.pdf', '.zip'];
+  const hasExtension = staticFileExtensions.some(ext => pathname.toLowerCase().endsWith(ext));
+  if (hasExtension) {
+    return NextResponse.next();
+  }
+  
+  // 静的ディレクトリ
+  if (pathname.startsWith('/static')) {
     return NextResponse.next();
   }
 
   // サブドメインの抽出
-  const currentHost = hostname
-    .replace(`.co-shien.inu.co.jp`, '')
-    .replace(`.localhost:3000`, '');
+  let currentHost = hostname;
+  
+  // .co-shien.inu.co.jp を削除
+  if (hostname.includes('.co-shien.inu.co.jp')) {
+    currentHost = hostname.replace('.co-shien.inu.co.jp', '').split(':')[0];
+  }
+  // .localhost:3000 を削除
+  else if (hostname.includes('.localhost')) {
+    currentHost = hostname.replace('.localhost:3000', '').replace('.localhost', '');
+  }
+  // Netlifyの場合
+  else if (hostname.includes('.netlify.app')) {
+    const subdomain = hostname.split('.')[0];
+    currentHost = subdomain.includes('biz') ? 'biz' : (subdomain.includes('my') || subdomain.includes('personal') ? 'my' : '');
+  }
+  // その他の場合（ポート番号を削除）
+  else {
+    currentHost = hostname.split(':')[0];
+  }
 
-  // biz. への書き換え
+  // リライト先のパスを決定
+  let rewritePath: string | null = null;
+  
   if (currentHost === 'biz') {
-    return NextResponse.rewrite(new URL(`/biz${pathname}`, req.url));
+    rewritePath = pathname === '/' ? '/biz' : `/biz${pathname}`;
+  } else if (currentHost === 'my') {
+    rewritePath = pathname === '/' ? '/personal' : `/personal${pathname}`;
   }
 
-  // my. への書き換え
-  if (currentHost === 'my') {
-    return NextResponse.rewrite(new URL(`/personal${pathname}`, req.url));
+  // リライトが必要な場合
+  if (rewritePath) {
+    // 【安全性チェック】リライト後のパスが/_nextを含まないことを確認
+    if (rewritePath.startsWith('/_next')) {
+      console.error('ERROR: Rewrite path contains /_next:', rewritePath);
+      return NextResponse.next();
+    }
+    
+    // 【安全性チェック】リライト後のパスが/apiを含まないことを確認（通常は起こらないが念のため）
+    if (rewritePath.startsWith('/api')) {
+      console.error('ERROR: Rewrite path contains /api:', rewritePath);
+      return NextResponse.next();
+    }
+    
+    const rewriteUrl = new URL(rewritePath, req.url);
+    return NextResponse.rewrite(rewriteUrl);
   }
 
+  // リライトが不要な場合はそのまま通過
   return NextResponse.next();
 }
 
-// matcherも念のため最強の設定にしておく
+// Matcherの設定：静的ファイルとNext.jsシステムファイルを確実に除外
 export const config = {
   matcher: [
     /*
      * 以下のパスは除外（Middlewareを適用しない）
      * - api: APIルート
-     * - _next/static: 静的ファイル（JS、CSSなど）
-     * - _next/image: 画像最適化
-     * - _next/webpack-hmr: ホットリロード
+     * - _next: Next.jsのシステムファイル（_next/static, _next/image, _next/webpack-hmrなど全て）
      * - favicon.ico: ファビコン
-     * - 拡張子付きファイル: 画像、フォントなど
+     * - 拡張子付きファイル: 画像、フォント、CSS、JSなどの静的アセット
      */
-    '/((?!api|_next|favicon.ico|.*\\.[^/]+$).*)',
+    '/((?!api|_next|favicon\\.ico|.*\\.[^/]+$).*)',
   ],
 };
