@@ -210,16 +210,103 @@ export const useFacilityData = () => {
 
         const allStaff: Staff[] = [];
         const existingUserIds = new Set<string>();
+        const existingStaffKeys = new Set<string>(); // user_idまたは(name+email)の組み合わせ
 
-        // staffテーブルのデータを追加（user_idがあるもののみ = パーソナルアカウントに紐づいているもの）
+        // 1. employment_recordsから取得（パーソナルアカウントに紐づいているスタッフを優先）
+        if (employmentData && employmentData.length > 0) {
+          // ユーザーIDのリストを取得
+          const userIds = employmentData
+            .map(emp => emp.user_id)
+            .filter((id): id is string => !!id);
+
+          if (userIds.length > 0) {
+            // usersテーブルからユーザー情報を取得
+            const { data: usersData, error: usersError } = await supabase
+              .from('users')
+              .select('id, name, email, phone, birth_date, gender, address')
+              .in('id', userIds);
+
+            if (usersError) {
+              console.error('Error fetching users:', usersError);
+            }
+
+            // employment_recordsとusersをマージ
+            if (usersData) {
+              const usersMap = new Map(usersData.map(u => [u.id, u]));
+              
+              employmentData.forEach((emp) => {
+                const user = usersMap.get(emp.user_id || '');
+                if (user) {
+                  const staffFromEmployment: Staff = {
+                    id: `emp-${emp.id}`, // employment_recordのIDを使用（重複を避けるためプレフィックス）
+                    facilityId: emp.facility_id,
+                    name: user.name || '',
+                    nameKana: '',
+                    role: (emp.role as '一般スタッフ' | 'マネージャー' | '管理者') || '一般スタッフ',
+                    type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as '常勤' | '非常勤',
+                    facilityRole: emp.role || '一般スタッフ', // 施設での役割として使用
+                    birthDate: user.birth_date || '',
+                    gender: user.gender as '男性' | '女性' | 'その他' | undefined,
+                    address: user.address || '',
+                    phone: user.phone || '',
+                    email: user.email || '',
+                    qualifications: '',
+                    yearsOfExperience: 0,
+                    qualificationCertificate: '',
+                    experienceCertificate: '',
+                    emergencyContact: '',
+                    emergencyContactPhone: '',
+                    memo: '',
+                    monthlySalary: 0,
+                    hourlyWage: 0,
+                    user_id: user.id,
+                    createdAt: emp.start_date || new Date().toISOString(),
+                    updatedAt: emp.start_date || new Date().toISOString(),
+                  };
+                  allStaff.push(staffFromEmployment);
+                  
+                  // 重複チェック用のキーを追加
+                  if (user.id) {
+                    existingUserIds.add(user.id);
+                    existingStaffKeys.add(`user-${user.id}`);
+                  }
+                  if (user.name && user.email) {
+                    existingStaffKeys.add(`name-email-${user.name}-${user.email}`);
+                  }
+                }
+              });
+            }
+          }
+        }
+
+        // 2. staffテーブルのデータを追加（employment_recordsに存在しないもののみ）
         if (staffData) {
-          const staffList: Staff[] = staffData
-            .filter((row) => row.user_id) // user_idがあるもののみ
-            .map((row) => {
-              if (row.user_id) {
+          staffData.forEach((row) => {
+            // 重複チェック
+            let shouldSkip = false;
+            
+            if (row.user_id) {
+              // user_idがある場合、employment_recordsに既に存在するかチェック
+              if (existingUserIds.has(row.user_id)) {
+                shouldSkip = true;
+              } else {
                 existingUserIds.add(row.user_id);
+                existingStaffKeys.add(`user-${row.user_id}`);
               }
-              return {
+            }
+            
+            // user_idがない場合でも、名前とメールアドレスで重複チェック
+            if (!shouldSkip && row.name && row.email) {
+              const key = `name-email-${row.name}-${row.email}`;
+              if (existingStaffKeys.has(key)) {
+                shouldSkip = true;
+              } else {
+                existingStaffKeys.add(key);
+              }
+            }
+            
+            if (!shouldSkip) {
+              const staffFromTable: Staff = {
                 id: row.id,
                 facilityId: row.facility_id,
                 name: row.name,
@@ -248,71 +335,9 @@ export const useFacilityData = () => {
                 createdAt: row.created_at,
                 updatedAt: row.updated_at,
               };
-            });
-          allStaff.push(...staffList);
-        }
-
-        // employment_recordsのデータを追加（staffテーブルに存在しない場合のみ）
-        if (employmentData && employmentData.length > 0) {
-          // ユーザーIDのリストを取得
-          const userIds = employmentData
-            .map(emp => emp.user_id)
-            .filter((id): id is string => !!id && !existingUserIds.has(id));
-
-          if (userIds.length > 0) {
-            // usersテーブルからユーザー情報を取得
-            const { data: usersData, error: usersError } = await supabase
-              .from('users')
-              .select('id, name, email, phone, birth_date, gender, address')
-              .in('id', userIds);
-
-            if (usersError) {
-              console.error('Error fetching users:', usersError);
+              allStaff.push(staffFromTable);
             }
-
-            // employment_recordsとusersをマージ
-            if (usersData) {
-              const usersMap = new Map(usersData.map(u => [u.id, u]));
-              
-              employmentData.forEach((emp) => {
-                // staffテーブルに既に存在する場合はスキップ
-                if (emp.user_id && existingUserIds.has(emp.user_id)) {
-                  return;
-                }
-
-                const user = usersMap.get(emp.user_id || '');
-                if (user) {
-                  const staffFromEmployment: Staff = {
-                    id: emp.id, // employment_recordのIDを使用
-                    facilityId: emp.facility_id,
-                    name: user.name || '',
-                    nameKana: '',
-                    role: (emp.role as '一般スタッフ' | 'マネージャー' | '管理者') || '一般スタッフ',
-                    type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as '常勤' | '非常勤',
-                    facilityRole: emp.role || '一般スタッフ', // 施設での役割として使用
-                    birthDate: user.birth_date || '',
-                    gender: user.gender as '男性' | '女性' | 'その他' | undefined,
-                    address: user.address || '',
-                    phone: user.phone || '',
-                    email: user.email || '',
-                    qualifications: '',
-                    yearsOfExperience: 0,
-                    qualificationCertificate: '',
-                    experienceCertificate: '',
-                    emergencyContact: '',
-                    emergencyContactPhone: '',
-                    memo: '',
-                    monthlySalary: 0,
-                    hourlyWage: 0,
-                    user_id: user.id,
-                    createdAt: emp.start_date || new Date().toISOString(),
-                    updatedAt: emp.start_date || new Date().toISOString(),
-                  };
-                  allStaff.push(staffFromEmployment);
-                }
-              });
-            }
-          }
+          });
         }
 
         setStaff(allStaff);
