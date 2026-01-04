@@ -843,7 +843,7 @@ export default function ActivatePage() {
   };
 
   return (
-    <div className={`min-h-screen p-4 ${screen === 'A' ? 'bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]' : 'bg-white'}`}>
+    <div className={`min-h-screen p-4 ${screen === 'register' ? 'bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]' : 'bg-white'}`}>
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
