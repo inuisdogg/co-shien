@@ -220,10 +220,10 @@ export const useFacilityData = () => {
             .filter((id): id is string => !!id);
 
           if (userIds.length > 0) {
-            // usersテーブルからユーザー情報を取得
+            // usersテーブルからユーザー情報を取得（個人情報も含む）
             const { data: usersData, error: usersError } = await supabase
               .from('users')
-              .select('id, name, email, phone, birth_date, gender, address')
+              .select('id, name, email, phone, birth_date, gender, address, postal_code, my_number, spouse_name, basic_pension_symbol, basic_pension_number, employment_insurance_status, employment_insurance_number, previous_retirement_date, previous_name, social_insurance_status, has_dependents, dependent_count, dependents')
               .in('id', userIds);
 
             if (usersError) {
@@ -272,6 +272,21 @@ export const useFacilityData = () => {
                     address: user.address || '',
                     phone: user.phone || '',
                     email: user.email || '',
+                    // 個人情報（usersテーブルから取得）
+                    postalCode: user.postal_code || null,
+                    myNumber: user.my_number || null,
+                    hasSpouse: !!user.spouse_name,
+                    spouseName: user.spouse_name || null,
+                    basicPensionSymbol: user.basic_pension_symbol || null,
+                    basicPensionNumber: user.basic_pension_number || null,
+                    employmentInsuranceStatus: user.employment_insurance_status || null,
+                    employmentInsuranceNumber: user.employment_insurance_number || null,
+                    previousRetirementDate: user.previous_retirement_date || null,
+                    previousName: user.previous_name || null,
+                    socialInsuranceStatus: user.social_insurance_status || null,
+                    hasDependents: user.has_dependents || false,
+                    dependentCount: user.dependent_count || 0,
+                    dependents: user.dependents || null,
                     qualifications: '',
                     yearsOfExperience: 0,
                     qualificationCertificate: '',

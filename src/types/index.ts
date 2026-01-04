@@ -248,6 +248,21 @@ export type Staff = {
   address?: string; // 住所
   phone?: string; // 電話番号
   email?: string; // メールアドレス
+  // 個人情報（usersテーブルから取得）
+  postalCode?: string | null; // 郵便番号
+  myNumber?: string | null; // マイナンバー
+  hasSpouse?: boolean; // 配偶者の有無
+  spouseName?: string | null; // 配偶者氏名
+  basicPensionSymbol?: string | null; // 基礎年金番号（記号）
+  basicPensionNumber?: string | null; // 基礎年金番号（番号）
+  employmentInsuranceStatus?: string | null; // 雇用保険の加入状況
+  employmentInsuranceNumber?: string | null; // 雇用保険被保険者番号
+  previousRetirementDate?: string | null; // 前職退職日
+  previousName?: string | null; // 旧姓
+  socialInsuranceStatus?: string | null; // 社会保険の加入状況
+  hasDependents?: boolean; // 扶養家族の有無
+  dependentCount?: number; // 扶養家族数
+  dependents?: Array<{ name: string; relationship: string; birthDate: string; myNumber: string }> | null; // 扶養家族情報
   // 資格・経験
   qualifications?: string; // 資格（複数可、カンマ区切りなど）
   yearsOfExperience?: number; // 経験年数
