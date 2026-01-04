@@ -2083,7 +2083,7 @@ const StaffManagementView: React.FC = () => {
                           <div>
                             <span className="text-sm text-gray-500">マイナンバー:</span>
                             <span className="ml-2 text-sm font-medium text-gray-800">
-                              ***-****-{displayData.myNumber.slice(-4)}
+                              ***-****-{String(displayData.myNumber || '').slice(-4)}
                             </span>
                           </div>
                         ) : (
