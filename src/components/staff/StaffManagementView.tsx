@@ -1990,7 +1990,7 @@ const StaffManagementView: React.FC = () => {
                 const facilityRole = careerData?.facilityRole || selectedStaff.facilityRole;
                 const displayData = selectedStaff.user_id ? {
                   postalCode: selectedStaff.postalCode || null,
-                  myNumber: selectedStaff.myNumber || null,
+                  myNumber: selectedStaff.myNumber ? String(selectedStaff.myNumber) : null,
                   hasSpouse: selectedStaff.hasSpouse !== undefined ? selectedStaff.hasSpouse : (!!selectedStaff.spouseName),
                   spouseName: selectedStaff.spouseName || null,
                   basicPensionSymbol: selectedStaff.basicPensionSymbol || null,
