@@ -2,162 +2,41 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(req: NextRequest) {
-  const hostname = req.headers.get('host') || '';
   const url = req.nextUrl;
+  const hostname = req.headers.get('host') || '';
   const pathname = url.pathname;
-  
-  // 重要: Next.jsのシステムファイルは絶対に書き換えない
-  // もしパスが /_next で始まっていたら、何もしないでそのまま通す
-  if (pathname.startsWith('/_next') || pathname.startsWith('/api')) {
-    return NextResponse.next();
-  }
-  
-  // 静的ファイル（画像、ファビコンなど）も除外
+
+  // 【最重要：ガードレール】
+  // 以下のシステムパスは、サブドメインに関わらず「絶対に」書き換えてはいけない
   if (
-    pathname.startsWith('/static') ||
-    pathname === '/favicon.ico' ||
-    /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)$/i.test(pathname)
+    pathname.startsWith('/_next') || // Next.jsのシステムファイル
+    pathname.startsWith('/api') ||   // APIルート
+    pathname.includes('.')           // 画像、favicon、robots.txtなどの静的ファイル
   ) {
     return NextResponse.next();
   }
-  
-  // デバッグ用：どのホスト名でアクセスされたかをログに出す
-  // Netlifyのログ（Functionsタブ）で確認できます
-  console.log("=== Middleware Debug ===");
-  console.log("Current Hostname:", hostname);
-  console.log("Pathname:", pathname);
-  console.log("Full URL:", url.toString());
-  
-  // もしURLに ?debug=true をつけたら、今認識しているホスト名を画面に出して止める
-  // 重要: この判定は最初に実行する（他の処理より先に）
-  if (url.searchParams.get('debug') === 'true') {
-    // 判定結果も含める
-    let debugTargetPath = null;
-    if (hostname === 'biz.co-shien.inu.co.jp' || hostname.startsWith('biz.co-shien.inu.co.jp:')) {
-      debugTargetPath = '/biz';
-    } else if (hostname === 'my.co-shien.inu.co.jp' || hostname.startsWith('my.co-shien.inu.co.jp:')) {
-      debugTargetPath = '/personal';
-    } else if (hostname.includes('biz.co-shien')) {
-      debugTargetPath = '/biz';
-    } else if (hostname.includes('my.co-shien')) {
-      debugTargetPath = '/personal';
-    } else if (hostname.startsWith('biz.')) {
-      debugTargetPath = '/biz';
-    } else if (hostname.startsWith('my.')) {
-      debugTargetPath = '/personal';
-    }
-    
-    // ヘッダー情報を取得（エラーを防ぐため）
-    const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-    
-    return NextResponse.json({ 
-      detected_hostname: hostname,
-      pathname: pathname,
-      full_url: url.toString(),
-      detected_target_path: debugTargetPath,
-      headers: headers,
-      analysis: {
-        includes_biz_co_shien: hostname.includes('biz.co-shien'),
-        includes_my_co_shien: hostname.includes('my.co-shien'),
-        starts_with_biz: hostname.startsWith('biz.'),
-        starts_with_my: hostname.startsWith('my.'),
-        exact_biz: hostname === 'biz.co-shien.inu.co.jp',
-        exact_my: hostname === 'my.co-shien.inu.co.jp',
-      }
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
+
+  // サブドメインの抽出
+  const currentHost = hostname
+    .replace(`.co-shien.inu.co.jp`, '')
+    .replace(`.localhost:3000`, '');
+
+  // biz. への書き換え
+  if (currentHost === 'biz') {
+    return NextResponse.rewrite(new URL(`/biz${pathname}`, req.url));
   }
 
-  // サブドメイン判定（複数のパターンを試す）
-  // 重要: より具体的なパターンから順に判定する
-  let targetPath = null;
-  
-  // パターン1: 完全一致（最優先）
-  if (hostname === 'biz.co-shien.inu.co.jp' || hostname.startsWith('biz.co-shien.inu.co.jp:')) {
-    targetPath = '/biz';
-    console.log("✓ Detected BIZ subdomain (exact match)");
-  }
-  else if (hostname === 'my.co-shien.inu.co.jp' || hostname.startsWith('my.co-shien.inu.co.jp:')) {
-    targetPath = '/personal';
-    console.log("✓ Detected PERSONAL subdomain (exact match)");
-  }
-  // パターン2: 部分一致（biz.co-shien を含む）
-  else if (hostname.includes('biz.co-shien')) {
-    targetPath = '/biz';
-    console.log("✓ Detected BIZ subdomain (contains 'biz.co-shien')");
-  }
-  // パターン3: 部分一致（my.co-shien を含む）- biz.co-shienより後にチェック
-  else if (hostname.includes('my.co-shien')) {
-    targetPath = '/personal';
-    console.log("✓ Detected PERSONAL subdomain (contains 'my.co-shien')");
-  }
-  // パターン4: 先頭が'biz.'で始まる
-  else if (hostname.startsWith('biz.')) {
-    targetPath = '/biz';
-    console.log("✓ Detected BIZ subdomain (starts with 'biz.')");
-  }
-  // パターン5: 先頭が'my.'で始まる
-  else if (hostname.startsWith('my.')) {
-    targetPath = '/personal';
-    console.log("✓ Detected PERSONAL subdomain (starts with 'my.')");
-  }
-  // パターン6: Netlifyのサブドメイン（biz-xxx.netlify.app など）
-  else if (hostname.includes('.netlify.app')) {
-    const subdomain = hostname.split('.')[0];
-    if (subdomain.includes('biz')) {
-      targetPath = '/biz';
-      console.log("✓ Detected BIZ (Netlify subdomain)");
-    } else if (subdomain.includes('my') || subdomain.includes('personal')) {
-      targetPath = '/personal';
-      console.log("✓ Detected PERSONAL (Netlify subdomain)");
-    }
-  }
-  // パターン7: ローカル開発（biz.localhost:3000 など）
-  else if (hostname.includes('localhost')) {
-    const parts = hostname.split('.');
-    if (parts[0] === 'biz') {
-      targetPath = '/biz';
-      console.log("✓ Detected BIZ (localhost)");
-    } else if (parts[0] === 'my') {
-      targetPath = '/personal';
-      console.log("✓ Detected PERSONAL (localhost)");
-    }
+  // my. への書き換え
+  if (currentHost === 'my') {
+    return NextResponse.rewrite(new URL(`/personal${pathname}`, req.url));
   }
 
-  // rewriteを実行
-  if (targetPath) {
-    // パス名がルート（/）の場合はそのまま、それ以外は結合
-    const rewritePath = pathname === '/' ? targetPath : `${targetPath}${pathname}`;
-    const rewriteUrl = new URL(rewritePath, req.url);
-    
-    console.log(`→ Rewriting: ${pathname} → ${rewritePath}`);
-    console.log(`→ Rewrite URL: ${rewriteUrl.toString()}`);
-    
-    return NextResponse.rewrite(rewriteUrl);
-  }
-
-  // それ以外は通常通り
-  console.log("→ No rewrite, passing through");
   return NextResponse.next();
 }
 
+// matcherも念のため最強の設定にしておく
 export const config = {
   matcher: [
-    /*
-     * 以下のパスで始まるリクエストには Middleware を適用しない（除外する）
-     * - api (APIルート)
-     * - _next/static (静的ファイル: JS, CSSなど)
-     * - _next/image (画像最適化)
-     * - favicon.ico (ファビコン)
-     * - public フォルダ内の静的資産 (png, jpg, svg等)
-     */
-    '/((?!api|_next/static|_next/image|_next/webpack-hmr|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };
-
