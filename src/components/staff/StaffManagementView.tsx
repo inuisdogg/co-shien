@@ -302,7 +302,12 @@ const StaffManagementView: React.FC = () => {
     setInviteToken('');
 
     try {
+      if (!facility?.id) {
+        throw new Error('施設情報が取得できませんでした');
+      }
+
       const invitation: StaffInvitation = {
+        facilityId: facility.id,
         name: inviteFormData.name,
         email: inviteFormData.email || undefined,
         phone: inviteFormData.phone || undefined,
