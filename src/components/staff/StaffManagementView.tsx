@@ -351,7 +351,7 @@ const StaffManagementView: React.FC = () => {
     try {
       // localStorageから勤怠記録を取得（暫定）
       const records = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-      const staffRecords = records.filter((r: any) => 
+      const staffRecords = records.filter((r: AttendanceRecord) => 
         r.user_id === staff.user_id && 
         r.facility_id === facility?.id
       );
@@ -359,7 +359,7 @@ const StaffManagementView: React.FC = () => {
       // 月でフィルタリング
       const year = attendanceMonth.getFullYear();
       const month = attendanceMonth.getMonth();
-      const filteredRecords = staffRecords.filter((r: any) => {
+      const filteredRecords = staffRecords.filter((r: AttendanceRecord) => {
         const recordDate = new Date(r.date);
         return recordDate.getFullYear() === year && recordDate.getMonth() === month;
       });
