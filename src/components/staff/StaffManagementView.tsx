@@ -57,8 +57,13 @@ type AttendanceRecord = {
   user_id: string;
   facility_id: string;
   date: string;
-  type: 'start' | 'end' | 'break_start' | 'break_end' | 'manual';
+  type: 'start' | 'end' | 'break_start' | 'break_end' | 'manual' | 'paid_leave';
   time?: string;
+  start_time?: string;
+  end_time?: string;
+  break_start_time?: string;
+  break_end_time?: string;
+  leave_type?: string;
   created_at: string;
 };
 
@@ -68,6 +73,20 @@ type CareerData = {
   educationHistory?: EducationHistory[];
   facilityRole?: string;
   [key: string]: unknown;
+};
+
+type StaffDisplayData = {
+  postalCode: string | null;
+  myNumber: string | null;
+  hasSpouse: boolean;
+  spouseName: string | null;
+  basicPensionSymbol: string | null;
+  basicPensionNumber: string | null;
+  employmentInsuranceStatus: string;
+  employmentInsuranceNumber: string | null;
+  socialInsuranceStatus: string;
+  hasDependents: boolean;
+  dependentCount: number;
 };
 
 // 資格リスト（activate/page.tsxから）
@@ -386,7 +405,6 @@ const StaffManagementView: React.FC = () => {
       monthlySalary: staff.monthlySalary || undefined,
       hourlyWage: staff.hourlyWage || undefined,
       facilityRole: careerData?.facilityRole || '',
-      facilityRoles: careerData?.facilityRoles || (careerData?.facilityRole ? careerData.facilityRole.split(',').map((r: string) => r.trim()) : []),
       // employmentTypeとstartDateを追加
       employmentType: staff.type || '常勤',
       startDate: startDate,
@@ -1988,7 +2006,7 @@ const StaffManagementView: React.FC = () => {
                 } catch (e) {}
                 
                 const facilityRole = careerData?.facilityRole || selectedStaff.facilityRole;
-                const displayData = selectedStaff.user_id ? {
+                const displayData: StaffDisplayData = selectedStaff.user_id ? {
                   postalCode: selectedStaff.postalCode || null,
                   myNumber: selectedStaff.myNumber ? String(selectedStaff.myNumber) : null,
                   hasSpouse: selectedStaff.hasSpouse !== undefined ? selectedStaff.hasSpouse : (!!selectedStaff.spouseName),
@@ -2000,7 +2018,19 @@ const StaffManagementView: React.FC = () => {
                   socialInsuranceStatus: selectedStaff.socialInsuranceStatus || 'joined',
                   hasDependents: selectedStaff.hasDependents !== undefined ? selectedStaff.hasDependents : false,
                   dependentCount: selectedStaff.dependentCount || 0,
-                } : careerData || {};
+                } : {
+                  postalCode: null,
+                  myNumber: null,
+                  hasSpouse: false,
+                  spouseName: null,
+                  basicPensionSymbol: null,
+                  basicPensionNumber: null,
+                  employmentInsuranceStatus: 'joined',
+                  employmentInsuranceNumber: null,
+                  socialInsuranceStatus: 'joined',
+                  hasDependents: false,
+                  dependentCount: 0,
+                };
 
                 return (
                   <>
@@ -2095,7 +2125,7 @@ const StaffManagementView: React.FC = () => {
                         <div>
                           <span className="text-sm text-gray-500">配偶者:</span>
                           <span className="ml-2 text-sm font-medium text-gray-800">
-                            {displayData?.hasSpouse ? (displayData.spouseName || '氏名未入力') : '無'}
+                            {String(displayData?.hasSpouse ? (displayData.spouseName || '氏名未入力') : '無')}
                           </span>
                         </div>
                         {displayData?.basicPensionSymbol && displayData?.basicPensionNumber ? (
@@ -3636,8 +3666,8 @@ const StaffManagementView: React.FC = () => {
                             雇用形態
                           </label>
                           <select
-                            value={editFormData.employmentType || editFormData.type || '常勤'}
-                            onChange={(e) => setEditFormData({ ...editFormData, employmentType: e.target.value as any, type: e.target.value as any })}
+                            value={editFormData.employmentType || '常勤'}
+                            onChange={(e) => setEditFormData({ ...editFormData, employmentType: e.target.value as '常勤' | '非常勤' })}
                             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
                           >
                             <option value="常勤">常勤（月給制）</option>
@@ -3647,7 +3677,7 @@ const StaffManagementView: React.FC = () => {
                       </div>
 
                       {/* 給与（雇用形態に応じて表示） */}
-                      {(editFormData.employmentType === '常勤' || editFormData.type === '常勤') ? (
+                       {(editFormData.employmentType === '常勤') ? (
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">
                             月給（円）<span className="text-xs text-gray-500 font-normal ml-2">※ 常勤のため月給制です</span>
@@ -3682,7 +3712,7 @@ const StaffManagementView: React.FC = () => {
                         </label>
                         <div className="space-y-2">
                           {['児童発達支援管理責任者', '管理者', '指導員', '機能性担当職員', '訪問支援員'].map((role) => {
-                            const facilityRoles = editFormData.facilityRoles || (editFormData.facilityRole ? [editFormData.facilityRole] : []);
+                            const facilityRoles = editFormData.facilityRole ? editFormData.facilityRole.split(',').map((r: string) => r.trim()) : [];
                             const isChecked = Array.isArray(facilityRoles) ? facilityRoles.includes(role) : facilityRoles === role;
                             return (
                               <label key={role} className="flex items-center gap-2 cursor-pointer hover:bg-orange-50 p-2 rounded">
@@ -3690,19 +3720,16 @@ const StaffManagementView: React.FC = () => {
                                   type="checkbox"
                                   checked={isChecked}
                                   onChange={(e) => {
-                                    const currentRoles = editFormData.facilityRoles || (editFormData.facilityRole ? [editFormData.facilityRole] : []);
-                                    const rolesArray = Array.isArray(currentRoles) ? currentRoles : [currentRoles].filter(Boolean);
+                                    const currentRoles = editFormData.facilityRole ? editFormData.facilityRole.split(',').map((r: string) => r.trim()) : [];
                                     if (e.target.checked) {
                                       setEditFormData({ 
                                         ...editFormData, 
-                                        facilityRoles: [...rolesArray, role],
-                                        facilityRole: [...rolesArray, role].join(', ')
+                                        facilityRole: [...currentRoles, role].join(', ')
                                       });
                                     } else {
-                                      const newRoles = rolesArray.filter((r: string) => r !== role);
+                                      const newRoles = currentRoles.filter((r: string) => r !== role);
                                       setEditFormData({ 
                                         ...editFormData, 
-                                        facilityRoles: newRoles,
                                         facilityRole: newRoles.length > 0 ? newRoles.join(', ') : ''
                                       });
                                     }
@@ -3787,7 +3814,7 @@ const StaffManagementView: React.FC = () => {
                               name: editFormData.name,
                               name_kana: editFormData.nameKana || null,
                               role: editFormData.role,
-                              type: editFormData.employmentType || editFormData.type,
+                              type: editFormData.employmentType,
                               birth_date: editFormData.birthDate || null,
                               gender: editFormData.gender || null,
                               email: editFormData.email || null,
