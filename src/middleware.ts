@@ -1,9 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  const url = request.nextUrl;
-  const hostname = request.headers.get('host') || '';
+export function middleware(req: NextRequest) {
+  const hostname = req.headers.get('host') || '';
+  const url = req.nextUrl;
+  
+  // デバッグ用：どのホスト名でアクセスされたかをログに出す
+  // Netlifyのログ（Functionsタブ）で確認できます
+  console.log("Current Hostname:", hostname);
+  console.log("Pathname:", url.pathname);
+
+  // もしURLに ?debug=true をつけたら、今認識しているホスト名を画面に出して止める
+  if (url.searchParams.get('debug') === 'true') {
+    return NextResponse.json({ 
+      detected_hostname: hostname,
+      pathname: url.pathname,
+      full_url: url.toString()
+    });
+  }
 
   // 静的ファイルとNext.js内部ファイルはスキップ
   if (
@@ -16,54 +30,30 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // サブドメインを抽出
-  // 例: biz.co-shien.inu.co.jp -> biz
-  // 例: my.co-shien.inu.co.jp -> my
-  // 例: biz.co-shien.netlify.app -> biz
-  // 例: my.co-shien.netlify.app -> my
-  let currentHost = '';
+  // シンプルな判定：hostnameが'biz.'で始まるか、'my.'で始まるか
+  if (hostname.startsWith('biz.')) {
+    console.log("Rewriting to /biz", url.pathname);
+    return NextResponse.rewrite(new URL(`/biz${url.pathname}`, req.url));
+  }
   
-  // カスタムドメインの場合
-  if (hostname.includes('biz.co-shien.inu.co.jp')) {
-    currentHost = 'biz';
-  } else if (hostname.includes('my.co-shien.inu.co.jp')) {
-    currentHost = 'my';
-  } 
-  // Netlifyのサブドメインの場合
-  else if (hostname.includes('.netlify.app')) {
-    const parts = hostname.split('.');
-    if (parts.length >= 3) {
-      const subdomain = parts[0];
-      if (subdomain === 'biz-co-shien' || subdomain === 'biz') {
-        currentHost = 'biz';
-      } else if (subdomain === 'my-co-shien' || subdomain === 'my') {
-        currentHost = 'my';
-      }
-    }
-  }
-  // ローカル開発用
-  else if (hostname.includes('localhost')) {
-    const parts = hostname.split('.');
-    if (parts[0] === 'biz') {
-      currentHost = 'biz';
-    } else if (parts[0] === 'my') {
-      currentHost = 'my';
-    }
+  if (hostname.startsWith('my.')) {
+    console.log("Rewriting to /personal", url.pathname);
+    return NextResponse.rewrite(new URL(`/personal${url.pathname}`, req.url));
   }
 
-  // 1. biz.co-shien.inu.co.jp の場合
-  if (currentHost === 'biz') {
-    // 内部的に /biz フォルダの内容を表示する（URLはそのまま）
-    return NextResponse.rewrite(new URL(`/biz${url.pathname}`, request.url));
+  // より詳細な判定（フォールバック）
+  if (hostname.includes('biz.co-shien')) {
+    console.log("Rewriting to /biz (fallback)", url.pathname);
+    return NextResponse.rewrite(new URL(`/biz${url.pathname}`, req.url));
+  }
+  
+  if (hostname.includes('my.co-shien')) {
+    console.log("Rewriting to /personal (fallback)", url.pathname);
+    return NextResponse.rewrite(new URL(`/personal${url.pathname}`, req.url));
   }
 
-  // 2. my.co-shien.inu.co.jp の場合
-  if (currentHost === 'my') {
-    // 内部的に /personal フォルダの内容を表示する（URLはそのまま）
-    return NextResponse.rewrite(new URL(`/personal${url.pathname}`, request.url));
-  }
-
-  // それ以外（co-shien.inu.co.jp 本体など）は通常通り
+  // それ以外は通常通り
+  console.log("No rewrite, passing through");
   return NextResponse.next();
 }
 
