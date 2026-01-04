@@ -2,37 +2,39 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const url = request.nextUrl;
   const hostname = request.headers.get('host') || '';
 
   // 静的ファイルとNext.js内部ファイルはスキップ
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.startsWith('/static') ||
-    pathname.includes('.') || // ファイル拡張子が含まれる場合
-    pathname === '/favicon.ico'
+    url.pathname.startsWith('/_next') ||
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/static') ||
+    url.pathname.includes('.') || // ファイル拡張子が含まれる場合
+    url.pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
   }
 
-  // サブドメインに応じたルーティング
-  // biz.co-shien.inu.co.jp → ルートページ（Biz用ログイン）
-  // my.co-shien.inu.co.jp → /login（Personal用ログイン）
-  if (pathname === '/') {
-    if (hostname.includes('biz.co-shien') || hostname === 'biz.co-shien.inu.co.jp') {
-      // Biz側: ルートページのまま（page.tsxでBizログインを表示）
-      return NextResponse.next();
-    } else if (hostname.includes('my.co-shien') || hostname === 'my.co-shien.inu.co.jp') {
-      // Personal側: /loginにリダイレクト
-      const url = request.nextUrl.clone();
-      url.pathname = '/login';
-      return NextResponse.redirect(url);
-    }
+  // サブドメインを抽出 (例: biz.co-shien.inu.co.jp -> biz)
+  const currentHost = hostname
+    .replace('.co-shien.inu.co.jp', '')
+    .replace('.localhost:3000', '') // ローカル開発用
+    .replace('.netlify.app', ''); // Netlify用
+
+  // 1. biz.co-shien.inu.co.jp の場合
+  if (currentHost === 'biz' || hostname.includes('biz.co-shien')) {
+    // 内部的に /biz フォルダの内容を表示する（URLはそのまま）
+    return NextResponse.rewrite(new URL(`/biz${url.pathname}`, request.url));
   }
 
-  // 全てのページにアクセスを許可（認証チェックはクライアントサイドで行う）
-  // これにより、Netlifyで全てのルートが正しく解決される
+  // 2. my.co-shien.inu.co.jp の場合
+  if (currentHost === 'my' || hostname.includes('my.co-shien')) {
+    // 内部的に /personal フォルダの内容を表示する（URLはそのまま）
+    return NextResponse.rewrite(new URL(`/personal${url.pathname}`, request.url));
+  }
+
+  // それ以外（co-shien.inu.co.jp 本体など）は通常通り
   return NextResponse.next();
 }
 
