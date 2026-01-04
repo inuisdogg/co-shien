@@ -16,20 +16,49 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // サブドメインを抽出 (例: biz.co-shien.inu.co.jp -> biz)
-  const currentHost = hostname
-    .replace('.co-shien.inu.co.jp', '')
-    .replace('.localhost:3000', '') // ローカル開発用
-    .replace('.netlify.app', ''); // Netlify用
+  // サブドメインを抽出
+  // 例: biz.co-shien.inu.co.jp -> biz
+  // 例: my.co-shien.inu.co.jp -> my
+  // 例: biz.co-shien.netlify.app -> biz
+  // 例: my.co-shien.netlify.app -> my
+  let currentHost = '';
+  
+  // カスタムドメインの場合
+  if (hostname.includes('biz.co-shien.inu.co.jp')) {
+    currentHost = 'biz';
+  } else if (hostname.includes('my.co-shien.inu.co.jp')) {
+    currentHost = 'my';
+  } 
+  // Netlifyのサブドメインの場合
+  else if (hostname.includes('.netlify.app')) {
+    const parts = hostname.split('.');
+    if (parts.length >= 3) {
+      const subdomain = parts[0];
+      if (subdomain === 'biz-co-shien' || subdomain === 'biz') {
+        currentHost = 'biz';
+      } else if (subdomain === 'my-co-shien' || subdomain === 'my') {
+        currentHost = 'my';
+      }
+    }
+  }
+  // ローカル開発用
+  else if (hostname.includes('localhost')) {
+    const parts = hostname.split('.');
+    if (parts[0] === 'biz') {
+      currentHost = 'biz';
+    } else if (parts[0] === 'my') {
+      currentHost = 'my';
+    }
+  }
 
   // 1. biz.co-shien.inu.co.jp の場合
-  if (currentHost === 'biz' || hostname.includes('biz.co-shien')) {
+  if (currentHost === 'biz') {
     // 内部的に /biz フォルダの内容を表示する（URLはそのまま）
     return NextResponse.rewrite(new URL(`/biz${url.pathname}`, request.url));
   }
 
   // 2. my.co-shien.inu.co.jp の場合
-  if (currentHost === 'my' || hostname.includes('my.co-shien')) {
+  if (currentHost === 'my') {
     // 内部的に /personal フォルダの内容を表示する（URLはそのまま）
     return NextResponse.rewrite(new URL(`/personal${url.pathname}`, request.url));
   }
