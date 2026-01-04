@@ -97,6 +97,7 @@ export default function ActivatePage() {
   const [invitedRole, setInvitedRole] = useState<string>('');
   const [existingUser, setExistingUser] = useState<any>(null);
   const [isExistingAccount, setIsExistingAccount] = useState(false);
+  const [shadowStaff, setShadowStaff] = useState<any>(null);
   
   // ログインフォーム
   const [loginForm, setLoginForm] = useState({
@@ -275,6 +276,36 @@ export default function ActivatePage() {
 
     setLoading(true);
     try {
+      // シャドウアカウント（staffテーブルにuser_idがNULLで存在するもの）を検索
+      let shadowStaff: any = null;
+      if (accountForm.email) {
+        const { data: staffByEmail } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .eq('email', accountForm.email)
+          .is('user_id', null)
+          .single();
+        
+        if (staffByEmail) {
+          shadowStaff = staffByEmail;
+        }
+      }
+      
+      if (!shadowStaff && accountForm.phone) {
+        const { data: staffByPhone } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .eq('phone', accountForm.phone)
+          .is('user_id', null)
+          .single();
+        
+        if (staffByPhone) {
+          shadowStaff = staffByPhone;
+        }
+      }
+
       // パスワードをハッシュ化
       const passwordHash = await hashPassword(accountForm.password);
 
@@ -302,7 +333,7 @@ export default function ActivatePage() {
           activated_at: new Date().toISOString(),
           has_account: true,
           role: 'staff',
-          facility_id: facilityId,
+          // facility_idは設定しない（usersテーブルは施設に依存しない）
         };
 
         const { data: createdUser, error: createError } = await supabase
@@ -318,6 +349,60 @@ export default function ActivatePage() {
         setUserId(newUserId);
         setInvitedName(accountForm.name);
         setInvitedEmail(accountForm.email);
+
+        // シャドウアカウントが見つかった場合、マージする
+        if (shadowStaff) {
+          // staffテーブルのuser_idを更新
+          const { error: updateStaffError } = await supabase
+            .from('staff')
+            .update({ user_id: newUserId })
+            .eq('id', shadowStaff.id);
+
+          if (updateStaffError) {
+            console.error('シャドウアカウントのマージエラー:', updateStaffError);
+            // エラーでも続行
+          }
+
+          // シャドウアカウントの情報をusersテーブルに反映
+          const updateUserData: any = {};
+          if (shadowStaff.birth_date && !createdUser.birth_date) {
+            updateUserData.birth_date = shadowStaff.birth_date;
+          }
+          if (shadowStaff.gender && !createdUser.gender) {
+            updateUserData.gender = shadowStaff.gender;
+          }
+          if (shadowStaff.address && !createdUser.address) {
+            updateUserData.address = shadowStaff.address;
+          }
+          if (shadowStaff.phone && !createdUser.phone) {
+            updateUserData.phone = shadowStaff.phone;
+          }
+
+          if (Object.keys(updateUserData).length > 0) {
+            await supabase
+              .from('users')
+              .update(updateUserData)
+              .eq('id', newUserId);
+          }
+
+          // employment_recordsを作成（シャドウアカウントの情報を使用）
+          const { error: employmentError } = await supabase
+            .from('employment_records')
+            .insert({
+              user_id: newUserId,
+              facility_id: facilityId,
+              start_date: shadowStaff.created_at ? shadowStaff.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+              role: shadowStaff.role || '一般スタッフ',
+              employment_type: shadowStaff.type || '常勤',
+              permissions: {},
+              experience_verification_status: 'not_requested',
+            });
+
+          if (employmentError) {
+            console.error('employment_records作成エラー:', employmentError);
+            // エラーでも続行
+          }
+        }
         
         // アカウント作成成功 → 画面Bへ
         setScreen('B');

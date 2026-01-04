@@ -18,7 +18,7 @@ const StaffManagementView: React.FC = () => {
   const { staff, facilitySettings } = useFacilityData();
   const { facility } = useAuth();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [inviteMethod, setInviteMethod] = useState<'link' | 'qr' | null>(null);
+  const [inviteMethod, setInviteMethod] = useState<'link' | 'qr' | 'manual' | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
@@ -26,6 +26,19 @@ const StaffManagementView: React.FC = () => {
   const [attendanceMonth, setAttendanceMonth] = useState(new Date());
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [publicInviteLink, setPublicInviteLink] = useState('');
+  
+  // 手動登録フォーム用の状態
+  const [manualFormData, setManualFormData] = useState({
+    name: '',
+    nameKana: '',
+    email: '',
+    phone: '',
+    birthDate: '',
+    gender: '' as '男性' | '女性' | 'その他' | '',
+    role: '一般スタッフ' as '一般スタッフ' | 'マネージャー' | '管理者',
+    employmentType: '常勤' as '常勤' | '非常勤',
+    startDate: new Date().toISOString().split('T')[0],
+  });
 
   // 招待フォーム用の状態
   const [inviteFormData, setInviteFormData] = useState<{
@@ -225,9 +238,20 @@ const StaffManagementView: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {sortedStaff.map((s) => (
+              {sortedStaff.map((s) => {
+                const isShadowAccount = !s.user_id;
+                return (
                 <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="p-3 font-medium text-gray-800">{s.name}</td>
+                  <td className="p-3 font-medium text-gray-800">
+                    <div className="flex items-center gap-2">
+                      {s.name}
+                      {isShadowAccount && (
+                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">
+                          未確認
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="p-3 text-gray-600">{s.role}</td>
                   <td className="p-3 text-gray-600">{s.type}</td>
                   <td className="p-3 text-gray-600">
@@ -252,7 +276,8 @@ const StaffManagementView: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
               {sortedStaff.length === 0 && (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500">
@@ -347,6 +372,241 @@ const StaffManagementView: React.FC = () => {
                       <p className="text-sm text-gray-600">
                         QRコードを表示・印刷して、スタッフにスキャンしてもらいます
                       </p>
+                    </button>
+                    <button
+                      onClick={() => setInviteMethod('manual')}
+                      className="p-6 border-2 border-gray-200 rounded-lg hover:border-orange-600 hover:bg-orange-50 transition-all text-left"
+                    >
+                      <User size={32} className="text-orange-600 mb-3" />
+                      <h4 className="font-bold text-gray-800 mb-2">代わりに情報を入力する（代行登録）</h4>
+                      <p className="text-sm text-gray-600">
+                        スタッフの代わりに基本情報を入力します。後日スタッフ本人がアカウントを作成できます
+                      </p>
+                    </button>
+                  </div>
+                </div>
+              ) : inviteMethod === 'manual' ? (
+                // 手動登録フォーム
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+                    <p className="text-sm text-blue-800">
+                      スタッフの基本情報を入力してください。後日、スタッフ本人が同じメールアドレスまたは電話番号でアカウントを作成すると、自動的に紐付けられます。
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      氏名 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={manualFormData.name}
+                      onChange={(e) => setManualFormData({ ...manualFormData, name: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      placeholder="スタッフの名前"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      フリガナ
+                    </label>
+                    <input
+                      type="text"
+                      value={manualFormData.nameKana}
+                      onChange={(e) => setManualFormData({ ...manualFormData, nameKana: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      placeholder="フリガナ"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        メールアドレス
+                      </label>
+                      <input
+                        type="email"
+                        value={manualFormData.email}
+                        onChange={(e) => setManualFormData({ ...manualFormData, email: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        placeholder="example@email.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        電話番号
+                      </label>
+                      <input
+                        type="tel"
+                        value={manualFormData.phone}
+                        onChange={(e) => setManualFormData({ ...manualFormData, phone: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        placeholder="090-1234-5678"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        生年月日
+                      </label>
+                      <input
+                        type="date"
+                        value={manualFormData.birthDate}
+                        onChange={(e) => setManualFormData({ ...manualFormData, birthDate: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        性別
+                      </label>
+                      <select
+                        value={manualFormData.gender}
+                        onChange={(e) => setManualFormData({ ...manualFormData, gender: e.target.value as any })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      >
+                        <option value="">選択してください</option>
+                        <option value="男性">男性</option>
+                        <option value="女性">女性</option>
+                        <option value="その他">その他</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        役職
+                      </label>
+                      <select
+                        value={manualFormData.role}
+                        onChange={(e) => setManualFormData({ ...manualFormData, role: e.target.value as any })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      >
+                        <option value="一般スタッフ">一般スタッフ</option>
+                        <option value="マネージャー">マネージャー</option>
+                        <option value="管理者">管理者</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        雇用形態
+                      </label>
+                      <select
+                        value={manualFormData.employmentType}
+                        onChange={(e) => setManualFormData({ ...manualFormData, employmentType: e.target.value as any })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      >
+                        <option value="常勤">常勤</option>
+                        <option value="非常勤">非常勤</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      開始日
+                    </label>
+                    <input
+                      type="date"
+                      value={manualFormData.startDate}
+                      onChange={(e) => setManualFormData({ ...manualFormData, startDate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setInviteMethod(null);
+                        setManualFormData({
+                          name: '',
+                          nameKana: '',
+                          email: '',
+                          phone: '',
+                          birthDate: '',
+                          gender: '',
+                          role: '一般スタッフ',
+                          employmentType: '常勤',
+                          startDate: new Date().toISOString().split('T')[0],
+                        });
+                      }}
+                      className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!facility?.id) {
+                          alert('施設情報が取得できませんでした');
+                          return;
+                        }
+
+                        if (!manualFormData.name || (!manualFormData.email && !manualFormData.phone)) {
+                          alert('名前とメールアドレスまたは電話番号を入力してください');
+                          return;
+                        }
+
+                        setInviteLoading(true);
+                        try {
+                          // staffテーブルにシャドウアカウントとして登録（user_idはNULL）
+                          const { data, error } = await supabase
+                            .from('staff')
+                            .insert({
+                              id: `staff-${Date.now()}`,
+                              facility_id: facility.id,
+                              name: manualFormData.name,
+                              name_kana: manualFormData.nameKana || null,
+                              role: manualFormData.role,
+                              type: manualFormData.employmentType,
+                              birth_date: manualFormData.birthDate || null,
+                              gender: manualFormData.gender || null,
+                              email: manualFormData.email || null,
+                              phone: manualFormData.phone || null,
+                              user_id: null, // シャドウアカウント
+                              created_at: new Date().toISOString(),
+                              updated_at: new Date().toISOString(),
+                            })
+                            .select()
+                            .single();
+
+                          if (error) {
+                            throw new Error(`登録エラー: ${error.message}`);
+                          }
+
+                          alert('スタッフを登録しました。後日、スタッフ本人が同じメールアドレスまたは電話番号でアカウントを作成すると、自動的に紐付けられます。');
+                          
+                          // フォームをリセット
+                          setInviteMethod(null);
+                          setManualFormData({
+                            name: '',
+                            nameKana: '',
+                            email: '',
+                            phone: '',
+                            birthDate: '',
+                            gender: '',
+                            role: '一般スタッフ',
+                            employmentType: '常勤',
+                            startDate: new Date().toISOString().split('T')[0],
+                          });
+                          setIsInviteModalOpen(false);
+                          
+                          // ページをリロードしてスタッフ一覧を更新
+                          window.location.reload();
+                        } catch (error: any) {
+                          alert(`登録エラー: ${error.message || 'Unknown error'}`);
+                        } finally {
+                          setInviteLoading(false);
+                        }
+                      }}
+                      disabled={inviteLoading}
+                      className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50"
+                    >
+                      {inviteLoading ? '登録中...' : '登録する'}
                     </button>
                   </div>
                 </div>
