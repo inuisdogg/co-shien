@@ -72,11 +72,31 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 SupabaseダッシュボードのSQL Editorで `supabase_setup.sql` の内容を実行して、`facility_settings` テーブルを作成してください。
 
 4. 開発サーバーの起動:
+
+通常の開発サーバー:
 ```bash
 npm run dev
 ```
+ブラウザで `http://localhost:3000` を開く
 
-5. ブラウザで `http://localhost:3000` を開く
+Netlify環境でのローカルテスト（推奨）:
+```bash
+# Netlify CLIのインストール（初回のみ）
+npm install -g netlify-cli
+
+# Netlify環境で起動
+netlify dev
+```
+
+Netlify環境でのテスト手順:
+1. ブラウザでサブドメインを使用してアクセス（`/etc/hosts`を編集して設定）
+   - `biz.localhost:8888` (Biz側)
+   - `my.localhost:8888` (Personal側)
+2. ブラウザの開発者ツールでNetworkタブを開く
+3. ページ（一番上の項目）をクリック
+4. Response Headersを確認:
+   - `x-debug-subdomain: biz` または `x-debug-subdomain: my` が表示されれば成功
+   - `x-debug-subdomain: none` の場合は、サブドメインの取得に失敗しています
 
 ## Supabase連携
 
