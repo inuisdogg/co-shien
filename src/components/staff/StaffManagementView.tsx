@@ -48,32 +48,70 @@ const StaffManagementView: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStaffData, setEditingStaffData] = useState<any>(null);
   
-  // 手動登録フォーム用の状態
+  // 手動登録フォーム用の状態（パーソナルキャリアタブの全項目を含む）
   const [manualFormData, setManualFormData] = useState({
+    // 基本情報
     name: '',
     nameKana: '',
     email: '',
     phone: '',
     birthDate: '',
     gender: '' as '男性' | '女性' | 'その他' | '',
+    address: '',
+    postalCode: '',
+    // マイナンバー
+    myNumber: '',
+    // 配偶者
+    hasSpouse: false,
+    spouseName: '',
+    // 基礎年金番号
+    basicPensionSymbol: '',
+    basicPensionNumber: '',
+    // 雇用保険
+    employmentInsuranceStatus: 'joined' as 'joined' | 'not_joined' | 'first_time',
+    employmentInsuranceNumber: '',
+    previousRetirementDate: '',
+    previousName: '',
+    // 社会保険
+    socialInsuranceStatus: 'joined' as 'joined' | 'not_joined',
+    // 扶養家族
+    hasDependents: false,
+    dependentCount: 0,
+    dependents: [] as Array<{
+      id: string;
+      name: string;
+      furigana: string;
+      relationship: string;
+      birthDate: string;
+      gender: 'male' | 'female';
+      occupation: string;
+      annualIncome: string;
+      notWorking: boolean;
+      notWorkingReason: string;
+      myNumber: string;
+      separateAddress?: string;
+    }>,
+    // 資格
+    qualifications: [] as string[],
+    qualificationCertificates: [] as { qualification: string; file: File | null; url: string }[],
+    // 職歴
+    experienceRecords: [] as Array<{
+      id: string;
+      facilityName: string;
+      startDate: string;
+      endDate?: string;
+    }>,
+    // 学歴
+    educationHistory: [] as Array<{
+      id: string;
+      schoolName: string;
+      graduationDate: string;
+      degree: string;
+    }>,
+    // 事業所側から登録する情報
     role: '一般スタッフ' as '一般スタッフ' | 'マネージャー' | '管理者',
     employmentType: '常勤' as '常勤' | '非常勤',
     startDate: new Date().toISOString().split('T')[0],
-    // パーソナルキャリア情報と同じ項目
-    postalCode: '',
-    address: '',
-    qualifications: [] as string[],
-    qualificationCertificates: [] as { qualification: string; file: File | null; url: string }[],
-    workHistory: [] as Array<{
-      id: string;
-      type: 'employment' | 'education';
-      organization: string;
-      position?: string;
-      startDate: string;
-      endDate: string;
-      description: string;
-    }>,
-    // 事業所側から登録する情報
     monthlySalary: undefined as number | undefined,
     hourlyWage: undefined as number | undefined,
     facilityRole: '',
@@ -145,6 +183,44 @@ const StaffManagementView: React.FC = () => {
         console.error('ユーザー情報取得エラー:', error);
       }
     }
+  };
+
+  // 編集モーダルを開く（代理登録アカウント用）
+  const handleOpenEdit = async (staff: Staff) => {
+    if (staff.user_id) {
+      alert('パーソナルアカウントに紐づいているスタッフは、Biz側から編集できません。スタッフ本人がパーソナル側で編集してください。');
+      return;
+    }
+
+    // memoフィールドからJSONデータを取得
+    let careerData: any = null;
+    try {
+      if (staff.memo && typeof staff.memo === 'string') {
+        careerData = JSON.parse(staff.memo);
+      }
+    } catch (e) {
+      // memoがJSONでない場合は無視
+    }
+
+    // 編集用のデータを設定
+    setEditingStaffData({
+      ...staff,
+      ...careerData,
+      // フォームデータに変換
+      nameKana: staff.nameKana || '',
+      qualifications: staff.qualifications ? staff.qualifications.split(',') : [],
+      qualificationCertificates: (careerData?.qualificationCertificates || []).map((c: any) => ({
+        qualification: c.qualification,
+        file: null,
+        url: c.url || '',
+      })),
+      experienceRecords: careerData?.experienceRecords || [],
+      educationHistory: careerData?.educationHistory || [],
+      monthlySalary: staff.monthlySalary || undefined,
+      hourlyWage: staff.hourlyWage || undefined,
+      facilityRole: careerData?.facilityRole || '',
+    });
+    setIsEditModalOpen(true);
   };
 
   // 勤怠簿を開く
@@ -560,7 +636,7 @@ const StaffManagementView: React.FC = () => {
 
                   {/* パーソナルキャリア情報と同じ項目 */}
                   <div className="border-t border-gray-200 pt-4 mt-4">
-                    <h4 className="font-bold text-gray-800 mb-4">キャリア情報（パーソナルアカウントと同じ項目）</h4>
+                    <h4 className="font-bold text-gray-800 mb-4">基本プロフィール（パーソナルアカウントと同じ項目）</h4>
                     
                     {/* 郵便番号・住所 */}
                     <div className="space-y-3 mb-4">
@@ -591,6 +667,468 @@ const StaffManagementView: React.FC = () => {
                           placeholder="都道府県市区町村番地"
                           className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                         />
+                      </div>
+                    </div>
+
+                    {/* マイナンバー */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        マイナンバー
+                      </label>
+                      <input
+                        type="text"
+                        value={manualFormData.myNumber}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 12);
+                          setManualFormData({ ...manualFormData, myNumber: value });
+                        }}
+                        placeholder="12桁のマイナンバー"
+                        maxLength={12}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      />
+                    </div>
+
+                    {/* 配偶者 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        配偶者
+                      </label>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="hasSpouse"
+                              checked={manualFormData.hasSpouse}
+                              onChange={() => setManualFormData({ ...manualFormData, hasSpouse: true })}
+                              className="w-4 h-4 text-[#00c4cc]"
+                            />
+                            <span className="text-sm">有</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="hasSpouse"
+                              checked={!manualFormData.hasSpouse}
+                              onChange={() => setManualFormData({ ...manualFormData, hasSpouse: false, spouseName: '' })}
+                              className="w-4 h-4 text-[#00c4cc]"
+                            />
+                            <span className="text-sm">無</span>
+                          </label>
+                        </div>
+                        {manualFormData.hasSpouse && (
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">配偶者氏名</label>
+                            <input
+                              type="text"
+                              value={manualFormData.spouseName}
+                              onChange={(e) => setManualFormData({ ...manualFormData, spouseName: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 基礎年金番号 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        基礎年金番号
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">記号（4桁）</label>
+                          <input
+                            type="text"
+                            value={manualFormData.basicPensionSymbol}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              setManualFormData({ ...manualFormData, basicPensionSymbol: value });
+                            }}
+                            maxLength={4}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">番号（6桁）</label>
+                          <input
+                            type="text"
+                            value={manualFormData.basicPensionNumber}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                              setManualFormData({ ...manualFormData, basicPensionNumber: value });
+                            }}
+                            maxLength={6}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 雇用保険 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        雇用保険
+                      </label>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="employmentInsurance"
+                              value="joined"
+                              checked={manualFormData.employmentInsuranceStatus === 'joined'}
+                              onChange={(e) => setManualFormData({ ...manualFormData, employmentInsuranceStatus: e.target.value as any })}
+                              className="w-4 h-4 text-[#00c4cc]"
+                            />
+                            <span className="text-sm">加入</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="employmentInsurance"
+                              value="not_joined"
+                              checked={manualFormData.employmentInsuranceStatus === 'not_joined'}
+                              onChange={(e) => setManualFormData({ ...manualFormData, employmentInsuranceStatus: e.target.value as any })}
+                              className="w-4 h-4 text-[#00c4cc]"
+                            />
+                            <span className="text-sm">非加入</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="employmentInsurance"
+                              value="first_time"
+                              checked={manualFormData.employmentInsuranceStatus === 'first_time'}
+                              onChange={(e) => setManualFormData({ ...manualFormData, employmentInsuranceStatus: e.target.value as any })}
+                              className="w-4 h-4 text-[#00c4cc]"
+                            />
+                            <span className="text-sm">初めて加入</span>
+                          </label>
+                        </div>
+                        {manualFormData.employmentInsuranceStatus === 'joined' && (
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">雇用保険番号（被保険者番号）</label>
+                            <input
+                              type="text"
+                              value={manualFormData.employmentInsuranceNumber}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^\d-]/g, '');
+                                setManualFormData({ ...manualFormData, employmentInsuranceNumber: value });
+                              }}
+                              placeholder="例: 1234-567890-1"
+                              maxLength={13}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">4桁-6桁-1桁の形式で入力してください</p>
+                          </div>
+                        )}
+                        {manualFormData.employmentInsuranceStatus === 'first_time' && (
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">前職の名（旧姓の場合）</label>
+                              <input
+                                type="text"
+                                value={manualFormData.previousName}
+                                onChange={(e) => setManualFormData({ ...manualFormData, previousName: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">前職の退職日</label>
+                              <input
+                                type="date"
+                                value={manualFormData.previousRetirementDate}
+                                onChange={(e) => setManualFormData({ ...manualFormData, previousRetirementDate: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 社会保険 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        社会保険
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="socialInsurance"
+                            value="joined"
+                            checked={manualFormData.socialInsuranceStatus === 'joined'}
+                            onChange={(e) => setManualFormData({ ...manualFormData, socialInsuranceStatus: e.target.value as any })}
+                            className="w-4 h-4 text-[#00c4cc]"
+                          />
+                          <span className="text-sm">加入</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="socialInsurance"
+                            value="not_joined"
+                            checked={manualFormData.socialInsuranceStatus === 'not_joined'}
+                            onChange={(e) => setManualFormData({ ...manualFormData, socialInsuranceStatus: e.target.value as any })}
+                            className="w-4 h-4 text-[#00c4cc]"
+                          />
+                          <span className="text-sm">非加入</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* 扶養家族 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        扶養家族
+                      </label>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="hasDependents"
+                              checked={manualFormData.hasDependents}
+                              onChange={() => setManualFormData({ ...manualFormData, hasDependents: true })}
+                              className="w-4 h-4 text-[#00c4cc]"
+                            />
+                            <span className="text-sm">有</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="hasDependents"
+                              checked={!manualFormData.hasDependents}
+                              onChange={() => setManualFormData({ ...manualFormData, hasDependents: false, dependents: [], dependentCount: 0 })}
+                              className="w-4 h-4 text-[#00c4cc]"
+                            />
+                            <span className="text-sm">無</span>
+                          </label>
+                        </div>
+                        {manualFormData.hasDependents && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">人数</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={manualFormData.dependentCount}
+                                onChange={(e) => {
+                                  const count = parseInt(e.target.value) || 0;
+                                  const currentDependents = manualFormData.dependents;
+                                  const newDependents = Array.from({ length: count }, (_, i) => 
+                                    currentDependents[i] || {
+                                      id: Date.now().toString() + i,
+                                      name: '',
+                                      furigana: '',
+                                      relationship: '',
+                                      birthDate: '',
+                                      gender: 'male' as const,
+                                      occupation: '',
+                                      annualIncome: '',
+                                      notWorking: false,
+                                      notWorkingReason: '',
+                                      myNumber: '',
+                                    }
+                                  );
+                                  setManualFormData({ ...manualFormData, dependentCount: count, dependents: newDependents });
+                                }}
+                                className="w-24 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                              />
+                              <span className="ml-2 text-sm text-gray-600">人</span>
+                            </div>
+                            {manualFormData.dependents.map((dependent, index) => (
+                              <div key={dependent.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
+                                <h5 className="text-sm font-bold text-gray-700">扶養家族 {index + 1}</h5>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">続柄</label>
+                                    <input
+                                      type="text"
+                                      value={dependent.relationship}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].relationship = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      placeholder="例：妻、子"
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">生年月日</label>
+                                    <input
+                                      type="date"
+                                      value={dependent.birthDate}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].birthDate = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">フリガナ</label>
+                                    <input
+                                      type="text"
+                                      value={dependent.furigana}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].furigana = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">氏名</label>
+                                    <input
+                                      type="text"
+                                      value={dependent.name}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].name = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">性別</label>
+                                  <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2">
+                                      <input
+                                        type="radio"
+                                        name={`dependent-gender-${index}`}
+                                        checked={dependent.gender === 'male'}
+                                        onChange={() => {
+                                          const updated = [...manualFormData.dependents];
+                                          updated[index].gender = 'male';
+                                          setManualFormData({ ...manualFormData, dependents: updated });
+                                        }}
+                                        className="w-4 h-4 text-[#00c4cc]"
+                                      />
+                                      <span className="text-sm">男</span>
+                                    </label>
+                                    <label className="flex items-center gap-2">
+                                      <input
+                                        type="radio"
+                                        name={`dependent-gender-${index}`}
+                                        checked={dependent.gender === 'female'}
+                                        onChange={() => {
+                                          const updated = [...manualFormData.dependents];
+                                          updated[index].gender = 'female';
+                                          setManualFormData({ ...manualFormData, dependents: updated });
+                                        }}
+                                        className="w-4 h-4 text-[#00c4cc]"
+                                      />
+                                      <span className="text-sm">女</span>
+                                    </label>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">職業</label>
+                                    <input
+                                      type="text"
+                                      value={dependent.occupation}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].occupation = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">収入（年収）</label>
+                                    <input
+                                      type="text"
+                                      value={dependent.annualIncome}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].annualIncome = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      placeholder="円"
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="flex items-center gap-2 mb-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={dependent.notWorking}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].notWorking = e.target.checked;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      className="w-4 h-4 text-[#00c4cc]"
+                                    />
+                                    <span className="text-xs text-gray-600">働いていない場合</span>
+                                  </label>
+                                  {dependent.notWorking && (
+                                    <select
+                                      value={dependent.notWorkingReason}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].notWorkingReason = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    >
+                                      <option value="">選択してください</option>
+                                      <option value="preschooler">未就学児</option>
+                                      <option value="elementary">小学生</option>
+                                      <option value="junior_high">中学生</option>
+                                      <option value="high_school">高校生</option>
+                                      <option value="university">大学生</option>
+                                      <option value="other">その他</option>
+                                    </select>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">マイナンバー</label>
+                                  <input
+                                    type="text"
+                                    value={dependent.myNumber}
+                                    onChange={(e) => {
+                                      const updated = [...manualFormData.dependents];
+                                      updated[index].myNumber = e.target.value.replace(/\D/g, '').slice(0, 12);
+                                      setManualFormData({ ...manualFormData, dependents: updated });
+                                    }}
+                                    maxLength={12}
+                                    placeholder="12桁"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                  />
+                                </div>
+                                {index > 0 && (
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">別居の場合は住所を明記</label>
+                                    <input
+                                      type="text"
+                                      value={dependent.separateAddress || ''}
+                                      onChange={(e) => {
+                                        const updated = [...manualFormData.dependents];
+                                        updated[index].separateAddress = e.target.value;
+                                        setManualFormData({ ...manualFormData, dependents: updated });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -715,19 +1253,17 @@ const StaffManagementView: React.FC = () => {
                       </div>
                     )}
 
-                    {/* 職歴・学歴 */}
+                    {/* 職歴 */}
                     <div className="mb-4">
                       <label className="block text-sm font-bold text-gray-700 mb-2">
-                        職歴・学歴
+                        職歴（実務経験）
                       </label>
                       <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {manualFormData.workHistory.map((history, index) => (
-                          <div key={history.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                        {manualFormData.experienceRecords.map((record, index) => (
+                          <div key={record.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-gray-700">
-                                  {history.type === 'employment' ? '職歴' : '学歴'}
-                                </span>
+                                <span className="text-xs font-bold text-gray-700">職歴</span>
                                 <span className="text-xs text-gray-500">#{index + 1}</span>
                               </div>
                               <button
@@ -735,7 +1271,7 @@ const StaffManagementView: React.FC = () => {
                                 onClick={() => {
                                   setManualFormData({
                                     ...manualFormData,
-                                    workHistory: manualFormData.workHistory.filter(h => h.id !== history.id),
+                                    experienceRecords: manualFormData.experienceRecords.filter(r => r.id !== record.id),
                                   });
                                 }}
                                 className="text-red-500 hover:text-red-700"
@@ -745,123 +1281,166 @@ const StaffManagementView: React.FC = () => {
                             </div>
                             <input
                               type="text"
-                              value={history.organization}
+                              value={record.facilityName}
                               onChange={(e) => {
                                 setManualFormData({
                                   ...manualFormData,
-                                  workHistory: manualFormData.workHistory.map(h =>
-                                    h.id === history.id ? { ...h, organization: e.target.value } : h
+                                  experienceRecords: manualFormData.experienceRecords.map(r =>
+                                    r.id === record.id ? { ...r, facilityName: e.target.value } : r
                                   ),
                                 });
                               }}
                               className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
-                              placeholder={history.type === 'employment' ? '事業所名' : '学校名'}
+                              placeholder="事業所名"
                             />
-                            {history.type === 'employment' && (
-                              <input
-                                type="text"
-                                value={history.position || ''}
-                                onChange={(e) => {
-                                  setManualFormData({
-                                    ...manualFormData,
-                                    workHistory: manualFormData.workHistory.map(h =>
-                                      h.id === history.id ? { ...h, position: e.target.value } : h
-                                    ),
-                                  });
-                                }}
-                                className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
-                                placeholder="役職・職種"
-                              />
-                            )}
                             <div className="grid grid-cols-2 gap-2">
                               <input
-                                type="month"
-                                value={history.startDate}
+                                type="date"
+                                value={record.startDate}
                                 onChange={(e) => {
                                   setManualFormData({
                                     ...manualFormData,
-                                    workHistory: manualFormData.workHistory.map(h =>
-                                      h.id === history.id ? { ...h, startDate: e.target.value } : h
+                                    experienceRecords: manualFormData.experienceRecords.map(r =>
+                                      r.id === record.id ? { ...r, startDate: e.target.value } : r
                                     ),
                                   });
                                 }}
                                 className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
-                                placeholder="開始年月"
+                                placeholder="開始日"
                               />
                               <input
-                                type="month"
-                                value={history.endDate}
+                                type="date"
+                                value={record.endDate || ''}
                                 onChange={(e) => {
                                   setManualFormData({
                                     ...manualFormData,
-                                    workHistory: manualFormData.workHistory.map(h =>
-                                      h.id === history.id ? { ...h, endDate: e.target.value } : h
+                                    experienceRecords: manualFormData.experienceRecords.map(r =>
+                                      r.id === record.id ? { ...r, endDate: e.target.value } : r
                                     ),
                                   });
                                 }}
                                 className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
-                                placeholder="終了年月"
+                                placeholder="終了日（在籍中は空欄）"
                               />
                             </div>
-                            <textarea
-                              value={history.description}
-                              onChange={(e) => {
-                                setManualFormData({
-                                  ...manualFormData,
-                                  workHistory: manualFormData.workHistory.map(h =>
-                                    h.id === history.id ? { ...h, description: e.target.value } : h
-                                  ),
-                                });
-                              }}
-                              rows={2}
-                              className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
-                              placeholder="詳細・備考"
-                            />
                           </div>
                         ))}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newId = `work_${Date.now()}`;
-                              setManualFormData({
-                                ...manualFormData,
-                                workHistory: [...manualFormData.workHistory, {
-                                  id: newId,
-                                  type: 'employment',
-                                  organization: '',
-                                  position: '',
-                                  startDate: '',
-                                  endDate: '',
-                                  description: '',
-                                }],
-                              });
-                            }}
-                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition-colors"
-                          >
-                            + 職歴を追加
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newId = `edu_${Date.now()}`;
-                              setManualFormData({
-                                ...manualFormData,
-                                workHistory: [...manualFormData.workHistory, {
-                                  id: newId,
-                                  type: 'education',
-                                  organization: '',
-                                  startDate: '',
-                                  endDate: '',
-                                  description: '',
-                                }],
-                              });
-                            }}
-                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition-colors"
-                          >
-                            + 学歴を追加
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualFormData({
+                              ...manualFormData,
+                              experienceRecords: [...manualFormData.experienceRecords, {
+                                id: Date.now().toString(),
+                                facilityName: '',
+                                startDate: '',
+                                endDate: '',
+                              }],
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition-colors"
+                        >
+                          + 職歴を追加
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 学歴 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        学歴
+                      </label>
+                      <div className="space-y-3 max-h-60 overflow-y-auto">
+                        {manualFormData.educationHistory.map((edu, index) => (
+                          <div key={edu.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-700">学歴</span>
+                                <span className="text-xs text-gray-500">#{index + 1}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setManualFormData({
+                                    ...manualFormData,
+                                    educationHistory: manualFormData.educationHistory.filter(e => e.id !== edu.id),
+                                  });
+                                }}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">学校名</label>
+                                <input
+                                  type="text"
+                                  value={edu.schoolName}
+                                  onChange={(e) => {
+                                    setManualFormData({
+                                      ...manualFormData,
+                                      educationHistory: manualFormData.educationHistory.map(item => 
+                                        item.id === edu.id ? { ...item, schoolName: e.target.value } : item
+                                      ),
+                                    });
+                                  }}
+                                  className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">卒業年月</label>
+                                <input
+                                  type="month"
+                                  value={edu.graduationDate}
+                                  onChange={(e) => {
+                                    setManualFormData({
+                                      ...manualFormData,
+                                      educationHistory: manualFormData.educationHistory.map(item => 
+                                        item.id === edu.id ? { ...item, graduationDate: e.target.value } : item
+                                      ),
+                                    });
+                                  }}
+                                  className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">学位・資格</label>
+                                <input
+                                  type="text"
+                                  value={edu.degree}
+                                  onChange={(e) => {
+                                    setManualFormData({
+                                      ...manualFormData,
+                                      educationHistory: manualFormData.educationHistory.map(item => 
+                                        item.id === edu.id ? { ...item, degree: e.target.value } : item
+                                      ),
+                                    });
+                                  }}
+                                  placeholder="例：高等学校卒業"
+                                  className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualFormData({
+                              ...manualFormData,
+                              educationHistory: [...manualFormData.educationHistory, {
+                                id: Date.now().toString(),
+                                schoolName: '',
+                                graduationDate: '',
+                                degree: '',
+                              }],
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition-colors"
+                        >
+                          + 学歴を追加
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -920,14 +1499,28 @@ const StaffManagementView: React.FC = () => {
                           phone: '',
                           birthDate: '',
                           gender: '',
+                          address: '',
+                          postalCode: '',
+                          myNumber: '',
+                          hasSpouse: false,
+                          spouseName: '',
+                          basicPensionSymbol: '',
+                          basicPensionNumber: '',
+                          employmentInsuranceStatus: 'joined',
+                          employmentInsuranceNumber: '',
+                          previousRetirementDate: '',
+                          previousName: '',
+                          socialInsuranceStatus: 'joined',
+                          hasDependents: false,
+                          dependentCount: 0,
+                          dependents: [],
+                          qualifications: [],
+                          qualificationCertificates: [],
+                          experienceRecords: [],
+                          educationHistory: [],
                           role: '一般スタッフ',
                           employmentType: '常勤',
                           startDate: new Date().toISOString().split('T')[0],
-                          postalCode: '',
-                          address: '',
-                          qualifications: [],
-                          qualificationCertificates: [],
-                          workHistory: [],
                           monthlySalary: undefined,
                           hourlyWage: undefined,
                           facilityRole: '',
@@ -998,9 +1591,26 @@ const StaffManagementView: React.FC = () => {
                               hourly_wage: manualFormData.hourlyWage || null,
                               // 追加情報をJSONBとして保存（memoフィールドに一時的に保存、後で専用フィールドを追加）
                               memo: JSON.stringify({
+                                // 基本プロフィール
                                 postalCode: manualFormData.postalCode,
+                                myNumber: manualFormData.myNumber,
+                                hasSpouse: manualFormData.hasSpouse,
+                                spouseName: manualFormData.spouseName,
+                                basicPensionSymbol: manualFormData.basicPensionSymbol,
+                                basicPensionNumber: manualFormData.basicPensionNumber,
+                                employmentInsuranceStatus: manualFormData.employmentInsuranceStatus,
+                                employmentInsuranceNumber: manualFormData.employmentInsuranceNumber,
+                                previousRetirementDate: manualFormData.previousRetirementDate,
+                                previousName: manualFormData.previousName,
+                                socialInsuranceStatus: manualFormData.socialInsuranceStatus,
+                                hasDependents: manualFormData.hasDependents,
+                                dependentCount: manualFormData.dependentCount,
+                                dependents: manualFormData.dependents,
+                                // 資格・職歴・学歴
                                 qualificationCertificates: uploadedCertificates,
-                                workHistory: manualFormData.workHistory,
+                                experienceRecords: manualFormData.experienceRecords,
+                                educationHistory: manualFormData.educationHistory,
+                                // 事業所固有情報
                                 facilityRole: manualFormData.facilityRole,
                               }),
                               user_id: null, // シャドウアカウント
@@ -1025,14 +1635,28 @@ const StaffManagementView: React.FC = () => {
                             phone: '',
                             birthDate: '',
                             gender: '',
+                            address: '',
+                            postalCode: '',
+                            myNumber: '',
+                            hasSpouse: false,
+                            spouseName: '',
+                            basicPensionSymbol: '',
+                            basicPensionNumber: '',
+                            employmentInsuranceStatus: 'joined',
+                            employmentInsuranceNumber: '',
+                            previousRetirementDate: '',
+                            previousName: '',
+                            socialInsuranceStatus: 'joined',
+                            hasDependents: false,
+                            dependentCount: 0,
+                            dependents: [],
+                            qualifications: [],
+                            qualificationCertificates: [],
+                            experienceRecords: [],
+                            educationHistory: [],
                             role: '一般スタッフ',
                             employmentType: '常勤',
                             startDate: new Date().toISOString().split('T')[0],
-                            postalCode: '',
-                            address: '',
-                            qualifications: [],
-                            qualificationCertificates: [],
-                            workHistory: [],
                             monthlySalary: undefined,
                             hourlyWage: undefined,
                             facilityRole: '',
@@ -1355,10 +1979,7 @@ const StaffManagementView: React.FC = () => {
                       </h4>
                       {!selectedStaff.user_id && (
                         <button
-                          onClick={() => {
-                            setEditingStaffData(selectedStaff);
-                            setIsEditModalOpen(true);
-                          }}
+                          onClick={() => handleOpenEdit(selectedStaff)}
                           className="px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-xs font-bold transition-colors"
                         >
                           編集
@@ -1701,8 +2322,23 @@ const StaffManagementView: React.FC = () => {
                   代理登録アカウントの情報を編集できます。スタッフ本人がアカウントを作成すると、この情報は本人の管理下に移ります。
                 </p>
               </div>
-              {/* TODO: 編集フォームを実装（代理登録フォームと同じ構造） */}
-              <p className="text-gray-600 text-sm">編集フォームは今後実装予定です。</p>
+              <div className="space-y-4">
+                <p className="text-gray-600 text-sm">
+                  編集フォームは代理登録フォームと同じ構造で実装予定です。
+                  現在は、スタッフ詳細画面から「編集」ボタンをクリックして編集できます。
+                </p>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setEditingStaffData(null);
+                    }}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
