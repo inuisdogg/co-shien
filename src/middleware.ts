@@ -16,11 +16,36 @@ export function middleware(req: NextRequest) {
 
   // もしURLに ?debug=true をつけたら、今認識しているホスト名を画面に出して止める
   if (url.searchParams.get('debug') === 'true') {
+    // 判定結果も含める
+    let debugTargetPath = null;
+    if (hostname === 'biz.co-shien.inu.co.jp' || hostname.startsWith('biz.co-shien.inu.co.jp:')) {
+      debugTargetPath = '/biz';
+    } else if (hostname === 'my.co-shien.inu.co.jp' || hostname.startsWith('my.co-shien.inu.co.jp:')) {
+      debugTargetPath = '/personal';
+    } else if (hostname.includes('biz.co-shien')) {
+      debugTargetPath = '/biz';
+    } else if (hostname.includes('my.co-shien')) {
+      debugTargetPath = '/personal';
+    } else if (hostname.startsWith('biz.')) {
+      debugTargetPath = '/biz';
+    } else if (hostname.startsWith('my.')) {
+      debugTargetPath = '/personal';
+    }
+    
     return NextResponse.json({ 
       detected_hostname: hostname,
       pathname: pathname,
       full_url: url.toString(),
-      headers: Object.fromEntries(req.headers.entries())
+      detected_target_path: debugTargetPath,
+      headers: Object.fromEntries(req.headers.entries()),
+      analysis: {
+        includes_biz_co_shien: hostname.includes('biz.co-shien'),
+        includes_my_co_shien: hostname.includes('my.co-shien'),
+        starts_with_biz: hostname.startsWith('biz.'),
+        starts_with_my: hostname.startsWith('my.'),
+        exact_biz: hostname === 'biz.co-shien.inu.co.jp',
+        exact_my: hostname === 'my.co-shien.inu.co.jp',
+      }
     });
   }
 
@@ -36,19 +61,39 @@ export function middleware(req: NextRequest) {
   }
 
   // サブドメイン判定（複数のパターンを試す）
+  // 重要: より具体的なパターンから順に判定する
   let targetPath = null;
   
-  // パターン1: biz.co-shien.inu.co.jp または biz.co-shien.netlify.app
-  if (hostname.includes('biz.co-shien') || hostname.startsWith('biz.')) {
+  // パターン1: 完全一致（最優先）
+  if (hostname === 'biz.co-shien.inu.co.jp' || hostname.startsWith('biz.co-shien.inu.co.jp:')) {
     targetPath = '/biz';
-    console.log("✓ Detected BIZ subdomain");
+    console.log("✓ Detected BIZ subdomain (exact match)");
   }
-  // パターン2: my.co-shien.inu.co.jp または my.co-shien.netlify.app
-  else if (hostname.includes('my.co-shien') || hostname.startsWith('my.')) {
+  else if (hostname === 'my.co-shien.inu.co.jp' || hostname.startsWith('my.co-shien.inu.co.jp:')) {
     targetPath = '/personal';
-    console.log("✓ Detected PERSONAL subdomain");
+    console.log("✓ Detected PERSONAL subdomain (exact match)");
   }
-  // パターン3: Netlifyのサブドメイン（biz-xxx.netlify.app など）
+  // パターン2: 部分一致（biz.co-shien を含む）
+  else if (hostname.includes('biz.co-shien')) {
+    targetPath = '/biz';
+    console.log("✓ Detected BIZ subdomain (contains 'biz.co-shien')");
+  }
+  // パターン3: 部分一致（my.co-shien を含む）- biz.co-shienより後にチェック
+  else if (hostname.includes('my.co-shien')) {
+    targetPath = '/personal';
+    console.log("✓ Detected PERSONAL subdomain (contains 'my.co-shien')");
+  }
+  // パターン4: 先頭が'biz.'で始まる
+  else if (hostname.startsWith('biz.')) {
+    targetPath = '/biz';
+    console.log("✓ Detected BIZ subdomain (starts with 'biz.')");
+  }
+  // パターン5: 先頭が'my.'で始まる
+  else if (hostname.startsWith('my.')) {
+    targetPath = '/personal';
+    console.log("✓ Detected PERSONAL subdomain (starts with 'my.')");
+  }
+  // パターン6: Netlifyのサブドメイン（biz-xxx.netlify.app など）
   else if (hostname.includes('.netlify.app')) {
     const subdomain = hostname.split('.')[0];
     if (subdomain.includes('biz')) {
@@ -59,7 +104,7 @@ export function middleware(req: NextRequest) {
       console.log("✓ Detected PERSONAL (Netlify subdomain)");
     }
   }
-  // パターン4: ローカル開発（biz.localhost:3000 など）
+  // パターン7: ローカル開発（biz.localhost:3000 など）
   else if (hostname.includes('localhost')) {
     const parts = hostname.split('.');
     if (parts[0] === 'biz') {
