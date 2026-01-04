@@ -315,6 +315,27 @@ const StaffManagementView: React.FC = () => {
       // memoがJSONでない場合は無視
     }
 
+    // employment_recordsからstartDateを取得
+    let startDate = new Date().toISOString().split('T')[0]; // デフォルト値：今日の日付
+    if (staff.user_id && facility?.id) {
+      try {
+        const { data: employmentRecord } = await supabase
+          .from('employment_records')
+          .select('start_date')
+          .eq('user_id', staff.user_id)
+          .eq('facility_id', facility.id)
+          .is('end_date', null)
+          .single();
+        
+        if (employmentRecord?.start_date) {
+          startDate = employmentRecord.start_date;
+        }
+      } catch (error) {
+        console.error('雇用記録取得エラー:', error);
+        // エラーが発生した場合はデフォルト値を使用
+      }
+    }
+
     // 編集用のデータを設定
     const editData = {
       ...staff,
@@ -333,6 +354,9 @@ const StaffManagementView: React.FC = () => {
       hourlyWage: staff.hourlyWage || undefined,
       facilityRole: careerData?.facilityRole || '',
       facilityRoles: careerData?.facilityRoles || (careerData?.facilityRole ? careerData.facilityRole.split(',').map((r: string) => r.trim()) : []),
+      // employmentTypeとstartDateを追加
+      employmentType: staff.type || '常勤',
+      startDate: startDate,
     };
     setEditingStaffData(staff);
     setEditFormData(editData);
