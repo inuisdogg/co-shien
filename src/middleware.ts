@@ -48,16 +48,10 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Matcher: 静的ファイルとAPIルートを除外
+// Matcherを削除：すべてのパスをMiddleware関数に渡し、関数内で確実に除外する
+// これにより、ガードレールが確実に機能する
 export const config = {
   matcher: [
-    /*
-     * 以下のパスは除外（Middleware関数に渡されない）
-     * - /_next/... : Next.jsの静的ファイル（全て）
-     * - /api/... : APIルート
-     * - /favicon.ico : ファビコン
-     * - 拡張子付きファイル: 静的アセット
-     */
-    '/((?!_next|api|favicon\\.ico|.*\\.[^/]+$).*)',
+    '/(.*)',
   ],
 };
