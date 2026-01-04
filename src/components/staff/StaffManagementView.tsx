@@ -16,6 +16,60 @@ import { getPersonalBaseUrl } from '@/utils/domain';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
+// 型定義
+type QualificationCertificate = {
+  qualification: string;
+  file: File | null;
+  url: string;
+};
+
+type ExperienceRecord = {
+  id: string;
+  facilityName: string;
+  startDate: string;
+  endDate?: string;
+};
+
+type EducationHistory = {
+  id: string;
+  schoolName: string;
+  graduationDate: string;
+  degree: string;
+};
+
+type Dependent = {
+  id: string;
+  name: string;
+  furigana: string;
+  relationship: string;
+  birthDate: string;
+  gender: 'male' | 'female';
+  occupation: string;
+  annualIncome: string;
+  notWorking: boolean;
+  notWorkingReason: string;
+  myNumber: string;
+  separateAddress?: string;
+};
+
+type AttendanceRecord = {
+  id: string;
+  user_id: string;
+  facility_id: string;
+  date: string;
+  type: 'start' | 'end' | 'break_start' | 'break_end' | 'manual';
+  time?: string;
+  created_at: string;
+};
+
+type CareerData = {
+  qualificationCertificates?: QualificationCertificate[];
+  experienceRecords?: ExperienceRecord[];
+  educationHistory?: EducationHistory[];
+  facilityRole?: string;
+  [key: string]: unknown;
+};
+
 // 資格リスト（activate/page.tsxから）
 const QUALIFICATIONS = [
   '資格無し',
@@ -43,13 +97,45 @@ const StaffManagementView: React.FC = () => {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [attendanceMonth, setAttendanceMonth] = useState(new Date());
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [publicInviteLink, setPublicInviteLink] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingStaffData, setEditingStaffData] = useState<any>(null);
-  const [editFormData, setEditFormData] = useState<any>(null);
+  const [editingStaffData, setEditingStaffData] = useState<Staff | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    nameKana: string;
+    email: string;
+    phone: string;
+    birthDate: string;
+    gender: '男性' | '女性' | 'その他' | '';
+    address: string;
+    postalCode: string;
+    myNumber: string;
+    hasSpouse: boolean;
+    spouseName: string;
+    basicPensionSymbol: string;
+    basicPensionNumber: string;
+    employmentInsuranceStatus: 'joined' | 'not_joined' | 'first_time';
+    employmentInsuranceNumber: string;
+    previousRetirementDate: string;
+    previousName: string;
+    socialInsuranceStatus: 'joined' | 'not_joined';
+    hasDependents: boolean;
+    dependentCount: number;
+    dependents: Dependent[];
+    qualifications: string[];
+    qualificationCertificates: QualificationCertificate[];
+    experienceRecords: ExperienceRecord[];
+    educationHistory: EducationHistory[];
+    role: '一般スタッフ' | 'マネージャー' | '管理者';
+    employmentType: '常勤' | '非常勤';
+    startDate: string;
+    monthlySalary?: number;
+    hourlyWage?: number;
+    facilityRole: string;
+  } | null>(null);
   
   // 手動登録フォーム用の状態（パーソナルキャリアタブの全項目を含む）
   const [manualFormData, setManualFormData] = useState({
@@ -220,7 +306,7 @@ const StaffManagementView: React.FC = () => {
     }
 
     // memoフィールドからJSONデータを取得
-    let careerData: any = null;
+    let careerData: CareerData | null = null;
     try {
       if (staff.memo && typeof staff.memo === 'string') {
         careerData = JSON.parse(staff.memo);
@@ -236,7 +322,7 @@ const StaffManagementView: React.FC = () => {
       // フォームデータに変換
       nameKana: staff.nameKana || '',
       qualifications: staff.qualifications ? staff.qualifications.split(',') : [],
-      qualificationCertificates: (careerData?.qualificationCertificates || []).map((c: any) => ({
+      qualificationCertificates: (careerData?.qualificationCertificates || []).map((c: QualificationCertificate) => ({
         qualification: c.qualification,
         file: null,
         url: c.url || '',
@@ -1837,7 +1923,7 @@ const StaffManagementView: React.FC = () => {
               )}
 
               {(() => {
-                let careerData: any = null;
+                let careerData: CareerData | null = null;
                 try {
                   if (selectedStaff.memo && typeof selectedStaff.memo === 'string') {
                     careerData = JSON.parse(selectedStaff.memo);
@@ -2105,11 +2191,11 @@ const StaffManagementView: React.FC = () => {
                 const year = attendanceMonth.getFullYear();
                 const month = attendanceMonth.getMonth();
                 const records = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-                const staffRecords = records.filter((r: any) => 
+                const staffRecords = records.filter((r: AttendanceRecord) => 
                   r.user_id === selectedStaff.user_id && 
                   r.facility_id === facility?.id
                 );
-                const monthRecords = staffRecords.filter((r: any) => {
+                const monthRecords = staffRecords.filter((r: AttendanceRecord) => {
                   const recordDate = new Date(r.date);
                   return recordDate.getFullYear() === year && recordDate.getMonth() === month;
                 });
@@ -2142,7 +2228,7 @@ const StaffManagementView: React.FC = () => {
                 const dailyWorkTimes: { [key: string]: number } = {};
                 let paidLeaveDays = 0;
 
-                monthRecords.forEach((record: any) => {
+                monthRecords.forEach((record: AttendanceRecord) => {
                   if (record.type === 'manual') {
                     if (record.start_time && record.end_time) {
                       const start = new Date(`${record.date}T${record.start_time}:00`);
@@ -2261,7 +2347,7 @@ const StaffManagementView: React.FC = () => {
                     }
 
                     const records = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-                    const staffRecords = records.filter((r: any) => 
+                    const staffRecords = records.filter((r: AttendanceRecord) => 
                       r.user_id === selectedStaff.user_id && 
                       r.facility_id === facility?.id
                     );
@@ -2288,9 +2374,9 @@ const StaffManagementView: React.FC = () => {
                       const isJapaneseHolidayDay = japaneseHolidays.includes(dateStr) || isJapaneseHoliday(dateStr);
                       const isHoliday = dayOfWeek === 0 || isRegularHoliday || isCustomHoliday || isJapaneseHolidayDay;
                       
-                      const dayRecords = staffRecords.filter((r: any) => r.date === dateStr);
-                      const startRecord = dayRecords.find((r: any) => r.type === 'start' || r.type === 'manual');
-                      const endRecord = dayRecords.find((r: any) => r.type === 'end' || r.type === 'manual');
+                      const dayRecords = staffRecords.filter((r: AttendanceRecord) => r.date === dateStr);
+                      const startRecord = dayRecords.find((r: AttendanceRecord) => r.type === 'start' || r.type === 'manual');
+                      const endRecord = dayRecords.find((r: AttendanceRecord) => r.type === 'end' || r.type === 'manual');
                       const hasAttendance = startRecord && endRecord;
                       
                       // 勤務時間を計算
@@ -2952,7 +3038,7 @@ const StaffManagementView: React.FC = () => {
                               />
                               <span className="ml-2 text-sm text-gray-600">人</span>
                             </div>
-                            {(editFormData.dependents || []).map((dependent: any, index: number) => (
+                            {(editFormData.dependents || []).map((dependent: Dependent, index: number) => (
                               <div key={dependent.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
                                 <h5 className="text-sm font-bold text-gray-700">扶養家族 {index + 1}</h5>
                                 <div className="grid grid-cols-2 gap-3">
@@ -3162,8 +3248,8 @@ const StaffManagementView: React.FC = () => {
                                 if (isSelected) {
                                   setEditFormData({
                                     ...editFormData,
-                                    qualifications: currentQuals.filter(q => q !== '資格無し'),
-                                    qualificationCertificates: (editFormData.qualificationCertificates || []).filter((c: any) => c.qualification !== '資格無し'),
+                                    qualifications: currentQuals.filter((q: string) => q !== '資格無し'),
+                                    qualificationCertificates: (editFormData.qualificationCertificates || []).filter((c: QualificationCertificate) => c.qualification !== '資格無し'),
                                   });
                                 } else {
                                   setEditFormData({
@@ -3174,12 +3260,12 @@ const StaffManagementView: React.FC = () => {
                                 }
                               } else {
                                 const newQualifications = isSelected
-                                  ? currentQuals.filter(q => q !== qual)
-                                  : [...currentQuals.filter(q => q !== '資格無し'), qual];
+                                  ? currentQuals.filter((q: string) => q !== qual)
+                                  : [...currentQuals.filter((q: string) => q !== '資格無し'), qual];
                                 const currentCerts = editFormData.qualificationCertificates || [];
                                 const newCertificates = isSelected
-                                  ? currentCerts.filter((c: any) => c.qualification !== qual)
-                                  : [...currentCerts.filter((c: any) => c.qualification !== '資格無し'), { qualification: qual, file: null, url: '' }];
+                                  ? currentCerts.filter((c: QualificationCertificate) => c.qualification !== qual)
+                                  : [...currentCerts.filter((c: QualificationCertificate) => c.qualification !== '資格無し'), { qualification: qual, file: null, url: '' }];
                                 setEditFormData({
                                   ...editFormData,
                                   qualifications: newQualifications,
@@ -3207,7 +3293,7 @@ const StaffManagementView: React.FC = () => {
                         </label>
                         <div className="space-y-2">
                           {(editFormData.qualifications || []).filter((q: string) => q !== '資格無し').map((qual: string) => {
-                            const cert = (editFormData.qualificationCertificates || []).find((c: any) => c.qualification === qual);
+                            const cert = (editFormData.qualificationCertificates || []).find((c: QualificationCertificate) => c.qualification === qual);
                             return (
                               <div key={qual} className="border border-gray-200 rounded-md p-3">
                                 <div className="flex items-center justify-between mb-2">
@@ -3218,7 +3304,7 @@ const StaffManagementView: React.FC = () => {
                                       onClick={() => {
                                         setEditFormData({
                                           ...editFormData,
-                                          qualificationCertificates: (editFormData.qualificationCertificates || []).map((c: any) =>
+                                          qualificationCertificates: (editFormData.qualificationCertificates || []).map((c: QualificationCertificate) =>
                                             c.qualification === qual ? { ...c, file: null, url: '' } : c
                                           ),
                                         });
@@ -3250,7 +3336,7 @@ const StaffManagementView: React.FC = () => {
                                           reader.onloadend = () => {
                                             setEditFormData({
                                               ...editFormData,
-                                              qualificationCertificates: (editFormData.qualificationCertificates || []).map((c: any) =>
+                                              qualificationCertificates: (editFormData.qualificationCertificates || []).map((c: QualificationCertificate) =>
                                                 c.qualification === qual ? { ...c, file, url: reader.result as string } : c
                                               ),
                                             });
@@ -3274,7 +3360,7 @@ const StaffManagementView: React.FC = () => {
                         職歴（実務経験）
                       </label>
                       <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {(editFormData.experienceRecords || []).map((record: any, index: number) => (
+                        {(editFormData.experienceRecords || []).map((record: ExperienceRecord, index: number) => (
                           <div key={record.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -3286,7 +3372,7 @@ const StaffManagementView: React.FC = () => {
                                 onClick={() => {
                                   setEditFormData({
                                     ...editFormData,
-                                    experienceRecords: (editFormData.experienceRecords || []).filter((r: any) => r.id !== record.id),
+                                    experienceRecords: (editFormData.experienceRecords || []).filter((r: ExperienceRecord) => r.id !== record.id),
                                   });
                                 }}
                                 className="text-red-500 hover:text-red-700"
@@ -3300,7 +3386,7 @@ const StaffManagementView: React.FC = () => {
                               onChange={(e) => {
                                 setEditFormData({
                                   ...editFormData,
-                                  experienceRecords: (editFormData.experienceRecords || []).map((r: any) =>
+                                  experienceRecords: (editFormData.experienceRecords || []).map((r: ExperienceRecord) =>
                                     r.id === record.id ? { ...r, facilityName: e.target.value } : r
                                   ),
                                 });
@@ -3315,7 +3401,7 @@ const StaffManagementView: React.FC = () => {
                                 onChange={(e) => {
                                   setEditFormData({
                                     ...editFormData,
-                                    experienceRecords: (editFormData.experienceRecords || []).map((r: any) =>
+                                    experienceRecords: (editFormData.experienceRecords || []).map((r: ExperienceRecord) =>
                                       r.id === record.id ? { ...r, startDate: e.target.value } : r
                                     ),
                                   });
@@ -3329,7 +3415,7 @@ const StaffManagementView: React.FC = () => {
                                 onChange={(e) => {
                                   setEditFormData({
                                     ...editFormData,
-                                    experienceRecords: (editFormData.experienceRecords || []).map((r: any) =>
+                                    experienceRecords: (editFormData.experienceRecords || []).map((r: ExperienceRecord) =>
                                       r.id === record.id ? { ...r, endDate: e.target.value } : r
                                     ),
                                   });
@@ -3366,7 +3452,7 @@ const StaffManagementView: React.FC = () => {
                         学歴
                       </label>
                       <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {(editFormData.educationHistory || []).map((edu: any, index: number) => (
+                        {(editFormData.educationHistory || []).map((edu: EducationHistory, index: number) => (
                           <div key={edu.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -3378,7 +3464,7 @@ const StaffManagementView: React.FC = () => {
                                 onClick={() => {
                                   setEditFormData({
                                     ...editFormData,
-                                    educationHistory: (editFormData.educationHistory || []).filter((e: any) => e.id !== edu.id),
+                                    educationHistory: (editFormData.educationHistory || []).filter((e: EducationHistory) => e.id !== edu.id),
                                   });
                                 }}
                                 className="text-red-500 hover:text-red-700"
@@ -3395,7 +3481,7 @@ const StaffManagementView: React.FC = () => {
                                   onChange={(e) => {
                                     setEditFormData({
                                       ...editFormData,
-                                      educationHistory: (editFormData.educationHistory || []).map((item: any) => 
+                                      educationHistory: (editFormData.educationHistory || []).map((item: EducationHistory) => 
                                         item.id === edu.id ? { ...item, schoolName: e.target.value } : item
                                       ),
                                     });
@@ -3411,7 +3497,7 @@ const StaffManagementView: React.FC = () => {
                                   onChange={(e) => {
                                     setEditFormData({
                                       ...editFormData,
-                                      educationHistory: (editFormData.educationHistory || []).map((item: any) => 
+                                      educationHistory: (editFormData.educationHistory || []).map((item: EducationHistory) => 
                                         item.id === edu.id ? { ...item, graduationDate: e.target.value } : item
                                       ),
                                     });
@@ -3427,7 +3513,7 @@ const StaffManagementView: React.FC = () => {
                                   onChange={(e) => {
                                     setEditFormData({
                                       ...editFormData,
-                                      educationHistory: (editFormData.educationHistory || []).map((item: any) => 
+                                      educationHistory: (editFormData.educationHistory || []).map((item: EducationHistory) => 
                                         item.id === edu.id ? { ...item, degree: e.target.value } : item
                                       ),
                                     });
@@ -3628,7 +3714,7 @@ const StaffManagementView: React.FC = () => {
                           }
 
                           // memoフィールドから既存データを取得
-                          let existingMemo: any = {};
+                          let existingMemo: Record<string, unknown> = {};
                           try {
                             if (editingStaffData.memo && typeof editingStaffData.memo === 'string') {
                               existingMemo = JSON.parse(editingStaffData.memo);
