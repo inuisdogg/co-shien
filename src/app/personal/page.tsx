@@ -153,15 +153,24 @@ export default function PersonalPage() {
         </form>
 
         <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-center text-sm text-gray-600">
-            アカウントをお持ちでない方は{' '}
+          <div className="text-center">
             <button
               onClick={() => router.push('/signup')}
-              className="text-[#00c4cc] hover:underline font-bold"
+              className="w-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 rounded-lg transition-all duration-200 transform hover:scale-105 border-2 border-purple-200 hover:border-purple-300"
             >
-              新規登録
+              <img
+                src="/signup-icon.png"
+                alt="新規登録"
+                className="w-24 h-24 mb-3 object-contain"
+                onError={(e) => {
+                  // 画像が存在しない場合のフォールバック
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <span className="text-lg font-bold text-purple-700">新規登録</span>
+              <span className="text-sm text-purple-600 mt-1">アカウントを作成して始めましょう</span>
             </button>
-          </p>
+          </div>
         </div>
       </div>
     </div>
