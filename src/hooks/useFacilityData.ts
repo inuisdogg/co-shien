@@ -211,41 +211,44 @@ export const useFacilityData = () => {
         const allStaff: Staff[] = [];
         const existingUserIds = new Set<string>();
 
-        // staffテーブルのデータを追加
+        // staffテーブルのデータを追加（user_idがあるもののみ = パーソナルアカウントに紐づいているもの）
         if (staffData) {
-          const staffList: Staff[] = staffData.map((row) => {
-            if (row.user_id) {
-              existingUserIds.add(row.user_id);
-            }
-            return {
-              id: row.id,
-              facilityId: row.facility_id,
-              name: row.name,
-              nameKana: row.name_kana,
-              role: row.role,
-              type: row.type,
-              birthDate: row.birth_date,
-              gender: row.gender,
-              address: row.address,
-              phone: row.phone,
-              email: row.email,
-              qualifications: row.qualifications,
-              yearsOfExperience: row.years_of_experience,
-              qualificationCertificate: row.qualification_certificate,
-              experienceCertificate: row.experience_certificate,
-              emergencyContact: row.emergency_contact,
-              emergencyContactPhone: row.emergency_contact_phone,
-              memo: row.memo,
-              monthlySalary: row.monthly_salary,
-              hourlyWage: row.hourly_wage,
-              user_id: row.user_id,
-              defaultShiftPattern: row.default_shift_pattern && Array.isArray(row.default_shift_pattern) 
-                ? row.default_shift_pattern as boolean[] 
-                : undefined,
-              createdAt: row.created_at,
-              updatedAt: row.updated_at,
-            };
-          });
+          const staffList: Staff[] = staffData
+            .filter((row) => row.user_id) // user_idがあるもののみ
+            .map((row) => {
+              if (row.user_id) {
+                existingUserIds.add(row.user_id);
+              }
+              return {
+                id: row.id,
+                facilityId: row.facility_id,
+                name: row.name,
+                nameKana: row.name_kana,
+                role: row.role as '一般スタッフ' | 'マネージャー' | '管理者',
+                type: row.type as '常勤' | '非常勤',
+                facilityRole: row.role, // 施設での役割として使用
+                birthDate: row.birth_date,
+                gender: row.gender,
+                address: row.address,
+                phone: row.phone,
+                email: row.email,
+                qualifications: row.qualifications,
+                yearsOfExperience: row.years_of_experience,
+                qualificationCertificate: row.qualification_certificate,
+                experienceCertificate: row.experience_certificate,
+                emergencyContact: row.emergency_contact,
+                emergencyContactPhone: row.emergency_contact_phone,
+                memo: row.memo,
+                monthlySalary: row.monthly_salary,
+                hourlyWage: row.hourly_wage,
+                user_id: row.user_id,
+                defaultShiftPattern: row.default_shift_pattern && Array.isArray(row.default_shift_pattern) 
+                  ? row.default_shift_pattern as boolean[] 
+                  : undefined,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at,
+              };
+            });
           allStaff.push(...staffList);
         }
 
@@ -284,8 +287,9 @@ export const useFacilityData = () => {
                     facilityId: emp.facility_id,
                     name: user.name || '',
                     nameKana: '',
-                    role: (emp.role as '一般スタッフ' | 'マネージャー') || '一般スタッフ',
+                    role: (emp.role as '一般スタッフ' | 'マネージャー' | '管理者') || '一般スタッフ',
                     type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as '常勤' | '非常勤',
+                    facilityRole: emp.role || '一般スタッフ', // 施設での役割として使用
                     birthDate: user.birth_date || '',
                     gender: user.gender as '男性' | '女性' | 'その他' | undefined,
                     address: user.address || '',

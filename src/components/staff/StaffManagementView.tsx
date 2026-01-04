@@ -220,7 +220,7 @@ const StaffManagementView: React.FC = () => {
                 <th className="p-3 text-left font-bold text-gray-700">名前</th>
                 <th className="p-3 text-left font-bold text-gray-700">役職</th>
                 <th className="p-3 text-left font-bold text-gray-700">雇用形態</th>
-                <th className="p-3 text-left font-bold text-gray-700">連絡先</th>
+                <th className="p-3 text-left font-bold text-gray-700">施設での役割</th>
                 <th className="p-3 text-center font-bold text-gray-700">操作</th>
               </tr>
             </thead>
@@ -231,7 +231,7 @@ const StaffManagementView: React.FC = () => {
                   <td className="p-3 text-gray-600">{s.role}</td>
                   <td className="p-3 text-gray-600">{s.type}</td>
                   <td className="p-3 text-gray-600">
-                    {s.email || s.phone || '-'}
+                    {s.facilityRole || s.role || '-'}
                   </td>
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-2">

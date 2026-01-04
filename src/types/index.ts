@@ -238,8 +238,9 @@ export type Staff = {
   facilityId: string; // 施設ID（マルチテナント対応）
   name: string;
   nameKana?: string; // フリガナ
-  role: '一般スタッフ' | 'マネージャー';
+  role: '一般スタッフ' | 'マネージャー' | '管理者';
   type: '常勤' | '非常勤';
+  facilityRole?: string; // 施設での役割（児童発達管理責任者、指導員など）
   user_id?: string; // ユーザーアカウントID（usersテーブルへの参照）
   // 基本情報
   birthDate?: string; // 生年月日 (YYYY-MM-DD)
