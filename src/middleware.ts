@@ -4,56 +4,87 @@ import type { NextRequest } from 'next/server';
 export function middleware(req: NextRequest) {
   const hostname = req.headers.get('host') || '';
   const url = req.nextUrl;
+  const pathname = url.pathname;
   
   // デバッグ用：どのホスト名でアクセスされたかをログに出す
   // Netlifyのログ（Functionsタブ）で確認できます
+  console.log("=== Middleware Debug ===");
   console.log("Current Hostname:", hostname);
-  console.log("Pathname:", url.pathname);
+  console.log("Pathname:", pathname);
+  console.log("Full URL:", url.toString());
+  console.log("Headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
 
   // もしURLに ?debug=true をつけたら、今認識しているホスト名を画面に出して止める
   if (url.searchParams.get('debug') === 'true') {
     return NextResponse.json({ 
       detected_hostname: hostname,
-      pathname: url.pathname,
-      full_url: url.toString()
+      pathname: pathname,
+      full_url: url.toString(),
+      headers: Object.fromEntries(req.headers.entries())
     });
   }
 
   // 静的ファイルとNext.js内部ファイルはスキップ
   if (
-    url.pathname.startsWith('/_next') ||
-    url.pathname.startsWith('/api') ||
-    url.pathname.startsWith('/static') ||
-    url.pathname.includes('.') || // ファイル拡張子が含まれる場合
-    url.pathname === '/favicon.ico'
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/static') ||
+    pathname.includes('.') || // ファイル拡張子が含まれる場合
+    pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
   }
 
-  // シンプルな判定：hostnameが'biz.'で始まるか、'my.'で始まるか
-  if (hostname.startsWith('biz.')) {
-    console.log("Rewriting to /biz", url.pathname);
-    return NextResponse.rewrite(new URL(`/biz${url.pathname}`, req.url));
-  }
+  // サブドメイン判定（複数のパターンを試す）
+  let targetPath = null;
   
-  if (hostname.startsWith('my.')) {
-    console.log("Rewriting to /personal", url.pathname);
-    return NextResponse.rewrite(new URL(`/personal${url.pathname}`, req.url));
+  // パターン1: biz.co-shien.inu.co.jp または biz.co-shien.netlify.app
+  if (hostname.includes('biz.co-shien') || hostname.startsWith('biz.')) {
+    targetPath = '/biz';
+    console.log("✓ Detected BIZ subdomain");
+  }
+  // パターン2: my.co-shien.inu.co.jp または my.co-shien.netlify.app
+  else if (hostname.includes('my.co-shien') || hostname.startsWith('my.')) {
+    targetPath = '/personal';
+    console.log("✓ Detected PERSONAL subdomain");
+  }
+  // パターン3: Netlifyのサブドメイン（biz-xxx.netlify.app など）
+  else if (hostname.includes('.netlify.app')) {
+    const subdomain = hostname.split('.')[0];
+    if (subdomain.includes('biz')) {
+      targetPath = '/biz';
+      console.log("✓ Detected BIZ (Netlify subdomain)");
+    } else if (subdomain.includes('my') || subdomain.includes('personal')) {
+      targetPath = '/personal';
+      console.log("✓ Detected PERSONAL (Netlify subdomain)");
+    }
+  }
+  // パターン4: ローカル開発（biz.localhost:3000 など）
+  else if (hostname.includes('localhost')) {
+    const parts = hostname.split('.');
+    if (parts[0] === 'biz') {
+      targetPath = '/biz';
+      console.log("✓ Detected BIZ (localhost)");
+    } else if (parts[0] === 'my') {
+      targetPath = '/personal';
+      console.log("✓ Detected PERSONAL (localhost)");
+    }
   }
 
-  // より詳細な判定（フォールバック）
-  if (hostname.includes('biz.co-shien')) {
-    console.log("Rewriting to /biz (fallback)", url.pathname);
-    return NextResponse.rewrite(new URL(`/biz${url.pathname}`, req.url));
-  }
-  
-  if (hostname.includes('my.co-shien')) {
-    console.log("Rewriting to /personal (fallback)", url.pathname);
-    return NextResponse.rewrite(new URL(`/personal${url.pathname}`, req.url));
+  // rewriteを実行
+  if (targetPath) {
+    // パス名がルート（/）の場合はそのまま、それ以外は結合
+    const rewritePath = pathname === '/' ? targetPath : `${targetPath}${pathname}`;
+    const rewriteUrl = new URL(rewritePath, req.url);
+    
+    console.log(`→ Rewriting: ${pathname} → ${rewritePath}`);
+    console.log(`→ Rewrite URL: ${rewriteUrl.toString()}`);
+    
+    return NextResponse.rewrite(rewriteUrl);
   }
 
   // それ以外は通常通り
-  console.log("No rewrite, passing through");
+  console.log("→ No rewrite, passing through");
   return NextResponse.next();
 }
 
