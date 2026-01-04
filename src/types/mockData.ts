@@ -21,6 +21,7 @@ export const mockUser: User = {
   name: '管理者 太郎',
   role: 'admin',
   facilityId: 'facility-1',
+  accountStatus: 'active',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 };

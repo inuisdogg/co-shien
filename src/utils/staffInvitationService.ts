@@ -417,7 +417,7 @@ export async function addExistingUserToFacility(
       throw new Error('ユーザーが見つかりません。まず招待リンクからアカウントを作成してください。');
     }
 
-    if (user.account_status !== 'active') {
+    if (user.accountStatus !== 'active') {
       throw new Error('このアカウントはまだ有効化されていません');
     }
 

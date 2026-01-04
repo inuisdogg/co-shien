@@ -68,6 +68,9 @@ export type User = {
   name: string;
   phone?: string;
   loginId?: string; // ログイン用ID
+  role: UserRole; // ユーザーロール
+  facilityId: string; // 施設ID（空文字列の場合は個人アカウント）
+  permissions?: UserPermissions; // 権限設定
   accountStatus: AccountStatus; // アカウントステータス
   invitedByFacilityId?: string; // 招待した事業所ID
   invitedAt?: string; // 招待日時

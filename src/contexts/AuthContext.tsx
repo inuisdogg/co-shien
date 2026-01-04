@@ -106,6 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role: userData.role as UserRole,
           facilityId: userData.facility_id || '',
           permissions: userData.permissions || {},
+          accountStatus: userData.account_status || 'active',
           createdAt: userData.created_at,
           updatedAt: userData.updated_at,
         };
@@ -210,6 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role: userData.role as UserRole,
           facilityId: userData.facility_id,
           permissions: userData.permissions || {},
+          accountStatus: userData.account_status || 'active',
           createdAt: userData.created_at,
           updatedAt: userData.updated_at,
         };
@@ -288,8 +290,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         id: staffData.id,
         email: staffData.email || '',
         name: staffData.name,
+        loginId: staffData.login_id || staffData.name,
         role: isAdmin ? 'admin' : 'staff',
         facilityId: staffData.facility_id,
+        permissions: {},
+        accountStatus: 'active',
         createdAt: staffData.created_at,
         updatedAt: staffData.updated_at,
       };
