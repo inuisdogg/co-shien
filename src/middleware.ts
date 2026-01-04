@@ -12,6 +12,7 @@ export function middleware(req: NextRequest) {
   
   // Next.jsのシステムファイル（/_nextで始まるすべてのパス）
   // /_next/static, /_next/image, /_next/webpack-hmr など全て
+  // これらは常にルートの/_next/...に存在するため、リライトしてはいけない
   if (pathname.startsWith('/_next')) {
     return NextResponse.next();
   }
@@ -42,63 +43,52 @@ export function middleware(req: NextRequest) {
   }
 
   // サブドメインの抽出
-  let currentHost = hostname;
+  let currentHost = hostname.split('.')[0]; // 最初の部分を取得（biz, my, またはその他）
   
-  // .co-shien.inu.co.jp を削除
+  // .co-shien.inu.co.jp の場合、サブドメインを抽出
   if (hostname.includes('.co-shien.inu.co.jp')) {
     currentHost = hostname.replace('.co-shien.inu.co.jp', '').split(':')[0];
   }
-  // .localhost:3000 を削除
+  // .localhost の場合
   else if (hostname.includes('.localhost')) {
-    currentHost = hostname.replace('.localhost:3000', '').replace('.localhost', '');
+    currentHost = hostname.replace('.localhost:3000', '').replace('.localhost', '').split(':')[0];
   }
   // Netlifyの場合
   else if (hostname.includes('.netlify.app')) {
     const subdomain = hostname.split('.')[0];
     currentHost = subdomain.includes('biz') ? 'biz' : (subdomain.includes('my') || subdomain.includes('personal') ? 'my' : '');
   }
-  // その他の場合（ポート番号を削除）
+  // その他の場合
   else {
-    currentHost = hostname.split(':')[0];
+    currentHost = hostname.split(':')[0].split('.')[0];
   }
 
-  // リライト先のパスを決定
-  let rewritePath: string | null = null;
-  
+  // サブドメインに基づいてリライト
   if (currentHost === 'biz') {
-    rewritePath = pathname === '/' ? '/biz' : `/biz${pathname}`;
+    // bizサブドメインの場合、/bizにリライト
+    const rewritePath = pathname === '/' ? '/biz' : `/biz${pathname}`;
+    const rewriteUrl = new URL(rewritePath, req.url);
+    return NextResponse.rewrite(rewriteUrl);
   } else if (currentHost === 'my') {
-    rewritePath = pathname === '/' ? '/personal' : `/personal${pathname}`;
-  }
-
-  // リライトが必要な場合
-  if (rewritePath) {
-    // 【安全性チェック】リライト後のパスが/_nextを含まないことを確認
-    if (rewritePath.includes('/_next')) {
-      return NextResponse.next();
-    }
-    
-    // 【安全性チェック】リライト後のパスが/apiを含まないことを確認
-    if (rewritePath.includes('/api')) {
-      return NextResponse.next();
-    }
-    
+    // myサブドメインの場合、/personalにリライト
+    const rewritePath = pathname === '/' ? '/personal' : `/personal${pathname}`;
     const rewriteUrl = new URL(rewritePath, req.url);
     return NextResponse.rewrite(rewriteUrl);
   }
 
-  // リライトが不要な場合はそのまま通過
+  // サブドメインがない場合（co-shien.inu.co.jpなど）はそのまま通過
   return NextResponse.next();
 }
 
-// Matcherの設定：できるだけ広範囲にマッチさせ、middleware関数内で除外する
-// これにより、middleware関数内のガードレールが確実に機能する
+// Matcherの設定：/_nextで始まるパスは絶対にマッチさせない
 export const config = {
   matcher: [
     /*
-     * 基本的にすべてのパスにマッチするが、
-     * middleware関数内のガードレールで/_next、/api、静的ファイルを除外する
+     * 以下のパスは除外（Middleware関数に渡されない）
+     * - /api/... : APIルート
+     * - /_next/... : Next.jsのシステムファイル（全て）
+     * - 拡張子付きファイル: 静的アセット
      */
-    '/(.*)',
+    '/((?!api/|_next/|.*\\.[a-zA-Z0-9]+$).*)',
   ],
 };
