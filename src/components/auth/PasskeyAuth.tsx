@@ -64,8 +64,13 @@ export const usePasskeyAuth = () => {
         rp: {
           name: 'co-shien',
           id: (() => {
-            const appType = getAppType();
-            return appType === 'biz' ? getBizDomain() : getPersonalDomain();
+            if (typeof window === 'undefined') {
+              return 'biz.co-shien.inu.co.jp'; // サーバーサイドのデフォルト
+            }
+            const appType = window.location.hostname.startsWith('biz.') || window.location.hostname.includes('biz.co-shien')
+              ? 'biz'
+              : 'personal';
+            return appType === 'biz' ? 'biz.co-shien.inu.co.jp' : 'my.co-shien.inu.co.jp';
           })(),
         },
         user: {
