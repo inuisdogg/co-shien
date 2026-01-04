@@ -47,6 +47,7 @@ const StaffManagementView: React.FC = () => {
   const [publicInviteLink, setPublicInviteLink] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStaffData, setEditingStaffData] = useState<any>(null);
+  const [editFormData, setEditFormData] = useState<any>(null);
   
   // 手動登録フォーム用の状態（パーソナルキャリアタブの全項目を含む）
   const [manualFormData, setManualFormData] = useState({
@@ -203,7 +204,7 @@ const StaffManagementView: React.FC = () => {
     }
 
     // 編集用のデータを設定
-    setEditingStaffData({
+    const editData = {
       ...staff,
       ...careerData,
       // フォームデータに変換
@@ -219,7 +220,9 @@ const StaffManagementView: React.FC = () => {
       monthlySalary: staff.monthlySalary || undefined,
       hourlyWage: staff.hourlyWage || undefined,
       facilityRole: careerData?.facilityRole || '',
-    });
+    };
+    setEditingStaffData(staff);
+    setEditFormData(editData);
     setIsEditModalOpen(true);
   };
 
@@ -1988,29 +1991,112 @@ const StaffManagementView: React.FC = () => {
                     </div>
 
                     <div className="space-y-4">
-                      {/* 郵便番号・住所 */}
-                      {(careerData?.postalCode || selectedStaff.address) && (
-                        <div>
-                          <h5 className="text-xs font-bold text-gray-600 mb-2">住所情報</h5>
-                          <div className="space-y-1 text-sm">
-                            {careerData?.postalCode && (
-                              <div>
-                                <span className="text-gray-500">郵便番号:</span>
-                                <span className="ml-2 font-medium text-gray-800">{careerData.postalCode}</span>
-                              </div>
-                            )}
-                            {selectedStaff.address && (
-                              <div>
-                                <span className="text-gray-500">住所:</span>
-                                <span className="ml-2 font-medium text-gray-800">{selectedStaff.address}</span>
-                                {selectedStaff.user_id && (
-                                  <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                      {/* 基本プロフィール */}
+                      <div>
+                        <h5 className="text-xs font-bold text-gray-600 mb-2">基本プロフィール</h5>
+                        <div className="space-y-1 text-sm">
+                          {/* 郵便番号・住所 */}
+                          {careerData?.postalCode && (
+                            <div>
+                              <span className="text-gray-500">郵便番号:</span>
+                              <span className="ml-2 font-medium text-gray-800">{careerData.postalCode}</span>
+                            </div>
+                          )}
+                          {selectedStaff.address && (
+                            <div>
+                              <span className="text-gray-500">住所:</span>
+                              <span className="ml-2 font-medium text-gray-800">{selectedStaff.address}</span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
+                          {/* マイナンバー */}
+                          {careerData?.myNumber && (
+                            <div>
+                              <span className="text-gray-500">マイナンバー:</span>
+                              <span className="ml-2 font-medium text-gray-800">
+                                {careerData.myNumber ? '***-****-' + careerData.myNumber.slice(-4) : '未登録'}
+                              </span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
+                          {/* 配偶者 */}
+                          {careerData?.hasSpouse !== undefined && (
+                            <div>
+                              <span className="text-gray-500">配偶者:</span>
+                              <span className="ml-2 font-medium text-gray-800">
+                                {careerData.hasSpouse ? (careerData.spouseName || '氏名未入力') : '無'}
+                              </span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
+                          {/* 基礎年金番号 */}
+                          {careerData?.basicPensionSymbol && careerData?.basicPensionNumber && (
+                            <div>
+                              <span className="text-gray-500">基礎年金番号:</span>
+                              <span className="ml-2 font-medium text-gray-800">
+                                {careerData.basicPensionSymbol}-{careerData.basicPensionNumber}
+                              </span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
+                          {/* 雇用保険 */}
+                          {careerData?.employmentInsuranceStatus && (
+                            <div>
+                              <span className="text-gray-500">雇用保険:</span>
+                              <span className="ml-2 font-medium text-gray-800">
+                                {careerData.employmentInsuranceStatus === 'joined' ? '加入' :
+                                 careerData.employmentInsuranceStatus === 'not_joined' ? '非加入' :
+                                 careerData.employmentInsuranceStatus === 'first_time' ? '初めて加入' : '未登録'}
+                              </span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
+                          {careerData?.employmentInsuranceStatus === 'joined' && careerData?.employmentInsuranceNumber && (
+                            <div>
+                              <span className="text-gray-500">雇用保険番号:</span>
+                              <span className="ml-2 font-medium text-gray-800">{careerData.employmentInsuranceNumber}</span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
+                          {/* 社会保険 */}
+                          {careerData?.socialInsuranceStatus && (
+                            <div>
+                              <span className="text-gray-500">社会保険:</span>
+                              <span className="ml-2 font-medium text-gray-800">
+                                {careerData.socialInsuranceStatus === 'joined' ? '加入' :
+                                 careerData.socialInsuranceStatus === 'not_joined' ? '非加入' : '未登録'}
+                              </span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
+                          {/* 扶養家族 */}
+                          {careerData?.hasDependents !== undefined && (
+                            <div>
+                              <span className="text-gray-500">扶養家族:</span>
+                              <span className="ml-2 font-medium text-gray-800">
+                                {careerData.hasDependents ? `${careerData.dependentCount || 0}人` : '無'}
+                              </span>
+                              {selectedStaff.user_id && (
+                                <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
 
                       {/* 資格 */}
                       {(selectedStaff.qualifications || careerData?.qualificationCertificates) && (
@@ -2046,41 +2132,51 @@ const StaffManagementView: React.FC = () => {
                         </div>
                       )}
 
-                      {/* 職歴・学歴 */}
-                      {careerData?.workHistory && (
+                      {/* 職歴 */}
+                      {careerData?.experienceRecords && careerData.experienceRecords.length > 0 && (
                         <div>
-                          <h5 className="text-xs font-bold text-gray-600 mb-2">職歴・学歴</h5>
+                          <h5 className="text-xs font-bold text-gray-600 mb-2">職歴（実務経験）</h5>
                           <div className="space-y-2">
-                            {(careerData?.workHistory || []).map((history: any, idx: number) => (
+                            {careerData.experienceRecords.map((record: any, idx: number) => (
                               <div key={idx} className="border border-gray-200 rounded-md p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-bold text-gray-700">
-                                    {history.type === 'employment' ? '職歴' : '学歴'}
-                                  </span>
-                                </div>
                                 <div className="text-sm space-y-1">
                                   <div>
-                                    <span className="text-gray-500">組織名:</span>
-                                    <span className="ml-2 font-medium text-gray-800">{history.organization}</span>
+                                    <span className="text-gray-500">事業所名:</span>
+                                    <span className="ml-2 font-medium text-gray-800">{record.facilityName}</span>
                                   </div>
-                                  {history.position && (
-                                    <div>
-                                      <span className="text-gray-500">役職:</span>
-                                      <span className="ml-2 font-medium text-gray-800">{history.position}</span>
-                                    </div>
-                                  )}
                                   <div>
                                     <span className="text-gray-500">期間:</span>
                                     <span className="ml-2 font-medium text-gray-800">
-                                      {history.startDate} ～ {history.endDate || '現在'}
+                                      {record.startDate} ～ {record.endDate || '現在'}
                                     </span>
                                   </div>
-                                  {history.description && (
-                                    <div>
-                                      <span className="text-gray-500">詳細:</span>
-                                      <span className="ml-2 font-medium text-gray-800">{history.description}</span>
-                                    </div>
-                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 学歴 */}
+                      {careerData?.educationHistory && careerData.educationHistory.length > 0 && (
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-600 mb-2">学歴</h5>
+                          <div className="space-y-2">
+                            {careerData.educationHistory.map((edu: any, idx: number) => (
+                              <div key={idx} className="border border-gray-200 rounded-md p-3">
+                                <div className="text-sm space-y-1">
+                                  <div>
+                                    <span className="text-gray-500">学校名:</span>
+                                    <span className="ml-2 font-medium text-gray-800">{edu.schoolName}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">卒業年月:</span>
+                                    <span className="ml-2 font-medium text-gray-800">{edu.graduationDate}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">学位・資格:</span>
+                                    <span className="ml-2 font-medium text-gray-800">{edu.degree}</span>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -2316,29 +2412,43 @@ const StaffManagementView: React.FC = () => {
                 <X size={24} />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-6 max-h-[80vh] overflow-y-auto">
               <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
                 <p className="text-sm text-yellow-800">
                   代理登録アカウントの情報を編集できます。スタッフ本人がアカウントを作成すると、この情報は本人の管理下に移ります。
                 </p>
               </div>
-              <div className="space-y-4">
-                <p className="text-gray-600 text-sm">
-                  編集フォームは代理登録フォームと同じ構造で実装予定です。
-                  現在は、スタッフ詳細画面から「編集」ボタンをクリックして編集できます。
-                </p>
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => {
-                      setIsEditModalOpen(false);
-                      setEditingStaffData(null);
-                    }}
-                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
-                  >
-                    閉じる
-                  </button>
+              {editFormData ? (
+                <div className="space-y-4">
+                  <p className="text-gray-600 text-sm">
+                    編集フォームは代理登録フォームと同じ構造で実装予定です。
+                    現在は、スタッフ詳細画面から情報を確認できます。
+                  </p>
+                  <div className="bg-gray-50 rounded-md p-4 space-y-2 text-sm">
+                    <div><strong>名前:</strong> {editFormData.name}</div>
+                    <div><strong>メール:</strong> {editFormData.email || '未登録'}</div>
+                    <div><strong>電話:</strong> {editFormData.phone || '未登録'}</div>
+                    <div><strong>生年月日:</strong> {editFormData.birthDate || '未登録'}</div>
+                    <div><strong>住所:</strong> {editFormData.address || '未登録'}</div>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setIsEditModalOpen(false);
+                        setEditingStaffData(null);
+                        setEditFormData(null);
+                      }}
+                      className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
+                    >
+                      閉じる
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-600 text-sm">データを読み込んでいます...</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
