@@ -6,13 +6,32 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Users, Plus, Mail, X, Clock, Calendar, User, Phone, MapPin, Briefcase, Award, FileText, QrCode, Download } from 'lucide-react';
+import { Users, Plus, Mail, X, Clock, Calendar, User, Phone, MapPin, Briefcase, Award, FileText, QrCode, Download, Upload, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Staff, UserPermissions, StaffInvitation } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { inviteStaff } from '@/utils/staffInvitationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+
+// 資格リスト（activate/page.tsxから）
+const QUALIFICATIONS = [
+  '資格無し',
+  '保育士',
+  '児童指導員任用資格',
+  '児童発達支援管理責任者',
+  '社会福祉士',
+  '精神保健福祉士',
+  '介護福祉士',
+  '理学療法士（PT）',
+  '作業療法士（OT）',
+  '言語聴覚士（ST）',
+  '臨床心理士',
+  '公認心理師',
+  '看護師',
+  '准看護師',
+  'その他'
+];
 
 const StaffManagementView: React.FC = () => {
   const { staff, facilitySettings } = useFacilityData();
@@ -26,6 +45,8 @@ const StaffManagementView: React.FC = () => {
   const [attendanceMonth, setAttendanceMonth] = useState(new Date());
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [publicInviteLink, setPublicInviteLink] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStaffData, setEditingStaffData] = useState<any>(null);
   
   // 手動登録フォーム用の状態
   const [manualFormData, setManualFormData] = useState({
@@ -38,6 +59,24 @@ const StaffManagementView: React.FC = () => {
     role: '一般スタッフ' as '一般スタッフ' | 'マネージャー' | '管理者',
     employmentType: '常勤' as '常勤' | '非常勤',
     startDate: new Date().toISOString().split('T')[0],
+    // パーソナルキャリア情報と同じ項目
+    postalCode: '',
+    address: '',
+    qualifications: [] as string[],
+    qualificationCertificates: [] as { qualification: string; file: File | null; url: string }[],
+    workHistory: [] as Array<{
+      id: string;
+      type: 'employment' | 'education';
+      organization: string;
+      position?: string;
+      startDate: string;
+      endDate: string;
+      description: string;
+    }>,
+    // 事業所側から登録する情報
+    monthlySalary: undefined as number | undefined,
+    hourlyWage: undefined as number | undefined,
+    facilityRole: '',
   });
 
   // 招待フォーム用の状態
@@ -519,6 +558,357 @@ const StaffManagementView: React.FC = () => {
                     />
                   </div>
 
+                  {/* パーソナルキャリア情報と同じ項目 */}
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h4 className="font-bold text-gray-800 mb-4">キャリア情報（パーソナルアカウントと同じ項目）</h4>
+                    
+                    {/* 郵便番号・住所 */}
+                    <div className="space-y-3 mb-4">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          郵便番号
+                        </label>
+                        <input
+                          type="text"
+                          value={manualFormData.postalCode}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, '');
+                            setManualFormData({ ...manualFormData, postalCode: value });
+                          }}
+                          placeholder="1234567"
+                          maxLength={7}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          住所
+                        </label>
+                        <input
+                          type="text"
+                          value={manualFormData.address}
+                          onChange={(e) => setManualFormData({ ...manualFormData, address: e.target.value })}
+                          placeholder="都道府県市区町村番地"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 資格 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        資格（複数選択可能）
+                      </label>
+                      <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-200 rounded-md">
+                        {QUALIFICATIONS.map((qual) => (
+                          <button
+                            key={qual}
+                            type="button"
+                            onClick={() => {
+                              const isSelected = manualFormData.qualifications.includes(qual);
+                              if (qual === '資格無し') {
+                                if (isSelected) {
+                                  setManualFormData({
+                                    ...manualFormData,
+                                    qualifications: manualFormData.qualifications.filter(q => q !== '資格無し'),
+                                    qualificationCertificates: manualFormData.qualificationCertificates.filter(c => c.qualification !== '資格無し'),
+                                  });
+                                } else {
+                                  setManualFormData({
+                                    ...manualFormData,
+                                    qualifications: ['資格無し'],
+                                    qualificationCertificates: [{ qualification: '資格無し', file: null, url: '' }],
+                                  });
+                                }
+                              } else {
+                                const newQualifications = isSelected
+                                  ? manualFormData.qualifications.filter(q => q !== qual)
+                                  : [...manualFormData.qualifications.filter(q => q !== '資格無し'), qual];
+                                const newCertificates = isSelected
+                                  ? manualFormData.qualificationCertificates.filter(c => c.qualification !== qual)
+                                  : [...manualFormData.qualificationCertificates.filter(c => c.qualification !== '資格無し'), { qualification: qual, file: null, url: '' }];
+                                setManualFormData({
+                                  ...manualFormData,
+                                  qualifications: newQualifications,
+                                  qualificationCertificates: newCertificates,
+                                });
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-md text-sm font-bold transition-colors ${
+                              manualFormData.qualifications.includes(qual)
+                                ? 'bg-[#00c4cc] text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {qual}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 資格証の写真 */}
+                    {manualFormData.qualifications.filter(q => q !== '資格無し').length > 0 && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          資格証の写真
+                        </label>
+                        <div className="space-y-2">
+                          {manualFormData.qualifications.filter(q => q !== '資格無し').map((qual) => {
+                            const cert = manualFormData.qualificationCertificates.find(c => c.qualification === qual);
+                            return (
+                              <div key={qual} className="border border-gray-200 rounded-md p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-sm font-bold text-gray-700">{qual}</span>
+                                  {cert?.url && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setManualFormData({
+                                          ...manualFormData,
+                                          qualificationCertificates: manualFormData.qualificationCertificates.map(c =>
+                                            c.qualification === qual ? { ...c, file: null, url: '' } : c
+                                          ),
+                                        });
+                                      }}
+                                      className="text-red-500 hover:text-red-700"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                                {cert?.url ? (
+                                  <img
+                                    src={cert.url}
+                                    alt={qual}
+                                    className="w-full h-32 object-contain border border-gray-300 rounded-md bg-gray-50"
+                                  />
+                                ) : (
+                                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                                    <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                                    <span className="text-xs text-gray-500">画像をアップロード</span>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const reader = new FileReader();
+                                          reader.onloadend = () => {
+                                            setManualFormData({
+                                              ...manualFormData,
+                                              qualificationCertificates: manualFormData.qualificationCertificates.map(c =>
+                                                c.qualification === qual ? { ...c, file, url: reader.result as string } : c
+                                              ),
+                                            });
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 職歴・学歴 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        職歴・学歴
+                      </label>
+                      <div className="space-y-3 max-h-60 overflow-y-auto">
+                        {manualFormData.workHistory.map((history, index) => (
+                          <div key={history.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-700">
+                                  {history.type === 'employment' ? '職歴' : '学歴'}
+                                </span>
+                                <span className="text-xs text-gray-500">#{index + 1}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setManualFormData({
+                                    ...manualFormData,
+                                    workHistory: manualFormData.workHistory.filter(h => h.id !== history.id),
+                                  });
+                                }}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={history.organization}
+                              onChange={(e) => {
+                                setManualFormData({
+                                  ...manualFormData,
+                                  workHistory: manualFormData.workHistory.map(h =>
+                                    h.id === history.id ? { ...h, organization: e.target.value } : h
+                                  ),
+                                });
+                              }}
+                              className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                              placeholder={history.type === 'employment' ? '事業所名' : '学校名'}
+                            />
+                            {history.type === 'employment' && (
+                              <input
+                                type="text"
+                                value={history.position || ''}
+                                onChange={(e) => {
+                                  setManualFormData({
+                                    ...manualFormData,
+                                    workHistory: manualFormData.workHistory.map(h =>
+                                      h.id === history.id ? { ...h, position: e.target.value } : h
+                                    ),
+                                  });
+                                }}
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                placeholder="役職・職種"
+                              />
+                            )}
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="month"
+                                value={history.startDate}
+                                onChange={(e) => {
+                                  setManualFormData({
+                                    ...manualFormData,
+                                    workHistory: manualFormData.workHistory.map(h =>
+                                      h.id === history.id ? { ...h, startDate: e.target.value } : h
+                                    ),
+                                  });
+                                }}
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                placeholder="開始年月"
+                              />
+                              <input
+                                type="month"
+                                value={history.endDate}
+                                onChange={(e) => {
+                                  setManualFormData({
+                                    ...manualFormData,
+                                    workHistory: manualFormData.workHistory.map(h =>
+                                      h.id === history.id ? { ...h, endDate: e.target.value } : h
+                                    ),
+                                  });
+                                }}
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                                placeholder="終了年月"
+                              />
+                            </div>
+                            <textarea
+                              value={history.description}
+                              onChange={(e) => {
+                                setManualFormData({
+                                  ...manualFormData,
+                                  workHistory: manualFormData.workHistory.map(h =>
+                                    h.id === history.id ? { ...h, description: e.target.value } : h
+                                  ),
+                                });
+                              }}
+                              rows={2}
+                              className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                              placeholder="詳細・備考"
+                            />
+                          </div>
+                        ))}
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newId = `work_${Date.now()}`;
+                              setManualFormData({
+                                ...manualFormData,
+                                workHistory: [...manualFormData.workHistory, {
+                                  id: newId,
+                                  type: 'employment',
+                                  organization: '',
+                                  position: '',
+                                  startDate: '',
+                                  endDate: '',
+                                  description: '',
+                                }],
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition-colors"
+                          >
+                            + 職歴を追加
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newId = `edu_${Date.now()}`;
+                              setManualFormData({
+                                ...manualFormData,
+                                workHistory: [...manualFormData.workHistory, {
+                                  id: newId,
+                                  type: 'education',
+                                  organization: '',
+                                  startDate: '',
+                                  endDate: '',
+                                  description: '',
+                                }],
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition-colors"
+                          >
+                            + 学歴を追加
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 事業所側から登録する情報 */}
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h4 className="font-bold text-gray-800 mb-4">事業所側から登録する情報</h4>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          月給（円）
+                        </label>
+                        <input
+                          type="number"
+                          value={manualFormData.monthlySalary || ''}
+                          onChange={(e) => setManualFormData({ ...manualFormData, monthlySalary: e.target.value ? parseInt(e.target.value) : undefined })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          placeholder="300000"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          時給（円）
+                        </label>
+                        <input
+                          type="number"
+                          value={manualFormData.hourlyWage || ''}
+                          onChange={(e) => setManualFormData({ ...manualFormData, hourlyWage: e.target.value ? parseInt(e.target.value) : undefined })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          placeholder="1500"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        施設での役割
+                      </label>
+                      <input
+                        type="text"
+                        value={manualFormData.facilityRole}
+                        onChange={(e) => setManualFormData({ ...manualFormData, facilityRole: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        placeholder="例: 児童発達支援管理責任者、指導員など"
+                      />
+                    </div>
+                  </div>
+
                   <div className="flex gap-3 pt-2">
                     <button
                       onClick={() => {
@@ -533,6 +923,14 @@ const StaffManagementView: React.FC = () => {
                           role: '一般スタッフ',
                           employmentType: '常勤',
                           startDate: new Date().toISOString().split('T')[0],
+                          postalCode: '',
+                          address: '',
+                          qualifications: [],
+                          qualificationCertificates: [],
+                          workHistory: [],
+                          monthlySalary: undefined,
+                          hourlyWage: undefined,
+                          facilityRole: '',
                         });
                       }}
                       className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
@@ -553,6 +951,33 @@ const StaffManagementView: React.FC = () => {
 
                         setInviteLoading(true);
                         try {
+                          // 資格証の写真をSupabase Storageにアップロード
+                          const uploadedCertificates: { qualification: string; url: string }[] = [];
+                          for (const cert of manualFormData.qualificationCertificates) {
+                            if (cert.file) {
+                              const fileExt = cert.file.name.split('.').pop();
+                              const fileName = `${facility.id}/qualifications/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                              const { error: uploadError } = await supabase.storage
+                                .from('qualifications')
+                                .upload(fileName, cert.file);
+                              
+                              if (!uploadError) {
+                                const { data: urlData } = supabase.storage
+                                  .from('qualifications')
+                                  .getPublicUrl(fileName);
+                                uploadedCertificates.push({
+                                  qualification: cert.qualification,
+                                  url: urlData.publicUrl,
+                                });
+                              }
+                            } else if (cert.url) {
+                              uploadedCertificates.push({
+                                qualification: cert.qualification,
+                                url: cert.url,
+                              });
+                            }
+                          }
+
                           // staffテーブルにシャドウアカウントとして登録（user_idはNULL）
                           const { data, error } = await supabase
                             .from('staff')
@@ -567,6 +992,17 @@ const StaffManagementView: React.FC = () => {
                               gender: manualFormData.gender || null,
                               email: manualFormData.email || null,
                               phone: manualFormData.phone || null,
+                              address: manualFormData.address || null,
+                              qualifications: manualFormData.qualifications.length > 0 ? manualFormData.qualifications.join(',') : null,
+                              monthly_salary: manualFormData.monthlySalary || null,
+                              hourly_wage: manualFormData.hourlyWage || null,
+                              // 追加情報をJSONBとして保存（memoフィールドに一時的に保存、後で専用フィールドを追加）
+                              memo: JSON.stringify({
+                                postalCode: manualFormData.postalCode,
+                                qualificationCertificates: uploadedCertificates,
+                                workHistory: manualFormData.workHistory,
+                                facilityRole: manualFormData.facilityRole,
+                              }),
                               user_id: null, // シャドウアカウント
                               created_at: new Date().toISOString(),
                               updated_at: new Date().toISOString(),
@@ -592,6 +1028,14 @@ const StaffManagementView: React.FC = () => {
                             role: '一般スタッフ',
                             employmentType: '常勤',
                             startDate: new Date().toISOString().split('T')[0],
+                            postalCode: '',
+                            address: '',
+                            qualifications: [],
+                            qualificationCertificates: [],
+                            workHistory: [],
+                            monthlySalary: undefined,
+                            hourlyWage: undefined,
+                            facilityRole: '',
                           });
                           setIsInviteModalOpen(false);
                           
@@ -890,6 +1334,153 @@ const StaffManagementView: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* パーソナルキャリア情報 */}
+              {(() => {
+                let careerData: any = null;
+                try {
+                  if (selectedStaff.memo && typeof selectedStaff.memo === 'string') {
+                    careerData = JSON.parse(selectedStaff.memo);
+                  }
+                } catch (e) {
+                  // memoがJSONでない場合は無視
+                }
+
+                return (
+                  <div className="border-t border-gray-200 pt-6 mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-bold text-sm text-gray-700 flex items-center gap-2">
+                        <Award size={16} />
+                        パーソナルキャリア情報
+                      </h4>
+                      {!selectedStaff.user_id && (
+                        <button
+                          onClick={() => {
+                            setEditingStaffData(selectedStaff);
+                            setIsEditModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-xs font-bold transition-colors"
+                        >
+                          編集
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* 郵便番号・住所 */}
+                      {(careerData?.postalCode || selectedStaff.address) && (
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-600 mb-2">住所情報</h5>
+                          <div className="space-y-1 text-sm">
+                            {careerData?.postalCode && (
+                              <div>
+                                <span className="text-gray-500">郵便番号:</span>
+                                <span className="ml-2 font-medium text-gray-800">{careerData.postalCode}</span>
+                              </div>
+                            )}
+                            {selectedStaff.address && (
+                              <div>
+                                <span className="text-gray-500">住所:</span>
+                                <span className="ml-2 font-medium text-gray-800">{selectedStaff.address}</span>
+                                {selectedStaff.user_id && (
+                                  <span className="ml-2 text-xs text-gray-400">（本人管理）</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 資格 */}
+                      {(selectedStaff.qualifications || careerData?.qualificationCertificates) && (
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-600 mb-2">資格</h5>
+                          <div className="space-y-2">
+                            {selectedStaff.qualifications && (
+                              <div className="flex flex-wrap gap-2">
+                                {selectedStaff.qualifications.split(',').map((qual: string, idx: number) => (
+                                  <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">
+                                    {qual}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {careerData?.qualificationCertificates && (
+                              <div className="grid grid-cols-2 gap-2">
+                                {(careerData.qualificationCertificates || []).map((cert: any, idx: number) => (
+                                  <div key={idx} className="border border-gray-200 rounded-md p-2">
+                                    <div className="text-xs font-bold text-gray-700 mb-1">{cert.qualification}</div>
+                                    {cert.url && (
+                                      <img
+                                        src={cert.url}
+                                        alt={cert.qualification}
+                                        className="w-full h-24 object-contain bg-gray-50 rounded"
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 職歴・学歴 */}
+                      {careerData?.workHistory && (
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-600 mb-2">職歴・学歴</h5>
+                          <div className="space-y-2">
+                            {(careerData?.workHistory || []).map((history: any, idx: number) => (
+                              <div key={idx} className="border border-gray-200 rounded-md p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-bold text-gray-700">
+                                    {history.type === 'employment' ? '職歴' : '学歴'}
+                                  </span>
+                                </div>
+                                <div className="text-sm space-y-1">
+                                  <div>
+                                    <span className="text-gray-500">組織名:</span>
+                                    <span className="ml-2 font-medium text-gray-800">{history.organization}</span>
+                                  </div>
+                                  {history.position && (
+                                    <div>
+                                      <span className="text-gray-500">役職:</span>
+                                      <span className="ml-2 font-medium text-gray-800">{history.position}</span>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <span className="text-gray-500">期間:</span>
+                                    <span className="ml-2 font-medium text-gray-800">
+                                      {history.startDate} ～ {history.endDate || '現在'}
+                                    </span>
+                                  </div>
+                                  {history.description && (
+                                    <div>
+                                      <span className="text-gray-500">詳細:</span>
+                                      <span className="ml-2 font-medium text-gray-800">{history.description}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 施設での役割 */}
+                      {careerData?.facilityRole && (
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-600 mb-2">施設での役割</h5>
+                          <div className="text-sm">
+                            <span className="font-medium text-gray-800">{careerData.facilityRole}</span>
+                            <span className="ml-2 text-xs text-gray-400">（事業所管理）</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1080,6 +1671,38 @@ const StaffManagementView: React.FC = () => {
                   閉じる
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 編集モーダル（代理登録アカウント用） */}
+      {isEditModalOpen && editingStaffData && !editingStaffData.user_id && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                <User size={20} className="text-[#00c4cc]" />
+                {editingStaffData.name} さんの情報を編集
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingStaffData(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+                <p className="text-sm text-yellow-800">
+                  代理登録アカウントの情報を編集できます。スタッフ本人がアカウントを作成すると、この情報は本人の管理下に移ります。
+                </p>
+              </div>
+              {/* TODO: 編集フォームを実装（代理登録フォームと同じ構造） */}
+              <p className="text-gray-600 text-sm">編集フォームは今後実装予定です。</p>
             </div>
           </div>
         </div>
