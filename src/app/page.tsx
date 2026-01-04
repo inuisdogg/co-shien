@@ -18,6 +18,7 @@ import StaffManagementView from '@/components/staff/StaffManagementView';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
+import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
 
 export default function Home() {
   const { isAuthenticated, isAdmin, hasPermission, login } = useAuth();
@@ -34,6 +35,14 @@ export default function Home() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const { authenticatePasskey, isSupported, isAuthenticating, checkSupport } = usePasskeyAuth();
+  
+  // WebAuthnサポート確認
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      checkSupport();
+    }
+  }, []);
 
   // 保存されたログイン情報を読み込む
   useEffect(() => {
@@ -238,12 +247,62 @@ export default function Home() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isAuthenticating}
               className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'ログイン中...' : 'ログイン'}
             </button>
           </form>
+
+          {isSupported && (
+            <div className="mt-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">または</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!facilityCode || !loginId) {
+                    setError('施設IDとメールアドレス（またはログインID）を入力してください');
+                    return;
+                  }
+                  setError('');
+                  try {
+                    await authenticatePasskey(facilityCode, loginId);
+                    // パスキー認証が成功した場合、通常のログインフローを実行
+                    // 実際の実装では、パスキー認証の結果に基づいてログイン処理を行う
+                    setError('パスキー認証機能は現在開発中です');
+                  } catch (err: any) {
+                    setError(err.message || 'パスキー認証に失敗しました');
+                  }
+                }}
+                disabled={loading || isAuthenticating || !facilityCode || !loginId}
+                className="mt-4 w-full bg-white hover:bg-gray-50 text-[#00c4cc] border-2 border-[#00c4cc] font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isAuthenticating ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    認証中...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    パスキーでログイン
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-center text-sm text-gray-600 mb-3">

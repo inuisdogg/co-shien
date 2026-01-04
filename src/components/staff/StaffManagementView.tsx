@@ -12,6 +12,7 @@ import { Staff, UserPermissions, StaffInvitation } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { inviteStaff } from '@/utils/staffInvitationService';
 import { useAuth } from '@/contexts/AuthContext';
+import { getPersonalBaseUrl } from '@/utils/domain';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
@@ -316,7 +317,7 @@ const StaffManagementView: React.FC = () => {
       setInviteToken(invitationToken);
 
       // 招待リンクを生成
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const baseUrl = getPersonalBaseUrl();
       const invitationLink = `${baseUrl}/activate?token=${invitationToken}`;
       
       setInviteSuccess(true);
@@ -501,7 +502,7 @@ const StaffManagementView: React.FC = () => {
                         setInviteMethod('qr');
                         // QRコード用のリンクを生成
                         if (facility?.id) {
-                          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                          const baseUrl = getPersonalBaseUrl();
                           const publicToken = btoa(JSON.stringify({ facilityId: facility.id, type: 'public' }));
                           const link = `${baseUrl}/activate?token=${publicToken}`;
                           setPublicInviteLink(link);

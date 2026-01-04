@@ -1,0 +1,28 @@
+{
+  "name": "co-shien - 児童発達支援管理システム",
+  "short_name": "co-shien",
+  "description": "児童発達支援事業所向けの管理システム",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#00c4cc",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "scope": "/",
+  "lang": "ja"
+}
+
