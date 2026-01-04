@@ -357,16 +357,30 @@ export default function Home() {
           )}
 
           <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-center text-sm text-gray-600 mb-3">
-              初めてご利用の方は、初期設定を行ってください
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push('/facility-setup')}
-              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
-            >
-              初期設定を行う
-            </button>
+            {isPersonal ? (
+              <p className="text-center text-sm text-gray-600">
+                アカウントをお持ちでない方は{' '}
+                <button
+                  onClick={() => router.push('/signup')}
+                  className="text-[#00c4cc] hover:underline font-bold"
+                >
+                  新規登録
+                </button>
+              </p>
+            ) : (
+              <>
+                <p className="text-center text-sm text-gray-600 mb-3">
+                  初めてご利用の方は、初期設定を行ってください
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push('/facility-setup')}
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
+                >
+                  初期設定を行う
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

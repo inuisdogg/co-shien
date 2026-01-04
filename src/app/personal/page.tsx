@@ -151,6 +151,18 @@ export default function PersonalPage() {
             {loading ? 'ログイン中...' : 'ログイン'}
           </button>
         </form>
+
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <p className="text-center text-sm text-gray-600">
+            アカウントをお持ちでない方は{' '}
+            <button
+              onClick={() => router.push('/signup')}
+              className="text-[#00c4cc] hover:underline font-bold"
+            >
+              新規登録
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
