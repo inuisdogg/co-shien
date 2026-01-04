@@ -27,6 +27,7 @@ import {
 import { activateAccount } from '@/utils/staffInvitationService';
 import { supabase } from '@/lib/supabase';
 import { hashPassword } from '@/utils/password';
+import { UserPermissions } from '@/types';
 
 // 資格の選択肢（児童発達支援・放課後等デイサービス関連）
 const QUALIFICATIONS = [
