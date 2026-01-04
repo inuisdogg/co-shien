@@ -19,6 +19,7 @@ import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
 import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
+import { getAppType } from '@/utils/domain';
 
 export default function Home() {
   const { isAuthenticated, isAdmin, hasPermission, login } = useAuth();
@@ -44,18 +45,40 @@ export default function Home() {
     }
   }, []);
 
-  // 保存されたログイン情報を読み込む
+  // アプリタイプを取得
+  const appType = getAppType();
+  
+  // 保存されたログイン情報を読み込む（30日間有効）
   useEffect(() => {
-    const savedFacilityCode = localStorage.getItem('savedFacilityCode');
-    const savedLoginId = localStorage.getItem('savedLoginId');
-    if (savedFacilityCode) {
-      setFacilityCode(savedFacilityCode);
-      setRememberMe(true);
+    const savedData = localStorage.getItem(`savedLoginData_${appType}`);
+    if (savedData) {
+      try {
+        const data = JSON.parse(savedData);
+        const savedDate = new Date(data.savedAt);
+        const daysSinceSaved = (Date.now() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
+        
+        // 30日以内なら読み込む
+        if (daysSinceSaved <= 30) {
+          if (data.facilityCode) {
+            setFacilityCode(data.facilityCode);
+          }
+          if (data.loginId) {
+            setLoginId(data.loginId);
+          }
+          if (data.password) {
+            setPassword(data.password);
+          }
+          setRememberMe(true);
+        } else {
+          // 30日を超えていたら削除
+          localStorage.removeItem(`savedLoginData_${appType}`);
+        }
+      } catch (e) {
+        // パースエラーの場合は削除
+        localStorage.removeItem(`savedLoginData_${appType}`);
+      }
     }
-    if (savedLoginId) {
-      setLoginId(savedLoginId);
-    }
-  }, []);
+  }, [appType]);
 
   // ログイン処理
   const handleLogin = async (e: React.FormEvent) => {
@@ -64,16 +87,24 @@ export default function Home() {
     setLoading(true);
 
     try {
-      await login(facilityCode, loginId, password);
-      // ログイン成功後、パスワードをリセット
-      setPassword('');
-      // ログイン情報を保存するかどうか
+      // Personal側では施設IDが不要（空文字列を渡す）
+      const facilityCodeToUse = appType === 'personal' ? '' : facilityCode;
+      await login(facilityCodeToUse, loginId, password);
+      // ログイン情報を保存するかどうか（30日間有効）
       if (rememberMe) {
-        localStorage.setItem('savedFacilityCode', facilityCode);
-        localStorage.setItem('savedLoginId', loginId);
+        const savedData = {
+          facilityCode,
+          loginId,
+          password, // パスワードも保存（30日間）
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`savedLoginData_${appType}`, JSON.stringify(savedData));
       } else {
-        localStorage.removeItem('savedFacilityCode');
-        localStorage.removeItem('savedLoginId');
+        localStorage.removeItem(`savedLoginData_${appType}`);
+      }
+      // ログイン成功後、パスワードをリセット（保存しない場合のみ）
+      if (!rememberMe) {
+        setPassword('');
       }
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
@@ -144,6 +175,9 @@ export default function Home() {
 
   // 未認証の場合はログイン画面を表示
   if (!isAuthenticated) {
+    const isBiz = appType === 'biz';
+    const isPersonal = appType === 'personal';
+    
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
@@ -153,8 +187,24 @@ export default function Home() {
               alt="co-shien"
               className="h-16 w-auto mx-auto mb-4"
             />
+            <div className="mb-2">
+              {isBiz && (
+                <span className="inline-block px-3 py-1 bg-[#00c4cc] text-white text-xs font-bold rounded-full mb-2">
+                  Biz（事業所向け）
+                </span>
+              )}
+              {isPersonal && (
+                <span className="inline-block px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-full mb-2">
+                  Personal（スタッフ向け）
+                </span>
+              )}
+            </div>
             <h1 className="text-2xl font-bold text-gray-800">ログイン</h1>
-            <p className="text-gray-600 text-sm mt-2">施設ID、メールアドレス（またはログインID）、パスワードを入力してください</p>
+            <p className="text-gray-600 text-sm mt-2">
+              {isBiz 
+                ? '施設ID、メールアドレス（またはログインID）、パスワードを入力してください'
+                : 'メールアドレス（またはログインID）、パスワードを入力してください'}
+            </p>
           </div>
 
           {error && (
@@ -164,21 +214,23 @@ export default function Home() {
           )}
 
           <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label htmlFor="facilityCode" className="block text-sm font-bold text-gray-700 mb-2">
-                施設ID
-              </label>
-              <input
-                id="facilityCode"
-                type="text"
-                value={facilityCode}
-                onChange={(e) => setFacilityCode(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                placeholder="施設IDを入力"
-                disabled={loading}
-              />
-            </div>
+            {isBiz && (
+              <div>
+                <label htmlFor="facilityCode" className="block text-sm font-bold text-gray-700 mb-2">
+                  施設ID
+                </label>
+                <input
+                  id="facilityCode"
+                  type="text"
+                  value={facilityCode}
+                  onChange={(e) => setFacilityCode(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  placeholder="施設IDを入力"
+                  disabled={loading}
+                />
+              </div>
+            )}
 
             <div>
               <label htmlFor="loginId" className="block text-sm font-bold text-gray-700 mb-2">
@@ -241,7 +293,7 @@ export default function Home() {
                 disabled={loading}
               />
               <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
-                ログイン情報を保存する
+                ログイン情報を30日間保存する
               </label>
             </div>
 
@@ -310,7 +362,7 @@ export default function Home() {
             </p>
             <button
               type="button"
-              onClick={() => router.push('/admin-setup')}
+              onClick={() => router.push('/facility-setup')}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
             >
               初期設定を行う

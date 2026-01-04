@@ -5,18 +5,22 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // リダイレクト先を取得（クエリパラメータから）
+  const redirectTo = searchParams?.get('redirect') || '/staff-dashboard';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +58,8 @@ export default function LoginPage() {
       };
       localStorage.setItem('user', JSON.stringify(user));
 
-      // スタッフダッシュボードにリダイレクト
-      router.push('/staff-dashboard');
+      // リダイレクト先に移動（クエリパラメータで指定された場合はそこへ、なければデフォルト）
+      router.push(redirectTo);
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
     } finally {
@@ -72,6 +76,11 @@ export default function LoginPage() {
             alt="co-shien"
             className="h-16 w-auto mx-auto mb-4"
           />
+          <div className="mb-2">
+            <span className="inline-block bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+              Personal（スタッフ向け）
+            </span>
+          </div>
           <h1 className="text-2xl font-bold text-gray-800">ログイン</h1>
           <p className="text-gray-600 text-sm mt-2">メールアドレスとパスワードを入力してください</p>
         </div>

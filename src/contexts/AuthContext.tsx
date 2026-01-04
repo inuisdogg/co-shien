@@ -55,6 +55,71 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (facilityCode: string, loginIdOrEmail: string, password: string) => {
     try {
+      // Personal側のログイン（施設IDが空文字列の場合）
+      if (!facilityCode || facilityCode.trim() === '') {
+        // メールアドレスかログインIDかを判定
+        const isEmail = loginIdOrEmail.includes('@');
+        
+        // usersテーブルから直接検索（施設IDなし）
+        let userData: any = null;
+        let userError: any = null;
+
+        if (isEmail) {
+          const result = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', loginIdOrEmail)
+            .eq('has_account', true)
+            .single();
+          userData = result.data;
+          userError = result.error;
+        } else {
+          const result = await supabase
+            .from('users')
+            .select('*')
+            .eq('login_id', loginIdOrEmail)
+            .eq('has_account', true)
+            .single();
+          userData = result.data;
+          userError = result.error;
+        }
+
+        if (userError || !userData) {
+          throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
+        }
+
+        if (!userData.password_hash) {
+          throw new Error('このアカウントにはパスワードが設定されていません');
+        }
+
+        const isValid = await verifyPassword(password, userData.password_hash);
+        if (!isValid) {
+          throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
+        }
+
+        // ユーザー情報を作成（Personal側では施設情報は不要）
+        const user: User = {
+          id: userData.id,
+          email: userData.email || '',
+          name: userData.name,
+          loginId: userData.login_id || userData.name,
+          role: userData.role as UserRole,
+          facilityId: userData.facility_id || '',
+          permissions: userData.permissions || {},
+          createdAt: userData.created_at,
+          updatedAt: userData.updated_at,
+        };
+
+        setUser(user);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        // Personal側では施設情報は設定しない
+        setFacility(null);
+        localStorage.removeItem('facility');
+        return;
+      }
+
+      // Biz側のログイン（施設IDがある場合）
       // 施設コードで施設を検索
       const { data: facilityData, error: facilityError } = await supabase
         .from('facilities')
