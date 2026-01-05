@@ -276,28 +276,36 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 各テーブルにトリガーを設定
+-- 各テーブルにトリガーを設定（既存のトリガーを削除してから作成）
+DROP TRIGGER IF EXISTS update_facility_settings_updated_at ON facility_settings;
 CREATE TRIGGER update_facility_settings_updated_at BEFORE UPDATE ON facility_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_children_updated_at ON children;
 CREATE TRIGGER update_children_updated_at BEFORE UPDATE ON children
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_staff_updated_at ON staff;
 CREATE TRIGGER update_staff_updated_at BEFORE UPDATE ON staff
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_schedules_updated_at ON schedules;
 CREATE TRIGGER update_schedules_updated_at BEFORE UPDATE ON schedules
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_booking_requests_updated_at ON booking_requests;
 CREATE TRIGGER update_booking_requests_updated_at BEFORE UPDATE ON booking_requests
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_usage_records_updated_at ON usage_records;
 CREATE TRIGGER update_usage_records_updated_at BEFORE UPDATE ON usage_records
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_leads_updated_at ON leads;
 CREATE TRIGGER update_leads_updated_at BEFORE UPDATE ON leads
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_shifts_updated_at ON shifts;
 CREATE TRIGGER update_shifts_updated_at BEFORE UPDATE ON shifts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
