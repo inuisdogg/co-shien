@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS staff (
   facility_id TEXT NOT NULL,
   name TEXT NOT NULL,
   name_kana TEXT,
-  role TEXT NOT NULL CHECK (role IN ('一般スタッフ', 'マネージャー')),
+  role TEXT NOT NULL CHECK (role IN ('一般スタッフ', 'マネージャー', '管理者')),
   type TEXT NOT NULL CHECK (type IN ('常勤', '非常勤')),
   -- 基本情報
   birth_date DATE,
