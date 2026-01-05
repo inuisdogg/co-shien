@@ -24,6 +24,7 @@ export default function AdminSetupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [setupData, setSetupData] = useState<{ facilityCode: string; email: string; password?: string } | null>(null);
 
   // ログイン済みの場合、ユーザー情報を設定
   useEffect(() => {
@@ -253,10 +254,19 @@ export default function AdminSetupPage() {
         // 施設設定のエラーは無視（後で設定可能）
       }
 
+      // 施設IDとログイン情報を保存（成功画面で表示するため）
+      const setupInfo = {
+        facilityCode,
+        email: finalAdminEmail,
+        password: !isLoggedInAsPersonal ? password : undefined, // 新規ユーザーの場合のみ
+      };
+      setSetupData(setupInfo);
       setSuccess(true);
-      setTimeout(() => {
-        router.push('/');
-      }, 2000);
+      // 施設コードとログイン情報をlocalStorageに一時保存（ログインページで使用）
+      localStorage.setItem('newFacilitySetup', JSON.stringify({
+        ...setupInfo,
+        savedAt: new Date().toISOString(),
+      }));
     } catch (err: any) {
       setError(err.message || '初期設定に失敗しました');
     } finally {
@@ -264,18 +274,88 @@ export default function AdminSetupPage() {
     }
   };
 
-  if (success) {
+  if (success && setupData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="mb-4">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
+          <div className="text-center mb-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">初期設定が完了しました</h2>
-            <p className="text-gray-600">ログインページに移動します...</p>
+            <p className="text-gray-600 text-sm mb-6">以下の情報でログインできます</p>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-6 mb-6 space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">施設ID</label>
+              <div className="flex items-center justify-between bg-white border-2 border-[#00c4cc] rounded-md px-4 py-3">
+                <code className="text-lg font-bold text-[#00c4cc] tracking-wider">{setupData.facilityCode}</code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(setupData.facilityCode);
+                    alert('施設IDをクリップボードにコピーしました');
+                  }}
+                  className="ml-2 text-[#00c4cc] hover:text-[#00b0b8]"
+                  title="コピー"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">※ この施設IDは大切に保管してください</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">メールアドレス</label>
+              <div className="bg-white border border-gray-300 rounded-md px-4 py-3">
+                <span className="text-gray-800">{setupData.email}</span>
+              </div>
+            </div>
+
+            {setupData.password && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">パスワード</label>
+                <div className="bg-white border border-gray-300 rounded-md px-4 py-3">
+                  <span className="text-gray-800">設定したパスワード</span>
+                </div>
+              </div>
+            )}
+
+            {!setupData.password && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-xs text-blue-800">
+                  ※ 既にログインしているアカウントを使用しています。既存のパスワードでログインしてください。
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                // Biz側のログインページに遷移（施設IDとメールアドレスをクエリパラメータで渡す）
+                router.push(`/?facilityCode=${setupData.facilityCode}&email=${encodeURIComponent(setupData.email)}`);
+              }}
+              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
+            >
+              Biz側にログインする
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // Personal側のログインページに遷移
+                window.location.href = `https://my.co-shien.inu.co.jp/login?email=${encodeURIComponent(setupData.email)}`;
+              }}
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-md transition-colors text-sm"
+            >
+              Personal側にログインする
+            </button>
           </div>
         </div>
       </div>

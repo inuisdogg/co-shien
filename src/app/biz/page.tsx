@@ -45,8 +45,50 @@ export default function BizPage() {
     }
   }, []);
 
-  // 保存されたログイン情報を読み込む（30日間有効）
+  // URLパラメータと保存されたログイン情報を読み込む
   useEffect(() => {
+    // URLパラメータから施設IDとメールアドレスを取得（初回セットアップ後の遷移用）
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlFacilityCode = urlParams.get('facilityCode');
+    const urlEmail = urlParams.get('email');
+
+    if (urlFacilityCode) {
+      setFacilityCode(urlFacilityCode);
+    }
+    if (urlEmail) {
+      setLoginId(urlEmail);
+    }
+
+    // 新規施設セットアップの情報を読み込む
+    const newFacilitySetup = localStorage.getItem('newFacilitySetup');
+    if (newFacilitySetup) {
+      try {
+        const data = JSON.parse(newFacilitySetup);
+        const savedDate = new Date(data.savedAt);
+        const minutesSinceSaved = (Date.now() - savedDate.getTime()) / (1000 * 60);
+        
+        // 5分以内なら読み込む（初回セットアップ直後のみ）
+        if (minutesSinceSaved <= 5) {
+          if (data.facilityCode && !urlFacilityCode) {
+            setFacilityCode(data.facilityCode);
+          }
+          if (data.email && !urlEmail) {
+            setLoginId(data.email);
+          }
+          if (data.password) {
+            setPassword(data.password);
+          }
+        } else {
+          // 5分を超えていたら削除
+          localStorage.removeItem('newFacilitySetup');
+        }
+      } catch (e) {
+        // パースエラーの場合は削除
+        localStorage.removeItem('newFacilitySetup');
+      }
+    }
+
+    // 保存されたログイン情報を読み込む（30日間有効）
     const savedData = localStorage.getItem('savedLoginData_biz');
     if (savedData) {
       try {
@@ -54,15 +96,15 @@ export default function BizPage() {
         const savedDate = new Date(data.savedAt);
         const daysSinceSaved = (Date.now() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
         
-        // 30日以内なら読み込む
+        // 30日以内なら読み込む（URLパラメータで上書きされていない場合のみ）
         if (daysSinceSaved <= 30) {
-          if (data.facilityCode) {
+          if (!urlFacilityCode && data.facilityCode) {
             setFacilityCode(data.facilityCode);
           }
-          if (data.loginId) {
+          if (!urlEmail && data.loginId) {
             setLoginId(data.loginId);
           }
-          if (data.password) {
+          if (data.password && !urlEmail) {
             setPassword(data.password);
           }
           setRememberMe(true);
