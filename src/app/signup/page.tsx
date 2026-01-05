@@ -15,14 +15,9 @@ import { supabase } from '@/lib/supabase';
 export default function SignupPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     agreedToTerms: false,
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,29 +27,26 @@ export default function SignupPage() {
     setError('');
 
     // バリデーション
-    if (formData.password !== formData.confirmPassword) {
-      setError('パスワードが一致しません');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('パスワードは6文字以上で入力してください');
-      return;
-    }
-
     if (!formData.agreedToTerms) {
       setError('利用規約に同意してください');
       return;
     }
 
-    if (!formData.name || !formData.email) {
-      setError('名前とメールアドレスを入力してください');
+    if (!formData.email) {
+      setError('メールアドレスを入力してください');
+      return;
+    }
+
+    // メールアドレスの形式チェック
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      setError('正しいメールアドレスを入力してください');
       return;
     }
 
     setLoading(true);
     try {
-      // 既存のユーザーをチェック（Supabase Authとusersテーブルの両方）
+      // 既存のユーザーをチェック
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -65,18 +57,20 @@ export default function SignupPage() {
         throw new Error('このメールアドレスは既に登録されています');
       }
 
-      // Supabase Authでサインアップ（メール認証を有効化）
+      // Supabase Authでサインアップ（メール認証を有効化、パスワードは後で設定）
+      // 一時的なパスワードを生成（メール認証後に設定画面で変更）
+      const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
       const redirectUrl = typeof window !== 'undefined' 
         ? `${window.location.origin}/auth/callback?type=biz`
         : 'https://biz.co-shien.inu.co.jp/auth/callback?type=biz';
       
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
-        password: formData.password,
+        password: tempPassword, // 一時パスワード（メール認証後に設定画面で変更）
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            name: formData.name,
+            setup_type: 'facility', // 施設セットアップであることを示す
           }
         }
       });
@@ -87,29 +81,6 @@ export default function SignupPage() {
 
       if (!authData.user) {
         throw new Error('ユーザー作成に失敗しました');
-      }
-
-      // usersテーブルにユーザー情報を保存（Supabase Authのトリガーで自動作成される場合もあるが、念のため）
-      // パスワードはSupabase Authで管理するため、password_hashは設定しない
-      const { error: userCreateError } = await supabase
-        .from('users')
-        .upsert({
-          id: authData.user.id,
-          name: formData.name,
-          email: formData.email,
-          login_id: formData.email,
-          account_status: 'pending', // メール認証待ち
-          has_account: true,
-          role: 'staff',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id'
-        });
-
-      if (userCreateError) {
-        console.error('usersテーブルへの保存エラー:', userCreateError);
-        // エラーでも続行（Supabase Authのトリガーで作成される可能性がある）
       }
 
       // メール認証待機ページにリダイレクト
@@ -233,12 +204,12 @@ export default function SignupPage() {
             priority
           />
           <div className="mb-2">
-            <span className="inline-block bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-              Personal（スタッフ向け）
+            <span className="inline-block bg-[#00c4cc] text-white text-xs font-bold px-3 py-1 rounded-full">
+              Biz（事業所向け）
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">新規登録</h1>
-          <p className="text-gray-600 text-sm mt-2">アカウントを作成して始めましょう</p>
+          <h1 className="text-2xl font-bold text-gray-800">施設の初回セットアップ</h1>
+          <p className="text-gray-600 text-sm mt-2">メールアドレスを入力して、施設IDを発行します</p>
         </div>
 
         {error && (
@@ -249,22 +220,6 @@ export default function SignupPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">
-              氏名 <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-              placeholder="氏名を入力"
-              disabled={loading}
-            />
-          </div>
-
           <div>
             <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
               メールアドレス <span className="text-red-500">*</span>
@@ -280,80 +235,8 @@ export default function SignupPage() {
               disabled={loading}
             />
             <p className="text-xs text-gray-500 mt-1">
-              このメールアドレスがログインIDとして使用されます
+              メール認証後、施設IDとパスワードを設定します
             </p>
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
-              パスワード <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                minLength={6}
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                placeholder="6文字以上で入力"
-                disabled={loading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                disabled={loading}
-              >
-                {showPassword ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-bold text-gray-700 mb-2">
-              パスワード（確認） <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                id="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-                minLength={6}
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                placeholder="パスワードを再入力"
-                disabled={loading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                disabled={loading}
-              >
-                {showConfirmPassword ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                )}
-              </button>
-            </div>
           </div>
 
           <div className="flex items-start">
