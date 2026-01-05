@@ -12,11 +12,20 @@ export function middleware(req: NextRequest) {
   // このチェックは最優先で実行し、確実にシステムファイルを除外する
   
   // Next.jsのシステムファイル（全ての/_nextで始まるパス）
+  // .js, .js.map, .css, .jsonなどのハッシュ付きファイルも含めて完全に除外
   // このチェックは最優先で実行し、確実にシステムファイルを除外する
-  if (pathname.startsWith('/_next')) {
+  if (pathname.startsWith('/_next/')) {
     const response = NextResponse.next();
     response.headers.set('x-middleware-skip', 'true');
     response.headers.set('x-debug-pathname', pathname);
+    return response;
+  }
+  
+  // .js, .js.map, .css, .jsonなどの静的ファイル（ハッシュ付きファイル含む）
+  // page-xxx.js, chunks-xxx.js などのパターンにも対応
+  if (/\.(js|js\.map|css|json|woff|woff2|ttf|eot|otf|png|jpg|jpeg|gif|svg|webp|ico|xml|txt|pdf|zip|webmanifest)$/i.test(pathname)) {
+    const response = NextResponse.next();
+    response.headers.set('x-middleware-skip', 'true');
     return response;
   }
   

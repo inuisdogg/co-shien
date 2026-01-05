@@ -56,39 +56,34 @@ export const usePasskeyAuth = () => {
         throw new Error('パスキー登録の開始に失敗しました');
       }
 
-      const challengeData = await challengeResponse.json();
+      const options = await challengeResponse.json();
 
-      // 公開鍵クレデンシャルを作成
-      const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
-        challenge: Uint8Array.from(challengeData.challenge, (c: string) => c.charCodeAt(0)),
-        rp: {
-          name: 'co-shien',
-          id: (() => {
-            if (typeof window === 'undefined') {
-              return 'biz.co-shien.inu.co.jp'; // サーバーサイドのデフォルト
-            }
-            const appType = window.location.hostname.startsWith('biz.') || window.location.hostname.includes('biz.co-shien')
-              ? 'biz'
-              : 'personal';
-            return appType === 'biz' ? 'biz.co-shien.inu.co.jp' : 'my.co-shien.inu.co.jp';
-          })(),
-        },
-        user: {
-          id: Uint8Array.from(userId, (c: string) => c.charCodeAt(0)),
-          name: loginId,
-          displayName: loginId,
-        },
-        pubKeyCredParams: [
-          { alg: -7, type: 'public-key' }, // ES256
-          { alg: -257, type: 'public-key' }, // RS256
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          userVerification: 'preferred',
-        },
-        timeout: 60000,
-        attestation: 'direct',
-      };
+      // サーバーから返されたオプションをBase64URLからArrayBufferに変換
+      if (options.challenge) {
+        options.challenge = Uint8Array.from(
+          atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')),
+          (c) => c.charCodeAt(0)
+        );
+      }
+      
+      if (options.user?.id) {
+        options.user.id = Uint8Array.from(
+          atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')),
+          (c) => c.charCodeAt(0)
+        );
+      }
+
+      if (options.excludeCredentials) {
+        options.excludeCredentials = options.excludeCredentials.map((cred: any) => ({
+          ...cred,
+          id: Uint8Array.from(
+            atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')),
+            (c) => c.charCodeAt(0)
+          ),
+        }));
+      }
+
+      const publicKeyCredentialCreationOptions = options as PublicKeyCredentialCreationOptions;
 
       const credential = await navigator.credentials.create({
         publicKey: publicKeyCredentialCreationOptions,
@@ -99,9 +94,25 @@ export const usePasskeyAuth = () => {
       }
 
       // レスポンスをサーバーに送信
+      // Base64URLエンコード用のヘルパー関数
+      const base64UrlEncode = (buffer: ArrayBuffer): string => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      };
+
       const response = credential.response as AuthenticatorAttestationResponse;
-      const clientDataJSON = new Uint8Array(response.clientDataJSON);
-      const attestationObject = new Uint8Array(response.attestationObject);
+      
+      // Base64URLエンコードされた文字列に変換
+      const clientDataJSON = base64UrlEncode(response.clientDataJSON);
+      const attestationObject = base64UrlEncode(response.attestationObject);
+      const credentialId = base64UrlEncode(credential.rawId);
+      
+      // チャレンジを取得（optionsから）
+      const challenge = base64UrlEncode(publicKeyCredentialCreationOptions.challenge as Uint8Array);
 
       const finishResponse = await fetch('/api/passkey/register/finish', {
         method: 'POST',
@@ -109,9 +120,16 @@ export const usePasskeyAuth = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          credentialId: credential.id,
-          clientDataJSON: Array.from(clientDataJSON),
-          attestationObject: Array.from(attestationObject),
+          credential: {
+            id: credentialId,
+            rawId: credentialId,
+            response: {
+              clientDataJSON,
+              attestationObject,
+            },
+            type: credential.type,
+          },
+          challenge,
           facilityCode,
           loginId,
           userId,
@@ -154,24 +172,33 @@ export const usePasskeyAuth = () => {
         throw new Error('パスキー認証の開始に失敗しました');
       }
 
-      const challengeData = await challengeResponse.json();
+      const options = await challengeResponse.json();
 
       // allowCredentialsが空の場合は、パスキーが登録されていないことを示す
       // ただし、エラーではなくユーザーフレンドリーなメッセージを表示
-      if (!challengeData.allowCredentials || challengeData.allowCredentials.length === 0) {
+      if (!options.allowCredentials || options.allowCredentials.length === 0) {
         throw new Error('パスキーが登録されていません。まずパスキーを登録してください。');
       }
 
-      // 公開鍵クレデンシャルを取得
-      const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
-        challenge: Uint8Array.from(challengeData.challenge, (c: string) => c.charCodeAt(0)),
-        allowCredentials: challengeData.allowCredentials.map((cred: any) => ({
-          id: Uint8Array.from(cred.id, (c: string) => c.charCodeAt(0)),
-          type: 'public-key',
-        })),
-        timeout: 60000,
-        userVerification: 'preferred',
-      };
+      // サーバーから返されたオプションをBase64URLからArrayBufferに変換
+      if (options.challenge) {
+        options.challenge = Uint8Array.from(
+          atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')),
+          (c) => c.charCodeAt(0)
+        );
+      }
+
+      if (options.allowCredentials) {
+        options.allowCredentials = options.allowCredentials.map((cred: any) => ({
+          ...cred,
+          id: Uint8Array.from(
+            atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')),
+            (c) => c.charCodeAt(0)
+          ),
+        }));
+      }
+
+      const publicKeyCredentialRequestOptions = options as PublicKeyCredentialRequestOptions;
 
       const assertion = await navigator.credentials.get({
         publicKey: publicKeyCredentialRequestOptions,
@@ -182,11 +209,27 @@ export const usePasskeyAuth = () => {
       }
 
       // レスポンスをサーバーに送信
+      // Base64URLエンコード用のヘルパー関数
+      const base64UrlEncode = (buffer: ArrayBuffer): string => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      };
+
       const response = assertion.response as AuthenticatorAssertionResponse;
-      const clientDataJSON = new Uint8Array(response.clientDataJSON);
-      const authenticatorData = new Uint8Array(response.authenticatorData);
-      const signature = new Uint8Array(response.signature);
-      const userHandle = response.userHandle ? new Uint8Array(response.userHandle) : null;
+      
+      // Base64URLエンコードされた文字列に変換
+      const clientDataJSON = base64UrlEncode(response.clientDataJSON);
+      const authenticatorData = base64UrlEncode(response.authenticatorData);
+      const signature = base64UrlEncode(response.signature);
+      const userHandle = response.userHandle ? base64UrlEncode(response.userHandle) : null;
+      const credentialId = base64UrlEncode(assertion.rawId);
+      
+      // チャレンジを取得（optionsから）
+      const challenge = base64UrlEncode(publicKeyCredentialRequestOptions.challenge as Uint8Array);
 
       const finishResponse = await fetch('/api/passkey/authenticate/finish', {
         method: 'POST',
@@ -194,11 +237,18 @@ export const usePasskeyAuth = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          credentialId: assertion.id,
-          clientDataJSON: Array.from(clientDataJSON),
-          authenticatorData: Array.from(authenticatorData),
-          signature: Array.from(signature),
-          userHandle: userHandle ? Array.from(userHandle) : null,
+          credential: {
+            id: credentialId,
+            rawId: credentialId,
+            response: {
+              clientDataJSON,
+              authenticatorData,
+              signature,
+              userHandle,
+            },
+            type: assertion.type,
+          },
+          challenge,
           facilityCode,
           loginId,
         }),
