@@ -399,7 +399,8 @@ export default function Home() {
   }
 
   // 認証済みだが初期タブが設定されるまでローディング表示
-  if (!initialTabSet || !activeTab) {
+  // 未認証の場合は既にログイン画面を表示しているので、ここには来ない
+  if (isAuthenticated && (!initialTabSet || !activeTab)) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div>読み込み中...</div>
