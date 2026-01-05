@@ -50,10 +50,16 @@ export function middleware(req: NextRequest) {
     return response;
   }
   
-  // PWA関連ファイル
+  // PWA関連ファイル（Service Workerとmanifestは常に最新を取得）
   if (pathname === '/favicon.ico' || pathname === '/sw.js' || pathname === '/manifest.json') {
     const response = NextResponse.next();
     response.headers.set('x-middleware-skip', 'true');
+    // Service Workerとmanifest.jsonはキャッシュさせない（常に最新版を取得）
+    if (pathname === '/sw.js' || pathname === '/manifest.json') {
+      response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+    }
     return response;
   }
   
@@ -73,16 +79,30 @@ export function middleware(req: NextRequest) {
     return response;
   }
 
-  // 3. ドメインを分解してサブドメインを取得 (例: biz.co-shien.inu.co.jp -> biz)
+  // 3. ドメインを分解してサブドメインを取得
   // 【理由】Netlifyのプロキシ環境では、x-forwarded-hostに実際のホスト名が含まれる
-  // ポート番号を除去し、最初の部分（サブドメイン）を取得
+  // ポート番号を除去し、ドメイン構造を解析
   const hostWithoutPort = host.split(':')[0];
-  const subdomain = hostWithoutPort.split('.')[0].toLowerCase();
+  const hostParts = hostWithoutPort.split('.');
+  const firstPart = hostParts[0]?.toLowerCase() || '';
+  
+  // ドメイン構造の判定
+  // - biz-shien.inu.co.jp → biz側（正のドメイン）
+  // - co-shien.inu.co.jp → biz-shien.inu.co.jpにリダイレクト
+  // - my.co-shien.inu.co.jp または my-shien.inu.co.jp → personal側
+  
+  // 4. co-shien.inu.co.jp に来た場合は biz-shien.inu.co.jp にリダイレクト
+  // ただし、my.co-shien.inu.co.jp などのサブドメイン付きは除外
+  if (hostWithoutPort === 'co-shien.inu.co.jp') {
+    // co-shien.inu.co.jp の場合、biz-shien.inu.co.jp にリダイレクト
+    const protocol = req.nextUrl.protocol || 'https:';
+    const redirectUrl = new URL(`${protocol}//biz-shien.inu.co.jp${pathname}${req.nextUrl.search}`);
+    return NextResponse.redirect(redirectUrl, 301); // 301: 恒久的なリダイレクト
+  }
 
-  // 4. サブドメインに応じたリライト処理
-  // bizドメインはco-shienと同じルートページを使用（正式な動線として統一）
-  // そのため、bizドメインからのアクセスはリライトせず、そのままルートページに進む
-  if (subdomain === 'my') {
+  // 5. personal側のサブドメイン処理
+  // my.co-shien.inu.co.jp または my-shien.inu.co.jp の場合
+  if (firstPart === 'my' || hostWithoutPort === 'my-shien.inu.co.jp' || hostWithoutPort.startsWith('my.')) {
     const rewritePath = pathname === '/' ? '/personal' : `/personal${pathname}`;
     const rewriteUrl = new URL(rewritePath, req.url);
     const response = NextResponse.rewrite(rewriteUrl);
@@ -99,10 +119,12 @@ export function middleware(req: NextRequest) {
     return response;
   }
 
-  // bizドメインとco-shienドメイン（サブドメインなし）は同じルートページを使用
+  // 6. biz-shien.inu.co.jp またはその他のドメイン（biz側として処理）
+  // biz-shien.inu.co.jp が正のドメインとして、ルートページを使用
   // リライトせず、そのまま処理を続行
   const response = NextResponse.next();
-  response.headers.set('x-debug-subdomain', subdomain || 'none');
+  response.headers.set('x-debug-subdomain', firstPart || 'none');
+  response.headers.set('x-debug-host', hostWithoutPort);
   
   // HTMLファイルに対してキャッシュ無効化ヘッダーを設定
   // これにより、ブラウザが常に最新のHTML（＝最新のJSファイル名）を取得する

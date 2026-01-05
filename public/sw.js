@@ -1,6 +1,8 @@
 // Service Worker for PWA
-// バージョン管理: デプロイごとにバージョンを更新することで、強制的にキャッシュを無効化
-const CACHE_VERSION = 'v2';
+// バージョン管理: デプロイごとにこのファイルの内容が変更されることで、ブラウザが新しいバージョンとして認識
+// このファイルを編集するたびに、ブラウザは新しいService Workerとして認識する
+// バージョン番号を手動で更新するか、ビルド時に自動生成する
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `co-shien-${CACHE_VERSION}`;
 const urlsToCache = [
   '/',
@@ -52,20 +54,31 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   
-  // HTMLファイル（ページ）は常にネットワークから取得し、キャッシュしない
+  // HTMLファイル（ページ）は常にネットワークから取得し、絶対にキャッシュしない
   // これにより、常に最新のHTML（＝最新のJSファイル名）を取得できる
+  // Service Workerファイル自体も常に最新を取得
   if (request.method === 'GET' && 
       (request.headers.get('accept')?.includes('text/html') || 
        url.pathname === '/' || 
-       !url.pathname.includes('.'))) {
+       url.pathname === '/sw.js' ||
+       url.pathname === '/manifest.json' ||
+       (!url.pathname.includes('.') && !url.pathname.startsWith('/_next/')))) {
     event.respondWith(
-      fetch(request)
+      fetch(request, {
+        // キャッシュを完全に無視して、常にネットワークから取得
+        cache: 'no-store',
+        headers: {
+          ...Object.fromEntries(request.headers.entries()),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      })
         .then((response) => {
-          // HTMLはキャッシュに保存しない（常に最新を取得）
+          // HTMLは絶対にキャッシュに保存しない（常に最新を取得）
           return response;
         })
         .catch(() => {
-          // オフライン時のみキャッシュから取得
+          // オフライン時のみキャッシュから取得（フォールバック）
           return caches.match(request);
         })
     );

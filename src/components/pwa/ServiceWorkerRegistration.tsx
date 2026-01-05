@@ -16,23 +16,55 @@ export default function ServiceWorkerRegistration() {
       typeof window !== 'undefined' &&
       'serviceWorker' in navigator
     ) {
-      // Service Workerを登録
-      navigator.serviceWorker
-        .register('/sw.js', {
+      // 既存のService Workerを全てアンインストール（強制クリーンアップ）
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister().then((success) => {
+            if (success) {
+              console.log('[SW] Unregistered old Service Worker');
+            }
+          });
+        }
+      }).then(() => {
+        // 既存のキャッシュを全て削除
+        if ('caches' in window) {
+          caches.keys().then((cacheNames) => {
+            return Promise.all(
+              cacheNames.map((cacheName) => {
+                console.log('[SW] Deleting cache:', cacheName);
+                return caches.delete(cacheName);
+              })
+            );
+          });
+        }
+      }).then(() => {
+        // 少し待ってから新しいService Workerを登録
+        return new Promise(resolve => setTimeout(resolve, 100));
+      }).then(() => {
+        // Service Workerを登録（キャッシュを無視して最新版を取得）
+        return navigator.serviceWorker.register('/sw.js', {
           // スコープをルートに設定
           scope: '/',
-        })
+          // 更新を強制（キャッシュを無視）- これにより、常に最新のSWファイルを取得
+          updateViaCache: 'none',
+        });
+      })
         .then((reg) => {
           console.log('Service Worker registered:', reg);
           setRegistration(reg);
 
-          // 更新が利用可能かチェック
+          // 即座に更新をチェック
           checkForUpdates(reg);
 
-          // 定期的に更新をチェック（5分ごと）
+          // ページロード時に必ず更新をチェック
+          window.addEventListener('focus', () => {
+            checkForUpdates(reg);
+          });
+
+          // 定期的に更新をチェック（1分ごと、より頻繁に）
           const updateInterval = setInterval(() => {
             checkForUpdates(reg);
-          }, 5 * 60 * 1000);
+          }, 60 * 1000);
 
           // クリーンアップ
           return () => clearInterval(updateInterval);
@@ -44,6 +76,7 @@ export default function ServiceWorkerRegistration() {
       // Service Workerの更新を検知
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         // 新しいService Workerが制御を取得した時、ページをリロード
+        console.log('[SW] Controller changed, reloading...');
         window.location.reload();
       });
 
@@ -58,25 +91,39 @@ export default function ServiceWorkerRegistration() {
 
   // 更新が利用可能かチェック
   const checkForUpdates = (reg: ServiceWorkerRegistration) => {
+    // キャッシュを無視して強制的に更新をチェック
     reg.update().then(() => {
       // 更新されたService Workerが待機中かチェック
       if (reg.waiting) {
+        console.log('[SW] Update available, waiting for user confirmation');
         setUpdateAvailable(true);
       }
+    }).catch((error) => {
+      console.error('[SW] Update check failed:', error);
     });
 
     // 新しいService Workerがインストールされた時
-    reg.addEventListener('updatefound', () => {
+    const handleUpdateFound = () => {
       const newWorker = reg.installing;
       if (newWorker) {
         newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // 既存のService Workerが動作している場合、更新が利用可能
-            setUpdateAvailable(true);
+          console.log('[SW] New worker state:', newWorker.state);
+          if (newWorker.state === 'installed') {
+            if (navigator.serviceWorker.controller) {
+              // 既存のService Workerが動作している場合、更新が利用可能
+              console.log('[SW] New version installed, update available');
+              setUpdateAvailable(true);
+            } else {
+              // 初回インストール
+              console.log('[SW] Service Worker installed for the first time');
+            }
           }
         });
       }
-    });
+    };
+
+    // 既にリスナーが登録されていない場合のみ追加
+    reg.addEventListener('updatefound', handleUpdateFound);
   };
 
   // 更新を適用
