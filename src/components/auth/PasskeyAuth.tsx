@@ -156,8 +156,10 @@ export const usePasskeyAuth = () => {
 
       const challengeData = await challengeResponse.json();
 
+      // allowCredentialsが空の場合は、パスキーが登録されていないことを示す
+      // ただし、エラーではなくユーザーフレンドリーなメッセージを表示
       if (!challengeData.allowCredentials || challengeData.allowCredentials.length === 0) {
-        throw new Error('登録されたパスキーが見つかりません');
+        throw new Error('パスキーが登録されていません。まずパスキーを登録してください。');
       }
 
       // 公開鍵クレデンシャルを取得
