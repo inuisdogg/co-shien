@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Sidebar from '@/components/common/Sidebar';
 import Header from '@/components/common/Header';
 import DashboardView from '@/components/dashboard/DashboardView';
@@ -43,7 +44,7 @@ export default function BizPage() {
     if (typeof window !== 'undefined') {
       checkSupport();
     }
-  }, []);
+  }, [checkSupport]);
 
   // URLパラメータと保存されたログイン情報を読み込む
   useEffect(() => {
@@ -216,10 +217,13 @@ export default function BizPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
           <div className="text-center mb-8">
-            <img
+            <Image
               src="/logo-cropped-center.png"
               alt="co-shien"
+              width={200}
+              height={64}
               className="h-16 w-auto mx-auto mb-4"
+              priority
             />
             <div className="mb-2">
               <span className="inline-block px-3 py-1 bg-[#00c4cc] text-white text-xs font-bold rounded-full mb-2">

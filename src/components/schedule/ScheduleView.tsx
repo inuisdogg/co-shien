@@ -223,7 +223,7 @@ const ScheduleView: React.FC = () => {
       utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
       uniqueChildrenCount: uniqueChildren.size,
     };
-  }, [schedules, currentDate, capacity, facilitySettings, isHoliday]);
+  }, [schedules, currentDate, capacity, isHoliday]);
 
   // 週間カレンダーの統計を計算
   const weeklyStats = useMemo(() => {
@@ -252,7 +252,7 @@ const ScheduleView: React.FC = () => {
       utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
       uniqueChildrenCount: uniqueChildren.size,
     };
-  }, [schedules, weekDates, capacity, facilitySettings, isHoliday]);
+  }, [schedules, weekDates, capacity, isHoliday]);
 
   // 日付をクリックしてモーダルを開く
   const handleDateClick = (date: string, slot?: TimeSlot) => {

@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw, Mail, Send } from 'lucide-react';
 import { Staff, ScheduleItem, UserPermissions, StaffInvitation } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -1380,10 +1381,13 @@ const StaffView: React.FC = () => {
                     <div className="space-y-2">
                       {qualificationPreview ? (
                         <div className="relative">
-                          <img
+                          <Image
                             src={qualificationPreview}
                             alt="資格証プレビュー"
+                            width={400}
+                            height={192}
                             className="w-full h-48 object-contain border border-gray-300 rounded-md bg-gray-50"
+                            unoptimized
                           />
                           <button
                             type="button"
@@ -1420,10 +1424,13 @@ const StaffView: React.FC = () => {
                     <div className="space-y-2">
                       {experiencePreview ? (
                         <div className="relative">
-                          <img
+                          <Image
                             src={experiencePreview}
                             alt="実務経験証明書プレビュー"
+                            width={400}
+                            height={192}
                             className="w-full h-48 object-contain border border-gray-300 rounded-md bg-gray-50"
+                            unoptimized
                           />
                           <button
                             type="button"
@@ -1788,10 +1795,13 @@ const StaffView: React.FC = () => {
                     <div className="space-y-2">
                       {qualificationPreview ? (
                         <div className="relative">
-                          <img
+                          <Image
                             src={qualificationPreview}
                             alt="資格証プレビュー"
+                            width={400}
+                            height={192}
                             className="w-full h-48 object-contain border border-gray-300 rounded-md bg-gray-50"
+                            unoptimized
                           />
                           <button
                             type="button"
@@ -1828,10 +1838,13 @@ const StaffView: React.FC = () => {
                     <div className="space-y-2">
                       {experiencePreview ? (
                         <div className="relative">
-                          <img
+                          <Image
                             src={experiencePreview}
                             alt="実務経験証明書プレビュー"
+                            width={400}
+                            height={192}
                             className="w-full h-48 object-contain border border-gray-300 rounded-md bg-gray-50"
+                            unoptimized
                           />
                           <button
                             type="button"

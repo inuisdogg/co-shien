@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -223,10 +224,13 @@ export default function SignupPage() {
 
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <img
+          <Image
             src="/logo-cropped-center.png"
             alt="co-shien"
+            width={200}
+            height={64}
             className="h-16 w-auto mx-auto mb-4"
+            priority
           />
           <div className="mb-2">
             <span className="inline-block bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, 
@@ -955,10 +956,13 @@ export default function ActivatePage() {
               className="bg-white rounded-lg shadow-2xl p-8"
             >
               <div className="text-center mb-8">
-                <img
+                <Image
                   src="/logo-cropped-center.png"
                   alt="co-shien"
+                  width={200}
+                  height={64}
                   className="h-16 w-auto mx-auto mb-4"
+                  priority
                 />
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">
                   pocopocoに招待されました！
@@ -1005,10 +1009,13 @@ export default function ActivatePage() {
               className="bg-white rounded-lg shadow-2xl p-8"
             >
               <div className="text-center mb-8">
-                <img
+                <Image
                   src="/logo-cropped-center.png"
                   alt="co-shien"
+                  width={200}
+                  height={64}
                   className="h-16 w-auto mx-auto mb-4"
+                  priority
                 />
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">
                   ログイン
@@ -1104,10 +1111,13 @@ export default function ActivatePage() {
               className="bg-white rounded-lg shadow-2xl p-8"
             >
               <div className="text-center mb-8">
-                <img
+                <Image
                   src="/logo-cropped-center.png"
                   alt="co-shien"
+                  width={200}
+                  height={64}
                   className="h-16 w-auto mx-auto mb-4"
+                  priority
                 />
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">
                   アカウントを作成
@@ -1598,10 +1608,13 @@ export default function ActivatePage() {
                               <label className="block text-sm font-bold text-gray-700 mb-2">{qual}</label>
                               {certificate?.url ? (
                                 <div className="relative">
-                                  <img
+                                  <Image
                                     src={certificate.url}
                                     alt={qual}
+                                    width={400}
+                                    height={192}
                                     className="w-full h-48 object-contain border border-gray-300 rounded-md bg-gray-50"
+                                    unoptimized
                                   />
                                   <button
                                     type="button"

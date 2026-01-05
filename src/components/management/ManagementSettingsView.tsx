@@ -62,7 +62,7 @@ const ManagementSettingsView: React.FC = () => {
   }, [getManagementTarget, selectedYear, selectedMonth]);
 
   // フォームの初期値（前月の設定を引き継ぐ）
-  const getInitialForm = (): ManagementTargetFormData => {
+  const getInitialForm = React.useCallback((): ManagementTargetFormData => {
     if (currentTarget) {
       return {
         year: selectedYear,
@@ -107,14 +107,14 @@ const ManagementSettingsView: React.FC = () => {
       targetOccupancyRate: 0,
       dailyPricePerChild: 0,
     };
-  };
+  }, [selectedYear, selectedMonth, currentTarget, previousMonthTarget]);
 
   const [formData, setFormData] = useState<ManagementTargetFormData>(getInitialForm());
 
   // 選択された月が変更されたらフォームを更新
   useEffect(() => {
     setFormData(getInitialForm());
-  }, [selectedYear, selectedMonth, currentTarget, previousMonthTarget]);
+  }, [selectedYear, selectedMonth, currentTarget, previousMonthTarget, getInitialForm]);
 
   // コスト合計を自動計算
   useEffect(() => {

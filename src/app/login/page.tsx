@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
 import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
@@ -170,10 +171,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <img
+          <Image
             src="/logo-cropped-center.png"
             alt="co-shien"
+            width={200}
+            height={64}
             className="h-16 w-auto mx-auto mb-4"
+            priority
           />
           <div className="mb-2">
             <span className="inline-block bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">

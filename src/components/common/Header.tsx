@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Search, Bell, Menu, LogOut } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' 
           onClick={onLogoClick}
           className="cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2"
         >
-          <img src="/logo-cropped-center.png" alt="co-shien" className="h-10 w-auto object-contain" />
+          <Image src="/logo-cropped-center.png" alt="co-shien" width={150} height={40} className="h-10 w-auto object-contain" priority />
           <span 
             className={`text-xs font-bold px-2 py-1 rounded ${
               isPersonal 
@@ -69,7 +70,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' 
           />
         </div>
         <div className="flex items-center gap-2">
-          <img src="/logo-cropped-center.png" alt="co-shien" className="h-8 w-auto object-contain" />
+          <Image src="/logo-cropped-center.png" alt="co-shien" width={120} height={32} className="h-8 w-auto object-contain" priority />
           <span 
             className={`text-xs font-bold px-2 py-1 rounded ${
               isPersonal 

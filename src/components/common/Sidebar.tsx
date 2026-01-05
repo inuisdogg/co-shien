@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   CalendarDays,
   Users,
@@ -125,7 +126,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
           }}
           className="cursor-pointer hover:opacity-80 transition-opacity"
         >
-          <img src="/logo-cropped-center.png" alt="co-shien" className="h-12 w-auto object-contain" />
+          <Image src="/logo-cropped-center.png" alt="co-shien" width={150} height={48} className="h-12 w-auto object-contain" priority />
         </button>
       </div>
 

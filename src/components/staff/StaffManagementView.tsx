@@ -5,7 +5,8 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Users, Plus, Mail, X, Clock, Calendar, User, Phone, MapPin, Briefcase, Award, FileText, QrCode, Download, Upload, Trash2, Edit } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Staff, UserPermissions, StaffInvitation } from '@/types';
@@ -422,7 +423,7 @@ const StaffManagementView: React.FC = () => {
   };
 
   // 勤怠記録を読み込む
-  const loadAttendanceRecords = async (staff: Staff) => {
+  const loadAttendanceRecords = useCallback(async (staff: Staff) => {
     try {
       // localStorageから勤怠記録を取得（暫定）
       const records = JSON.parse(localStorage.getItem('attendance_records') || '[]');
@@ -444,7 +445,7 @@ const StaffManagementView: React.FC = () => {
       console.error('勤怠記録読み込みエラー:', error);
       setAttendanceRecords([]);
     }
-  };
+  }, [facility?.id, attendanceMonth]);
 
   // 招待リンクを作成
   const handleCreateInvitation = async () => {
@@ -512,7 +513,7 @@ const StaffManagementView: React.FC = () => {
     if (isAttendanceModalOpen && selectedStaff) {
       loadAttendanceRecords(selectedStaff);
     }
-  }, [attendanceMonth, isAttendanceModalOpen, selectedStaff]);
+  }, [attendanceMonth, isAttendanceModalOpen, selectedStaff, loadAttendanceRecords]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -1411,10 +1412,13 @@ const StaffManagementView: React.FC = () => {
                                   )}
                                 </div>
                                 {cert?.url ? (
-                                  <img
+                                  <Image
                                     src={cert.url}
                                     alt={qual}
+                                    width={400}
+                                    height={128}
                                     className="w-full h-32 object-contain border border-gray-300 rounded-md bg-gray-50"
+                                    unoptimized
                                   />
                                 ) : (
                                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
@@ -2640,7 +2644,7 @@ const StaffManagementView: React.FC = () => {
                       const svgData = new XMLSerializer().serializeToString(svgElement);
                       const canvas = document.createElement('canvas');
                       const ctx = canvas.getContext('2d');
-                      const img = new Image();
+                       const img = new window.Image();
                       img.onload = () => {
                         canvas.width = img.width;
                         canvas.height = img.height;
@@ -3403,10 +3407,13 @@ const StaffManagementView: React.FC = () => {
                                   )}
                                 </div>
                                 {cert?.url ? (
-                                  <img
+                                  <Image
                                     src={cert.url}
                                     alt={qual}
+                                    width={400}
+                                    height={128}
                                     className="w-full h-32 object-contain border border-gray-300 rounded-md bg-gray-50"
+                                    unoptimized
                                   />
                                 ) : (
                                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">

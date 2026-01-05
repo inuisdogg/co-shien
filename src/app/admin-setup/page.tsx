@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { hashPassword } from '@/utils/password';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +27,9 @@ export default function AdminSetupPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [setupData, setSetupData] = useState<{ facilityCode: string; email: string; password?: string } | null>(null);
+
+  // ログイン済みかどうか（Personal側でログインしている場合）
+  const isLoggedInAsPersonal = isAuthenticated && user && !facility;
 
   // ログイン済みの場合、ユーザー情報を設定
   useEffect(() => {
@@ -58,22 +62,6 @@ export default function AdminSetupPage() {
 
     checkEmailConfirmation();
   }, [router]);
-
-  // ログイン済みかどうか（Personal側でログインしている場合）
-  const isLoggedInAsPersonal = isAuthenticated && user && !facility;
-
-  // 認証確認中はローディング表示
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">確認中...</h2>
-          <p className="text-gray-600">認証状態を確認しています</p>
-        </div>
-      </div>
-    );
-  }
 
   // セットアップ完了後、自動的にログイン処理を実行
   useEffect(() => {
@@ -146,6 +134,19 @@ export default function AdminSetupPage() {
       return () => clearTimeout(timer);
     }
   }, [success, setupData, isLoggedInAsPersonal, login, router, user]);
+
+  // 認証確認中はローディング表示
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">確認中...</h2>
+          <p className="text-gray-600">認証状態を確認しています</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -517,10 +518,13 @@ export default function AdminSetupPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-8">
         <div className="text-center mb-8">
-          <img
+          <Image
             src="/logo-cropped-center.png"
             alt="co-shien"
+            width={200}
+            height={64}
             className="h-16 w-auto mx-auto mb-4"
+            priority
           />
           <h1 className="text-2xl font-bold text-gray-800">施設の初回セットアップ</h1>
           <p className="text-gray-600 text-sm mt-2">

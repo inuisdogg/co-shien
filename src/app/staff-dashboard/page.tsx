@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import {
   Briefcase,
@@ -514,7 +515,7 @@ export default function StaffDashboardPage() {
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <img src="/logo-cropped-center.png" alt="co-shien" className="h-8 w-auto object-contain" />
+              <Image src="/logo-cropped-center.png" alt="co-shien" width={120} height={32} className="h-8 w-auto object-contain" priority />
               <span className="text-xs font-bold px-2 py-1 rounded bg-[#8b5cf6] text-white">
                 Personal
               </span>
@@ -2441,7 +2442,7 @@ export default function StaffDashboardPage() {
                     </div>
                     {qual.imageUrl && (
                       <div className="mt-3">
-                        <img src={qual.imageUrl} alt={qual.name} className="max-w-full h-32 object-contain border border-gray-200 rounded" />
+                        <Image src={qual.imageUrl} alt={qual.name} width={400} height={128} className="max-w-full h-32 object-contain border border-gray-200 rounded" unoptimized />
                       </div>
                     )}
                   </div>
