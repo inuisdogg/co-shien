@@ -12,7 +12,7 @@ import { hashPassword } from '@/utils/password';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function AdminSetupPage() {
-  const { user, isAuthenticated, facility } = useAuth();
+  const { user, isAuthenticated, facility, login } = useAuth();
   const router = useRouter();
   const [facilityName, setFacilityName] = useState('');
   const [adminName, setAdminName] = useState('');
@@ -37,6 +37,78 @@ export default function AdminSetupPage() {
 
   // ログイン済みかどうか（Personal側でログインしている場合）
   const isLoggedInAsPersonal = isAuthenticated && user && !facility;
+
+  // セットアップ完了後、自動的にログイン処理を実行
+  useEffect(() => {
+    if (success && setupData) {
+      const autoLogin = async () => {
+        // 新規ユーザーの場合、自動的にBiz側にログイン
+        if (!isLoggedInAsPersonal && setupData.password) {
+          try {
+            await login(setupData.facilityCode, setupData.email, setupData.password);
+            // ログイン成功後、ダッシュボードに遷移
+            router.push('/staff-dashboard');
+          } catch (loginError: any) {
+            // ログインエラーは無視（成功画面は表示するが、手動ログインを促す）
+            console.error('自動ログインに失敗しました:', loginError);
+            setError('自動ログインに失敗しました。手動でログインしてください。');
+          }
+        } else if (isLoggedInAsPersonal && user) {
+          // 既存ユーザーの場合、施設情報を取得してlocalStorageに保存し、ページをリロード
+          try {
+            // 施設コードから施設情報を取得
+            const { data: facilityData, error: facilityError } = await supabase
+              .from('facilities')
+              .select('*')
+              .eq('code', setupData.facilityCode)
+              .single();
+
+            if (facilityError || !facilityData) {
+              throw new Error('施設情報の取得に失敗しました');
+            }
+
+            // 施設設定から施設名を取得
+            const { data: facilitySettings } = await supabase
+              .from('facility_settings')
+              .select('facility_name')
+              .eq('facility_id', facilityData.id)
+              .single();
+
+            const facilityInfo = {
+              id: facilityData.id,
+              name: facilitySettings?.facility_name || facilityData.name,
+              code: facilityData.code || facilityData.id,
+              createdAt: facilityData.created_at,
+              updatedAt: facilityData.updated_at,
+            };
+
+            // 施設情報をlocalStorageに保存
+            localStorage.setItem('facility', JSON.stringify(facilityInfo));
+            
+            // ユーザー情報のfacility_idを更新
+            const updatedUser = {
+              ...user,
+              facilityId: facilityData.id,
+            };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+
+            // ページをリロードしてAuthContextに施設情報を反映
+            window.location.href = '/staff-dashboard';
+          } catch (error: any) {
+            console.error('施設情報の取得に失敗しました:', error);
+            setError('施設情報の取得に失敗しました。手動でログインしてください。');
+          }
+        }
+      };
+
+      // 少し待ってから自動ログインを実行（成功画面を表示するため）
+      const timer = setTimeout(() => {
+        autoLogin();
+      }, 2000); // 2秒後に自動ログイン（施設IDを確認する時間を確保）
+
+      return () => clearTimeout(timer);
+    }
+  }, [success, setupData, isLoggedInAsPersonal, login, router, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,7 +357,11 @@ export default function AdminSetupPage() {
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">初期設定が完了しました</h2>
-            <p className="text-gray-600 text-sm mb-6">以下の情報でログインできます</p>
+            <p className="text-gray-600 text-sm mb-6">
+              {setupData.password 
+                ? '自動的にログインします...' 
+                : '施設情報を読み込み中...'}
+            </p>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-6 mb-6 space-y-4">
