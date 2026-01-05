@@ -87,22 +87,22 @@ export function middleware(req: NextRequest) {
   const firstPart = hostParts[0]?.toLowerCase() || '';
   
   // ドメイン構造の判定
-  // - biz-shien.inu.co.jp → biz側（正のドメイン）
-  // - co-shien.inu.co.jp → biz-shien.inu.co.jpにリダイレクト
-  // - my.co-shien.inu.co.jp または my-shien.inu.co.jp → personal側
+  // - biz.co-shien.inu.co.jp → biz側（正のドメイン）
+  // - co-shien.inu.co.jp → biz.co-shien.inu.co.jpにリダイレクト
+  // - my.co-shien.inu.co.jp → personal側
   
-  // 4. co-shien.inu.co.jp に来た場合は biz-shien.inu.co.jp にリダイレクト
+  // 4. co-shien.inu.co.jp に来た場合は biz.co-shien.inu.co.jp にリダイレクト
   // ただし、my.co-shien.inu.co.jp などのサブドメイン付きは除外
   if (hostWithoutPort === 'co-shien.inu.co.jp') {
-    // co-shien.inu.co.jp の場合、biz-shien.inu.co.jp にリダイレクト
+    // co-shien.inu.co.jp の場合、biz.co-shien.inu.co.jp にリダイレクト
     const protocol = req.nextUrl.protocol || 'https:';
-    const redirectUrl = new URL(`${protocol}//biz-shien.inu.co.jp${pathname}${req.nextUrl.search}`);
+    const redirectUrl = new URL(`${protocol}//biz.co-shien.inu.co.jp${pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(redirectUrl, 301); // 301: 恒久的なリダイレクト
   }
 
   // 5. personal側のサブドメイン処理
-  // my.co-shien.inu.co.jp または my-shien.inu.co.jp の場合
-  if (firstPart === 'my' || hostWithoutPort === 'my-shien.inu.co.jp' || hostWithoutPort.startsWith('my.')) {
+  // my.co-shien.inu.co.jp の場合
+  if (firstPart === 'my' || hostWithoutPort.startsWith('my.')) {
     const rewritePath = pathname === '/' ? '/personal' : `/personal${pathname}`;
     const rewriteUrl = new URL(rewritePath, req.url);
     const response = NextResponse.rewrite(rewriteUrl);
@@ -119,8 +119,8 @@ export function middleware(req: NextRequest) {
     return response;
   }
 
-  // 6. biz-shien.inu.co.jp またはその他のドメイン（biz側として処理）
-  // biz-shien.inu.co.jp が正のドメインとして、ルートページを使用
+  // 6. biz.co-shien.inu.co.jp またはその他のドメイン（biz側として処理）
+  // biz.co-shien.inu.co.jp が正のドメインとして、ルートページを使用
   // リライトせず、そのまま処理を続行
   const response = NextResponse.next();
   response.headers.set('x-debug-subdomain', firstPart || 'none');
