@@ -319,13 +319,20 @@ export default function Home() {
               <button
                 type="button"
                 onClick={async () => {
-                  if (!facilityCode || !loginId) {
-                    setError('施設IDとメールアドレス（またはログインID）を入力してください');
+                  if (isBiz && !facilityCode) {
+                    setError('施設IDを入力してください');
+                    return;
+                  }
+                  if (!loginId) {
+                    setError(isBiz 
+                      ? 'メールアドレス（またはログインID）を入力してください'
+                      : 'メールアドレスを入力してください');
                     return;
                   }
                   setError('');
                   try {
-                    await authenticatePasskey(facilityCode, loginId);
+                    const facilityCodeToUse = isBiz ? facilityCode : '';
+                    await authenticatePasskey(facilityCodeToUse, loginId);
                     // パスキー認証が成功した場合、通常のログインフローを実行
                     // 実際の実装では、パスキー認証の結果に基づいてログイン処理を行う
                     setError('パスキー認証機能は現在開発中です');
@@ -333,7 +340,7 @@ export default function Home() {
                     setError(err.message || 'パスキー認証に失敗しました');
                   }
                 }}
-                disabled={loading || isAuthenticating || !facilityCode || !loginId}
+                disabled={loading || isAuthenticating || (isBiz && !facilityCode) || !loginId}
                 className="mt-4 w-full bg-white hover:bg-gray-50 text-[#00c4cc] border-2 border-[#00c4cc] font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isAuthenticating ? (

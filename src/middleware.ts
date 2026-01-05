@@ -73,15 +73,8 @@ export function middleware(req: NextRequest) {
   const subdomain = hostWithoutPort.split('.')[0].toLowerCase();
 
   // 4. サブドメインに応じたリライト処理
-  if (subdomain === 'biz') {
-    const rewritePath = pathname === '/' ? '/biz' : `/biz${pathname}`;
-    const rewriteUrl = new URL(rewritePath, req.url);
-    const response = NextResponse.rewrite(rewriteUrl);
-    response.headers.set('x-debug-subdomain', 'biz');
-    response.headers.set('x-debug-rewrite-path', rewritePath);
-    return response;
-  }
-  
+  // bizドメインはco-shienと同じルートページを使用（正式な動線として統一）
+  // そのため、bizドメインからのアクセスはリライトせず、そのままルートページに進む
   if (subdomain === 'my') {
     const rewritePath = pathname === '/' ? '/personal' : `/personal${pathname}`;
     const rewriteUrl = new URL(rewritePath, req.url);
@@ -91,7 +84,8 @@ export function middleware(req: NextRequest) {
     return response;
   }
 
-  // サブドメインがない場合（co-shien.inu.co.jpなど）
+  // bizドメインとco-shienドメイン（サブドメインなし）は同じルートページを使用
+  // リライトせず、そのまま処理を続行
   const response = NextResponse.next();
   response.headers.set('x-debug-subdomain', subdomain || 'none');
   return response;

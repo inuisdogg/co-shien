@@ -59,8 +59,10 @@ export async function POST(request: NextRequest) {
       .select('credential_id')
       .eq('user_id', userId);
 
+    // 既存のパスキーを除外するリスト（実際には使用されていないが、一貫性のために保持）
+    // idはbase64url形式の文字列として提供する必要がある
     const excludeCredentials = (existingPasskeys || []).map((pk) => ({
-      id: Buffer.from(pk.credential_id, 'base64url'),
+      id: pk.credential_id, // 既にbase64url形式の文字列として保存されている
       type: 'public-key' as const,
       transports: [] as AuthenticatorTransport[],
     }));

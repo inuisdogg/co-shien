@@ -49,8 +49,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 許可するクレデンシャルのリストを作成
+    // idはbase64url形式の文字列として提供する必要がある
     const allowCredentials = passkeys.map((pk) => ({
-      id: Buffer.from(pk.credential_id, 'base64url'),
+      id: pk.credential_id, // 既にbase64url形式の文字列として保存されている
       type: 'public-key' as const,
       transports: [] as AuthenticatorTransport[],
     }));
