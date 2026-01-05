@@ -82,7 +82,7 @@ export function middleware(req: NextRequest) {
   // 3. ドメインを分解してサブドメインを取得
   // 【理由】Netlifyのプロキシ環境では、x-forwarded-hostに実際のホスト名が含まれる
   // ポート番号を除去し、ドメイン構造を解析
-  const hostWithoutPort = host.split(':')[0];
+  const hostWithoutPort = host.split(':')[0].toLowerCase();
   const hostParts = hostWithoutPort.split('.');
   const firstPart = hostParts[0]?.toLowerCase() || '';
   
@@ -93,11 +93,17 @@ export function middleware(req: NextRequest) {
   
   // 4. co-shien.inu.co.jp に来た場合は biz.co-shien.inu.co.jp にリダイレクト
   // ただし、my.co-shien.inu.co.jp などのサブドメイン付きは除外
-  if (hostWithoutPort === 'co-shien.inu.co.jp') {
+  // 完全一致でチェック（大文字小文字を区別しない）
+  if (hostWithoutPort === 'co-shien.inu.co.jp' || 
+      hostWithoutPort === 'www.co-shien.inu.co.jp') {
     // co-shien.inu.co.jp の場合、biz.co-shien.inu.co.jp にリダイレクト
     const protocol = req.nextUrl.protocol || 'https:';
     const redirectUrl = new URL(`${protocol}//biz.co-shien.inu.co.jp${pathname}${req.nextUrl.search}`);
-    return NextResponse.redirect(redirectUrl, 301); // 301: 恒久的なリダイレクト
+    // デバッグ情報をヘッダーに追加
+    const response = NextResponse.redirect(redirectUrl, 301); // 301: 恒久的なリダイレクト
+    response.headers.set('x-redirect-from', hostWithoutPort);
+    response.headers.set('x-redirect-to', 'biz.co-shien.inu.co.jp');
+    return response;
   }
 
   // 5. personal側のサブドメイン処理
