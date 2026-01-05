@@ -54,16 +54,57 @@ export default function PersonalSignupPage() {
 
     setLoading(true);
     try {
-      // 既存のユーザーをチェック（Supabase Authとusersテーブルの両方）
-      const { data: existingUser } = await supabase
+      // 重複チェック：メールアドレス
+      const { data: existingUserByEmail, error: emailCheckError } = await supabase
         .from('users')
-        .select('id')
-        .eq('email', formData.email)
-        .single();
+        .select('id, email, name, login_id')
+        .eq('email', formData.email.trim().toLowerCase())
+        .maybeSingle();
 
-      if (existingUser) {
+      if (emailCheckError && emailCheckError.code !== 'PGRST116') {
+        // PGRST116は「結果が見つからない」エラーなので無視
+        throw new Error(`ユーザー確認エラー: ${emailCheckError.message}`);
+      }
+
+      if (existingUserByEmail) {
         throw new Error('このメールアドレスは既に登録されています');
       }
+
+      // 重複チェック：ログインID（メールアドレスと同じ値）
+      const { data: existingUserByLoginId, error: loginIdCheckError } = await supabase
+        .from('users')
+        .select('id, email, name, login_id')
+        .eq('login_id', formData.email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (loginIdCheckError && loginIdCheckError.code !== 'PGRST116') {
+        throw new Error(`ログインID確認エラー: ${loginIdCheckError.message}`);
+      }
+
+      if (existingUserByLoginId) {
+        throw new Error('このメールアドレスは既にログインIDとして使用されています');
+      }
+
+      // 重複チェック：名前（同一名のユーザーが存在するか確認）
+      // ただし、名前のみでの重複チェックは緩くする（同名の可能性があるため）
+      // メールアドレスと名前の組み合わせでチェック
+      const { data: existingUserByNameAndEmail, error: nameCheckError } = await supabase
+        .from('users')
+        .select('id, email, name')
+        .eq('name', formData.name.trim())
+        .eq('email', formData.email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (nameCheckError && nameCheckError.code !== 'PGRST116') {
+        throw new Error(`名前確認エラー: ${nameCheckError.message}`);
+      }
+
+      if (existingUserByNameAndEmail) {
+        throw new Error('この名前とメールアドレスの組み合わせは既に登録されています');
+      }
+
+      // Supabase Authでの重複チェックは、signUp時にエラーとして返されるため
+      // ここではusersテーブルのチェックで十分
 
       // Supabase Authでサインアップ（メール認証を有効化）
       const redirectUrl = typeof window !== 'undefined' 
@@ -82,6 +123,12 @@ export default function PersonalSignupPage() {
       });
 
       if (signUpError) {
+        // Supabase Authの重複エラーをチェック
+        if (signUpError.message.includes('already registered') || 
+            signUpError.message.includes('already exists') ||
+            signUpError.message.includes('User already registered')) {
+          throw new Error('このメールアドレスは既にSupabase Authに登録されています');
+        }
         throw new Error(`サインアップエラー: ${signUpError.message}`);
       }
 

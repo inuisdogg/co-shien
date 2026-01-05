@@ -305,14 +305,22 @@ export default function PersonalPage() {
           </div>
         )}
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
           <p className="text-center text-sm text-gray-600">
             アカウントをお持ちでない方は{' '}
             <button
-              onClick={() => router.push('/signup')}
+              onClick={() => router.push('/personal/signup')}
               className="text-[#00c4cc] hover:underline font-bold"
             >
               こちらから新規登録
+            </button>
+          </p>
+          <p className="text-center text-xs text-gray-400">
+            <button
+              onClick={() => window.location.href = 'https://biz.co-shien.inu.co.jp/'}
+              className="hover:underline"
+            >
+              Biz側でログイン
             </button>
           </p>
         </div>

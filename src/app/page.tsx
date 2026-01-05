@@ -367,17 +367,27 @@ export default function Home() {
             </div>
           )}
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
             {isPersonal ? (
-              <p className="text-center text-sm text-gray-600">
-                アカウントをお持ちでない方は{' '}
-                <button
-                  onClick={() => router.push('/signup')}
-                  className="text-[#00c4cc] hover:underline font-bold"
-                >
-                  こちらから新規登録
-                </button>
-              </p>
+              <>
+                <p className="text-center text-sm text-gray-600">
+                  アカウントをお持ちでない方は{' '}
+                  <button
+                    onClick={() => router.push('/signup')}
+                    className="text-[#00c4cc] hover:underline font-bold"
+                  >
+                    こちらから新規登録
+                  </button>
+                </p>
+                <p className="text-center text-xs text-gray-400">
+                  <button
+                    onClick={() => window.location.href = 'https://biz.co-shien.inu.co.jp/'}
+                    className="hover:underline"
+                  >
+                    Biz側でログイン
+                  </button>
+                </p>
+              </>
             ) : (
               <>
                 <p className="text-center text-sm text-gray-600 mb-3">
@@ -390,6 +400,14 @@ export default function Home() {
                 >
                   初期設定を行う
                 </button>
+                <p className="text-center text-xs text-gray-400 mt-2">
+                  <button
+                    onClick={() => window.location.href = 'https://my.co-shien.inu.co.jp/'}
+                    className="hover:underline"
+                  >
+                    Personal側でログイン
+                  </button>
+                </p>
               </>
             )}
           </div>

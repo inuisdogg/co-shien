@@ -305,7 +305,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
           <p className="text-center text-sm text-gray-600">
             アカウントをお持ちでない方は{' '}
             <button
@@ -313,6 +313,14 @@ export default function LoginPage() {
               className="text-[#00c4cc] hover:underline font-bold"
             >
               新規登録
+            </button>
+          </p>
+          <p className="text-center text-xs text-gray-400">
+            <button
+              onClick={() => window.location.href = 'https://my.co-shien.inu.co.jp/'}
+              className="hover:underline"
+            >
+              Personal側でログイン
             </button>
           </p>
         </div>

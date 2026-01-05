@@ -46,15 +46,35 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      // 既存のユーザーをチェック
-      const { data: existingUser } = await supabase
+      // 重複チェック：メールアドレス
+      const { data: existingUserByEmail, error: emailCheckError } = await supabase
         .from('users')
-        .select('id')
-        .eq('email', formData.email)
-        .single();
+        .select('id, email, name, login_id')
+        .eq('email', formData.email.trim().toLowerCase())
+        .maybeSingle();
 
-      if (existingUser) {
+      if (emailCheckError && emailCheckError.code !== 'PGRST116') {
+        // PGRST116は「結果が見つからない」エラーなので無視
+        throw new Error(`ユーザー確認エラー: ${emailCheckError.message}`);
+      }
+
+      if (existingUserByEmail) {
         throw new Error('このメールアドレスは既に登録されています');
+      }
+
+      // 重複チェック：ログインID（メールアドレスと同じ値）
+      const { data: existingUserByLoginId, error: loginIdCheckError } = await supabase
+        .from('users')
+        .select('id, email, name, login_id')
+        .eq('login_id', formData.email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (loginIdCheckError && loginIdCheckError.code !== 'PGRST116') {
+        throw new Error(`ログインID確認エラー: ${loginIdCheckError.message}`);
+      }
+
+      if (existingUserByLoginId) {
+        throw new Error('このメールアドレスは既にログインIDとして使用されています');
       }
 
       // Supabase Authでサインアップ（メール認証を有効化、パスワードは後で設定）
