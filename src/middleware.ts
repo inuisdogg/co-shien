@@ -6,6 +6,13 @@ export function middleware(req: NextRequest) {
   // Netlify等のプロキシ環境では x-forwarded-host を優先的に見るのが定石
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
 
+  // 0. HTMLファイル（ページ）に対してキャッシュ無効化ヘッダーを設定
+  // 【理由】ブラウザがindex.htmlをキャッシュしてしまうと、新しいバージョンのJSファイル名に気づけない
+  // HTMLファイルのみ常に最新を確認させ、JS/CSSなどの静的ファイルは適切にキャッシュさせる
+  const isHtmlRequest = 
+    pathname === '/' || 
+    (!pathname.includes('.') && req.headers.get('accept')?.includes('text/html'));
+
   // 1. システムファイル・静的資産は「絶対に」リライトせず即座にスルー
   // 【理由】Next.jsの静的ファイル（/_next/static, /_next/imageなど）は
   // 常にルートに存在し、サブドメインに関わらず同じパスでアクセスできる必要がある
@@ -81,6 +88,14 @@ export function middleware(req: NextRequest) {
     const response = NextResponse.rewrite(rewriteUrl);
     response.headers.set('x-debug-subdomain', 'my');
     response.headers.set('x-debug-rewrite-path', rewritePath);
+    
+    // HTMLファイルに対してキャッシュ無効化ヘッダーを設定
+    if (isHtmlRequest) {
+      response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+    }
+    
     return response;
   }
 
@@ -88,6 +103,15 @@ export function middleware(req: NextRequest) {
   // リライトせず、そのまま処理を続行
   const response = NextResponse.next();
   response.headers.set('x-debug-subdomain', subdomain || 'none');
+  
+  // HTMLファイルに対してキャッシュ無効化ヘッダーを設定
+  // これにより、ブラウザが常に最新のHTML（＝最新のJSファイル名）を取得する
+  if (isHtmlRequest) {
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+  }
+  
   return response;
 }
 
