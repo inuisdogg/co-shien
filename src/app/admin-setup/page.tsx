@@ -68,9 +68,13 @@ export default function AdminSetupPage() {
     if (success && setupData) {
       const autoLogin = async () => {
         // 新規ユーザーの場合、自動的にBiz側にログイン
-        if (!isLoggedInAsPersonal && setupData.password) {
+        // isLoggedInAsPersonalがfalseで、passwordが存在する場合のみ新規ユーザーとして扱う
+        if (!isLoggedInAsPersonal && setupData.password && setupData.facilityCode) {
           try {
+            console.log('自動ログイン開始:', { facilityCode: setupData.facilityCode, email: setupData.email });
+            // Biz側のログイン（facilityCodeを指定）
             await login(setupData.facilityCode, setupData.email, setupData.password);
+            console.log('自動ログイン成功');
             // ログイン成功後、ダッシュボードに遷移
             router.push('/staff-dashboard');
           } catch (loginError: any) {
@@ -78,9 +82,10 @@ export default function AdminSetupPage() {
             console.error('自動ログインに失敗しました:', loginError);
             setError('自動ログインに失敗しました。手動でログインしてください。');
           }
-        } else if (isLoggedInAsPersonal && user) {
-          // 既存ユーザーの場合、施設情報を取得してlocalStorageに保存し、ページをリロード
+        } else if (isLoggedInAsPersonal && user && setupData.facilityCode) {
+          // 既存ユーザー（Personal側でログイン済み）の場合、施設情報を取得してlocalStorageに保存し、ページをリロード
           try {
+            console.log('既存ユーザーの施設情報取得開始:', { facilityCode: setupData.facilityCode });
             // 施設コードから施設情報を取得
             const { data: facilityData, error: facilityError } = await supabase
               .from('facilities')
@@ -117,19 +122,22 @@ export default function AdminSetupPage() {
             };
             localStorage.setItem('user', JSON.stringify(updatedUser));
 
+            console.log('施設情報を保存しました。ページをリロードします。');
             // ページをリロードしてAuthContextに施設情報を反映
             window.location.href = '/staff-dashboard';
           } catch (error: any) {
             console.error('施設情報の取得に失敗しました:', error);
             setError('施設情報の取得に失敗しました。手動でログインしてください。');
           }
+        } else {
+          console.log('自動ログインをスキップ:', { isLoggedInAsPersonal, hasPassword: !!setupData.password, hasFacilityCode: !!setupData.facilityCode });
         }
       };
 
       // 少し待ってから自動ログインを実行（成功画面を表示するため）
       const timer = setTimeout(() => {
         autoLogin();
-      }, 2000); // 2秒後に自動ログイン（施設IDを確認する時間を確保）
+      }, 1500); // 1.5秒後に自動ログイン（施設IDを確認する時間を確保）
 
       return () => clearTimeout(timer);
     }

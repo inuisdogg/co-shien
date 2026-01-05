@@ -235,10 +235,18 @@ export default function SetupPage() {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={() => router.push('/')}
+            onClick={async () => {
+              // 施設セットアップページにリダイレクト（施設IDとメールアドレスを渡す）
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user?.email && facilityCode) {
+                router.push(`/admin-setup?facilityCode=${facilityCode}&email=${encodeURIComponent(session.user.email)}`);
+              } else {
+                router.push('/');
+              }
+            }}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
           >
-            ログインページへ
+            施設セットアップを続ける
           </button>
         </div>
       </div>
