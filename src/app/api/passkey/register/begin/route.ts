@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // リライイングパーティ（RP）情報を設定
     const rpName = 'co-shien';
-    const rpId = (() => {
+    const rpID = (() => {
       if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
         if (hostname.startsWith('biz.') || hostname.includes('biz.co-shien')) {
@@ -66,11 +66,14 @@ export async function POST(request: NextRequest) {
       return 'my.co-shien.inu.co.jp';
     })();
 
+    // userIDをUint8Arrayに変換
+    const userID = new Uint8Array(Buffer.from(userId));
+
     // 登録オプションを生成
     const opts: GenerateRegistrationOptionsOpts = {
       rpName,
-      rpId,
-      userID: Buffer.from(userId),
+      rpID,
+      userID,
       userName: loginId,
       userDisplayName: userData.email || loginId,
       timeout: 60000,

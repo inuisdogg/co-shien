@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // RP IDを決定
-    const rpId = (() => {
+    const rpID = (() => {
       const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
       const hostname = host.split(':')[0];
       if (hostname.startsWith('biz.') || hostname.includes('biz.co-shien')) {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     })();
 
     const origin = request.headers.get('origin') || 
-      `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || request.headers.get('x-forwarded-host') || rpId}`;
+      `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || request.headers.get('x-forwarded-host') || rpID}`;
 
     // 既存のパスキーを取得（重複チェック用）
     const { data: existingPasskeys } = await supabase
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       response: credential,
       expectedChallenge: Buffer.from(decodedChallenge).toString('base64url'),
       expectedOrigin: origin,
-      expectedRPID: rpId,
+      expectedRPID: rpID,
       requireUserVerification: false,
     };
 
@@ -107,9 +107,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+    // 最新の@simplewebauthn/serverでは、registrationInfo.credentialに情報が含まれる
+    const { credential: registrationCredential } = verification.registrationInfo;
+    const credentialID = registrationCredential.id;
+    const credentialPublicKey = registrationCredential.publicKey;
+    // 新規登録時はcounterは0から始まる
+    const counter = 0;
 
     // パスキー情報をデータベースに保存
+    // credentialIDはUint8Array型であることが保証されている
     const credentialIdBase64 = Buffer.from(credentialID).toString('base64url');
 
     // デバイス情報を取得（可能であれば）
@@ -117,12 +123,16 @@ export async function POST(request: NextRequest) {
       'Unknown Device';
     const deviceType = credentialData.authenticatorAttachment === 'platform' ? 'platform' : 'cross-platform';
 
+    // credentialPublicKeyをBufferに変換（データベース保存用）
+    // credentialPublicKeyはUint8Array型であることが保証されている
+    const publicKeyBuffer = Buffer.from(credentialPublicKey);
+
     const { data: passkeyData, error: insertError } = await supabase
       .from('passkeys')
       .insert({
         user_id: userId,
         credential_id: credentialIdBase64,
-        public_key: Buffer.from(credentialPublicKey),
+        public_key: publicKeyBuffer,
         counter: counter || 0,
         device_name: deviceName,
         device_type: deviceType,

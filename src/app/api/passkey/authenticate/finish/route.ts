@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     const decodedChallenge = base64UrlDecode(expectedChallenge);
 
     // RP IDを決定
-    const rpId = (() => {
+    const rpID = (() => {
       const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
       const hostname = host.split(':')[0];
       if (hostname.startsWith('biz.') || hostname.includes('biz.co-shien')) {
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
     })();
 
     const origin = request.headers.get('origin') || 
-      `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || request.headers.get('x-forwarded-host') || rpId}`;
+      `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || request.headers.get('x-forwarded-host') || rpID}`;
 
     // 認証レスポンスを検証
     // 最新の@simplewebauthn/serverでは、credentialオブジェクトとして渡す
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
       response: credential,
       expectedChallenge: Buffer.from(decodedChallenge).toString('base64url'),
       expectedOrigin: origin,
-      expectedRPID: rpId,
+      expectedRPID: rpID,
       credential: {
         id: credentialIDString,
         publicKey: publicKey,

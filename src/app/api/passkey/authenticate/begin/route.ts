@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }));
 
     // RP IDを決定
-    const rpId = (() => {
+    const rpID = (() => {
       const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
       const hostname = host.split(':')[0];
       if (hostname.startsWith('biz.') || hostname.includes('biz.co-shien')) {
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // 認証オプションを生成
     const opts: GenerateAuthenticationOptionsOpts = {
-      rpID: rpId,
+      rpID,
       allowCredentials,
       userVerification: 'preferred',
       timeout: 60000,
