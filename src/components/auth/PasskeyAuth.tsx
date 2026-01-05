@@ -112,7 +112,12 @@ export const usePasskeyAuth = () => {
       const credentialId = base64UrlEncode(credential.rawId);
       
       // チャレンジを取得（optionsから）
-      const challenge = base64UrlEncode(publicKeyCredentialCreationOptions.challenge as Uint8Array);
+      // Uint8ArrayをArrayBufferに変換
+      const challengeBuffer = publicKeyCredentialCreationOptions.challenge as Uint8Array;
+      const challengeArrayBuffer = new ArrayBuffer(challengeBuffer.length);
+      const challengeView = new Uint8Array(challengeArrayBuffer);
+      challengeView.set(challengeBuffer);
+      const challenge = base64UrlEncode(challengeArrayBuffer);
 
       const finishResponse = await fetch('/api/passkey/register/finish', {
         method: 'POST',
@@ -229,7 +234,12 @@ export const usePasskeyAuth = () => {
       const credentialId = base64UrlEncode(assertion.rawId);
       
       // チャレンジを取得（optionsから）
-      const challenge = base64UrlEncode(publicKeyCredentialRequestOptions.challenge as Uint8Array);
+      // Uint8ArrayをArrayBufferに変換
+      const challengeBuffer = publicKeyCredentialRequestOptions.challenge as Uint8Array;
+      const challengeArrayBuffer = new ArrayBuffer(challengeBuffer.length);
+      const challengeView = new Uint8Array(challengeArrayBuffer);
+      challengeView.set(challengeBuffer);
+      const challenge = base64UrlEncode(challengeArrayBuffer);
 
       const finishResponse = await fetch('/api/passkey/authenticate/finish', {
         method: 'POST',
