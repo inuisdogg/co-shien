@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function AdminSetupPage() {
   const { user, isAuthenticated, facility, login } = useAuth();
   const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [facilityName, setFacilityName] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
@@ -35,8 +36,44 @@ export default function AdminSetupPage() {
     }
   }, [isAuthenticated, user, facility]);
 
+  // メール認証状態を確認
+  useEffect(() => {
+    const checkEmailConfirmation = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // Supabase Authを使用している場合、メール認証が完了しているか確認
+        if (session?.user && !session.user.email_confirmed_at) {
+          // メール認証が完了していない場合、サインアップページにリダイレクト
+          router.push('/signup?waiting=true');
+          return;
+        }
+        
+        setCheckingAuth(false);
+      } catch (error) {
+        console.error('認証確認エラー:', error);
+        setCheckingAuth(false);
+      }
+    };
+
+    checkEmailConfirmation();
+  }, [router]);
+
   // ログイン済みかどうか（Personal側でログインしている場合）
   const isLoggedInAsPersonal = isAuthenticated && user && !facility;
+
+  // 認証確認中はローディング表示
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">確認中...</h2>
+          <p className="text-gray-600">認証状態を確認しています</p>
+        </div>
+      </div>
+    );
+  }
 
   // セットアップ完了後、自動的にログイン処理を実行
   useEffect(() => {

@@ -10,7 +10,6 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { hashPassword } from '@/utils/password';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -54,7 +53,7 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      // 既存のユーザーをチェック
+      // 既存のユーザーをチェック（Supabase Authとusersテーブルの両方）
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -65,58 +64,55 @@ export default function SignupPage() {
         throw new Error('このメールアドレスは既に登録されています');
       }
 
-      // パスワードをハッシュ化
-      const passwordHash = await hashPassword(formData.password);
-
-      // UUIDを生成
-      const generateUUID = () => {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-          return crypto.randomUUID();
-        }
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-          const r = (Math.random() * 16) | 0;
-          const v = c === 'x' ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        });
-      };
-
-      const newUserId = generateUUID();
-      const newUser: any = {
-        id: newUserId,
-        name: formData.name,
+      // Supabase Authでサインアップ（メール認証を有効化）
+      const redirectUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/auth/callback?type=biz`
+        : 'https://biz.co-shien.inu.co.jp/auth/callback?type=biz';
+      
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
-        password_hash: passwordHash,
-        account_status: 'active',
-        activated_at: new Date().toISOString(),
-        has_account: true,
-        role: 'staff',
-        // facility_idは設定しない（Personal側では施設に依存しない）
-      };
+        password: formData.password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            name: formData.name,
+          }
+        }
+      });
 
-      const { data: createdUser, error: createError } = await supabase
-        .from('users')
-        .insert(newUser)
-        .select()
-        .single();
-
-      if (createError || !createdUser) {
-        throw new Error(`アカウント作成エラー: ${createError?.message || 'Unknown error'}`);
+      if (signUpError) {
+        throw new Error(`サインアップエラー: ${signUpError.message}`);
       }
 
-      // ログイン情報をlocalStorageに保存
-      const user = {
-        id: createdUser.id,
-        name: createdUser.name,
-        email: createdUser.email,
-        account_status: createdUser.account_status,
-      };
-      localStorage.setItem('user', JSON.stringify(user));
+      if (!authData.user) {
+        throw new Error('ユーザー作成に失敗しました');
+      }
 
-      // 新規登録成功後、キャリア情報入力へのオプションを提供
-      // activateページの新規登録ロジックと統合するため、キャリア情報入力へのリンクを表示
-      // ただし、Personal側では施設IDが不要なので、直接スタッフダッシュボードへリダイレクト
-      // キャリア情報は後から入力可能（スタッフダッシュボードから）
-      router.push('/staff-dashboard');
+      // usersテーブルにユーザー情報を保存（Supabase Authのトリガーで自動作成される場合もあるが、念のため）
+      // パスワードはSupabase Authで管理するため、password_hashは設定しない
+      const { error: userCreateError } = await supabase
+        .from('users')
+        .upsert({
+          id: authData.user.id,
+          name: formData.name,
+          email: formData.email,
+          login_id: formData.email,
+          account_status: 'pending', // メール認証待ち
+          has_account: true,
+          role: 'staff',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'id'
+        });
+
+      if (userCreateError) {
+        console.error('usersテーブルへの保存エラー:', userCreateError);
+        // エラーでも続行（Supabase Authのトリガーで作成される可能性がある）
+      }
+
+      // メール認証待機ページにリダイレクト
+      router.push(`/signup/waiting?email=${encodeURIComponent(formData.email)}`);
     } catch (err: any) {
       setError(err.message || 'アカウント作成に失敗しました');
     } finally {
