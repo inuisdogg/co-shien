@@ -4,3 +4,4 @@ ADD COLUMN IF NOT EXISTS holiday_periods JSONB DEFAULT '[]'::jsonb;
 
 
 
+

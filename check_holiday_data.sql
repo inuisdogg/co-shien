@@ -59,3 +59,4 @@ WHERE table_name = 'facility_settings'
 ORDER BY ordinal_position;
 
 
+
