@@ -198,13 +198,22 @@ export default function AdminSetupPage() {
       // ============================================
       // 管理者は「施設オーナー（Biz権限）」と「一人のスタッフ（Personal権限）」の
       // 両方の顔を持ちます。
-      // - 新規ユーザーの場合: Personal用のシャドウアカウントを自動生成
+      // - 新規ユーザーの場合: Personal用のアカウントを自動生成
       // - 既存ユーザーの場合: 既存のアカウントにBiz側の所属記録を追加
+      //
+      // 【将来的な離職時の設計】
+      // 管理者が離職した場合：
+      // 1. usersテーブル: 個人アカウントとして残る（削除しない）
+      // 2. employment_recordsテーブル: end_dateを設定して所属関係を終了
+      // 3. staffテーブル: 削除または非アクティブ化（事業所固有の情報のため）
+      // これにより、離職後も個人アカウントとしてログイン可能で、
+      // 他の事業所への所属やキャリア管理が可能
       // ============================================
       
-      // 1. Personal用のアカウント処理
+      // 1. Personal用のアカウント処理（usersテーブル）
+      // 管理者は必ずusersテーブルに存在する必要がある（個人アカウントとして）
       if (!isLoggedInAsPersonal) {
-        // 新規ユーザー作成の場合: Personal用のシャドウアカウントを作成（usersテーブル）
+        // 新規ユーザー作成の場合: Personal用のアカウントを作成（usersテーブル）
         //    - account_status='active'で有効化済み
         //    - 初期ログイン時にパスワード設定も完了しているため、すぐに利用可能
         const { error: userError } = await supabase
@@ -226,12 +235,38 @@ export default function AdminSetupPage() {
           });
 
         if (userError) {
+          console.error('usersテーブルへの挿入エラー:', userError);
           // 施設を削除（ロールバック）
           await supabase.from('facilities').delete().eq('id', facilityId);
-          throw new Error(`管理者アカウントの作成に失敗しました: ${userError.message}`);
+          throw new Error(`管理者アカウント（usersテーブル）の作成に失敗しました: ${userError.message}`);
+        }
+        
+        // 挿入が成功したことを確認
+        const { data: insertedUser, error: verifyError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', adminId)
+          .single();
+        
+        if (verifyError || !insertedUser) {
+          console.error('usersテーブルへの挿入確認エラー:', verifyError);
+          await supabase.from('facilities').delete().eq('id', facilityId);
+          throw new Error(`管理者アカウント（usersテーブル）の作成確認に失敗しました`);
         }
       } else {
-        // 既存ユーザーの場合: usersテーブルのroleをadminに更新（既に存在するため）
+        // 既存ユーザーの場合: usersテーブルが存在することを確認し、roleをadminに更新
+        const { data: existingUser, error: checkError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', adminId)
+          .single();
+        
+        if (checkError || !existingUser) {
+          console.error('既存ユーザーの確認エラー:', checkError);
+          await supabase.from('facilities').delete().eq('id', facilityId);
+          throw new Error(`既存のユーザーアカウントが見つかりません: ${checkError?.message || 'ユーザーが存在しません'}`);
+        }
+        
         const { error: userUpdateError } = await supabase
           .from('users')
           .update({
@@ -241,9 +276,10 @@ export default function AdminSetupPage() {
           .eq('id', adminId);
 
         if (userUpdateError) {
+          console.error('usersテーブルの更新エラー:', userUpdateError);
           // 施設を削除（ロールバック）
           await supabase.from('facilities').delete().eq('id', facilityId);
-          throw new Error(`管理者アカウントの更新に失敗しました: ${userUpdateError.message}`);
+          throw new Error(`管理者アカウント（usersテーブル）の更新に失敗しました: ${userUpdateError.message}`);
         }
       }
 
@@ -278,6 +314,8 @@ export default function AdminSetupPage() {
       // 3. 管理者のスタッフレコードを作成（staffテーブル - 後方互換性のため）
       //    - 既存のシステムとの互換性を保つため
       //    - user_idでusersテーブルと紐付け
+      //    - 注意: staffテーブルは事業所固有の情報のため、離職時は削除される
+      //      ただし、usersテーブルとemployment_recordsテーブルは残る
       const staffId = `staff-${adminId}`;
       const { error: staffError } = await supabase
         .from('staff')
