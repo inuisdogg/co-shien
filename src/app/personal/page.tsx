@@ -5,10 +5,11 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
+import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
 
 export default function PersonalPage() {
   const router = useRouter();
@@ -18,9 +19,48 @@ export default function PersonalPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const { authenticatePasskey, isSupported, isAuthenticating, checkSupport } = usePasskeyAuth();
   
   // リダイレクト先を取得（クエリパラメータから）
   const redirectTo = searchParams?.get('redirect') || '/staff-dashboard';
+
+  // WebAuthnサポート確認
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      checkSupport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 保存されたログイン情報を読み込む（30日間有効）
+  useEffect(() => {
+    const savedData = localStorage.getItem('savedLoginData_personal');
+    if (savedData) {
+      try {
+        const data = JSON.parse(savedData);
+        const savedDate = new Date(data.savedAt);
+        const daysSinceSaved = (Date.now() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
+        
+        // 30日以内なら読み込む
+        if (daysSinceSaved <= 30) {
+          if (data.email) {
+            setEmail(data.email);
+          }
+          if (data.password) {
+            setPassword(data.password);
+          }
+          setRememberMe(true);
+        } else {
+          // 30日を超えていたら削除
+          localStorage.removeItem('savedLoginData_personal');
+        }
+      } catch (e) {
+        // パースエラーの場合は削除
+        localStorage.removeItem('savedLoginData_personal');
+      }
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,12 +98,71 @@ export default function PersonalPage() {
       };
       localStorage.setItem('user', JSON.stringify(user));
 
+      // ログイン情報を保存するかどうか（30日間有効）
+      if (rememberMe) {
+        const savedData = {
+          email,
+          password, // パスワードも保存（30日間）
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('savedLoginData_personal', JSON.stringify(savedData));
+      } else {
+        localStorage.removeItem('savedLoginData_personal');
+      }
+      // ログイン成功後、パスワードをリセット（保存しない場合のみ）
+      if (!rememberMe) {
+        setPassword('');
+      }
+
       // リダイレクト先に移動（クエリパラメータで指定された場合はそこへ、なければデフォルト）
       router.push(redirectTo);
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // パスキー認証処理
+  const handlePasskeyLogin = async () => {
+    if (!email) {
+      setError('メールアドレスを入力してください');
+      return;
+    }
+    setError('');
+    try {
+      // 個人向けなのでfacilityCodeは空文字列
+      const result = await authenticatePasskey('', email);
+      
+      // パスキー認証成功後、ユーザー情報を取得してログイン処理
+      if (result && result.userId) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', result.userId)
+          .eq('account_status', 'active')
+          .single();
+
+        if (userError || !userData) {
+          throw new Error('ユーザー情報の取得に失敗しました');
+        }
+
+        // ユーザー情報をlocalStorageに保存
+        const user = {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          account_status: userData.account_status,
+        };
+        localStorage.setItem('user', JSON.stringify(user));
+
+        // リダイレクト先に移動
+        router.push(redirectTo);
+      } else {
+        throw new Error('パスキー認証に失敗しました');
+      }
+    } catch (err: any) {
+      setError(err.message || 'パスキー認証に失敗しました');
     }
   };
 
@@ -143,14 +242,64 @@ export default function PersonalPage() {
             </div>
           </div>
 
+          <div className="flex items-center">
+            <input
+              id="rememberMe"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+              disabled={loading}
+            />
+            <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
+              ログイン情報を30日間保存する
+            </label>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isAuthenticating}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'ログイン中...' : 'ログイン'}
           </button>
         </form>
+
+        {isSupported && (
+          <div className="mt-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">または</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handlePasskeyLogin}
+              disabled={loading || isAuthenticating || !email}
+              className="mt-4 w-full bg-white hover:bg-gray-50 text-[#00c4cc] border-2 border-[#00c4cc] font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isAuthenticating ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  認証中...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  パスキーでログイン
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-center text-sm text-gray-600">
