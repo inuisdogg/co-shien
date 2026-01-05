@@ -64,9 +64,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 公開鍵をBufferに変換
-    const publicKey = Buffer.from(passkeyData.public_key);
-    const credentialID = Buffer.from(passkeyData.credential_id, 'base64url');
+    // 公開鍵をUint8Arrayに変換
+    // データベースから取得したpublic_keyはBufferまたはバイナリデータとして保存されている
+    // Uint8Arrayを作成する際は、内容を新しいArrayBufferにコピーする必要がある
+    let publicKeyBuffer: Buffer;
+    if (Buffer.isBuffer(passkeyData.public_key)) {
+      publicKeyBuffer = passkeyData.public_key;
+    } else if (typeof passkeyData.public_key === 'string') {
+      // Base64エンコードされた文字列の場合
+      publicKeyBuffer = Buffer.from(passkeyData.public_key, 'base64');
+    } else if (passkeyData.public_key instanceof Uint8Array) {
+      // 既にUint8Arrayの場合は、Bufferに変換
+      publicKeyBuffer = Buffer.from(passkeyData.public_key);
+    } else {
+      // ArrayBufferやその他の形式の場合
+      publicKeyBuffer = Buffer.from(passkeyData.public_key);
+    }
+    
+    // Bufferから新しいArrayBufferを作成し、Uint8Arrayに変換
+    // これにより、型の互換性の問題を回避
+    const arrayBuffer = new ArrayBuffer(publicKeyBuffer.length);
+    const publicKey = new Uint8Array(arrayBuffer);
+    publicKey.set(publicKeyBuffer);
+
+    // credentialIDはbase64url形式の文字列として保存されているため、そのまま使用
+    const credentialIDString = passkeyData.credential_id;
 
     // レスポンスを正しい形式に変換
     const credential = {
@@ -101,14 +123,16 @@ export async function POST(request: NextRequest) {
       `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || request.headers.get('x-forwarded-host') || rpId}`;
 
     // 認証レスポンスを検証
+    // 最新の@simplewebauthn/serverでは、credentialオブジェクトとして渡す
+    // idはbase64url形式の文字列、publicKeyはUint8Array型である必要がある
     const opts: VerifyAuthenticationResponseOpts = {
       response: credential,
       expectedChallenge: Buffer.from(decodedChallenge).toString('base64url'),
       expectedOrigin: origin,
       expectedRPID: rpId,
-      authenticator: {
-        credentialID,
-        credentialPublicKey: publicKey,
+      credential: {
+        id: credentialIDString,
+        publicKey: publicKey,
         counter: passkeyData.counter || 0,
       },
       requireUserVerification: false,
