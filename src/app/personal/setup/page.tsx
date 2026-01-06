@@ -8,12 +8,10 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
 
 export default function PersonalSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
@@ -56,7 +54,8 @@ export default function PersonalSetupPage() {
         const welcomeEmailSent = localStorage.getItem(`welcome_email_sent_${existingUser.id}`);
         if (welcomeEmailSent === 'true') {
           setEmailSent(true);
-          setLoading(false);
+          // 既にメール送信済みの場合、自動的にログインして遷移
+          await autoLoginAndRedirect(existingUser);
           return;
         }
 
@@ -86,6 +85,8 @@ export default function PersonalSetupPage() {
           // メール送信エラーは無視
         }
 
+        // 本登録完了後、自動的にログインして遷移
+        await autoLoginAndRedirect(existingUser);
         setLoading(false);
       } catch (err: any) {
         console.error('Setup error:', err);
@@ -96,6 +97,26 @@ export default function PersonalSetupPage() {
 
     setupPersonal();
   }, [router]);
+
+  // 自動ログインとリダイレクト処理
+  const autoLoginAndRedirect = async (userData: any) => {
+    try {
+      // ユーザー情報をlocalStorageに保存（ログイン状態を設定）
+      const user = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        account_status: userData.account_status,
+      };
+      localStorage.setItem('user', JSON.stringify(user));
+
+      // パーソナルのログイン突破後の画面に遷移
+      router.push('/staff-dashboard');
+    } catch (err: any) {
+      console.error('自動ログインエラー:', err);
+      // エラーでも続行（手動ログインを促す）
+    }
+  };
 
   if (loading) {
     return (
@@ -149,12 +170,18 @@ export default function PersonalSetupPage() {
         </div>
 
         <div className="space-y-3">
+          <p className="text-center text-sm text-gray-600 mb-4">
+            ダッシュボードに移動しています...
+          </p>
           <button
             type="button"
-            onClick={() => router.push('/personal/login')}
+            onClick={() => {
+              // パーソナルのログイン突破後の画面に遷移
+              router.push('/staff-dashboard');
+            }}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
           >
-            ログインページへ
+            ダッシュボードへ
           </button>
         </div>
       </div>

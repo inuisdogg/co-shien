@@ -152,28 +152,6 @@ export default function SetupPage() {
         setFacilityCode(newFacilityCode);
         setName(userName);
 
-        // ウェルカムメールを送信
-        try {
-          const response = await fetch('/api/send-welcome-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: userEmail,
-              name: userName,
-              facilityCode: newFacilityCode,
-              type: 'biz',
-            }),
-          });
-
-          if (response.ok) {
-            setEmailSent(true);
-          }
-        } catch (emailError) {
-          console.error('ウェルカムメール送信エラー:', emailError);
-        }
-
         // パスワード設定画面へ
         setStep('password');
         setLoading(false);
@@ -253,10 +231,48 @@ export default function SetupPage() {
       // 自動Bizログイン
       if (facilityCode) {
         await login(facilityCode, session.user.email!, password);
+        
+        // 本登録完了メールを2通送信（個人アカウント発行メール + 施設IDメール）
+        try {
+          // 1. 個人アカウント発行のお知らせ
+          const personalAccountResponse = await fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: session.user.email,
+              name: name.trim(),
+              mailType: 'personal_account',
+            }),
+          });
+
+          // 2. 施設IDを記したお知らせ
+          const facilityIdResponse = await fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: session.user.email,
+              name: name.trim(),
+              facilityCode: facilityCode,
+              mailType: 'facility_id',
+            }),
+          });
+
+          if (personalAccountResponse.ok && facilityIdResponse.ok) {
+            setEmailSent(true);
+          }
+        } catch (emailError) {
+          console.error('ウェルカムメール送信エラー:', emailError);
+          // メール送信エラーは無視（本登録は完了している）
+        }
+        
         setStep('complete');
-        // ダッシュボードにリダイレクト
+        // Bizのログイン突破後の画面にリダイレクト
         setTimeout(() => {
-          router.push('/staff-dashboard');
+          router.push('/biz');
         }, 1500);
       } else {
         throw new Error('施設IDが見つかりません');
