@@ -2261,7 +2261,16 @@ const StaffManagementView: React.FC = () => {
                             .single();
                           
                           if (!error && employmentData?.permissions) {
-                            setDashboardPermissions(employmentData.permissions as UserPermissions);
+                            const permissions = employmentData.permissions as UserPermissions;
+                            // undefinedをfalseに変換
+                            setDashboardPermissions({
+                              dashboard: permissions.dashboard ?? false,
+                              management: permissions.management ?? false,
+                              lead: permissions.lead ?? false,
+                              children: permissions.children ?? false,
+                              staff: permissions.staff ?? false,
+                              facility: permissions.facility ?? false,
+                            });
                           }
                         } catch (err) {
                           console.error('Error fetching permissions:', err);
