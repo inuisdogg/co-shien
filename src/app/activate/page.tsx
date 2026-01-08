@@ -82,7 +82,7 @@ interface CareerFormData {
   workHistory: WorkHistory[];
 }
 
-export default function ActivatePage() {
+function ActivatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -1913,5 +1913,20 @@ export default function ActivatePage() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+export default function ActivatePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto"></div>
+          <p className="mt-4 text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    }>
+      <ActivatePageContent />
+    </Suspense>
   );
 }

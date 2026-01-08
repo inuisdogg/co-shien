@@ -639,7 +639,7 @@ const StaffManagementView: React.FC = () => {
                           try {
                             setInviteLoading(true);
                             // 公開招待用のトークンを生成
-                            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                            const baseUrl = getPersonalBaseUrl();
                             const publicToken = btoa(JSON.stringify({ facilityId: facility.id, type: 'public' }));
                             const link = `${baseUrl}/activate?token=${publicToken}`;
                             setInviteToken(publicToken);
@@ -1892,12 +1892,12 @@ const StaffManagementView: React.FC = () => {
                       <input
                         type="text"
                         readOnly
-                        value={typeof window !== 'undefined' ? `${window.location.origin}/activate?token=${inviteToken}` : ''}
+                        value={typeof window !== 'undefined' ? `${getPersonalBaseUrl()}/activate?token=${inviteToken}` : ''}
                         className="flex-1 px-4 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
                       />
                       <button
                         onClick={async () => {
-                          const link = typeof window !== 'undefined' ? `${window.location.origin}/activate?token=${inviteToken}` : '';
+                          const link = typeof window !== 'undefined' ? `${getPersonalBaseUrl()}/activate?token=${inviteToken}` : '';
                           if (navigator.clipboard) {
                             await navigator.clipboard.writeText(link);
                             alert('リンクをコピーしました');
