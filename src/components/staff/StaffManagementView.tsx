@@ -2246,12 +2246,26 @@ const StaffManagementView: React.FC = () => {
               {selectedStaff.user_id && (
                 <div className="border-t border-gray-200 pt-4 mt-6">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setIsDetailModalOpen(false);
                       setIsDashboardInviteModalOpen(true);
-                      // 現在の権限を初期値として設定
-                      if (selectedStaff.permissions) {
-                        setDashboardPermissions(selectedStaff.permissions);
+                      // 現在の権限を初期値として設定（employment_recordsから取得）
+                      if (selectedStaff.user_id && facility?.id) {
+                        try {
+                          const { data: employmentData, error } = await supabase
+                            .from('employment_records')
+                            .select('permissions')
+                            .eq('user_id', selectedStaff.user_id)
+                            .eq('facility_id', facility.id)
+                            .is('end_date', null)
+                            .single();
+                          
+                          if (!error && employmentData?.permissions) {
+                            setDashboardPermissions(employmentData.permissions as UserPermissions);
+                          }
+                        } catch (err) {
+                          console.error('Error fetching permissions:', err);
+                        }
                       }
                     }}
                     className="w-full px-4 py-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors flex items-center justify-center gap-2"

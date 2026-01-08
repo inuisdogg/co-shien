@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const StaffView: React.FC = () => {
   const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings } = useFacilityData();
   const { facility } = useAuth();
-  const [subTab, setSubTab] = useState<'shift' | 'list'>('shift');
+  const [subTab] = useState<'shift' | 'list'>('shift');
   
   // スタッフを並び順でソート（マネージャー→常勤→非常勤）
   const sortedStaff = useMemo(() => {
@@ -705,34 +705,10 @@ const StaffView: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800">スタッフ・シフト管理</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">シフト管理</h2>
           <p className="text-gray-500 text-xs sm:text-sm mt-1">
-            スタッフのマスタ管理と、配置基準を満たすためのシフト作成を行います。
+            配置基準を満たすためのシフト作成を行います。
           </p>
-        </div>
-        <div className="bg-gray-100 p-1 rounded-md flex w-full sm:w-auto">
-          <button
-            onClick={() => setSubTab('shift')}
-            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded transition-all flex items-center justify-center ${
-              subTab === 'shift'
-                ? 'bg-white text-[#00c4cc] shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <CalendarCheck size={14} className="sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
-            <span className="whitespace-nowrap">シフト管理</span>
-          </button>
-          <button
-            onClick={() => setSubTab('list')}
-            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded transition-all flex items-center justify-center ${
-              subTab === 'list'
-                ? 'bg-white text-[#00c4cc] shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Users size={14} className="sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
-            <span className="whitespace-nowrap">スタッフ登録</span>
-          </button>
         </div>
       </div>
 
