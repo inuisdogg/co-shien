@@ -7,9 +7,10 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Search, Bell, Menu, LogOut } from 'lucide-react';
+import { Search, Bell, Menu, LogOut, User } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
+import { getPersonalBaseUrl } from '@/utils/domain';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -84,9 +85,41 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' 
       </div>
       <div className="flex items-center space-x-5">
         {user && (
-          <div className="text-sm text-gray-600 hidden md:block">
-            {user.name}さん
+          <div className="text-sm font-medium text-gray-700 hidden md:block">
+            {isPersonal ? (
+              // パーソナルモード：個人名を表示
+              <span>
+                {user.lastName && user.firstName 
+                  ? `${user.lastName} ${user.firstName}` 
+                  : user.name || user.email}
+              </span>
+            ) : (
+              // Bizモード：施設のスタッフ名を表示
+              <span>
+                {user.lastName && user.firstName 
+                  ? `${user.lastName} ${user.firstName}` 
+                  : user.name || user.email}さん
+              </span>
+            )}
           </div>
+        )}
+        {!isPersonal && user && (
+          <button
+            onClick={() => {
+              // パーソナルダッシュボードに遷移（localStorageの情報は保持される）
+              const personalUrl = getPersonalBaseUrl();
+              // パーソナルダッシュボードのパスを追加
+              const targetUrl = personalUrl.endsWith('/') 
+                ? `${personalUrl}staff-dashboard` 
+                : `${personalUrl}/staff-dashboard`;
+              window.location.href = targetUrl;
+            }}
+            className="text-sm text-gray-600 hover:text-[#8b5cf6] transition-colors flex items-center space-x-1 px-2 py-1 rounded hover:bg-[#8b5cf6]/10"
+            title="パーソナルダッシュボードへ"
+          >
+            <User size={18} />
+            <span className="hidden md:inline">パーソナル</span>
+          </button>
         )}
         <div className="relative cursor-pointer group">
           <Bell size={20} className="text-gray-400 group-hover:text-gray-600 transition-colors" />

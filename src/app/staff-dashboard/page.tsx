@@ -9,6 +9,10 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+
+// 静的生成をスキップ
+export const dynamic = 'force-dynamic';
+
 import {
   Briefcase,
   Award,
@@ -36,6 +40,63 @@ import {
 import { supabase } from '@/lib/supabase';
 import { User as UserType, EmploymentRecord, FacilitySettings } from '@/types';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
+import { getBizBaseUrl } from '@/utils/domain';
+import { Shield } from 'lucide-react';
+
+// 運営管理画面へのアクセスリンクコンポーネント
+function AdminAccessLink({ userId }: { userId?: string }) {
+  const router = useRouter();
+  const [hasPermission, setHasPermission] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('admin_permissions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('permission_type', 'facility_creation')
+          .single();
+
+        if (!error && data) {
+          setHasPermission(true);
+        }
+      } catch (err) {
+        console.error('権限確認エラー:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkPermission();
+  }, [userId]);
+
+  if (loading || !hasPermission) {
+    return null;
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <Shield className="w-5 h-5 text-[#00c4cc]" />
+        運営管理
+      </h3>
+      <button
+        onClick={() => router.push('/admin')}
+        className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors"
+      >
+        <Shield className="w-5 h-5" />
+        運営管理画面を開く
+      </button>
+    </div>
+  );
+}
 
 export default function StaffDashboardPage() {
   const router = useRouter();
@@ -161,29 +222,75 @@ export default function StaffDashboardPage() {
         }
 
         const userData = JSON.parse(storedUser);
-        setUser(userData);
-        setProfileData({
-          name: userData.name || '',
-          email: userData.email || '',
-          birthDate: userData.birth_date || '',
-          address: userData.address || '',
-          phone: userData.phone || '',
-          gender: userData.gender || '',
-          education: userData.education || '',
-          hasSpouse: !!userData.spouse_name, // 配偶者氏名がある場合はtrue
-          spouseName: userData.spouse_name || '',
-          myNumber: userData.my_number || '',
-          basicPensionSymbol: userData.basic_pension_symbol || '',
-          basicPensionNumber: userData.basic_pension_number || '',
-          employmentInsuranceStatus: userData.employment_insurance_status || 'joined',
-          employmentInsuranceNumber: userData.employment_insurance_number || '',
-          previousRetirementDate: userData.previous_retirement_date || '',
-          previousName: userData.previous_name || '',
-          socialInsuranceStatus: userData.social_insurance_status || 'joined',
-          hasDependents: userData.has_dependents || false,
-          dependentCount: userData.dependent_count || 0,
-          dependents: userData.dependents || [],
-        });
+        
+        // データベースから最新のユーザー情報を取得（lastName、firstNameを取得するため）
+        const { data: latestUserData, error: userFetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userData.id)
+          .single();
+
+        if (!userFetchError && latestUserData) {
+          // 最新のユーザー情報でlocalStorageを更新
+          const updatedUser = {
+            ...userData,
+            name: latestUserData.name || (latestUserData.last_name && latestUserData.first_name ? `${latestUserData.last_name} ${latestUserData.first_name}` : userData.name),
+            lastName: latestUserData.last_name || userData.lastName,
+            firstName: latestUserData.first_name || userData.firstName,
+            birthDate: latestUserData.birth_date || userData.birthDate,
+            gender: latestUserData.gender || userData.gender,
+          };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          
+          setProfileData({
+            name: updatedUser.name || '',
+            email: updatedUser.email || '',
+            birthDate: updatedUser.birthDate || '',
+            address: userData.address || '',
+            phone: userData.phone || '',
+            gender: updatedUser.gender || '',
+            education: userData.education || '',
+            hasSpouse: !!userData.spouse_name, // 配偶者氏名がある場合はtrue
+            spouseName: userData.spouse_name || '',
+            myNumber: userData.my_number || '',
+            basicPensionSymbol: userData.basic_pension_symbol || '',
+            basicPensionNumber: userData.basic_pension_number || '',
+            employmentInsuranceStatus: userData.employment_insurance_status || 'joined',
+            employmentInsuranceNumber: userData.employment_insurance_number || '',
+            previousRetirementDate: userData.previous_retirement_date || '',
+            previousName: userData.previous_name || '',
+            socialInsuranceStatus: userData.social_insurance_status || 'joined',
+            hasDependents: userData.has_dependents || false,
+            dependentCount: userData.dependent_count || 0,
+            dependents: userData.dependents || [],
+          });
+        } else {
+          // データベースから取得できない場合は、localStorageの情報を使用
+          setUser(userData);
+          setProfileData({
+            name: userData.name || '',
+            email: userData.email || '',
+            birthDate: userData.birthDate || userData.birth_date || '',
+            address: userData.address || '',
+            phone: userData.phone || '',
+            gender: userData.gender || '',
+            education: userData.education || '',
+            hasSpouse: !!userData.spouse_name, // 配偶者氏名がある場合はtrue
+            spouseName: userData.spouse_name || '',
+            myNumber: userData.my_number || '',
+            basicPensionSymbol: userData.basic_pension_symbol || '',
+            basicPensionNumber: userData.basic_pension_number || '',
+            employmentInsuranceStatus: userData.employment_insurance_status || 'joined',
+            employmentInsuranceNumber: userData.employment_insurance_number || '',
+            previousRetirementDate: userData.previous_retirement_date || '',
+            previousName: userData.previous_name || '',
+            socialInsuranceStatus: userData.social_insurance_status || 'joined',
+            hasDependents: userData.has_dependents || false,
+            dependentCount: userData.dependent_count || 0,
+            dependents: userData.dependents || [],
+          });
+        }
 
         // アクティブな所属関係を取得
         const { data: employments, error } = await supabase
@@ -540,7 +647,11 @@ export default function StaffDashboardPage() {
                 <User className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">{user.name}</h1>
+                <h1 className="text-2xl font-bold text-gray-800">
+                  {user.lastName && user.firstName 
+                    ? `${user.lastName} ${user.firstName}` 
+                    : user.name || user.email}
+                </h1>
                 <p className="text-sm text-gray-500">{user.email}</p>
               </div>
             </div>
@@ -549,7 +660,7 @@ export default function StaffDashboardPage() {
           {/* 所属情報 */}
           {currentFacility && (
             <div className="bg-[#8b5cf6]/10 rounded-lg p-4 border border-[#8b5cf6]/20">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-[#8b5cf6]" />
                   <div>
@@ -562,11 +673,85 @@ export default function StaffDashboardPage() {
                   </div>
                 </div>
                 {activeEmployments.length > 1 && (
-                  <button className="text-sm text-[#8b5cf6] hover:underline">
+                  <button 
+                    onClick={() => {
+                      // 施設選択モーダルを表示（簡易版：最初の施設以外を選択）
+                      const otherFacilities = activeEmployments.filter(emp => emp.id !== currentFacility?.id);
+                      if (otherFacilities.length > 0) {
+                        setCurrentFacility(otherFacilities[0]);
+                      }
+                    }}
+                    className="text-sm text-[#8b5cf6] hover:underline"
+                  >
                     切り替え
                   </button>
                 )}
               </div>
+              {/* Bizダッシュボードへのアクセスボタン */}
+              {(currentFacility.role === '管理者' || currentFacility.role === 'admin') && (
+                <button
+                  onClick={async () => {
+                    // 施設情報を取得してlocalStorageに保存
+                    try {
+                      const { data: facilityData, error } = await supabase
+                        .from('facilities')
+                        .select('*')
+                        .eq('id', currentFacility.facilityId)
+                        .single();
+
+                      if (!error && facilityData) {
+                        // selectedFacilityとfacilityの両方を設定
+                        localStorage.setItem('selectedFacility', JSON.stringify({
+                          id: currentFacility.facilityId,
+                          name: currentFacility.facilityName,
+                          code: currentFacility.facilityCode,
+                          role: currentFacility.role,
+                          facilityId: currentFacility.facilityId,
+                          facilityName: currentFacility.facilityName,
+                          facilityCode: currentFacility.facilityCode,
+                        }));
+                        localStorage.setItem('facility', JSON.stringify({
+                          id: facilityData.id,
+                          name: facilityData.name,
+                          code: facilityData.code || '',
+                          createdAt: facilityData.created_at || new Date().toISOString(),
+                          updatedAt: facilityData.updated_at || new Date().toISOString(),
+                        }));
+                      } else {
+                        // 施設情報が取得できない場合でも、selectedFacilityだけ設定
+                        localStorage.setItem('selectedFacility', JSON.stringify({
+                          id: currentFacility.facilityId,
+                          name: currentFacility.facilityName,
+                          code: currentFacility.facilityCode,
+                          role: currentFacility.role,
+                          facilityId: currentFacility.facilityId,
+                          facilityName: currentFacility.facilityName,
+                          facilityCode: currentFacility.facilityCode,
+                        }));
+                      }
+                    } catch (err) {
+                      console.error('施設情報の取得エラー:', err);
+                      // エラーが発生しても、selectedFacilityだけ設定
+                      localStorage.setItem('selectedFacility', JSON.stringify({
+                        id: currentFacility.facilityId,
+                        name: currentFacility.facilityName,
+                        code: currentFacility.facilityCode,
+                        role: currentFacility.role,
+                        facilityId: currentFacility.facilityId,
+                        facilityName: currentFacility.facilityName,
+                        facilityCode: currentFacility.facilityCode,
+                      }));
+                    }
+                    // BizのURLにリダイレクト（ローカルホスト対応）
+                    const bizBaseUrl = getBizBaseUrl();
+                    window.location.href = `${bizBaseUrl}/?facilityId=${currentFacility.facilityId}`;
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md transition-colors text-sm mt-2"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Bizダッシュボードを開く
+                </button>
+              )}
             </div>
           )}
 
@@ -2274,7 +2459,15 @@ export default function StaffDashboardPage() {
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-sm font-bold text-gray-600 w-24">性別</span>
-                  <span className="text-sm text-gray-800">{profileData.gender || '未登録'}</span>
+                  <span className="text-sm text-gray-800">
+                    {profileData.gender === 'male' ? '男' :
+                     profileData.gender === 'female' ? '女' :
+                     profileData.gender === 'other' ? 'その他' :
+                     profileData.gender === '男性' ? '男' :
+                     profileData.gender === '女性' ? '女' :
+                     profileData.gender === 'その他' ? 'その他' :
+                     profileData.gender || '未登録'}
+                  </span>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-sm font-bold text-gray-600 w-24">マイナンバー</span>
@@ -2734,9 +2927,84 @@ export default function StaffDashboardPage() {
       )}
 
       {activeTab === 'settings' && (
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">設定</h2>
-          <p className="text-gray-600">設定機能は後で実装します</p>
+        <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
+          <h2 className="text-xl font-bold text-gray-800 mb-6">設定</h2>
+
+          {/* 所属施設 */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+            <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-[#8b5cf6]" />
+              所属施設
+            </h3>
+            {activeEmployments.length > 0 ? (
+              <div className="space-y-2">
+                {activeEmployments.map((emp: any) => (
+                  <div
+                    key={emp.id}
+                    className={`p-3 rounded-lg border ${
+                      currentFacility?.id === emp.id
+                        ? 'border-[#8b5cf6] bg-purple-50'
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
+                    onClick={() => setCurrentFacility(emp)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-gray-800">{emp.facilityName || '施設名未設定'}</p>
+                        <p className="text-sm text-gray-500">{emp.role || 'スタッフ'}</p>
+                      </div>
+                      {currentFacility?.id === emp.id && (
+                        <span className="text-xs bg-[#8b5cf6] text-white px-2 py-1 rounded-full">選択中</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm mb-3">まだ施設に所属していません</p>
+            )}
+            <button
+              onClick={() => router.push('/facility/join')}
+              className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              施設に参加申請
+            </button>
+          </div>
+
+          {/* アカウント設定 */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+            <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <User className="w-5 h-5 text-[#8b5cf6]" />
+              アカウント
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-600">名前</span>
+                <span className="font-bold text-gray-800">{user?.name || '未設定'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-600">メール</span>
+                <span className="font-bold text-gray-800">{user?.email || '未設定'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 運営管理画面へのアクセス（施設発行権限がある場合のみ） */}
+          <AdminAccessLink userId={user?.id} />
+
+          {/* ログアウト */}
+          <button
+            onClick={() => {
+              localStorage.removeItem('user');
+              localStorage.removeItem('selectedFacility');
+              router.push('/login');
+            }}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            ログアウト
+          </button>
         </div>
       )}
 

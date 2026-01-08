@@ -182,3 +182,5 @@ SELECT * FROM facility_settings WHERE facility_id = '{facilityId}';
 
 これにより、離職後も個人アカウントとしてログイン可能で、他の事業所への所属やキャリア管理が可能です。
 
+
+

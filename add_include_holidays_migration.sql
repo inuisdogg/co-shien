@@ -5,3 +5,5 @@ ADD COLUMN IF NOT EXISTS include_holidays BOOLEAN DEFAULT false;
 
 
 
+
+

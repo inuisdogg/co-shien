@@ -9,6 +9,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+// 静的生成をスキップ（useSearchParamsを使用するため）
+export const dynamic = 'force-dynamic';
+
 export default function EmailWaitingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();

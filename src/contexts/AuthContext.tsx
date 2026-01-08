@@ -35,11 +35,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const storedUser = localStorage.getItem('user');
         const storedFacility = localStorage.getItem('facility');
         
-        if (storedUser && storedFacility) {
+        if (storedUser) {
           const userData = JSON.parse(storedUser);
-          const facilityData = JSON.parse(storedFacility);
           setUser(userData);
-          setFacility(facilityData);
+          
+          if (storedFacility) {
+            const facilityData = JSON.parse(storedFacility);
+            setFacility(facilityData);
+          } else {
+            // facilityが存在しない場合はnullに設定
+            setFacility(null);
+          }
         }
       } catch (error) {
         console.error('Error restoring session:', error);
@@ -101,7 +107,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const user: User = {
           id: userData.id,
           email: userData.email || '',
-          name: userData.name,
+          name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
+          lastName: userData.last_name,
+          firstName: userData.first_name,
+          birthDate: userData.birth_date,
+          gender: userData.gender,
           loginId: userData.login_id || userData.name,
           role: userData.role as UserRole,
           facilityId: userData.facility_id || '',
@@ -206,10 +216,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const user: User = {
           id: userData.id,
           email: userData.email || '',
-          name: userData.name,
+          name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
+          lastName: userData.last_name,
+          firstName: userData.first_name,
+          birthDate: userData.birth_date,
+          gender: userData.gender,
           loginId: userData.login_id || userData.name,
           role: userData.role as UserRole,
-          facilityId: userData.facility_id,
+          facilityId: userData.facility_id || '',
           permissions: userData.permissions || {},
           accountStatus: userData.account_status || 'active',
           createdAt: userData.created_at,

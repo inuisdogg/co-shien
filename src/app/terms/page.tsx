@@ -9,6 +9,9 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
+// 静的生成をスキップ
+export const dynamic = 'force-dynamic';
+
 export default function TermsPage() {
   const router = useRouter();
 
@@ -171,6 +174,8 @@ export default function TermsPage() {
     </div>
   );
 }
+
+
 
 
 

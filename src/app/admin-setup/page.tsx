@@ -12,6 +12,9 @@ import { supabase } from '@/lib/supabase';
 import { hashPassword } from '@/utils/password';
 import { useAuth } from '@/contexts/AuthContext';
 
+// 静的生成をスキップ（useAuthを使用するため）
+export const dynamic = 'force-dynamic';
+
 export default function AdminSetupPage() {
   const { user, isAuthenticated, facility, login } = useAuth();
   const router = useRouter();
@@ -27,6 +30,8 @@ export default function AdminSetupPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [setupData, setSetupData] = useState<{ facilityCode: string; email: string; password?: string } | null>(null);
+  const [existingUserId, setExistingUserId] = useState<string | null>(null); // 既存ユーザーのID
+  const [hasExistingPassword, setHasExistingPassword] = useState(false); // 既にパスワードが設定されているか
 
   // ログイン済みかどうか（Personal側でログインしている場合）
   const isLoggedInAsPersonal = isAuthenticated && user && !facility;
@@ -40,7 +45,7 @@ export default function AdminSetupPage() {
     }
   }, [isAuthenticated, user, facility]);
 
-  // メール認証状態を確認
+  // メール認証状態を確認し、Supabase Authセッションからユーザー情報を取得
   useEffect(() => {
     const checkEmailConfirmation = async () => {
       try {
@@ -51,6 +56,36 @@ export default function AdminSetupPage() {
           // メール認証が完了していない場合、サインアップページにリダイレクト
           router.push('/signup?waiting=true');
           return;
+        }
+        
+        // Supabase Authのセッションがある場合、ユーザー情報を自動入力
+        if (session?.user) {
+          const userEmail = session.user.email || '';
+          const userName = session.user.user_metadata?.name || userEmail.split('@')[0];
+          
+          // 既にusersテーブルにユーザーが存在するか確認
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('id, name, email, password_hash')
+            .eq('email', userEmail)
+            .maybeSingle();
+          
+          if (existingUser) {
+            // 既存ユーザーの場合、情報を自動入力
+            setAdminName(existingUser.name || userName);
+            setAdminEmail(existingUser.email || userEmail);
+            setExistingUserId(existingUser.id);
+            // パスワードが既に設定されている場合は、パスワード入力不要
+            if (existingUser.password_hash) {
+              setHasExistingPassword(true);
+            }
+          } else {
+            // 新規ユーザーの場合でも、セッション情報から自動入力
+            setAdminName(userName);
+            setAdminEmail(userEmail);
+            // Supabase AuthのユーザーIDを使用
+            setExistingUserId(session.user.id);
+          }
         }
         
         setCheckingAuth(false);
@@ -75,8 +110,8 @@ export default function AdminSetupPage() {
             // Biz側のログイン（facilityCodeを指定）
             await login(setupData.facilityCode, setupData.email, setupData.password);
             console.log('自動ログイン成功');
-            // ログイン成功後、ダッシュボードに遷移
-            router.push('/staff-dashboard');
+            // ログイン成功後、Biz側ダッシュボードに遷移
+            router.push('/');
           } catch (loginError: any) {
             // ログインエラーは無視（成功画面は表示するが、手動ログインを促す）
             console.error('自動ログインに失敗しました:', loginError);
@@ -123,8 +158,8 @@ export default function AdminSetupPage() {
             localStorage.setItem('user', JSON.stringify(updatedUser));
 
             console.log('施設情報を保存しました。ページをリロードします。');
-            // ページをリロードしてAuthContextに施設情報を反映
-            window.location.href = '/staff-dashboard';
+            // ページをリロードしてAuthContextに施設情報を反映（Biz側ダッシュボードへ）
+            window.location.href = '/';
           } catch (error: any) {
             console.error('施設情報の取得に失敗しました:', error);
             setError('施設情報の取得に失敗しました。手動でログインしてください。');
@@ -167,8 +202,10 @@ export default function AdminSetupPage() {
         throw new Error('施設名を入力してください');
       }
 
-      // 既存ユーザーの場合（ログイン済み）は、管理者アカウント情報のバリデーションをスキップ
-      if (!isLoggedInAsPersonal) {
+      // 既存ユーザーの場合（ログイン済み or Supabase Authセッションあり）は、管理者アカウント情報のバリデーションをスキップ
+      const isExistingUser = isLoggedInAsPersonal || existingUserId;
+      
+      if (!isExistingUser) {
         // 新規ユーザー作成の場合のみバリデーション
         if (!adminName.trim()) {
           throw new Error('管理者名を入力してください');
@@ -214,13 +251,13 @@ export default function AdminSetupPage() {
       
       // 既存ユーザーの場合、既存のuser_idを使用
       // 新規ユーザーの場合、新しいadminIdを生成
-      const adminId = isLoggedInAsPersonal && user ? user.id : `admin-${facilityId}`;
-      const finalAdminName = isLoggedInAsPersonal && user ? user.name : adminName.trim();
-      const finalAdminEmail = isLoggedInAsPersonal && user ? user.email : adminEmail.trim();
+      const adminId = existingUserId || (isLoggedInAsPersonal && user ? user.id : `admin-${facilityId}`);
+      const finalAdminName = (isLoggedInAsPersonal && user ? user.name : null) || adminName.trim();
+      const finalAdminEmail = (isLoggedInAsPersonal && user ? user.email : null) || adminEmail.trim();
 
       // 新規ユーザー作成の場合のみパスワードをハッシュ化
       let passwordHash: string | undefined;
-      if (!isLoggedInAsPersonal) {
+      if (!isExistingUser && password) {
         passwordHash = await hashPassword(password);
       }
 
@@ -258,7 +295,7 @@ export default function AdminSetupPage() {
       
       // 1. Personal用のアカウント処理（usersテーブル）
       // 管理者は必ずusersテーブルに存在する必要がある（個人アカウントとして）
-      if (!isLoggedInAsPersonal) {
+      if (!isExistingUser) {
         // 新規ユーザー作成の場合: Personal用のアカウントを作成（usersテーブル）
         //    - account_status='active'で有効化済み
         //    - 初期ログイン時にパスワード設定も完了しているため、すぐに利用可能
@@ -301,24 +338,32 @@ export default function AdminSetupPage() {
         }
       } else {
         // 既存ユーザーの場合: usersテーブルが存在することを確認し、roleをadminに更新
-        const { data: existingUser, error: checkError } = await supabase
+        const { data: existingUserCheck, error: checkError } = await supabase
           .from('users')
           .select('id')
           .eq('id', adminId)
           .single();
         
-        if (checkError || !existingUser) {
+        if (checkError || !existingUserCheck) {
           console.error('既存ユーザーの確認エラー:', checkError);
           await supabase.from('facilities').delete().eq('id', facilityId);
           throw new Error(`既存のユーザーアカウントが見つかりません: ${checkError?.message || 'ユーザーが存在しません'}`);
         }
         
+        // 既存ユーザーの情報を更新（roleをadminに、facility_idも更新）
+        const updateData: any = {
+          role: 'admin',
+          updated_at: new Date().toISOString(),
+        };
+        
+        // facility_idも更新（後方互換性のため）
+        if (facilityId) {
+          updateData.facility_id = facilityId;
+        }
+        
         const { error: userUpdateError } = await supabase
           .from('users')
-          .update({
-            role: 'admin',
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq('id', adminId);
 
         if (userUpdateError) {
@@ -509,8 +554,8 @@ export default function AdminSetupPage() {
             <button
               type="button"
               onClick={() => {
-                // Personal側のログインページに遷移
-                window.location.href = `https://my.co-shien.inu.co.jp/login?email=${encodeURIComponent(setupData.email)}`;
+                // Personal側のトップページ（ログイン画面）に遷移
+                window.location.href = 'https://my.co-shien.inu.co.jp/';
               }}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-md transition-colors text-sm"
             >
@@ -550,15 +595,20 @@ export default function AdminSetupPage() {
           )}
 
           {/* ログイン済みの場合、現在のアカウント情報を表示 */}
-          {isLoggedInAsPersonal && user && (
+          {(isLoggedInAsPersonal || existingUserId) && (
             <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md">
               <p className="font-bold mb-1">管理者として登録するアカウント</p>
               <p className="text-sm">
-                管理者：<span className="font-semibold">{user.name}</span>（{user.email}）
+                管理者：<span className="font-semibold">{adminName || user?.name}</span>（{adminEmail || user?.email}）
               </p>
               <p className="text-xs mt-2 text-green-700">
                 ※ このアカウントで施設管理者として登録されます。個人のキャリア情報は引き続き管理できます。
               </p>
+              {hasExistingPassword && (
+                <p className="text-xs mt-1 text-green-700">
+                  ※ パスワードは既に設定済みです。施設名のみ入力してください。
+                </p>
+              )}
             </div>
           )}
 
@@ -583,115 +633,121 @@ export default function AdminSetupPage() {
             </div>
           </div>
 
-          {/* ログイン済みの場合は管理者アカウント情報セクションを非表示 */}
-          {!isLoggedInAsPersonal && (
+          {/* ログイン済み or 既存ユーザーの場合は管理者アカウント情報セクションを非表示 */}
+          {!isLoggedInAsPersonal && !existingUserId && (
             <div className="space-y-4">
               <h3 className="font-bold text-gray-700 border-b border-gray-200 pb-2">管理者アカウント情報</h3>
               
-              <div>
-                <label htmlFor="adminName" className="block text-sm font-bold text-gray-700 mb-2">
-                  管理者名 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="adminName"
-                  type="text"
-                  value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                  placeholder="山田 太郎"
-                  disabled={loading}
-                />
-                <p className="text-xs text-gray-400 mt-1">※ 本名を入力してください</p>
-              </div>
-
-              <div>
-                <label htmlFor="adminEmail" className="block text-sm font-bold text-gray-700 mb-2">
-                  メールアドレス <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="adminEmail"
-                  type="email"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                  placeholder="メールアドレスを入力（例: admin@example.com）"
-                  disabled={loading}
-                />
-                <p className="text-xs text-gray-500 mt-1">※ ログイン時に使用するメールアドレスです</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
-                    パスワード <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
+              {!existingUserId && (
+                <>
+                  <div>
+                    <label htmlFor="adminName" className="block text-sm font-bold text-gray-700 mb-2">
+                      管理者名 <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      id="adminName"
+                      type="text"
+                      value={adminName}
+                      onChange={(e) => setAdminName(e.target.value)}
                       required
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                      placeholder="6文字以上"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      placeholder="山田 太郎"
                       disabled={loading}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      disabled={loading}
-                    >
-                      {showPassword ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
+                    <p className="text-xs text-gray-400 mt-1">※ 本名を入力してください</p>
                   </div>
-                </div>
-                <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-bold text-gray-700 mb-2">
-                    パスワード（確認） <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
+
+                  <div>
+                    <label htmlFor="adminEmail" className="block text-sm font-bold text-gray-700 mb-2">
+                      メールアドレス <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      id="adminEmail"
+                      type="email"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
                       required
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                      placeholder="パスワードを再入力"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      placeholder="メールアドレスを入力（例: admin@example.com）"
                       disabled={loading}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      disabled={loading}
-                    >
-                      {showConfirmPassword ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
+                    <p className="text-xs text-gray-500 mt-1">※ ログイン時に使用するメールアドレスです</p>
+                  </div>
+                </>
+              )}
+
+              {!hasExistingPassword && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
+                      パスワード <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                        placeholder="6文字以上"
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        disabled={loading}
+                      >
+                        {showPassword ? (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="confirmPassword" className="block text-sm font-bold text-gray-700 mb-2">
+                      パスワード（確認） <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                        placeholder="パスワードを再入力"
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        disabled={loading}
+                      >
+                        {showConfirmPassword ? (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 

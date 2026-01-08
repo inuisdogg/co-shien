@@ -12,6 +12,9 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { hashPassword } from '@/utils/password';
 
+// 静的生成をスキップ（useSearchParamsとuseAuthを使用するため）
+export const dynamic = 'force-dynamic';
+
 export default function SetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -20,6 +23,7 @@ export default function SetupPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [facilityCode, setFacilityCode] = useState<string | null>(null);
+  const [facilityName, setFacilityName] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -171,8 +175,13 @@ export default function SetupPage() {
     setError('');
 
     // バリデーション
+    if (!facilityName.trim()) {
+      setError('施設名を入力してください');
+      return;
+    }
+
     if (!name.trim()) {
-      setError('名前を入力してください');
+      setError('氏名を入力してください');
       return;
     }
 
@@ -202,6 +211,12 @@ export default function SetupPage() {
       const passwordHash = await hashPassword(password);
 
       // usersテーブルを更新（名前とパスワードを設定）
+      const { data: userData } = await supabase
+        .from('users')
+        .select('facility_id')
+        .eq('id', session.user.id)
+        .single();
+
       const { error: updateError } = await supabase
         .from('users')
         .update({
@@ -213,6 +228,25 @@ export default function SetupPage() {
 
       if (updateError) {
         throw new Error(`パスワードの設定に失敗しました: ${updateError.message}`);
+      }
+
+      // 施設名を更新
+      if (userData?.facility_id) {
+        await supabase
+          .from('facilities')
+          .update({
+            name: facilityName.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userData.facility_id);
+
+        await supabase
+          .from('facility_settings')
+          .update({
+            facility_name: facilityName.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('facility_id', userData.facility_id);
       }
 
       // Supabase Authのパスワードも更新
@@ -346,8 +380,24 @@ export default function SetupPage() {
 
           <form onSubmit={handlePasswordSubmit} className="space-y-6">
             <div>
+              <label htmlFor="facilityName" className="block text-sm font-bold text-gray-700 mb-2">
+                施設名 <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="facilityName"
+                type="text"
+                value={facilityName}
+                onChange={(e) => setFacilityName(e.target.value)}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                placeholder="施設名を入力"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
               <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">
-                氏名 <span className="text-red-500">*</span>
+                管理者氏名 <span className="text-red-500">*</span>
               </label>
               <input
                 id="name"
@@ -356,7 +406,7 @@ export default function SetupPage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                placeholder="氏名を入力"
+                placeholder="管理者の氏名を入力"
                 disabled={loading}
               />
             </div>

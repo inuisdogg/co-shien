@@ -65,7 +65,11 @@ export type AccountStatus = 'pending' | 'active' | 'suspended';
 export type User = {
   id: string;
   email: string;
-  name: string;
+  name: string; // 後方互換性のため残す（姓+名の結合）
+  lastName?: string; // 姓
+  firstName?: string; // 名
+  birthDate?: string; // 生年月日（YYYY-MM-DD形式）
+  gender?: 'male' | 'female' | 'other'; // 性別
   phone?: string;
   loginId?: string; // ログイン用ID
   role: UserRole; // ユーザーロール

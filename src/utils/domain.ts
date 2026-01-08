@@ -62,17 +62,37 @@ export function getPersonalDomain(): string {
 }
 
 /**
- * Biz側のベースURLを取得
+ * Biz側のベースURLを取得（ローカルホスト対応）
  */
 export function getBizBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    // クライアントサイド: 現在のホスト名を確認
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // ローカルホストの場合は現在のポートを使用
+      return `${window.location.protocol}//${window.location.host}`;
+    }
+  }
+  // 本番環境またはサーバーサイド
   return `https://${getBizDomain()}`;
 }
 
 /**
- * Personal側のベースURLを取得
+ * Personal側のベースURLを取得（ローカルホスト対応）
  */
 export function getPersonalBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    // クライアントサイド: 現在のホスト名を確認
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // ローカルホストの場合は現在のポートを使用
+      return `${window.location.protocol}//${window.location.host}`;
+    }
+  }
+  // 本番環境またはサーバーサイド
   return `https://${getPersonalDomain()}`;
 }
+
+
 
 

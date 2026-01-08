@@ -1,11 +1,16 @@
 /**
  * Main Application Page
+ *
+ * アクセス時の動作:
+ * - 未ログイン → /login へリダイレクト
+ * - ログイン済み + 施設未選択 → /portal へリダイレクト
+ * - ログイン済み + 施設選択済み → Biz/Personalモード表示
  */
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Sidebar from '@/components/common/Sidebar';
 import Header from '@/components/common/Header';
@@ -21,13 +26,140 @@ import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
 import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
 import { getAppType } from '@/utils/domain';
+import { supabase } from '@/lib/supabase';
+
+// 静的生成をスキップ（useAuthを使用するため）
+export const dynamic = 'force-dynamic';
 
 export default function Home() {
   const { isAuthenticated, isAdmin, hasPermission, login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [initialTabSet, setInitialTabSet] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // リダイレクト先を取得（クエリパラメータから）
+  const redirectTo = searchParams?.get('redirect') || null;
+  const facilityIdFromQuery = searchParams?.get('facilityId') || null;
+
+  // 新フロー: 未ログインなら /login へ、ログイン済み+施設未選択なら /portal へ
+  useEffect(() => {
+    const checkAuthFlow = async () => {
+      const userStr = localStorage.getItem('user');
+      const facilityStr = localStorage.getItem('selectedFacility');
+
+      if (!userStr) {
+        // 未ログイン → /login へ
+        router.push('/login');
+        return;
+      }
+
+      // facilityIdクエリパラメータがある場合、既にログイン済みなら施設情報を取得して認証をスキップ
+      if (facilityIdFromQuery) {
+        try {
+          const userData = JSON.parse(userStr);
+          
+          // 既存の施設選択がある場合、同じ施設IDならスキップ
+          if (facilityStr) {
+            try {
+              const existingFacility = JSON.parse(facilityStr);
+              if (existingFacility.id === facilityIdFromQuery || existingFacility.facilityId === facilityIdFromQuery) {
+                // 既に同じ施設が選択されている場合は、クエリパラメータを削除して続行
+                const url = new URL(window.location.href);
+                url.searchParams.delete('facilityId');
+                window.history.replaceState({}, '', url.toString());
+                setCheckingAuth(false);
+                return;
+              }
+            } catch (e) {
+              // パースエラーは無視して続行
+            }
+          }
+          
+          // 施設情報を取得
+          const { data: facilityData, error: facilityError } = await supabase
+            .from('facilities')
+            .select('*')
+            .eq('id', facilityIdFromQuery)
+            .single();
+
+          if (facilityError || !facilityData) {
+            console.error('施設情報の取得に失敗:', facilityError);
+            // クエリパラメータを削除してスタッフダッシュボードへ
+            const url = new URL(window.location.href);
+            url.searchParams.delete('facilityId');
+            window.history.replaceState({}, '', url.toString());
+            router.push('/staff-dashboard');
+            return;
+          }
+
+          // ユーザーがその施設に所属しているか確認（所属していなくても、パーソナルアカウントでログイン済みなら許可）
+          let employmentData = null;
+          const { data: empData, error: employmentError } = await supabase
+            .from('employment_records')
+            .select('*')
+            .eq('user_id', userData.id)
+            .eq('facility_id', facilityIdFromQuery)
+            .is('end_date', null)
+            .single();
+
+          if (!employmentError && empData) {
+            employmentData = empData;
+          }
+          // 所属関係がない場合でも、パーソナルアカウントでログイン済みなら施設情報を保存して続行
+
+          // 施設情報をlocalStorageに保存（selectedFacilityとfacilityの両方）
+          const facilityInfo = {
+            id: facilityData.id,
+            name: facilityData.name,
+            code: facilityData.code || '',
+            role: employmentData?.role || '一般スタッフ',
+            facilityId: facilityData.id,
+            facilityName: facilityData.name,
+            facilityCode: facilityData.code || '',
+          };
+          const facilityForAuth = {
+            id: facilityData.id,
+            name: facilityData.name,
+            code: facilityData.code || '',
+            createdAt: facilityData.created_at || new Date().toISOString(),
+            updatedAt: facilityData.updated_at || new Date().toISOString(),
+          };
+          localStorage.setItem('selectedFacility', JSON.stringify(facilityInfo));
+          localStorage.setItem('facility', JSON.stringify(facilityForAuth));
+          
+          // クエリパラメータを削除してからページをリロード（AuthContextがlocalStorageから読み込む）
+          const url = new URL(window.location.href);
+          url.searchParams.delete('facilityId');
+          window.location.href = url.toString();
+          return;
+        } catch (err) {
+          console.error('施設情報の取得エラー:', err);
+          // クエリパラメータを削除してスタッフダッシュボードへ
+          const url = new URL(window.location.href);
+          url.searchParams.delete('facilityId');
+          window.history.replaceState({}, '', url.toString());
+          router.push('/staff-dashboard');
+          return;
+        }
+      }
+
+      if (!facilityStr) {
+        // ログイン済みだが施設未選択 → スタッフダッシュボードへ
+        // パーソナル単体でも利用可能。施設参加はダッシュボードからできる
+        router.push('/staff-dashboard');
+        return;
+      }
+
+      setCheckingAuth(false);
+    };
+
+    // 少し遅延してチェック（AuthContextの初期化を待つ）
+    const timer = setTimeout(checkAuthFlow, 100);
+    return () => clearTimeout(timer);
+  }, [router, isAuthenticated, facilityIdFromQuery]);
   
   // ログインフォーム用の状態
   const [facilityCode, setFacilityCode] = useState('');
@@ -107,6 +239,15 @@ export default function Home() {
       if (!rememberMe) {
         setPassword('');
       }
+      // リダイレクト先が指定されている場合はそこに移動
+      if (redirectTo) {
+        // 外部URL（httpで始まる）の場合はwindow.location.hrefを使用
+        if (redirectTo.startsWith('http')) {
+          window.location.href = redirectTo;
+        } else {
+          router.push(redirectTo);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
     } finally {
@@ -174,8 +315,24 @@ export default function Home() {
     }
   }, [isAuthenticated, isAdmin, activeTab, hasPermission, initialTabSet]);
 
-  // 未認証の場合はログイン画面を表示
-  if (!isAuthenticated) {
+  // 認証確認中はローディング表示
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
+
+  // パーソナルアカウントでログイン済みの場合、facilityIdクエリパラメータがあれば施設情報を取得して認証をスキップ
+  const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+  const hasUser = userStr !== null;
+  const facilityStr = typeof window !== 'undefined' ? localStorage.getItem('facility') : null;
+  const hasFacility = facilityStr !== null;
+
+  // 未認証の場合はログイン画面を表示（従来のフォールバック）
+  // ただし、パーソナルアカウントでログイン済みでfacilityIdクエリパラメータがある場合は認証をスキップ
+  if (!isAuthenticated && !(hasUser && facilityIdFromQuery)) {
     const isBiz = appType === 'biz';
     const isPersonal = appType === 'personal';
     
@@ -373,7 +530,7 @@ export default function Home() {
                 <p className="text-center text-sm text-gray-600">
                   アカウントをお持ちでない方は{' '}
                   <button
-                    onClick={() => router.push('/signup')}
+                    onClick={() => router.push('/personal/signup')}
                     className="text-[#00c4cc] hover:underline font-bold"
                   >
                     こちらから新規登録
@@ -391,14 +548,14 @@ export default function Home() {
             ) : (
               <>
                 <p className="text-center text-sm text-gray-600 mb-3">
-                  初めてご利用の方は、初期設定を行ってください
+                  初めてご利用の方は新規登録してください
                 </p>
                 <button
                   type="button"
-                  onClick={() => router.push('/facility-setup')}
+                  onClick={() => router.push('/signup')}
                   className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
                 >
-                  初期設定を行う
+                  新規登録（施設ID発行）
                 </button>
                 <p className="text-center text-xs text-gray-400 mt-2">
                   <button

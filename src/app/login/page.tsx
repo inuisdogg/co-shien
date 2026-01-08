@@ -1,67 +1,77 @@
 /**
- * 個人スタッフ用ログインページ
- * メールアドレスとパスワードでログイン、パスキー認証も対応
+ * 個人認証ページ（共通入口）
+ * すべてのユーザーはまずここでログインする
+ * ログイン後は /portal へ遷移し、所属施設を選択する
  */
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
-import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
+
+// 静的生成をスキップ
+export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
-  const { authenticatePasskey, isSupported, isAuthenticating, checkSupport } = usePasskeyAuth();
-  
-  // リダイレクト先を取得（クエリパラメータから）
-  const redirectTo = searchParams?.get('redirect') || '/staff-dashboard';
 
-  // WebAuthnサポート確認
+  // 既にログイン済みかチェック、保存されたログイン情報を読み込む
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      checkSupport();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 保存されたログイン情報を読み込む（30日間有効）
-  useEffect(() => {
-    const savedData = localStorage.getItem('savedLoginData_personal');
-    if (savedData) {
+    const checkSession = async () => {
       try {
-        const data = JSON.parse(savedData);
-        const savedDate = new Date(data.savedAt);
-        const daysSinceSaved = (Date.now() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
-        
-        // 30日以内なら読み込む
-        if (daysSinceSaved <= 30) {
-          if (data.email) {
-            setEmail(data.email);
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          if (user?.id) {
+            // 既にログイン済みならダッシュボードへ
+            router.push('/staff-dashboard');
+            return;
           }
-          if (data.password) {
-            setPassword(data.password);
+        }
+
+        // 保存されたログイン情報を読み込む（30日間有効）
+        const savedData = localStorage.getItem('savedLoginData');
+        if (savedData) {
+          try {
+            const data = JSON.parse(savedData);
+            const savedDate = new Date(data.savedAt);
+            const daysSinceSaved = (Date.now() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
+            
+            // 30日以内なら読み込む
+            if (daysSinceSaved <= 30) {
+              if (data.email) {
+                setEmail(data.email);
+              }
+              if (data.password) {
+                setPassword(data.password);
+              }
+              setRememberMe(true);
+            } else {
+              // 30日を超えていたら削除
+              localStorage.removeItem('savedLoginData');
+            }
+          } catch (e) {
+            // パースエラーの場合は削除
+            localStorage.removeItem('savedLoginData');
           }
-          setRememberMe(true);
-        } else {
-          // 30日を超えていたら削除
-          localStorage.removeItem('savedLoginData_personal');
         }
       } catch (e) {
-        // パースエラーの場合は削除
-        localStorage.removeItem('savedLoginData_personal');
+        console.error('Session check error:', e);
       }
-    }
-  }, []);
+      setCheckingSession(false);
+    };
+    checkSession();
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,11 +79,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // usersテーブルからメールアドレスで検索
+      // usersテーブルからメールアドレスまたはログインIDで検索
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('email', email)
+        .or(`email.eq.${email.toLowerCase()},login_id.eq.${email.toLowerCase()}`)
         .eq('account_status', 'active')
         .single();
 
@@ -93,8 +103,11 @@ export default function LoginPage() {
       // ユーザー情報をlocalStorageに保存
       const user = {
         id: userData.id,
-        name: userData.name,
+        name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
+        lastName: userData.last_name,
+        firstName: userData.first_name,
         email: userData.email,
+        role: userData.role,
         account_status: userData.account_status,
       };
       localStorage.setItem('user', JSON.stringify(user));
@@ -106,17 +119,14 @@ export default function LoginPage() {
           password, // パスワードも保存（30日間）
           savedAt: new Date().toISOString(),
         };
-        localStorage.setItem('savedLoginData_personal', JSON.stringify(savedData));
+        localStorage.setItem('savedLoginData', JSON.stringify(savedData));
       } else {
-        localStorage.removeItem('savedLoginData_personal');
-      }
-      // ログイン成功後、パスワードをリセット（保存しない場合のみ）
-      if (!rememberMe) {
-        setPassword('');
+        localStorage.removeItem('savedLoginData');
       }
 
-      // リダイレクト先に移動（クエリパラメータで指定された場合はそこへ、なければデフォルト）
-      router.push(redirectTo);
+      // スタッフダッシュボードへリダイレクト（パーソナルモード）
+      // 施設への参加や切り替えはダッシュボードから行える
+      router.push('/staff-dashboard');
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
     } finally {
@@ -124,48 +134,13 @@ export default function LoginPage() {
     }
   };
 
-  // パスキー認証処理
-  const handlePasskeyLogin = async () => {
-    if (!email) {
-      setError('メールアドレスを入力してください');
-      return;
-    }
-    setError('');
-    try {
-      // 個人向けなのでfacilityCodeは空文字列
-      const result = await authenticatePasskey('', email);
-      
-      // パスキー認証成功後、ユーザー情報を取得してログイン処理
-      if (result && result.userId) {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', result.userId)
-          .eq('account_status', 'active')
-          .single();
-
-        if (userError || !userData) {
-          throw new Error('ユーザー情報の取得に失敗しました');
-        }
-
-        // ユーザー情報をlocalStorageに保存
-        const user = {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email,
-          account_status: userData.account_status,
-        };
-        localStorage.setItem('user', JSON.stringify(user));
-
-        // リダイレクト先に移動
-        router.push(redirectTo);
-      } else {
-        throw new Error('パスキー認証に失敗しました');
-      }
-    } catch (err: any) {
-      setError(err.message || 'パスキー認証に失敗しました');
-    }
-  };
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
@@ -179,13 +154,10 @@ export default function LoginPage() {
             className="h-16 w-auto mx-auto mb-4"
             priority
           />
-          <div className="mb-2">
-            <span className="inline-block bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-              Personal（スタッフ向け）
-            </span>
-          </div>
           <h1 className="text-2xl font-bold text-gray-800">ログイン</h1>
-          <p className="text-gray-600 text-sm mt-2">メールアドレスとパスワードを入力してください</p>
+          <p className="text-gray-600 text-sm mt-2">
+            ログインIDとパスワードを入力してください
+          </p>
         </div>
 
         {error && (
@@ -197,16 +169,16 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
-              メールアドレス
+              ログインID（メールアドレス）
             </label>
             <input
               id="email"
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-              placeholder="メールアドレスを入力"
+              placeholder="ログインID（メールアドレス）を入力"
               disabled={loading}
             />
           </div>
@@ -256,76 +228,49 @@ export default function LoginPage() {
               disabled={loading}
             />
             <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
-              ログイン情報を30日間保存する
+              ログイン情報を保存する
             </label>
           </div>
 
           <button
             type="submit"
-            disabled={loading || isAuthenticating}
+            disabled={loading}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'ログイン中...' : 'ログイン'}
           </button>
         </form>
 
-        {isSupported && (
-          <div className="mt-4">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">または</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handlePasskeyLogin}
-              disabled={loading || isAuthenticating || !email}
-              className="mt-4 w-full bg-white hover:bg-gray-50 text-[#00c4cc] border-2 border-[#00c4cc] font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isAuthenticating ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  認証中...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  パスキーでログイン
-                </>
-              )}
-            </button>
-          </div>
-        )}
+        <div className="mt-4 flex flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => router.push('/login/forgot-login-id')}
+            className="text-xs text-[#00c4cc] hover:underline"
+          >
+            ログインIDを忘れた場合
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/login/forgot-password')}
+            className="text-xs text-[#00c4cc] hover:underline"
+          >
+            パスワードを忘れた場合
+          </button>
+        </div>
 
-        <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
-          <p className="text-center text-sm text-gray-600">
-            アカウントをお持ちでない方は{' '}
-            <button
-              onClick={() => router.push('/signup')}
-              className="text-[#00c4cc] hover:underline font-bold"
-            >
-              新規登録
-            </button>
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <p className="text-center text-sm text-gray-600 mb-3">
+            アカウントをお持ちでない方
           </p>
-          <p className="text-center text-xs text-gray-400">
-            <button
-              onClick={() => window.location.href = 'https://my.co-shien.inu.co.jp/'}
-              className="hover:underline"
-            >
-              Personal側でログイン
-            </button>
-          </p>
+          <button
+            type="button"
+            onClick={() => router.push('/personal/signup')}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
+          >
+            新規アカウント作成
+          </button>
         </div>
       </div>
     </div>
   );
 }
-

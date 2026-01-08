@@ -9,6 +9,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+// 静的生成をスキップ（useSearchParamsを使用するため）
+export const dynamic = 'force-dynamic';
+
 export default function PersonalSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,16 +41,42 @@ export default function PersonalSetupPage() {
           return;
         }
 
+        // 登録時のメールアドレスを確認（別ユーザーでログインされないように）
+        const pendingEmail = localStorage.getItem('pending_signup_email');
+        const sessionEmail = session.user.email?.toLowerCase();
+
+        // セッションのメールが登録時のメールと異なる場合は警告
+        if (pendingEmail && sessionEmail && pendingEmail !== sessionEmail) {
+          console.warn('Session email mismatch:', { pendingEmail, sessionEmail });
+          // 古いセッションを破棄して再ログインを促す
+          await supabase.auth.signOut();
+          localStorage.removeItem('user');
+          setError('セッションエラーが発生しました。再度ログインしてください。');
+          router.push('/login');
+          return;
+        }
+
         // ユーザー情報を取得
         const { data: existingUser } = await supabase
           .from('users')
-          .select('id, email, name')
+          .select('id, email, name, account_status')
           .eq('email', session.user.email)
           .single();
 
         if (!existingUser) {
           setError('ユーザー情報が見つかりません');
           return;
+        }
+
+        // account_statusをactiveに更新（まだpendingの場合）
+        if (existingUser.account_status === 'pending') {
+          await supabase
+            .from('users')
+            .update({
+              account_status: 'active',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingUser.id);
         }
 
         // 既にウェルカムメールが送信されているか確認（localStorageで管理）
@@ -106,11 +135,15 @@ export default function PersonalSetupPage() {
         id: userData.id,
         name: userData.name,
         email: userData.email,
-        account_status: userData.account_status,
+        account_status: 'active', // 認証完了したのでactive
       };
       localStorage.setItem('user', JSON.stringify(user));
 
-      // パーソナルのログイン突破後の画面に遷移
+      // 登録時のメール確認用フラグをクリア
+      localStorage.removeItem('pending_signup_email');
+
+      // スタッフダッシュボードへリダイレクト（パーソナル単体利用）
+      // 施設への参加は後からダッシュボードからできる
       router.push('/staff-dashboard');
     } catch (err: any) {
       console.error('自動ログインエラー:', err);
@@ -176,7 +209,7 @@ export default function PersonalSetupPage() {
           <button
             type="button"
             onClick={() => {
-              // パーソナルのログイン突破後の画面に遷移
+              // スタッフダッシュボードへリダイレクト（パーソナル単体利用）
               router.push('/staff-dashboard');
             }}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"

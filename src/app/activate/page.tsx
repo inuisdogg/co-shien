@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,6 +29,9 @@ import { activateAccount } from '@/utils/staffInvitationService';
 import { supabase } from '@/lib/supabase';
 import { hashPassword } from '@/utils/password';
 import { UserPermissions } from '@/types';
+
+// 静的生成をスキップ（useSearchParamsを使用するため）
+export const dynamic = 'force-dynamic';
 
 // 資格の選択肢（児童発達支援・放課後等デイサービス関連）
 const QUALIFICATIONS = [

@@ -2,13 +2,16 @@
  * Root Layout
  */
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ServiceWorkerRegistration from '@/components/pwa/ServiceWorkerRegistration';
 
 const inter = Inter({ subsets: ['latin'] });
+
+// 全ページを動的レンダリングに設定（AuthProviderがコンテキストを使用するため）
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'co-shien - 児童発達支援管理システム',
@@ -17,13 +20,20 @@ export const metadata: Metadata = {
     icon: '/favicon.png',
   },
   manifest: '/manifest.json',
-  themeColor: '#00c4cc',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'co-shien',
   },
+};
+
+// Next.js 14ではviewportとthemeColorは別のexportに
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#00c4cc',
 };
 
 export default function RootLayout({

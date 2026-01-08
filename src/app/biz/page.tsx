@@ -1,30 +1,38 @@
 /**
  * Biz用ログインページ（事業所向け）
- * biz.co-shien.inu.co.jp でアクセスされた場合に表示される
+ * パーソナルアカウントに一本化されたため、/login にリダイレクト
+ * facilityIdクエリパラメータがある場合は、メインページにリダイレクト（施設情報を自動取得）
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import Sidebar from '@/components/common/Sidebar';
-import Header from '@/components/common/Header';
-import DashboardView from '@/components/dashboard/DashboardView';
-import ManagementSettingsView from '@/components/management/ManagementSettingsView';
-import LeadView from '@/components/lead/LeadView';
-import ScheduleView from '@/components/schedule/ScheduleView';
-import ChildrenView from '@/components/children/ChildrenView';
-import StaffView from '@/components/staff/StaffView';
-import StaffManagementView from '@/components/staff/StaffManagementView';
-import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
-import { useAuth } from '@/contexts/AuthContext';
-import { UserPermissions } from '@/types';
-import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+// 静的生成をスキップ
+export const dynamic = 'force-dynamic';
 
 export default function BizPage() {
-  const { isAuthenticated, isAdmin, hasPermission, login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const facilityIdFromQuery = searchParams?.get('facilityId') || null;
+  
+  useEffect(() => {
+    // facilityIdクエリパラメータがある場合は、メインページにリダイレクト（施設情報を自動取得）
+    if (facilityIdFromQuery) {
+      router.replace(`/?facilityId=${facilityIdFromQuery}`);
+    } else {
+      // /login にリダイレクト
+      router.replace('/login');
+    }
+  }, [router, facilityIdFromQuery]);
+  
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+      <div className="text-white">リダイレクト中...</div>
+    </div>
+  );
+}
   const [activeTab, setActiveTab] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [initialTabSet, setInitialTabSet] = useState(false);
@@ -383,14 +391,14 @@ export default function BizPage() {
 
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-center text-sm text-gray-600 mb-3">
-              初めてご利用の方は、初期設定を行ってください
+              初めてご利用の方は新規登録してください
             </p>
             <button
               type="button"
-              onClick={() => router.push('/facility-setup')}
+              onClick={() => router.push('/signup')}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
             >
-              初期設定を行う
+              新規登録（施設ID発行）
             </button>
           </div>
         </div>

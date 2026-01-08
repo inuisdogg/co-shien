@@ -12,10 +12,16 @@ import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
+// 静的生成をスキップ
+export const dynamic = 'force-dynamic';
+
 export default function PersonalSignupPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '',
+    lastName: '',
+    firstName: '',
+    birthDate: '',
+    gender: '' as 'male' | 'female' | 'other' | '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -47,13 +53,52 @@ export default function PersonalSignupPage() {
       return;
     }
 
-    if (!formData.name || !formData.email) {
-      setError('名前とメールアドレスを入力してください');
+    // バリデーション
+    if (!formData.lastName || !formData.firstName) {
+      setError('姓と名を入力してください');
       return;
     }
 
+    if (!formData.birthDate) {
+      setError('生年月日を入力してください');
+      return;
+    }
+
+    if (!formData.gender) {
+      setError('性別を選択してください');
+      return;
+    }
+
+    if (!formData.email) {
+      setError('メールアドレスを入力してください');
+      return;
+    }
+
+    // 生年月日の形式チェック
+    const birthDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!birthDateRegex.test(formData.birthDate)) {
+      setError('生年月日はYYYY-MM-DD形式で入力してください');
+      return;
+    }
+
+    // 生年月日の妥当性チェック（未来の日付でないか）
+    const birthDateObj = new Date(formData.birthDate);
+    const today = new Date();
+    if (birthDateObj > today) {
+      setError('生年月日は未来の日付にできません');
+      return;
+    }
+
+    // 名前を結合（後方互換性のため）
+    const fullName = `${formData.lastName} ${formData.firstName}`;
+
     setLoading(true);
     try {
+      // 既存のセッションをクリア（別ユーザーのセッションが残っている場合に備えて）
+      await supabase.auth.signOut();
+      localStorage.removeItem('user');
+      localStorage.removeItem('selectedFacility');
+
       // 重複チェック：メールアドレス
       const { data: existingUserByEmail, error: emailCheckError } = await supabase
         .from('users')
@@ -85,23 +130,8 @@ export default function PersonalSignupPage() {
         throw new Error('このメールアドレスは既にログインIDとして使用されています');
       }
 
-      // 重複チェック：名前（同一名のユーザーが存在するか確認）
-      // ただし、名前のみでの重複チェックは緩くする（同名の可能性があるため）
-      // メールアドレスと名前の組み合わせでチェック
-      const { data: existingUserByNameAndEmail, error: nameCheckError } = await supabase
-        .from('users')
-        .select('id, email, name')
-        .eq('name', formData.name.trim())
-        .eq('email', formData.email.trim().toLowerCase())
-        .maybeSingle();
-
-      if (nameCheckError && nameCheckError.code !== 'PGRST116') {
-        throw new Error(`名前確認エラー: ${nameCheckError.message}`);
-      }
-
-      if (existingUserByNameAndEmail) {
-        throw new Error('この名前とメールアドレスの組み合わせは既に登録されています');
-      }
+      // 名前を結合（後方互換性のため）
+      const fullName = `${formData.lastName} ${formData.firstName}`;
 
       // Supabase Authでの重複チェックは、signUp時にエラーとして返されるため
       // ここではusersテーブルのチェックで十分
@@ -117,7 +147,9 @@ export default function PersonalSignupPage() {
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            name: formData.name,
+            name: fullName,
+            lastName: formData.lastName,
+            firstName: formData.firstName,
           }
         }
       });
@@ -142,7 +174,11 @@ export default function PersonalSignupPage() {
         .from('users')
         .upsert({
           id: authData.user.id,
-          name: formData.name,
+          name: fullName, // 後方互換性のため
+          last_name: formData.lastName,
+          first_name: formData.firstName,
+          birth_date: formData.birthDate,
+          gender: formData.gender,
           email: formData.email,
           login_id: formData.email,
           account_status: 'pending', // メール認証待ち
@@ -158,6 +194,9 @@ export default function PersonalSignupPage() {
         console.error('usersテーブルへの保存エラー:', userCreateError);
         // エラーでも続行（Supabase Authのトリガーで作成される可能性がある）
       }
+
+      // 登録したメールアドレスをlocalStorageに保存（認証後の確認用）
+      localStorage.setItem('pending_signup_email', formData.email.trim().toLowerCase());
 
       // メール認証待機ページにリダイレクト
       router.push(`/personal/signup/waiting?email=${encodeURIComponent(formData.email)}`);
@@ -296,20 +335,71 @@ export default function PersonalSignupPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="lastName" className="block text-sm font-bold text-gray-700 mb-2">
+                姓 <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="lastName"
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                placeholder="姓を入力"
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-bold text-gray-700 mb-2">
+                名 <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="firstName"
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                placeholder="名を入力"
+                disabled={loading}
+              />
+            </div>
+          </div>
+
           <div>
-            <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">
-              氏名 <span className="text-red-500">*</span>
+            <label htmlFor="birthDate" className="block text-sm font-bold text-gray-700 mb-2">
+              生年月日 <span className="text-red-500">*</span>
             </label>
             <input
-              id="name"
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              id="birthDate"
+              type="date"
+              value={formData.birthDate}
+              onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-              placeholder="氏名を入力"
               disabled={loading}
             />
+          </div>
+
+          <div>
+            <label htmlFor="gender" className="block text-sm font-bold text-gray-700 mb-2">
+              性別 <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="gender"
+              value={formData.gender}
+              onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'male' | 'female' | 'other' })}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+              disabled={loading}
+            >
+              <option value="">選択してください</option>
+              <option value="male">男性</option>
+              <option value="female">女性</option>
+              <option value="other">その他</option>
+            </select>
           </div>
 
           <div>
@@ -433,14 +523,22 @@ export default function PersonalSignupPage() {
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
           <p className="text-center text-sm text-gray-600">
             既にアカウントをお持ちの方は{' '}
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/login')}
               className="text-[#00c4cc] hover:underline font-bold"
             >
               ログイン
+            </button>
+          </p>
+          <p className="text-center text-xs text-gray-400">
+            <button
+              onClick={() => window.location.href = 'https://biz.co-shien.inu.co.jp/'}
+              className="hover:underline"
+            >
+              Biz側でログイン
             </button>
           </p>
         </div>

@@ -1,6 +1,8 @@
 /**
- * Personal側用新規登録ページ
- * 施設ID不要で個人アカウントを作成
+ * Biz側用：施設の初回セットアップページ
+ * 施設IDを発行し、管理者アカウントを作成する
+ *
+ * ※ Personal側の新規登録は /personal/signup を使用
  */
 
 'use client';
@@ -11,6 +13,9 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+
+// 静的生成をスキップ
+export const dynamic = 'force-dynamic';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -289,14 +294,22 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
           <p className="text-center text-sm text-gray-600">
             既にアカウントをお持ちの方は{' '}
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/biz')}
               className="text-[#00c4cc] hover:underline font-bold"
             >
               ログイン
+            </button>
+          </p>
+          <p className="text-center text-xs text-gray-400">
+            <button
+              onClick={() => window.location.href = 'https://my.co-shien.inu.co.jp/'}
+              className="hover:underline"
+            >
+              Personal側でログイン
             </button>
           </p>
         </div>
