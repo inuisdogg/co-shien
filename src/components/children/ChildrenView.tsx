@@ -41,8 +41,11 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   // フォームの初期値
   const initialFormData: ChildFormData = {
     name: '',
+    nameKana: '',
     age: undefined,
+    birthDate: '',
     guardianName: '',
+    guardianNameKana: '',
     guardianRelationship: '',
     beneficiaryNumber: '',
     grantDays: undefined,
@@ -54,13 +57,22 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     doctorClinic: '',
     schoolName: '',
     pattern: '',
+    patternDays: [],
+    patternTimeSlots: {},
     needsPickup: false,
     needsDropoff: false,
     pickupLocation: '',
+    pickupLocationCustom: '',
     dropoffLocation: '',
+    dropoffLocationCustom: '',
+    characteristics: '',
     contractStatus: 'pre-contract',
     contractStartDate: '',
     contractEndDate: '',
+    registrationType: 'post-contract',
+    plannedContractDays: undefined,
+    plannedUsageStartDate: '',
+    plannedUsageDays: undefined,
   };
 
   const [formData, setFormData] = useState<ChildFormData>(initialFormData);
@@ -207,10 +219,25 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   // 編集モードに切り替え
   const handleEditChild = () => {
     if (selectedChild) {
+      // パターン文字列から曜日配列を生成（既存データの互換性のため）
+      let patternDays: number[] = [];
+      if (selectedChild.patternDays) {
+        patternDays = selectedChild.patternDays;
+      } else if (selectedChild.pattern) {
+        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+        const patternParts = selectedChild.pattern.split(/[・、,]/);
+        patternDays = patternParts
+          .map(part => dayNames.indexOf(part.trim()))
+          .filter(index => index !== -1);
+      }
+      
       setFormData({
         name: selectedChild.name,
+        nameKana: selectedChild.nameKana,
         age: selectedChild.age,
+        birthDate: selectedChild.birthDate || '',
         guardianName: selectedChild.guardianName,
+        guardianNameKana: selectedChild.guardianNameKana,
         guardianRelationship: selectedChild.guardianRelationship,
         beneficiaryNumber: selectedChild.beneficiaryNumber,
         grantDays: selectedChild.grantDays,
@@ -221,14 +248,23 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
         doctorName: selectedChild.doctorName,
         doctorClinic: selectedChild.doctorClinic,
         schoolName: selectedChild.schoolName,
-        pattern: selectedChild.pattern,
+        pattern: selectedChild.pattern || '',
+        patternDays: patternDays,
+        patternTimeSlots: selectedChild.patternTimeSlots || {},
         needsPickup: selectedChild.needsPickup,
         needsDropoff: selectedChild.needsDropoff,
-        pickupLocation: selectedChild.pickupLocation,
-        dropoffLocation: selectedChild.dropoffLocation,
+        pickupLocation: selectedChild.pickupLocation || '',
+        pickupLocationCustom: selectedChild.pickupLocationCustom || '',
+        dropoffLocation: selectedChild.dropoffLocation || '',
+        dropoffLocationCustom: selectedChild.dropoffLocationCustom || '',
+        characteristics: selectedChild.characteristics || '',
         contractStatus: selectedChild.contractStatus,
         contractStartDate: selectedChild.contractStartDate,
         contractEndDate: selectedChild.contractEndDate,
+        registrationType: selectedChild.registrationType || 'post-contract',
+        plannedContractDays: selectedChild.plannedContractDays,
+        plannedUsageStartDate: selectedChild.plannedUsageStartDate,
+        plannedUsageDays: selectedChild.plannedUsageDays,
       });
       setIsDetailModalOpen(false);
       setIsModalOpen(true);
@@ -515,55 +551,141 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             </div>
 
             {/* フォーム本体 */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <div className="space-y-6">
+            <div className="p-4 md:p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="space-y-4 md:space-y-5">
+                {/* 契約ステータスセクション */}
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">契約ステータス</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'pre-contract', label: '契約前', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+                      { value: 'active', label: '契約中', color: 'bg-green-100 text-green-700 border-green-300' },
+                      { value: 'inactive', label: '休止中', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+                      { value: 'terminated', label: '解約', color: 'bg-red-100 text-red-700 border-red-300' },
+                    ].map((status) => (
+                      <button
+                        key={status.value}
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            contractStatus: status.value as ContractStatus,
+                          })
+                        }
+                        className={`px-4 py-2 text-xs md:text-sm font-bold rounded-md transition-colors border-2 ${
+                          formData.contractStatus === status.value
+                            ? status.color
+                            : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        {status.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* 基本情報セクション */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">基本情報</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">基本情報</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
                         児童氏名 <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
                         placeholder="例: 山田 太郎"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">年齢</label>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
+                        フリガナ
+                      </label>
                       <input
-                        type="number"
-                        min="0"
-                        max="18"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
-                        placeholder="例: 5"
-                        value={formData.age || ''}
-                        onChange={(e) =>
+                        type="text"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                        placeholder="例: ヤマダ タロウ"
+                        value={formData.nameKana || ''}
+                        onChange={(e) => setFormData({ ...formData, nameKana: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
+                        生年月日 <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        value={formData.birthDate || ''}
+                        onChange={(e) => {
+                          const birthDate = e.target.value;
+                          // 年齢を自動計算
+                          let age: number | undefined = undefined;
+                          let contractEndDate: string = '';
+                          
+                          if (birthDate) {
+                            const birth = new Date(birthDate + 'T00:00:00');
+                            const today = new Date();
+                            age = today.getFullYear() - birth.getFullYear();
+                            const monthDiff = today.getMonth() - birth.getMonth();
+                            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                              age--;
+                            }
+                            
+                            // 利用終了日を計算（満6歳に達した日以後の最初の3月31日まで）
+                            // 満6歳になる日を計算
+                            const sixYearsOldDate = new Date(birth);
+                            sixYearsOldDate.setFullYear(birth.getFullYear() + 6);
+                            
+                            // 満6歳になる日が3月31日以前なら、その年の3月31日
+                            // 満6歳になる日が4月1日以降なら、翌年の3月31日
+                            const sixYearsOldYear = sixYearsOldDate.getFullYear();
+                            const sixYearsOldMonth = sixYearsOldDate.getMonth() + 1; // 1-12
+                            const sixYearsOldDay = sixYearsOldDate.getDate();
+                            
+                            // 満6歳になる日が3月31日以前または4月1日の場合、その年の3月31日
+                            // 満6歳になる日が4月2日以降の場合、翌年の3月31日
+                            let endYear: number;
+                            if (sixYearsOldMonth < 4 || (sixYearsOldMonth === 4 && sixYearsOldDay === 1)) {
+                              endYear = sixYearsOldYear;
+                            } else {
+                              endYear = sixYearsOldYear + 1;
+                            }
+                            
+                            // 日付文字列を直接構築（タイムゾーン問題を回避）
+                            contractEndDate = `${endYear}-03-31`;
+                          }
+                          
                           setFormData({
                             ...formData,
-                            age: e.target.value ? parseInt(e.target.value) : undefined,
-                          })
-                        }
+                            birthDate,
+                            age,
+                            contractEndDate,
+                          });
+                        }}
                       />
+                      {formData.birthDate && formData.age !== undefined && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          年齢: {formData.age}歳
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* 保護者情報セクション */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">保護者情報</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">保護者情報</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
                         保護者名
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
                         placeholder="例: 山田 花子"
                         value={formData.guardianName}
                         onChange={(e) =>
@@ -572,10 +694,24 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">続柄</label>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
+                        フリガナ
+                      </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        placeholder="例: ヤマダ ハナコ"
+                        value={formData.guardianNameKana || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, guardianNameKana: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">続柄</label>
+                      <input
+                        type="text"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
                         placeholder="例: 母、父、祖母"
                         value={formData.guardianRelationship}
                         onChange={(e) =>
@@ -587,16 +723,16 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                 </div>
 
                 {/* 受給者証情報セクション */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">受給者証情報</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">受給者証情報</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
                         受給者証番号
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc] font-mono"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] font-mono"
                         placeholder="10桁の番号"
                         value={formData.beneficiaryNumber}
                         onChange={(e) =>
@@ -605,13 +741,13 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
                         支給日数
                       </label>
                       <input
                         type="number"
                         min="0"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
                         placeholder="例: 10"
                         value={formData.grantDays || ''}
                         onChange={(e) =>
@@ -623,13 +759,13 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
-                        契約日数
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
+                        契約日数（実績）
                       </label>
                       <input
                         type="number"
                         min="0"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
                         placeholder="例: 8"
                         value={formData.contractDays || ''}
                         onChange={(e) =>
@@ -640,24 +776,267 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                         }
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
+                        契約日数（予定）
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        placeholder="例: 10"
+                        value={formData.plannedContractDays || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            plannedContractDays: e.target.value ? parseInt(e.target.value) : undefined,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 利用パターン・送迎セクション */}
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">利用パターン・送迎</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-2">
+                        基本利用パターン
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => {
+                          const isChecked = formData.patternDays?.includes(index) || false;
+                          const timeSlot = formData.patternTimeSlots?.[index] || 'PM';
+                          return (
+                            <div key={index} className="flex flex-col items-start p-1.5 border border-gray-200 rounded-md hover:bg-gray-50 min-w-[80px]">
+                              <label className="flex items-center space-x-1 cursor-pointer w-full mb-1">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const currentDays = formData.patternDays || [];
+                                    const newDays = e.target.checked
+                                      ? [...currentDays, index]
+                                      : currentDays.filter(d => d !== index);
+                                    
+                                    // パターン文字列も更新（後方互換性のため）
+                                    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+                                    const pattern = newDays.sort((a, b) => a - b).map(d => dayNames[d]).join('・');
+                                    
+                                    // 時間帯設定も更新
+                                    const newTimeSlots = { ...formData.patternTimeSlots };
+                                    if (e.target.checked) {
+                                      newTimeSlots[index] = timeSlot;
+                                    } else {
+                                      delete newTimeSlots[index];
+                                    }
+                                    
+                                    setFormData({
+                                      ...formData,
+                                      patternDays: newDays,
+                                      pattern: pattern || '',
+                                      patternTimeSlots: newTimeSlots,
+                                    });
+                                  }}
+                                  className="accent-[#00c4cc] w-3 h-3"
+                                />
+                                <span className="text-xs text-gray-700 font-medium">
+                                  {day}
+                                </span>
+                              </label>
+                              {isChecked && (
+                                <div className="flex flex-col items-start space-y-0.5 w-full">
+                                  <label className="flex items-center cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`timeSlot-${index}`}
+                                      value="AM"
+                                      checked={timeSlot === 'AM'}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          patternTimeSlots: {
+                                            ...formData.patternTimeSlots,
+                                            [index]: 'AM',
+                                          },
+                                        });
+                                      }}
+                                      className="accent-[#00c4cc] w-2.5 h-2.5"
+                                    />
+                                    <span className="text-[10px] text-gray-600 ml-0.5">午前</span>
+                                  </label>
+                                  <label className="flex items-center cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`timeSlot-${index}`}
+                                      value="PM"
+                                      checked={timeSlot === 'PM'}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          patternTimeSlots: {
+                                            ...formData.patternTimeSlots,
+                                            [index]: 'PM',
+                                          },
+                                        });
+                                      }}
+                                      className="accent-[#00c4cc] w-2.5 h-2.5"
+                                    />
+                                    <span className="text-[10px] text-gray-600 ml-0.5">午後</span>
+                                  </label>
+                                  <label className="flex items-center cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`timeSlot-${index}`}
+                                      value="AMPM"
+                                      checked={timeSlot === 'AMPM'}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          patternTimeSlots: {
+                                            ...formData.patternTimeSlots,
+                                            [index]: 'AMPM',
+                                          },
+                                        });
+                                      }}
+                                      className="accent-[#00c4cc] w-2.5 h-2.5"
+                                    />
+                                    <span className="text-[10px] text-gray-600 ml-0.5">終日</span>
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 p-3 md:p-4 rounded-md border border-gray-200 space-y-3">
+                      <label className="text-xs font-bold text-gray-500 block">送迎オプション</label>
+                      
+                      {/* お迎え */}
+                      <div className="space-y-2">
+                        <label className="flex items-center space-x-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={formData.needsPickup}
+                            onChange={(e) =>
+                              setFormData({ ...formData, needsPickup: e.target.checked })
+                            }
+                            className="accent-[#00c4cc] w-4 h-4"
+                          />
+                          <span className="text-xs md:text-sm text-gray-700 group-hover:text-gray-900 font-bold">
+                            お迎え
+                          </span>
+                        </label>
+                        {formData.needsPickup && (
+                          <div className="ml-7 space-y-2">
+                            <label className="block text-xs font-bold text-gray-500 mb-1">
+                              乗車地
+                            </label>
+                            <select
+                              className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                              value={formData.pickupLocation || ''}
+                              onChange={(e) =>
+                                setFormData({ ...formData, pickupLocation: e.target.value, pickupLocationCustom: '' })
+                              }
+                            >
+                              <option value="">選択してください</option>
+                              <option value="事業所">事業所</option>
+                              <option value="自宅">自宅</option>
+                              <option value="その他">その他（自由記入）</option>
+                            </select>
+                            {formData.pickupLocation === 'その他' && (
+                              <input
+                                type="text"
+                                className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                                placeholder="例: 保育所、待ち合わせ場所（駅）など"
+                                value={formData.pickupLocationCustom || ''}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, pickupLocationCustom: e.target.value })
+                                }
+                              />
+                            )}
+                            {formData.pickupLocation && formData.pickupLocation !== 'その他' && (
+                              <p className="text-[10px] text-gray-500">
+                                選択: {formData.pickupLocation}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* お送り */}
+                      <div className="space-y-2">
+                        <label className="flex items-center space-x-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={formData.needsDropoff}
+                            onChange={(e) =>
+                              setFormData({ ...formData, needsDropoff: e.target.checked })
+                            }
+                            className="accent-[#00c4cc] w-4 h-4"
+                          />
+                          <span className="text-xs md:text-sm text-gray-700 group-hover:text-gray-900 font-bold">
+                            お送り
+                          </span>
+                        </label>
+                        {formData.needsDropoff && (
+                          <div className="ml-7 space-y-2">
+                            <label className="block text-xs font-bold text-gray-500 mb-1">
+                              降車地
+                            </label>
+                            <select
+                              className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                              value={formData.dropoffLocation || ''}
+                              onChange={(e) =>
+                                setFormData({ ...formData, dropoffLocation: e.target.value, dropoffLocationCustom: '' })
+                              }
+                            >
+                              <option value="">選択してください</option>
+                              <option value="事業所">事業所</option>
+                              <option value="自宅">自宅</option>
+                              <option value="その他">その他（自由記入）</option>
+                            </select>
+                            {formData.dropoffLocation === 'その他' && (
+                              <input
+                                type="text"
+                                className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                                placeholder="例: 保育所、待ち合わせ場所（駅）など"
+                                value={formData.dropoffLocationCustom || ''}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, dropoffLocationCustom: e.target.value })
+                                }
+                              />
+                            )}
+                            {formData.dropoffLocation && formData.dropoffLocation !== 'その他' && (
+                              <p className="text-[10px] text-gray-500">
+                                選択: {formData.dropoffLocation}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* 連絡先セクション */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">連絡先</h4>
-                  <div className="space-y-4">
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">連絡先</h4>
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">住所</label>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">住所</label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
                         placeholder="例: 東京都渋谷区..."
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1.5">
                           電話番号
@@ -687,9 +1066,9 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                 </div>
 
                 {/* 医療情報セクション */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">医療情報</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">医療情報</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1.5">
                         かかりつけ医名
@@ -718,15 +1097,15 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                 </div>
 
                 {/* 通園情報セクション */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">通園情報</h4>
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">通園情報</h4>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1.5">
+                    <label className="block text-xs font-bold text-gray-500 mb-1">
                       通園場所名
                     </label>
                     <input
                       type="text"
-                      className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                      className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
                       placeholder="例: 〇〇小学校、〇〇幼稚園"
                       value={formData.schoolName}
                       onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
@@ -734,125 +1113,33 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                   </div>
                 </div>
 
-                {/* 利用パターン・送迎セクション */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">利用パターン・送迎</h4>
-                  <div className="space-y-4">
+                {/* 契約情報セクション */}
+                <div className="border-b border-gray-200 pb-3 md:pb-4">
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">契約情報</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
-                        基本利用パターン
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
+                        契約開始予定日
                       </label>
                       <input
-                        type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
-                        placeholder="例: 月・水・金"
-                        value={formData.pattern}
-                        onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
-                      />
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-md border border-gray-200 space-y-4">
-                      <label className="text-xs font-bold text-gray-500 block">送迎オプション</label>
-                      
-                      {/* お迎え */}
-                      <div className="space-y-2">
-                        <label className="flex items-center space-x-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={formData.needsPickup}
-                            onChange={(e) =>
-                              setFormData({ ...formData, needsPickup: e.target.checked })
-                            }
-                            className="accent-[#00c4cc] w-4 h-4"
-                          />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900 font-bold">
-                            お迎え
-                          </span>
-                        </label>
-                        {formData.needsPickup && (
-                          <div className="ml-7">
-                            <label className="block text-xs font-bold text-gray-500 mb-1.5">
-                              乗車地
-                            </label>
-                            <input
-                              type="text"
-                              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-                              placeholder="例: 〇〇小学校正門、〇〇幼稚園"
-                              value={formData.pickupLocation || ''}
-                              onChange={(e) =>
-                                setFormData({ ...formData, pickupLocation: e.target.value })
-                              }
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* お送り */}
-                      <div className="space-y-2">
-                        <label className="flex items-center space-x-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={formData.needsDropoff}
-                            onChange={(e) =>
-                              setFormData({ ...formData, needsDropoff: e.target.checked })
-                            }
-                            className="accent-[#00c4cc] w-4 h-4"
-                          />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900 font-bold">
-                            お送り
-                          </span>
-                        </label>
-                        {formData.needsDropoff && (
-                          <div className="ml-7">
-                            <label className="block text-xs font-bold text-gray-500 mb-1.5">
-                              降車地
-                            </label>
-                            <input
-                              type="text"
-                              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-                              placeholder="例: 自宅、〇〇アパート前"
-                              value={formData.dropoffLocation || ''}
-                              onChange={(e) =>
-                                setFormData({ ...formData, dropoffLocation: e.target.value })
-                              }
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 契約情報セクション */}
-                <div>
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">契約情報</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
-                        契約ステータス
-                      </label>
-                      <select
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
-                        value={formData.contractStatus}
+                        type="date"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        value={formData.plannedUsageStartDate || ''}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            contractStatus: e.target.value as ContractStatus,
+                            plannedUsageStartDate: e.target.value,
                           })
                         }
-                      >
-                        <option value="pre-contract">契約前</option>
-                        <option value="active">契約中</option>
-                        <option value="inactive">休止中</option>
-                        <option value="terminated">解約</option>
-                      </select>
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
                         契約開始日
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
                         value={formData.contractStartDate}
                         onChange={(e) =>
                           setFormData({ ...formData, contractStartDate: e.target.value })
@@ -860,18 +1147,45 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-500 mb-1">
                         契約終了日
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className={`w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] ${
+                          formData.birthDate ? 'bg-gray-50' : ''
+                        }`}
                         value={formData.contractEndDate}
                         onChange={(e) =>
                           setFormData({ ...formData, contractEndDate: e.target.value })
                         }
+                        readOnly={!!formData.birthDate}
                       />
+                      {formData.birthDate && (
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          生年月日から自動計算
+                        </p>
+                      )}
                     </div>
+                  </div>
+                </div>
+
+                {/* 特性・メモセクション */}
+                <div>
+                  <h4 className="font-bold text-xs md:text-sm text-gray-700 mb-3">特性・メモ</h4>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">
+                      特性・メモ
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                      placeholder="児童の特性、配慮事項、その他のメモを記入してください"
+                      value={formData.characteristics || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, characteristics: e.target.value })
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -932,9 +1246,11 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       <p className="text-sm text-gray-800 mt-1">{selectedChild.name}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500">年齢</label>
+                      <label className="text-xs font-bold text-gray-500">生年月日</label>
                       <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.age ? `${selectedChild.age}歳` : '-'}
+                        {selectedChild.birthDate 
+                          ? `${selectedChild.birthDate} ${selectedChild.age ? `(${selectedChild.age}歳)` : ''}`
+                          : selectedChild.age ? `${selectedChild.age}歳` : '-'}
                       </p>
                     </div>
                   </div>
@@ -1059,11 +1375,11 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
                               お迎え
                             </span>
-                            {selectedChild.pickupLocation && (
-                              <span className="text-sm text-gray-600">
-                                ({selectedChild.pickupLocation})
-                              </span>
-                            )}
+                            <span className="text-sm text-gray-600">
+                              {selectedChild.pickupLocation === 'その他' 
+                                ? selectedChild.pickupLocationCustom || '（未入力）'
+                                : selectedChild.pickupLocation || '（未入力）'}
+                            </span>
                           </div>
                         )}
                         {selectedChild.needsDropoff && (
@@ -1071,11 +1387,11 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
                               お送り
                             </span>
-                            {selectedChild.dropoffLocation && (
-                              <span className="text-sm text-gray-600">
-                                ({selectedChild.dropoffLocation})
-                              </span>
-                            )}
+                            <span className="text-sm text-gray-600">
+                              {selectedChild.dropoffLocation === 'その他'
+                                ? selectedChild.dropoffLocationCustom || '（未入力）'
+                                : selectedChild.dropoffLocation || '（未入力）'}
+                            </span>
                           </div>
                         )}
                         {!selectedChild.needsPickup && !selectedChild.needsDropoff && (
@@ -1085,6 +1401,18 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                     </div>
                   </div>
                 </div>
+
+                {/* 特性・メモ */}
+                {selectedChild.characteristics && (
+                  <div className="border-b border-gray-200 pb-4">
+                    <h4 className="font-bold text-sm text-gray-700 mb-4">特性・メモ</h4>
+                    <div>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {selectedChild.characteristics}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* リード案件 */}
                 {(() => {

@@ -20,6 +20,29 @@ export type HolidayPeriod = {
   regularHolidays: number[]; // 定休日（0=日, 1=月, ..., 6=土）
 };
 
+// 期間ごとの営業時間設定
+export type BusinessHoursPeriod = {
+  id: string; // 期間ID
+  startDate: string; // 開始日（YYYY-MM-DD形式）
+  endDate: string; // 終了日（YYYY-MM-DD形式、空文字の場合は無期限）
+  businessHours: {
+    AM: { start: string; end: string };
+    PM: { start: string; end: string };
+  };
+};
+
+// 施設設定の変更履歴
+export type FacilitySettingsHistory = {
+  id: string;
+  facilityId: string;
+  changeType: 'business_hours' | 'holidays' | 'capacity' | 'all'; // 変更タイプ
+  oldValue: any; // 変更前の値（JSON）
+  newValue: any; // 変更後の値（JSON）
+  changedBy: string; // 変更者（user_id）
+  changedAt: string; // 変更日時
+  description?: string; // 変更説明
+};
+
 // 施設情報設定
 export type FacilitySettings = {
   id: string;
@@ -35,6 +58,7 @@ export type FacilitySettings = {
     AM: { start: string; end: string }; // 例: { start: '09:00', end: '12:00' }
     PM: { start: string; end: string }; // 例: { start: '13:00', end: '18:00' }
   };
+  businessHoursPeriods?: BusinessHoursPeriod[]; // 期間ごとの営業時間設定
   // 受け入れ人数
   capacity: {
     AM: number; // 午前の定員
@@ -206,9 +230,12 @@ export type Child = {
   facilityId: string; // 施設ID（マルチテナント対応）
   // 基本情報
   name: string; // 児童名
-  age?: number; // 年齢
+  nameKana?: string; // 児童名（フリガナ）
+  age?: number; // 年齢（自動計算）
+  birthDate?: string; // 生年月日 (YYYY-MM-DD)
   // 保護者情報
   guardianName?: string; // 保護者名
+  guardianNameKana?: string; // 保護者名（フリガナ）
   guardianRelationship?: string; // 続柄（例: 母、父、祖母）
   // 受給者証情報
   beneficiaryNumber?: string; // 受給者証番号
@@ -224,15 +251,27 @@ export type Child = {
   // 通園情報
   schoolName?: string; // 通園場所名（学校・幼稚園等）
   // 利用パターン
-  pattern?: string; // 基本利用パターン (例: "月・水・金")
+  pattern?: string; // 基本利用パターン (例: "月・水・金") - 後方互換性のため保持
+  patternDays?: number[]; // 基本利用パターン（曜日の配列: 0=日, 1=月, ..., 6=土）
+  patternTimeSlots?: Record<number, 'AM' | 'PM' | 'AMPM'>; // 曜日ごとの時間帯設定（0=日, 1=月, ..., 6=土）
   needsPickup: boolean; // お迎え有無
   needsDropoff: boolean; // お送り有無
-  pickupLocation?: string; // 乗車地（自由入力）
-  dropoffLocation?: string; // 降車地（自由入力）
+  pickupLocation?: string; // 乗車地（選択肢または自由入力）
+  pickupLocationCustom?: string; // 乗車地（自由記入）
+  dropoffLocation?: string; // 降車地（選択肢または自由入力）
+  dropoffLocationCustom?: string; // 降車地（自由記入）
+  // 特性・メモ
+  characteristics?: string; // 特性・メモ
   // 契約ステータス
   contractStatus: ContractStatus; // 契約ステータス
   contractStartDate?: string; // 契約開始日
   contractEndDate?: string; // 契約終了日
+  // 登録タイプ（契約前/契約後）
+  registrationType?: 'pre-contract' | 'post-contract'; // 登録タイプ
+  // 契約前登録用の情報
+  plannedContractDays?: number; // 契約予定日数（月間）
+  plannedUsageStartDate?: string; // 利用開始予定日
+  plannedUsageDays?: number; // 利用予定日数（総日数）
   // メタデータ
   createdAt: string;
   updatedAt: string;

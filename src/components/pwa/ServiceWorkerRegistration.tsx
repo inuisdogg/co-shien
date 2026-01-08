@@ -61,10 +61,10 @@ export default function ServiceWorkerRegistration() {
             checkForUpdates(reg);
           });
 
-          // 定期的に更新をチェック（1分ごと、より頻繁に）
+          // 定期的に更新をチェック（5分ごと）- 頻繁すぎると問題が発生するため間隔を延長
           const updateInterval = setInterval(() => {
             checkForUpdates(reg);
-          }, 60 * 1000);
+          }, 5 * 60 * 1000);
 
           // クリーンアップ
           return () => clearInterval(updateInterval);
@@ -73,11 +73,12 @@ export default function ServiceWorkerRegistration() {
           console.error('Service Worker registration failed:', error);
         });
 
-      // Service Workerの更新を検知
+      // Service Workerの更新を検知（自動リロードは削除）
+      // 自動リロードはユーザー体験を損なうため、ユーザーが明示的に更新ボタンを押した時のみリロード
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        // 新しいService Workerが制御を取得した時、ページをリロード
-        console.log('[SW] Controller changed, reloading...');
-        window.location.reload();
+        // 新しいService Workerが制御を取得した時
+        console.log('[SW] Controller changed');
+        // 自動リロードは行わない（ユーザーが明示的に更新ボタンを押した時のみリロード）
       });
 
       // PWAインストールプロンプトの処理（オプション）
@@ -91,7 +92,12 @@ export default function ServiceWorkerRegistration() {
 
   // 更新が利用可能かチェック
   const checkForUpdates = (reg: ServiceWorkerRegistration) => {
-    // キャッシュを無視して強制的に更新をチェック
+    // 既に待機中のService Workerがある場合は再チェックしない
+    if (reg.waiting) {
+      return;
+    }
+
+    // キャッシュを無視して強制的に更新をチェック（ただし頻繁に呼ばれないように注意）
     reg.update().then(() => {
       // 更新されたService Workerが待機中かチェック
       if (reg.waiting) {
@@ -102,28 +108,30 @@ export default function ServiceWorkerRegistration() {
       console.error('[SW] Update check failed:', error);
     });
 
-    // 新しいService Workerがインストールされた時
-    const handleUpdateFound = () => {
-      const newWorker = reg.installing;
-      if (newWorker) {
-        newWorker.addEventListener('statechange', () => {
-          console.log('[SW] New worker state:', newWorker.state);
-          if (newWorker.state === 'installed') {
-            if (navigator.serviceWorker.controller) {
-              // 既存のService Workerが動作している場合、更新が利用可能
-              console.log('[SW] New version installed, update available');
-              setUpdateAvailable(true);
-            } else {
-              // 初回インストール
-              console.log('[SW] Service Worker installed for the first time');
+    // 新しいService Workerがインストールされた時（一度だけ実行）
+    if (!reg.installing && !reg.waiting) {
+      const handleUpdateFound = () => {
+        const newWorker = reg.installing;
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            console.log('[SW] New worker state:', newWorker.state);
+            if (newWorker.state === 'installed') {
+              if (navigator.serviceWorker.controller) {
+                // 既存のService Workerが動作している場合、更新が利用可能
+                console.log('[SW] New version installed, update available');
+                setUpdateAvailable(true);
+              } else {
+                // 初回インストール
+                console.log('[SW] Service Worker installed for the first time');
+              }
             }
-          }
-        });
-      }
-    };
+          });
+        }
+      };
 
-    // 既にリスナーが登録されていない場合のみ追加
-    reg.addEventListener('updatefound', handleUpdateFound);
+      // 既にリスナーが登録されていない場合のみ追加
+      reg.addEventListener('updatefound', handleUpdateFound);
+    }
   };
 
   // 更新を適用

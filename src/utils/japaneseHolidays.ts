@@ -12,6 +12,11 @@ export function getJapaneseHolidays(year: number): string[] {
 
   // 固定祝日
   holidays.push(`${year}-01-01`); // 元日
+  
+  // 成人の日（1月の第2月曜日）
+  const comingOfAgeDay = getComingOfAgeDay(year);
+  holidays.push(comingOfAgeDay);
+  
   holidays.push(`${year}-02-11`); // 建国記念の日
   holidays.push(`${year}-04-29`); // 昭和の日
   holidays.push(`${year}-05-03`); // 憲法記念日
@@ -68,6 +73,24 @@ export function getJapaneseHolidays(year: number): string[] {
   holidays.sort();
 
   return holidays;
+}
+
+/**
+ * 成人の日を計算（1月の第2月曜日）
+ */
+function getComingOfAgeDay(year: number): string {
+  // 1月1日の曜日を取得
+  const january1 = new Date(year, 0, 1);
+  const dayOfWeek = january1.getDay(); // 0=日曜日, 1=月曜日, ...
+  
+  // 第2月曜日までの日数を計算
+  // 月曜日(1)なら7日後、日曜日(0)なら8日後、火曜日(2)なら6日後、...
+  const daysToAdd = (1 - dayOfWeek + 7) % 7 + 7;
+  
+  const comingOfAgeDay = new Date(year, 0, 1 + daysToAdd);
+  const month = String(comingOfAgeDay.getMonth() + 1).padStart(2, '0');
+  const day = String(comingOfAgeDay.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**

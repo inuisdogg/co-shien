@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { CalendarDays, X, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, X, Plus, Trash2, Car } from 'lucide-react';
 import { TimeSlot, ScheduleItem, Child } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import UsageRecordForm from './UsageRecordForm';
@@ -28,7 +28,7 @@ const ScheduleView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDateForBooking, setSelectedDateForBooking] = useState('');
-  const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<TimeSlot>('PM');
+  const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<TimeSlot | null>(null);
   const [selectedScheduleItem, setSelectedScheduleItem] = useState<ScheduleItem | null>(null);
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
   const [isUsageRecordFormOpen, setIsUsageRecordFormOpen] = useState(false);
@@ -36,7 +36,7 @@ const ScheduleView: React.FC = () => {
   const [newBooking, setNewBooking] = useState({
     childId: '',
     date: '',
-    slot: 'PM' as TimeSlot,
+    slots: { AM: false, PM: false } as { AM: boolean; PM: boolean },
     pickup: false,
     dropoff: false,
   });
@@ -257,12 +257,11 @@ const ScheduleView: React.FC = () => {
   // 日付をクリックしてモーダルを開く
   const handleDateClick = (date: string, slot?: TimeSlot) => {
     setSelectedDateForBooking(date);
-    const selectedSlot = slot || 'PM';
-    setSelectedSlotForBooking(selectedSlot);
+    setSelectedSlotForBooking(slot || null);
     setNewBooking({
       childId: '',
       date,
-      slot: selectedSlot,
+      slots: slot ? { AM: slot === 'AM', PM: slot === 'PM' } : { AM: false, PM: false },
       pickup: false,
       dropoff: false,
     });
@@ -275,24 +274,41 @@ const ScheduleView: React.FC = () => {
       alert('児童を選択してください');
       return;
     }
+    if (!newBooking.slots.AM && !newBooking.slots.PM) {
+      alert('午前または午後のいずれかを選択してください');
+      return;
+    }
     const child = children.find((c) => c.id === newBooking.childId);
     if (!child) return;
 
-    addSchedule({
-      date: newBooking.date,
-      childId: child.id,
-      childName: child.name,
-      slot: newBooking.slot,
-      hasPickup: newBooking.pickup,
-      hasDropoff: newBooking.dropoff,
-    });
+    // 選択された時間帯ごとにスケジュールを追加
+    if (newBooking.slots.AM) {
+      addSchedule({
+        date: newBooking.date,
+        childId: child.id,
+        childName: child.name,
+        slot: 'AM',
+        hasPickup: newBooking.pickup,
+        hasDropoff: newBooking.dropoff,
+      });
+    }
+    if (newBooking.slots.PM) {
+      addSchedule({
+        date: newBooking.date,
+        childId: child.id,
+        childName: child.name,
+        slot: 'PM',
+        hasPickup: newBooking.pickup,
+        hasDropoff: newBooking.dropoff,
+      });
+    }
 
     alert(`${child.name}さんの予約を追加しました`);
     setIsModalOpen(false);
     setNewBooking({
       childId: '',
       date: '',
-      slot: 'PM',
+      slots: { AM: false, PM: false },
       pickup: false,
       dropoff: false,
     });
@@ -483,6 +499,20 @@ const ScheduleView: React.FC = () => {
                   ).length;
                   const amUtilization = capacity.AM > 0 ? Math.round((amCount / capacity.AM) * 100) : 0;
                   const pmUtilization = capacity.PM > 0 ? Math.round((pmCount / capacity.PM) * 100) : 0;
+                  
+                  // 送迎予定枠の人数を計算
+                  const amPickupCount = schedules.filter(
+                    (s) => s.date === dateInfo.date && s.slot === 'AM' && s.hasPickup
+                  ).length;
+                  const amDropoffCount = schedules.filter(
+                    (s) => s.date === dateInfo.date && s.slot === 'AM' && s.hasDropoff
+                  ).length;
+                  const pmPickupCount = schedules.filter(
+                    (s) => s.date === dateInfo.date && s.slot === 'PM' && s.hasPickup
+                  ).length;
+                  const pmDropoffCount = schedules.filter(
+                    (s) => s.date === dateInfo.date && s.slot === 'PM' && s.hasDropoff
+                  ).length;
                   // 今日の日付をYYYY-MM-DD形式で取得（タイムゾーン問題を回避）
                   const today = new Date();
                   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -529,6 +559,14 @@ const ScheduleView: React.FC = () => {
                                 {amCount}/{capacity.AM}
                               </span>
                             </div>
+                            {(amPickupCount > 0 || amDropoffCount > 0) && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <Car className="w-3 h-3 text-[#006064]" />
+                                <span className="text-[9px] sm:text-[10px] text-[#006064] leading-tight">
+                                  送迎: 迎{amPickupCount} 送{amDropoffCount}
+                                </span>
+                              </div>
+                            )}
                             <div className="w-full bg-white/50 rounded-full h-1">
                               <div
                                 className={`h-1 rounded-full ${
@@ -550,6 +588,14 @@ const ScheduleView: React.FC = () => {
                                 {pmCount}/{capacity.PM}
                               </span>
                             </div>
+                            {(pmPickupCount > 0 || pmDropoffCount > 0) && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <Car className="w-3 h-3 text-orange-900" />
+                                <span className="text-[9px] sm:text-[10px] text-orange-900 leading-tight">
+                                  送迎: 迎{pmPickupCount} 送{pmDropoffCount}
+                                </span>
+                              </div>
+                            )}
                             <div className="w-full bg-white/50 rounded-full h-1">
                               <div
                                 className={`h-1 rounded-full ${
@@ -762,7 +808,18 @@ const ScheduleView: React.FC = () => {
                 <select
                   className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] transition-all"
                   value={newBooking.childId}
-                  onChange={(e) => setNewBooking({ ...newBooking, childId: e.target.value })}
+                  onChange={(e) => {
+                    const selectedChildId = e.target.value;
+                    const selectedChild = children.find(c => c.id === selectedChildId);
+                    
+                    // 児童の送迎情報を自動入力
+                    setNewBooking({
+                      ...newBooking,
+                      childId: selectedChildId,
+                      pickup: selectedChild?.needsPickup || false,
+                      dropoff: selectedChild?.needsDropoff || false,
+                    });
+                  }}
                 >
                   <option value="">選択してください</option>
                   {children.map((child) => (
@@ -788,42 +845,104 @@ const ScheduleView: React.FC = () => {
 
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">時間帯</label>
-                <select
-                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={newBooking.slot}
-                  onChange={(e) =>
-                    setNewBooking({ ...newBooking, slot: e.target.value as TimeSlot })
-                  }
-                >
-                  <option value="PM">午後 (放課後)</option>
-                  <option value="AM">午前</option>
-                </select>
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-3 cursor-pointer group p-2 rounded-md border border-gray-200 hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={newBooking.slots.AM}
+                      onChange={(e) =>
+                        setNewBooking({
+                          ...newBooking,
+                          slots: { ...newBooking.slots, AM: e.target.checked },
+                        })
+                      }
+                      className="accent-[#00c4cc] w-4 h-4"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
+                        午前
+                      </span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {facilitySettings.businessHours?.AM?.start || '09:00'} ～ {facilitySettings.businessHours?.AM?.end || '12:00'}
+                      </p>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer group p-2 rounded-md border border-gray-200 hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={newBooking.slots.PM}
+                      onChange={(e) =>
+                        setNewBooking({
+                          ...newBooking,
+                          slots: { ...newBooking.slots, PM: e.target.checked },
+                        })
+                      }
+                      className="accent-[#00c4cc] w-4 h-4"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
+                        午後
+                      </span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {facilitySettings.businessHours?.PM?.start || '13:00'} ～ {facilitySettings.businessHours?.PM?.end || '18:00'}
+                      </p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div className="bg-gray-50 p-4 rounded-md border border-gray-200 space-y-3">
                 <label className="text-xs font-bold text-gray-500 block">送迎オプション</label>
-                <label className="flex items-center space-x-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={newBooking.pickup}
-                    onChange={(e) => setNewBooking({ ...newBooking, pickup: e.target.checked })}
-                    className="accent-[#00c4cc] w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                    お迎え (学校→事業所)
-                  </span>
-                </label>
-                <label className="flex items-center space-x-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={newBooking.dropoff}
-                    onChange={(e) => setNewBooking({ ...newBooking, dropoff: e.target.checked })}
-                    className="accent-[#00c4cc] w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                    お送り (事業所→自宅)
-                  </span>
-                </label>
+                {(() => {
+                  const selectedChild = children.find(c => c.id === newBooking.childId);
+                  const pickupLocation = selectedChild?.pickupLocation === 'その他' 
+                    ? selectedChild?.pickupLocationCustom 
+                    : selectedChild?.pickupLocation || '未設定';
+                  const dropoffLocation = selectedChild?.dropoffLocation === 'その他'
+                    ? selectedChild?.dropoffLocationCustom
+                    : selectedChild?.dropoffLocation || '未設定';
+                  
+                  return (
+                    <>
+                      <label className="flex items-center space-x-3 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={newBooking.pickup}
+                          onChange={(e) => setNewBooking({ ...newBooking, pickup: e.target.checked })}
+                          className="accent-[#00c4cc] w-4 h-4"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
+                            お迎え
+                          </span>
+                          {selectedChild && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              登録情報: {pickupLocation}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                      <label className="flex items-center space-x-3 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={newBooking.dropoff}
+                          onChange={(e) => setNewBooking({ ...newBooking, dropoff: e.target.checked })}
+                          className="accent-[#00c4cc] w-4 h-4"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
+                            お送り
+                          </span>
+                          {selectedChild && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              登録情報: {dropoffLocation}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="flex space-x-3 pt-2">

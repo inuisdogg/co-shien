@@ -40,6 +40,7 @@ export const useFacilityData = () => {
       AM: { start: '09:00', end: '12:00' },
       PM: { start: '13:00', end: '18:00' },
     },
+    businessHoursPeriods: [],
     capacity: {
       AM: 10,
       PM: 10,
@@ -96,6 +97,7 @@ export const useFacilityData = () => {
               AM: { start: '09:00', end: '12:00' },
               PM: { start: '13:00', end: '18:00' },
             },
+            businessHoursPeriods: data.business_hours_periods || [],
             capacity: data.capacity || {
               AM: 10,
               PM: 10,
@@ -137,33 +139,84 @@ export const useFacilityData = () => {
 
         if (data) {
           // データベースのスネークケースをキャメルケースに変換
-          const childrenData: Child[] = data.map((row) => ({
-            id: row.id,
-            facilityId: row.facility_id,
-            name: row.name,
-            age: row.age,
-            guardianName: row.guardian_name,
-            guardianRelationship: row.guardian_relationship,
-            beneficiaryNumber: row.beneficiary_number,
-            grantDays: row.grant_days,
-            contractDays: row.contract_days,
-            address: row.address,
-            phone: row.phone,
-            email: row.email,
-            doctorName: row.doctor_name,
-            doctorClinic: row.doctor_clinic,
-            schoolName: row.school_name,
-            pattern: row.pattern,
-            needsPickup: row.needs_pickup || false,
-            needsDropoff: row.needs_dropoff || false,
-            pickupLocation: row.pickup_location,
-            dropoffLocation: row.dropoff_location,
-            contractStatus: row.contract_status,
-            contractStartDate: row.contract_start_date,
-            contractEndDate: row.contract_end_date,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-          }));
+          const childrenData: Child[] = data.map((row) => {
+            // pattern_daysをパース（JSON文字列の場合）
+            let patternDays: number[] | undefined = undefined;
+            if (row.pattern_days) {
+              try {
+                patternDays = typeof row.pattern_days === 'string' 
+                  ? JSON.parse(row.pattern_days)
+                  : row.pattern_days;
+              } catch (e) {
+                console.error('Error parsing pattern_days:', e);
+              }
+            }
+            
+            // pattern_time_slotsをパース（JSON文字列の場合）
+            let patternTimeSlots: Record<number, 'AM' | 'PM' | 'AMPM'> | undefined = undefined;
+            if (row.pattern_time_slots) {
+              try {
+                patternTimeSlots = typeof row.pattern_time_slots === 'string'
+                  ? JSON.parse(row.pattern_time_slots)
+                  : row.pattern_time_slots;
+              } catch (e) {
+                console.error('Error parsing pattern_time_slots:', e);
+              }
+            }
+            
+            // 送迎場所を復元（pickup_location_customがある場合は「その他」として扱う）
+            let pickupLocation = row.pickup_location;
+            let pickupLocationCustom = row.pickup_location_custom;
+            if (pickupLocationCustom && !['事業所', '自宅'].includes(pickupLocation || '')) {
+              pickupLocation = 'その他';
+            }
+            
+            let dropoffLocation = row.dropoff_location;
+            let dropoffLocationCustom = row.dropoff_location_custom;
+            if (dropoffLocationCustom && !['事業所', '自宅'].includes(dropoffLocation || '')) {
+              dropoffLocation = 'その他';
+            }
+            
+            return {
+              id: row.id,
+              facilityId: row.facility_id,
+              name: row.name,
+              nameKana: row.name_kana,
+              age: row.age,
+              birthDate: row.birth_date,
+              guardianName: row.guardian_name,
+              guardianNameKana: row.guardian_name_kana,
+              guardianRelationship: row.guardian_relationship,
+              beneficiaryNumber: row.beneficiary_number,
+              grantDays: row.grant_days,
+              contractDays: row.contract_days,
+              address: row.address,
+              phone: row.phone,
+              email: row.email,
+              doctorName: row.doctor_name,
+              doctorClinic: row.doctor_clinic,
+              schoolName: row.school_name,
+              pattern: row.pattern,
+              patternDays: patternDays,
+              patternTimeSlots: patternTimeSlots,
+              needsPickup: row.needs_pickup || false,
+              needsDropoff: row.needs_dropoff || false,
+              pickupLocation: pickupLocation,
+              pickupLocationCustom: pickupLocationCustom,
+              dropoffLocation: dropoffLocation,
+              dropoffLocationCustom: dropoffLocationCustom,
+              characteristics: row.characteristics,
+              contractStatus: row.contract_status,
+              contractStartDate: row.contract_start_date,
+              contractEndDate: row.contract_end_date,
+              registrationType: row.registration_type,
+              plannedContractDays: row.planned_contract_days,
+              plannedUsageStartDate: row.planned_usage_start_date,
+              plannedUsageDays: row.planned_usage_days,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+            };
+          });
           setChildren(childrenData);
         }
       } catch (error) {
@@ -437,6 +490,14 @@ export const useFacilityData = () => {
     const now = new Date().toISOString();
     
     try {
+      // 送迎場所を統合（「その他」の場合は自由記入の値を保存）
+      const finalPickupLocation = child.pickupLocation === 'その他' 
+        ? child.pickupLocationCustom || ''
+        : child.pickupLocation || '';
+      const finalDropoffLocation = child.dropoffLocation === 'その他'
+        ? child.dropoffLocationCustom || ''
+        : child.dropoffLocation || '';
+      
       // Supabaseに保存
       const { data, error } = await supabase
         .from('children')
@@ -444,8 +505,11 @@ export const useFacilityData = () => {
           id: newChildId,
           facility_id: facilityId,
           name: child.name,
+          name_kana: child.nameKana,
           age: child.age,
+          birth_date: child.birthDate,
           guardian_name: child.guardianName,
+          guardian_name_kana: child.guardianNameKana,
           guardian_relationship: child.guardianRelationship,
           beneficiary_number: child.beneficiaryNumber,
           grant_days: child.grantDays,
@@ -457,13 +521,22 @@ export const useFacilityData = () => {
           doctor_clinic: child.doctorClinic,
           school_name: child.schoolName,
           pattern: child.pattern,
+          pattern_days: child.patternDays ? JSON.stringify(child.patternDays) : null,
+          pattern_time_slots: child.patternTimeSlots ? JSON.stringify(child.patternTimeSlots) : null,
           needs_pickup: child.needsPickup || false,
           needs_dropoff: child.needsDropoff || false,
-          pickup_location: child.pickupLocation,
-          dropoff_location: child.dropoffLocation,
+          pickup_location: finalPickupLocation,
+          pickup_location_custom: child.pickupLocationCustom,
+          dropoff_location: finalDropoffLocation,
+          dropoff_location_custom: child.dropoffLocationCustom,
+          characteristics: child.characteristics,
           contract_status: child.contractStatus,
           contract_start_date: child.contractStartDate,
           contract_end_date: child.contractEndDate,
+          registration_type: child.registrationType,
+          planned_contract_days: child.plannedContractDays,
+          planned_usage_start_date: child.plannedUsageStartDate,
+          planned_usage_days: child.plannedUsageDays,
           created_at: now,
           updated_at: now,
         })
@@ -493,13 +566,24 @@ export const useFacilityData = () => {
 
   const updateChild = async (child: Child) => {
     try {
+      // 送迎場所を統合（「その他」の場合は自由記入の値を保存）
+      const finalPickupLocation = child.pickupLocation === 'その他'
+        ? child.pickupLocationCustom || ''
+        : child.pickupLocation || '';
+      const finalDropoffLocation = child.dropoffLocation === 'その他'
+        ? child.dropoffLocationCustom || ''
+        : child.dropoffLocation || '';
+      
       // Supabaseを更新
       const { error } = await supabase
         .from('children')
         .update({
           name: child.name,
+          name_kana: child.nameKana,
           age: child.age,
+          birth_date: child.birthDate,
           guardian_name: child.guardianName,
+          guardian_name_kana: child.guardianNameKana,
           guardian_relationship: child.guardianRelationship,
           beneficiary_number: child.beneficiaryNumber,
           grant_days: child.grantDays,
@@ -511,13 +595,22 @@ export const useFacilityData = () => {
           doctor_clinic: child.doctorClinic,
           school_name: child.schoolName,
           pattern: child.pattern,
+          pattern_days: child.patternDays ? JSON.stringify(child.patternDays) : null,
+          pattern_time_slots: child.patternTimeSlots ? JSON.stringify(child.patternTimeSlots) : null,
           needs_pickup: child.needsPickup || false,
           needs_dropoff: child.needsDropoff || false,
-          pickup_location: child.pickupLocation,
-          dropoff_location: child.dropoffLocation,
+          pickup_location: finalPickupLocation,
+          pickup_location_custom: child.pickupLocationCustom,
+          dropoff_location: finalDropoffLocation,
+          dropoff_location_custom: child.dropoffLocationCustom,
+          characteristics: child.characteristics,
           contract_status: child.contractStatus,
           contract_start_date: child.contractStartDate,
           contract_end_date: child.contractEndDate,
+          registration_type: child.registrationType,
+          planned_contract_days: child.plannedContractDays,
+          planned_usage_start_date: child.plannedUsageStartDate,
+          planned_usage_days: child.plannedUsageDays,
           updated_at: new Date().toISOString(),
         })
         .eq('id', child.id);
@@ -580,11 +673,46 @@ export const useFacilityData = () => {
     return newRequest;
   };
 
-  const updateFacilitySettings = async (settings: Partial<FacilitySettings>) => {
+  const updateFacilitySettings = async (settings: Partial<FacilitySettings>, changeDescription?: string) => {
     const updatedSettings = {
       ...facilitySettings,
       ...settings,
       updatedAt: new Date().toISOString(),
+    };
+    
+    // 変更履歴を記録
+    const { data: { user } } = await supabase.auth.getUser();
+    const changedBy = user?.id || null;
+    
+    // 変更タイプを判定
+    let changeType: 'business_hours' | 'holidays' | 'capacity' | 'all' = 'all';
+    if (settings.businessHours && !settings.regularHolidays && !settings.capacity) {
+      changeType = 'business_hours';
+    } else if (settings.regularHolidays && !settings.businessHours && !settings.capacity) {
+      changeType = 'holidays';
+    } else if (settings.capacity && !settings.businessHours && !settings.regularHolidays) {
+      changeType = 'capacity';
+    }
+    
+    // 変更前の値を保存
+    const oldValue = {
+      businessHours: facilitySettings.businessHours,
+      regularHolidays: facilitySettings.regularHolidays,
+      holidayPeriods: facilitySettings.holidayPeriods,
+      customHolidays: facilitySettings.customHolidays,
+      includeHolidays: facilitySettings.includeHolidays,
+      capacity: facilitySettings.capacity,
+      businessHoursPeriods: facilitySettings.businessHoursPeriods,
+    };
+    
+    const newValue = {
+      businessHours: updatedSettings.businessHours,
+      regularHolidays: updatedSettings.regularHolidays,
+      holidayPeriods: updatedSettings.holidayPeriods,
+      customHolidays: updatedSettings.customHolidays,
+      includeHolidays: updatedSettings.includeHolidays,
+      capacity: updatedSettings.capacity,
+      businessHoursPeriods: updatedSettings.businessHoursPeriods,
     };
     
     setFacilitySettings(updatedSettings);
@@ -607,6 +735,7 @@ export const useFacilityData = () => {
           custom_holidays: updatedSettings.customHolidays,
           include_holidays: updatedSettings.includeHolidays ?? false,
           business_hours: updatedSettings.businessHours,
+          business_hours_periods: updatedSettings.businessHoursPeriods || [],
           capacity: updatedSettings.capacity,
           updated_at: updatedSettings.updatedAt,
         };
@@ -635,6 +764,21 @@ export const useFacilityData = () => {
           // エラーが発生した場合はローカル状態を元に戻す
           setFacilitySettings(facilitySettings);
         } else if (data) {
+          // 変更履歴を保存
+          try {
+            await supabase.from('facility_settings_history').insert({
+              facility_id: facilityId,
+              change_type: changeType,
+              old_value: oldValue,
+              new_value: newValue,
+              changed_by: changedBy,
+              description: changeDescription,
+            });
+          } catch (historyError) {
+            console.error('Error saving facility settings history:', historyError);
+            // 履歴の保存に失敗してもメインの保存は成功しているので続行
+          }
+          
           // デバッグ用: 取得したデータをログに出力
           console.log('Retrieved facility settings from DB:', {
             include_holidays: data.include_holidays,
@@ -651,6 +795,7 @@ export const useFacilityData = () => {
             customHolidays: data.custom_holidays,
             includeHolidays: data.include_holidays ?? false,
             businessHours: data.business_hours,
+            businessHoursPeriods: data.business_hours_periods || [],
             capacity: data.capacity,
             createdAt: data.created_at,
             updatedAt: data.updated_at,

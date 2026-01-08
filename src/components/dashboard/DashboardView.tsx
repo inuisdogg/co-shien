@@ -38,6 +38,9 @@ import {
   calculateDayOfWeekUtilization,
   calculateAMPMOccupancyRate,
 } from '@/utils/dashboardCalculations';
+import { calculateMonthlyUtilizationForecast, MonthlyUtilizationForecast } from '@/utils/utilizationForecast';
+import { calculateBusinessDays } from '@/utils/dashboardCalculations';
+import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
 const DashboardView: React.FC = () => {
   const {
@@ -54,6 +57,8 @@ const DashboardView: React.FC = () => {
   const [viewPeriod, setViewPeriod] = useState<'week' | 'month'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isContractTrendExpanded, setIsContractTrendExpanded] = useState(false);
+  const [selectedForecastMonth, setSelectedForecastMonth] = useState<{ year: number; month: number } | null>(null);
+  const [forecastDetailView, setForecastDetailView] = useState<'week' | 'day'>('week');
 
   // 前月の日付を計算
   const previousMonth = useMemo(() => {
@@ -170,6 +175,23 @@ const DashboardView: React.FC = () => {
     () => calculateLaborRatio(staff, usageRecords, currentDate),
     [staff, usageRecords, currentDate]
   );
+
+  // 利用見込み計算（現在の月）
+  const utilizationForecast = useMemo(
+    () => calculateMonthlyUtilizationForecast(children, facilitySettings, currentDate.getFullYear(), currentDate.getMonth()),
+    [children, facilitySettings, currentDate]
+  );
+
+  // 選択された月の利用見込み詳細
+  const selectedForecast = useMemo(() => {
+    if (!selectedForecastMonth) return null;
+    return calculateMonthlyUtilizationForecast(
+      children,
+      facilitySettings,
+      selectedForecastMonth.year,
+      selectedForecastMonth.month
+    );
+  }, [children, facilitySettings, selectedForecastMonth]);
 
   // 当月の総見込み売り上げ
   const totalMonthlyRevenue = useMemo(() => {
@@ -319,6 +341,225 @@ const DashboardView: React.FC = () => {
               style={{ width: `${Math.min(slotStats.cancellationRate, 100)}%` }}
             />
           </div>
+        </div>
+      </div>
+
+      {/* 利用見込み */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center">
+          <Target size={18} className="sm:w-5 sm:h-5 mr-2 text-[#00c4cc] shrink-0" />
+          利用見込み（月別）
+        </h3>
+        <div className="mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <div className="text-xs font-bold text-blue-700 mb-1">予測埋まり枠数</div>
+              <div className="text-2xl font-bold text-blue-800">
+                {utilizationForecast.forecastedSlots}枠
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                総枠数: {utilizationForecast.totalSlots}枠
+              </div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+              <div className="text-xs font-bold text-green-700 mb-1">稼働率</div>
+              <div className="text-2xl font-bold text-green-800">
+                {utilizationForecast.utilizationRate.toFixed(1)}%
+              </div>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+              <div className="text-xs font-bold text-purple-700 mb-1">対象児童数</div>
+              <div className="text-2xl font-bold text-purple-800">
+                {children.filter(c => {
+                  const startDate = c.contractStatus === 'pre-contract' 
+                    ? c.plannedUsageStartDate 
+                    : c.contractStartDate;
+                  if (!startDate) return false;
+                  const start = new Date(startDate + 'T00:00:00');
+                  const current = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                  return start <= current;
+                }).length}名
+              </div>
+            </div>
+          </div>
+          
+          {/* 予測埋まり枠数の内訳 */}
+          <div className="mb-4">
+            <h4 className="text-sm font-bold text-gray-700 mb-2">予測埋まり枠数の内訳</h4>
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-3">
+              <div className="text-xs font-bold text-gray-500 mb-1">予測埋まり枠数</div>
+              <div className="text-2xl font-bold text-gray-800 mb-3">
+                {utilizationForecast.forecastedSlots}枠
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                  <div className="text-xs font-bold text-orange-700 mb-1">実際の予約枠</div>
+                  <div className="text-xl font-bold text-orange-800">
+                    {schedules.filter(s => {
+                      const scheduleDate = new Date(s.date);
+                      return scheduleDate.getFullYear() === currentDate.getFullYear() &&
+                             scheduleDate.getMonth() === currentDate.getMonth();
+                    }).length}枠
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    既に予約されている枠数
+                  </div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <div className="text-xs font-bold text-blue-700 mb-1">利用予定枠（見込み）</div>
+                  <div className="text-xl font-bold text-blue-800">
+                    {Math.max(0, utilizationForecast.forecastedSlots - schedules.filter(s => {
+                      const scheduleDate = new Date(s.date);
+                      return scheduleDate.getFullYear() === currentDate.getFullYear() &&
+                             scheduleDate.getMonth() === currentDate.getMonth();
+                    }).length)}枠
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    児童登録情報から算出（予約未確定分）
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* 曜日別稼働率 */}
+          <div className="mb-4">
+            <h4 className="text-sm font-bold text-gray-700 mb-2">曜日別稼働率</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-3 text-xs font-bold text-gray-600">曜日</th>
+                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午前</th>
+                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午後</th>
+                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">合計</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {utilizationForecast.dayOfWeekBreakdown.map((day) => {
+                    // その月の実際の営業日数を計算（曜日別）
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth();
+                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                    
+                    // その曜日が定休日かどうかを判定（祝日は考慮しない）
+                    let isRegularHoliday = false;
+                    
+                    // 期間ごとの定休日を確認
+                    if (facilitySettings.holidayPeriods) {
+                      for (const period of facilitySettings.holidayPeriods) {
+                        const periodStart = new Date(period.startDate);
+                        const periodEnd = period.endDate ? new Date(period.endDate) : new Date(9999, 11, 31);
+                        const monthStart = new Date(year, month, 1);
+                        const monthEnd = new Date(year, month + 1, 0);
+                        
+                        // 期間がその月と重なっているか確認
+                        if (periodStart <= monthEnd && periodEnd >= monthStart) {
+                          if (period.regularHolidays.includes(day.dayIndex)) {
+                            isRegularHoliday = true;
+                            break;
+                          }
+                        }
+                      }
+                    }
+                    
+                    // 期間に該当しない場合はデフォルトの定休日を確認
+                    if (!isRegularHoliday && facilitySettings.regularHolidays.includes(day.dayIndex)) {
+                      isRegularHoliday = true;
+                    }
+                    
+                    let dayOccurrences = 0;
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      const date = new Date(year, month, d);
+                      const dayOfWeek = date.getDay();
+                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                      
+                      if (dayOfWeek !== day.dayIndex) continue;
+                      
+                      // 定休日の場合はスキップ
+                      if (isRegularHoliday) continue;
+                      
+                      // 祝日チェック（定休日でない場合のみ）
+                      if (facilitySettings.includeHolidays) {
+                        const holidays = getJapaneseHolidays(year);
+                        if (holidays.includes(dateStr) || isJapaneseHoliday(dateStr)) {
+                          continue; // 祝日は営業日数から除外するが、曜日自体は休業日ではない
+                        }
+                      }
+                      
+                      // カスタム休業日を確認
+                      if (facilitySettings.customHolidays.includes(dateStr)) {
+                        continue; // カスタム休業日も営業日数から除外するが、曜日自体は休業日ではない
+                      }
+                      
+                      dayOccurrences++;
+                    }
+                    
+                    const amCapacity = dayOccurrences * facilitySettings.capacity.AM;
+                    const pmCapacity = dayOccurrences * facilitySettings.capacity.PM;
+                    const amRate = amCapacity > 0 ? (day.amSlots / amCapacity) * 100 : 0;
+                    const pmRate = pmCapacity > 0 ? (day.pmSlots / pmCapacity) * 100 : 0;
+                    const totalRate = (amCapacity + pmCapacity) > 0 
+                      ? (day.totalSlots / (amCapacity + pmCapacity)) * 100 
+                      : 0;
+                    
+                    return (
+                      <tr 
+                        key={day.dayIndex} 
+                        className={`border-b border-gray-100 ${isRegularHoliday ? 'bg-red-50' : 'hover:bg-gray-50'}`}
+                      >
+                        <td className="py-2 px-3 font-bold text-gray-800">
+                          {day.dayOfWeek}
+                          {isRegularHoliday && (
+                            <span className="ml-2 text-xs text-red-600 font-normal">（休業日）</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          {isRegularHoliday ? (
+                            <div className="text-sm text-red-600 italic">休業日</div>
+                          ) : (
+                            <div className="text-sm font-bold text-gray-800">
+                              {day.amSlots}枠 / {amCapacity}枠 ({amRate.toFixed(1)}%)
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          {isRegularHoliday ? (
+                            <div className="text-sm text-red-600 italic">休業日</div>
+                          ) : (
+                            <div className="text-sm font-bold text-gray-800">
+                              {day.pmSlots}枠 / {pmCapacity}枠 ({pmRate.toFixed(1)}%)
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          {isRegularHoliday ? (
+                            <div className="text-sm text-red-600 italic">休業日</div>
+                          ) : (
+                            <div className="text-sm font-bold text-[#00c4cc]">
+                              {day.totalSlots}枠 / {amCapacity + pmCapacity}枠 ({totalRate.toFixed(1)}%)
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* 月をクリックして詳細を見る */}
+          <button
+            onClick={() => setSelectedForecastMonth({
+              year: currentDate.getFullYear(),
+              month: currentDate.getMonth(),
+            })}
+            className="w-full px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors flex items-center justify-center gap-2"
+          >
+            <Calendar size={16} />
+            {currentDate.getFullYear()}年{currentDate.getMonth() + 1}月の詳細を見る
+          </button>
         </div>
       </div>
 
@@ -698,6 +939,104 @@ const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 利用見込み詳細モーダル */}
+      {selectedForecastMonth && selectedForecast && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800">
+                {selectedForecastMonth.year}年{selectedForecastMonth.month + 1}月 利用見込み詳細
+              </h3>
+              <button
+                onClick={() => setSelectedForecastMonth(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              <div className="mb-4 flex gap-2">
+                <button
+                  onClick={() => setForecastDetailView('week')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                    forecastDetailView === 'week'
+                      ? 'bg-[#00c4cc] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  週別
+                </button>
+                <button
+                  onClick={() => setForecastDetailView('day')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                    forecastDetailView === 'day'
+                      ? 'bg-[#00c4cc] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  日別
+                </button>
+              </div>
+              
+              {forecastDetailView === 'week' ? (
+                <div className="space-y-4">
+                  {selectedForecast.weeklyBreakdown.map((week) => (
+                    <div key={week.week} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-bold text-gray-800">
+                          第{week.week}週 ({week.startDate} ～ {week.endDate})
+                        </h4>
+                        <div className="text-sm text-gray-600">
+                          午前: {week.amSlots}枠 / 午後: {week.pmSlots}枠 / 合計: {week.totalSlots}枠
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-xs font-bold text-gray-500 mb-2">対象児童</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {week.children.map((child) => (
+                            <div key={child.childId} className="bg-gray-50 rounded p-2 text-sm">
+                              <div className="font-bold text-gray-800">{child.childName}</div>
+                              <div className="text-xs text-gray-600">{child.days}日</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedForecast.dailyBreakdown.map((day) => (
+                    <div key={day.date} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-bold text-gray-800">
+                          {day.date} ({day.dayOfWeek})
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          午前: {day.amSlots}枠 / 午後: {day.pmSlots}枠 / 合計: {day.totalSlots}枠
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-xs font-bold text-gray-500 mb-1">対象児童</div>
+                        <div className="flex flex-wrap gap-2">
+                          {day.children.map((child, idx) => (
+                            <div key={`${child.childId}-${idx}`} className="bg-gray-50 rounded px-2 py-1 text-xs">
+                              <span className="font-bold text-gray-800">{child.childName}</span>
+                              <span className="text-gray-600 ml-1">({child.timeSlot})</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

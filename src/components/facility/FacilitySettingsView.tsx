@@ -5,8 +5,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2 } from 'lucide-react';
-import { FacilitySettings, HolidayPeriod } from '@/types';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X } from 'lucide-react';
+import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -38,6 +38,9 @@ const FacilitySettingsView: React.FC = () => {
 
   const [settings, setSettings] = useState<FacilitySettings>(facilitySettings);
   const [newHoliday, setNewHoliday] = useState('');
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyType, setHistoryType] = useState<'business_hours' | 'holidays' | 'all'>('all');
+  const [historyData, setHistoryData] = useState<FacilitySettingsHistory[]>([]);
 
   // facilitySettingsが更新されたらローカル状態も更新
   useEffect(() => {
@@ -55,8 +58,92 @@ const FacilitySettingsView: React.FC = () => {
   ];
 
   const handleSave = async () => {
-    await updateFacilitySettings(settings);
+    await updateFacilitySettings(settings, '施設情報を更新しました');
     alert('施設情報を保存しました');
+  };
+
+  // 履歴を取得
+  const fetchHistory = async (type: 'business_hours' | 'holidays' | 'all' = 'all') => {
+    if (!facility?.id) return;
+    
+    try {
+      let query = supabase
+        .from('facility_settings_history')
+        .select('*')
+        .eq('facility_id', facility.id)
+        .order('changed_at', { ascending: false })
+        .limit(50);
+      
+      if (type !== 'all') {
+        query = query.eq('change_type', type);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching history:', error);
+        return;
+      }
+      
+      if (data) {
+        setHistoryData(data.map((row: any) => ({
+          id: row.id,
+          facilityId: row.facility_id,
+          changeType: row.change_type,
+          oldValue: row.old_value,
+          newValue: row.new_value,
+          changedBy: row.changed_by,
+          changedAt: row.changed_at,
+          description: row.description,
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    }
+  };
+
+  // 履歴モーダルを開く
+  const openHistoryModal = async (type: 'business_hours' | 'holidays' | 'all' = 'all') => {
+    setHistoryType(type);
+    setIsHistoryModalOpen(true);
+    await fetchHistory(type);
+  };
+
+  // 期間ごとの営業時間設定を追加
+  const addBusinessHoursPeriod = () => {
+    const newPeriod: BusinessHoursPeriod = {
+      id: `period-${Date.now()}`,
+      startDate: '',
+      endDate: '',
+      businessHours: {
+        AM: { start: '09:00', end: '12:00' },
+        PM: { start: '13:00', end: '18:00' },
+      },
+    };
+    setSettings({
+      ...settings,
+      businessHoursPeriods: [...(settings.businessHoursPeriods || []), newPeriod],
+    });
+  };
+
+  // 期間ごとの営業時間設定を更新
+  const updateBusinessHoursPeriod = (periodId: string, updates: Partial<BusinessHoursPeriod>) => {
+    setSettings({
+      ...settings,
+      businessHoursPeriods: (settings.businessHoursPeriods || []).map((period) =>
+        period.id === periodId ? { ...period, ...updates } : period
+      ),
+    });
+  };
+
+  // 期間ごとの営業時間設定を削除
+  const removeBusinessHoursPeriod = (periodId: string) => {
+    setSettings({
+      ...settings,
+      businessHoursPeriods: (settings.businessHoursPeriods || []).filter(
+        (period) => period.id !== periodId
+      ),
+    });
   };
 
   const toggleRegularHoliday = (day: number) => {
@@ -197,10 +284,19 @@ const FacilitySettingsView: React.FC = () => {
 
       {/* 定休日設定 */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
-          <Calendar size={20} className="mr-2 text-[#00c4cc]" />
-          定休日設定
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-lg text-gray-800 flex items-center">
+            <Calendar size={20} className="mr-2 text-[#00c4cc]" />
+            定休日設定
+          </h3>
+          <button
+            onClick={() => openHistoryModal('holidays')}
+            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"
+          >
+            <History size={14} />
+            変更履歴を見る
+          </button>
+        </div>
         <div className="space-y-4">
           <div>
             <label className="text-sm font-bold text-gray-700 block mb-3">
@@ -369,13 +465,22 @@ const FacilitySettingsView: React.FC = () => {
 
       {/* 営業時間設定 */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
-          <Clock size={20} className="mr-2 text-[#00c4cc]" />
-          営業時間設定
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-lg text-gray-800 flex items-center">
+            <Clock size={20} className="mr-2 text-[#00c4cc]" />
+            営業時間設定
+          </h3>
+          <button
+            onClick={() => openHistoryModal('business_hours')}
+            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"
+          >
+            <History size={14} />
+            変更履歴を見る
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label className="text-sm font-bold text-gray-700 block mb-2">午前</label>
+            <label className="text-sm font-bold text-gray-700 block mb-2">午前（デフォルト）</label>
             <div className="flex items-center space-x-2">
               <input
                 type="time"
@@ -409,7 +514,7 @@ const FacilitySettingsView: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="text-sm font-bold text-gray-700 block mb-2">午後</label>
+            <label className="text-sm font-bold text-gray-700 block mb-2">午後（デフォルト）</label>
             <div className="flex items-center space-x-2">
               <input
                 type="time"
@@ -442,6 +547,126 @@ const FacilitySettingsView: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+        
+        {/* 期間ごとの営業時間設定 */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-bold text-gray-700">期間ごとの営業時間設定</label>
+            <button
+              onClick={addBusinessHoursPeriod}
+              className="text-xs bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors"
+            >
+              <Plus size={14} />
+              期間を追加
+            </button>
+          </div>
+          {settings.businessHoursPeriods && settings.businessHoursPeriods.length > 0 && (
+            <div className="space-y-3">
+              {settings.businessHoursPeriods.map((period) => (
+                <div key={period.id} className="border border-gray-200 rounded-md p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">開始日</label>
+                        <input
+                          type="date"
+                          value={period.startDate}
+                          onChange={(e) =>
+                            updateBusinessHoursPeriod(period.id, { startDate: e.target.value })
+                          }
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">終了日（空欄=無期限）</label>
+                        <input
+                          type="date"
+                          value={period.endDate}
+                          onChange={(e) =>
+                            updateBusinessHoursPeriod(period.id, { endDate: e.target.value })
+                          }
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeBusinessHoursPeriod(period.id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">午前</label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="time"
+                          value={period.businessHours.AM.start}
+                          onChange={(e) =>
+                            updateBusinessHoursPeriod(period.id, {
+                              businessHours: {
+                                ...period.businessHours,
+                                AM: { ...period.businessHours.AM, start: e.target.value },
+                              },
+                            })
+                          }
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
+                        />
+                        <span className="text-gray-600 text-xs">～</span>
+                        <input
+                          type="time"
+                          value={period.businessHours.AM.end}
+                          onChange={(e) =>
+                            updateBusinessHoursPeriod(period.id, {
+                              businessHours: {
+                                ...period.businessHours,
+                                AM: { ...period.businessHours.AM, end: e.target.value },
+                              },
+                            })
+                          }
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">午後</label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="time"
+                          value={period.businessHours.PM.start}
+                          onChange={(e) =>
+                            updateBusinessHoursPeriod(period.id, {
+                              businessHours: {
+                                ...period.businessHours,
+                                PM: { ...period.businessHours.PM, start: e.target.value },
+                              },
+                            })
+                          }
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
+                        />
+                        <span className="text-gray-600 text-xs">～</span>
+                        <input
+                          type="time"
+                          value={period.businessHours.PM.end}
+                          onChange={(e) =>
+                            updateBusinessHoursPeriod(period.id, {
+                              businessHours: {
+                                ...period.businessHours,
+                                PM: { ...period.businessHours.PM, end: e.target.value },
+                              },
+                            })
+                          }
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -509,6 +734,84 @@ const FacilitySettingsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* 履歴モーダル */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[80vh] overflow-hidden shadow-2xl border border-gray-100">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-800">変更履歴</h3>
+              <div className="flex items-center gap-2">
+                <select
+                  value={historyType}
+                  onChange={(e) => {
+                    const type = e.target.value as 'business_hours' | 'holidays' | 'all';
+                    setHistoryType(type);
+                    fetchHistory(type);
+                  }}
+                  className="text-xs border border-gray-300 rounded-md px-2 py-1"
+                >
+                  <option value="all">全て</option>
+                  <option value="business_hours">営業時間</option>
+                  <option value="holidays">定休日</option>
+                </select>
+                <button
+                  onClick={() => setIsHistoryModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto max-h-[calc(80vh-80px)] p-4">
+              {historyData.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">履歴がありません</div>
+              ) : (
+                <div className="space-y-4">
+                  {historyData.map((history) => (
+                    <div
+                      key={history.id}
+                      className="border border-gray-200 rounded-md p-4 bg-gray-50"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-gray-600">
+                            {history.changeType === 'business_hours'
+                              ? '営業時間'
+                              : history.changeType === 'holidays'
+                              ? '定休日'
+                              : '全て'}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(history.changedAt).toLocaleString('ja-JP')}
+                          </span>
+                        </div>
+                      </div>
+                      {history.description && (
+                        <p className="text-xs text-gray-600 mb-2">{history.description}</p>
+                      )}
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <div className="font-bold text-gray-700 mb-1">変更前</div>
+                          <pre className="bg-white p-2 rounded border border-gray-200 overflow-x-auto text-[10px]">
+                            {JSON.stringify(history.oldValue, null, 2)}
+                          </pre>
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-700 mb-1">変更後</div>
+                          <pre className="bg-white p-2 rounded border border-gray-200 overflow-x-auto text-[10px]">
+                            {JSON.stringify(history.newValue, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

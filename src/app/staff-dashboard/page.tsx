@@ -688,7 +688,7 @@ export default function StaffDashboardPage() {
                 )}
               </div>
               {/* Bizダッシュボードへのアクセスボタン */}
-              {currentFacility.role === '管理者' && (
+              {(currentFacility.role === '管理者' || (currentFacility.permissions && Object.values(currentFacility.permissions).some(v => v === true))) && (
                 <button
                   onClick={async () => {
                     // 施設情報を取得してlocalStorageに保存
@@ -709,6 +709,7 @@ export default function StaffDashboardPage() {
                           facilityId: currentFacility.facilityId,
                           facilityName: currentFacility.facilityName,
                           facilityCode: currentFacility.facilityCode,
+                          permissions: currentFacility.permissions || {},
                         }));
                         localStorage.setItem('facility', JSON.stringify({
                           id: facilityData.id,
@@ -727,6 +728,7 @@ export default function StaffDashboardPage() {
                           facilityId: currentFacility.facilityId,
                           facilityName: currentFacility.facilityName,
                           facilityCode: currentFacility.facilityCode,
+                          permissions: currentFacility.permissions || {},
                         }));
                       }
                     } catch (err) {
@@ -740,6 +742,7 @@ export default function StaffDashboardPage() {
                         facilityId: currentFacility.facilityId,
                         facilityName: currentFacility.facilityName,
                         facilityCode: currentFacility.facilityCode,
+                        permissions: currentFacility.permissions || {},
                       }));
                     }
                     // BizのURLにリダイレクト（ローカルホスト対応）
@@ -1244,7 +1247,7 @@ export default function StaffDashboardPage() {
                       const applicableRegularHolidays = getRegularHolidaysForDate(dateStr);
                       const isRegularHoliday = applicableRegularHolidays.includes(dayOfWeek);
                       const isCustomHoliday = customHolidays && Array.isArray(customHolidays) && customHolidays.includes(dateStr);
-                      const isJapaneseHolidayDay = japaneseHolidaysList.includes(dateStr) || isJapaneseHoliday(dateStr);
+                      const isJapaneseHolidayDay = includeHolidays && japaneseHolidaysList.includes(dateStr);
                       const isHoliday = dayOfWeek === 0 || isRegularHoliday || isCustomHoliday || isJapaneseHolidayDay;
                       
                       return (
@@ -1397,7 +1400,7 @@ export default function StaffDashboardPage() {
                               const applicableRegularHolidaysForCheck = getRegularHolidaysForDateCheck(dateStr);
                               const isRegularHolidayForCheck = applicableRegularHolidaysForCheck.includes(cellDate.getDay());
                               const isCustomHolidayForCheck = customHolidaysForCheck && customHolidaysForCheck.includes(dateStr);
-                              const isJapaneseHolidayForCheck = japaneseHolidaysForCheck.includes(dateStr) || isJapaneseHoliday(dateStr);
+                              const isJapaneseHolidayForCheck = includeHolidaysForCheck && japaneseHolidaysForCheck.includes(dateStr);
                               const isHolidayForCheck = cellDate.getDay() === 0 || isRegularHolidayForCheck || isCustomHolidayForCheck || isJapaneseHolidayForCheck;
                               
                               if (cellDate <= todayDate && !isHolidayForCheck) {

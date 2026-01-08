@@ -113,6 +113,7 @@ function ActivatePageContent() {
   // 画面A: アカウント作成フォーム
   const [accountForm, setAccountForm] = useState({
     name: '',
+    nameKana: '', // 名前の振り仮名
     email: '',
     password: '',
     confirmPassword: '',
@@ -333,6 +334,7 @@ function ActivatePageContent() {
         const newUser: any = {
           id: newUserId,
           name: accountForm.name,
+          name_kana: accountForm.nameKana || null,
           email: accountForm.email,
           password_hash: passwordHash,
           account_status: 'active',
@@ -423,6 +425,11 @@ function ActivatePageContent() {
         has_account: true,
         email: accountForm.email || null,
       };
+      
+      // nameKanaを更新
+      if (accountForm.nameKana) {
+        updateData.name_kana = accountForm.nameKana;
+      }
       
       // 名前が変更されている場合のみ更新（重複チェック付き）
       if (accountForm.name && accountForm.name !== invitedName) {
@@ -1154,6 +1161,20 @@ function ActivatePageContent() {
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">
+                    フリガナ
+                  </label>
+                  <input
+                    type="text"
+                    value={accountForm.nameKana}
+                    onChange={(e) => setAccountForm(prev => ({ ...prev, nameKana: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    placeholder="カタカナで入力"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     メールアドレス <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1865,7 +1886,8 @@ function ActivatePageContent() {
                     戻る
                   </button>
                   <div className="flex gap-2">
-                    {currentStep === 3 && (
+                    {/* 生年月日以外のステップに「後で入力する」ボタンを表示 */}
+                    {currentStep !== 0 && (
                       <button
                         type="button"
                         onClick={handleNextStep}

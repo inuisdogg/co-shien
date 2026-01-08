@@ -2,7 +2,7 @@
 // バージョン管理: デプロイごとにこのファイルの内容が変更されることで、ブラウザが新しいバージョンとして認識
 // このファイルを編集するたびに、ブラウザは新しいService Workerとして認識する
 // バージョン番号を手動で更新するか、ビルド時に自動生成する
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `co-shien-${CACHE_VERSION}`;
 const urlsToCache = [
   '/',
@@ -13,19 +13,15 @@ const urlsToCache = [
 
 // Install event: 新しいService Workerがインストールされた時
 self.addEventListener('install', (event) => {
-  // skipWaiting: 新しいSWが来たら、古いSWを待たずに即座に有効化
-  // これにより、ユーザーが次にページを開いた時に自動で最新版に差し替わる
-  self.skipWaiting();
+  // skipWaitingは削除 - ユーザーが明示的に更新を選択した時のみ有効化
+  // これにより、自動的なリロードを防ぐ
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         return cache.addAll(urlsToCache);
       })
-      .then(() => {
-        // インストール完了後、即座にアクティベート
-        return self.skipWaiting();
-      })
+      // skipWaitingは削除 - ユーザーが明示的に更新を選択した時のみ有効化
   );
 });
 
@@ -43,8 +39,8 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      // 全てのクライアント（開いているタブ）に対して、新しいSWを即座に制御させる
-      return self.clients.claim();
+      // clients.claim()は削除 - 自動的な制御取得を防ぐ
+      // ユーザーが明示的に更新を選択した時のみ制御を取得
     })
   );
 });
@@ -116,8 +112,11 @@ self.addEventListener('fetch', (event) => {
 // Message event: クライアントからのメッセージを受信
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    // クライアントから明示的に更新を要求された場合
-    self.skipWaiting();
+    // クライアントから明示的に更新を要求された場合のみ有効化
+    self.skipWaiting().then(() => {
+      // 制御を取得した後、クライアントに通知
+      return self.clients.claim();
+    });
   }
 });
 
