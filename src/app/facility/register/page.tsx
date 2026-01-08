@@ -284,17 +284,20 @@ export default function FacilityRegisterPage() {
         const timestamp = Date.now();
         facilityId = `facility-${timestamp}`;
 
-        // 指定通知書をSupabase Storageにアップロード
-        const fileExt = designationFile.name.split('.').pop();
-        const fileName = `${facilityId}/designation.${fileExt}`;
+        // 指定通知書をSupabase Storageにアップロード（ファイルがある場合のみ）
+        let fileName: string | undefined;
+        if (designationFile) {
+          const fileExt = designationFile.name.split('.').pop();
+          fileName = `${facilityId}/designation.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('facility-documents')
-          .upload(fileName, designationFile);
+          const { error: uploadError } = await supabase.storage
+            .from('facility-documents')
+            .upload(fileName, designationFile);
 
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          // ストレージがない場合はスキップ（開発環境用）
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            // ストレージがない場合はスキップ（開発環境用）
+          }
         }
 
         // 施設を作成
@@ -305,7 +308,7 @@ export default function FacilityRegisterPage() {
             name: facilityName.trim(),
             code: newFacilityCode,
             business_number: businessNumber,
-            designation_document_path: fileName,
+            designation_document_path: fileName || null,
             verification_status: 'unverified',
             pre_registered: false,
             created_at: new Date().toISOString(),

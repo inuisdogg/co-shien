@@ -145,9 +145,9 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+site_url = "http://localhost:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = ["https://biz.co-shien.inu.co.jp/setup", "https://my.co-shien.inu.co.jp/setup", "https://biz.co-shien.inu.co.jp/setup?type=confirm", "https://my.co-shien.inu.co.jp/setup?type=confirm", "http://localhost:3000/auth/callback", "https://biz.co-shien.inu.co.jp/auth/callback", "https://my.co-shien.inu.co.jp/auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -220,10 +220,18 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# メールテンプレートのカスタマイズ
+[auth.email.template.confirmation]
+subject = "co-shien メールアドレスの確認"
+content_path = "./supabase/templates/confirm-signup.html"
+
+[auth.email.template.recovery]
+subject = "co-shien パスワードリセット"
+content_path = "./supabase/templates/reset-password.html"
+
+[auth.email.template.invite]
+subject = "co-shien へのご招待"
+content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

@@ -688,7 +688,7 @@ export default function StaffDashboardPage() {
                 )}
               </div>
               {/* Bizダッシュボードへのアクセスボタン */}
-              {(currentFacility.role === '管理者' || currentFacility.role === 'admin') && (
+              {currentFacility.role === '管理者' && (
                 <button
                   onClick={async () => {
                     // 施設情報を取得してlocalStorageに保存
@@ -2362,27 +2362,15 @@ export default function StaffDashboardPage() {
                         }
 
                         // localStorageのユーザー情報も更新
-                        const updatedUser = {
+                        const updatedUser: UserType = {
                           ...user,
                           name: profileData.name,
                           email: profileData.email,
-                          birth_date: profileData.birthDate,
-                          address: profileData.address,
+                          birthDate: profileData.birthDate,
                           phone: profileData.phone,
-                          gender: profileData.gender,
-                          education: profileData.education,
-                          spouse_name: profileData.spouseName,
-                          my_number: profileData.myNumber,
-                          basic_pension_symbol: profileData.basicPensionSymbol,
-                          basic_pension_number: profileData.basicPensionNumber,
-                          employment_insurance_status: profileData.employmentInsuranceStatus,
-                          employment_insurance_number: profileData.employmentInsuranceNumber,
-                          previous_retirement_date: profileData.previousRetirementDate,
-                          previous_name: profileData.previousName,
-                          social_insurance_status: profileData.socialInsuranceStatus,
-                          has_dependents: profileData.hasDependents,
-                          dependent_count: profileData.dependentCount,
-                          dependents: profileData.dependents,
+                          gender: (profileData.gender === 'male' || profileData.gender === 'female' || profileData.gender === 'other') 
+                            ? profileData.gender 
+                            : undefined,
                         };
                         localStorage.setItem('user', JSON.stringify(updatedUser));
                         setUser(updatedUser);

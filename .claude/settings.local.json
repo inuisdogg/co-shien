@@ -17,7 +17,9 @@
       "Bash(supabase sql:*)",
       "Bash(1 --help:*)",
       "Bash(supabase db dump --help:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(supabase link:*)",
+      "Bash(supabase config push:*)"
     ]
   }
 }
