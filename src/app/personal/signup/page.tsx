@@ -20,6 +20,8 @@ export default function PersonalSignupPage() {
   const [formData, setFormData] = useState({
     lastName: '',
     firstName: '',
+    lastNameKana: '',
+    firstNameKana: '',
     birthDate: '',
     gender: '' as 'male' | 'female' | 'other' | '',
     email: '',
@@ -56,6 +58,11 @@ export default function PersonalSignupPage() {
     // バリデーション
     if (!formData.lastName || !formData.firstName) {
       setError('姓と名を入力してください');
+      return;
+    }
+
+    if (!formData.lastNameKana || !formData.firstNameKana) {
+      setError('姓と名のフリガナを入力してください');
       return;
     }
 
@@ -177,6 +184,8 @@ export default function PersonalSignupPage() {
           name: fullName, // 後方互換性のため
           last_name: formData.lastName,
           first_name: formData.firstName,
+          last_name_kana: formData.lastNameKana,
+          first_name_kana: formData.firstNameKana,
           birth_date: formData.birthDate,
           gender: formData.gender,
           email: formData.email,
@@ -363,6 +372,39 @@ export default function PersonalSignupPage() {
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
                 placeholder="名を入力"
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="lastNameKana" className="block text-sm font-bold text-gray-700 mb-2">
+                姓（フリガナ） <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="lastNameKana"
+                type="text"
+                value={formData.lastNameKana}
+                onChange={(e) => setFormData({ ...formData, lastNameKana: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                placeholder="セイを入力"
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label htmlFor="firstNameKana" className="block text-sm font-bold text-gray-700 mb-2">
+                名（フリガナ） <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="firstNameKana"
+                type="text"
+                value={formData.firstNameKana}
+                onChange={(e) => setFormData({ ...formData, firstNameKana: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                placeholder="メイを入力"
                 disabled={loading}
               />
             </div>

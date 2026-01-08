@@ -40,8 +40,22 @@ export default function ForgotPasswordPage() {
         throw new Error('このメールアドレスは登録されていません');
       }
 
-      // パスワードリセットメールを送信（実装は後で追加）
-      // ここでは成功メッセージを表示
+      // Supabase Authでパスワードリセットメールを送信
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback?type=recovery`
+        : 'https://my.co-shien.inu.co.jp/auth/callback?type=recovery';
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email.toLowerCase().trim(),
+        {
+          redirectTo: redirectUrl,
+        }
+      );
+
+      if (resetError) {
+        throw new Error(`パスワードリセットメールの送信に失敗しました: ${resetError.message}`);
+      }
+
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || 'パスワードリセットに失敗しました');
