@@ -442,6 +442,28 @@ const DashboardView: React.FC = () => {
                     const month = currentDate.getMonth();
                     const daysInMonth = new Date(year, month + 1, 0).getDate();
                     
+                    // 実際のschedulesデータからその曜日の午前・午後の登録数を取得
+                    const actualAmCount = schedules.filter((s) => {
+                      const scheduleDate = new Date(s.date);
+                      return scheduleDate.getFullYear() === year &&
+                             scheduleDate.getMonth() === month &&
+                             scheduleDate.getDay() === day.dayIndex &&
+                             s.slot === 'AM';
+                    }).length;
+                    
+                    const actualPmCount = schedules.filter((s) => {
+                      const scheduleDate = new Date(s.date);
+                      return scheduleDate.getFullYear() === year &&
+                             scheduleDate.getMonth() === month &&
+                             scheduleDate.getDay() === day.dayIndex &&
+                             s.slot === 'PM';
+                    }).length;
+                    
+                    // 予測値と実際の値を合算（実際の登録がある場合は実際の値を優先）
+                    const amSlots = actualAmCount > 0 ? actualAmCount : day.amSlots;
+                    const pmSlots = actualPmCount > 0 ? actualPmCount : day.pmSlots;
+                    const totalSlots = amSlots + pmSlots;
+                    
                     // その曜日が定休日かどうかを判定（祝日は考慮しない）
                     let isRegularHoliday = false;
                     
@@ -497,10 +519,10 @@ const DashboardView: React.FC = () => {
                     
                     const amCapacity = dayOccurrences * facilitySettings.capacity.AM;
                     const pmCapacity = dayOccurrences * facilitySettings.capacity.PM;
-                    const amRate = amCapacity > 0 ? (day.amSlots / amCapacity) * 100 : 0;
-                    const pmRate = pmCapacity > 0 ? (day.pmSlots / pmCapacity) * 100 : 0;
+                    const amRate = amCapacity > 0 ? (amSlots / amCapacity) * 100 : 0;
+                    const pmRate = pmCapacity > 0 ? (pmSlots / pmCapacity) * 100 : 0;
                     const totalRate = (amCapacity + pmCapacity) > 0 
-                      ? (day.totalSlots / (amCapacity + pmCapacity)) * 100 
+                      ? (totalSlots / (amCapacity + pmCapacity)) * 100 
                       : 0;
                     
                     return (
@@ -519,7 +541,7 @@ const DashboardView: React.FC = () => {
                             <div className="text-sm text-red-600 italic">休業日</div>
                           ) : (
                             <div className="text-sm font-bold text-gray-800">
-                              {day.amSlots}枠 / {amCapacity}枠 ({amRate.toFixed(1)}%)
+                              {amSlots}枠 / {amCapacity}枠 ({amRate.toFixed(1)}%)
                             </div>
                           )}
                         </td>
@@ -528,7 +550,7 @@ const DashboardView: React.FC = () => {
                             <div className="text-sm text-red-600 italic">休業日</div>
                           ) : (
                             <div className="text-sm font-bold text-gray-800">
-                              {day.pmSlots}枠 / {pmCapacity}枠 ({pmRate.toFixed(1)}%)
+                              {pmSlots}枠 / {pmCapacity}枠 ({pmRate.toFixed(1)}%)
                             </div>
                           )}
                         </td>
@@ -537,7 +559,7 @@ const DashboardView: React.FC = () => {
                             <div className="text-sm text-red-600 italic">休業日</div>
                           ) : (
                             <div className="text-sm font-bold text-[#00c4cc]">
-                              {day.totalSlots}枠 / {amCapacity + pmCapacity}枠 ({totalRate.toFixed(1)}%)
+                              {totalSlots}枠 / {amCapacity + pmCapacity}枠 ({totalRate.toFixed(1)}%)
                             </div>
                           )}
                         </td>

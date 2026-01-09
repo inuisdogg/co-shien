@@ -333,7 +333,7 @@ export type Staff = {
 export type TimeSlot = 'AM' | 'PM';
 
 export type ScheduleItem = {
-  id: number;
+  id: string; // データベース保存に対応するためstring型に変更
   facilityId: string; // 施設ID（マルチテナント対応）
   date: string; // YYYY-MM-DD
   childId: string; // Link to Child
@@ -375,7 +375,7 @@ export type Shift = {
 export type UsageRecord = {
   id: string;
   facilityId: string; // 施設ID（マルチテナント対応）
-  scheduleId: number; // スケジュールIDへの参照
+  scheduleId: string; // スケジュールIDへの参照（データベース保存に対応するためstring型に変更）
   childId: string; // 児童ID
   childName: string; // 児童名（非正規化）
   date: string; // YYYY-MM-DD

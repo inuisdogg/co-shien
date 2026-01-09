@@ -550,7 +550,8 @@ export const calculateWeeklyRevenue = (
       (r) => r.serviceStatus === '利用' && r.billingTarget === '請求する'
     ).length;
     
-    const revenue = actualCount * dailyPricePerChild;
+    // 利用枠数×単価で計算（見込み売り上げ）
+    const revenue = weekSchedules.length * dailyPricePerChild;
     
     weeks.push({
       week,

@@ -32,6 +32,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const restoreSession = async () => {
       try {
+        // 開発モード: 環境変数で有効化
+        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+        
+        if (isDevMode) {
+          // 開発モード: テストユーザー情報を自動設定
+          const testUser: User = {
+            id: process.env.NEXT_PUBLIC_DEV_USER_ID || 'dev-user-id',
+            email: process.env.NEXT_PUBLIC_DEV_USER_EMAIL || 'dev@example.com',
+            name: process.env.NEXT_PUBLIC_DEV_USER_NAME || '開発テストユーザー',
+            lastName: process.env.NEXT_PUBLIC_DEV_USER_LAST_NAME || '開発',
+            firstName: process.env.NEXT_PUBLIC_DEV_USER_FIRST_NAME || 'テスト',
+            lastNameKana: process.env.NEXT_PUBLIC_DEV_USER_LAST_NAME_KANA || 'カイハツ',
+            firstNameKana: process.env.NEXT_PUBLIC_DEV_USER_FIRST_NAME_KANA || 'テスト',
+            loginId: process.env.NEXT_PUBLIC_DEV_USER_LOGIN_ID || 'dev@example.com',
+            role: (process.env.NEXT_PUBLIC_DEV_USER_ROLE as UserRole) || 'admin',
+            facilityId: process.env.NEXT_PUBLIC_DEV_FACILITY_ID || 'dev-facility-test',
+            permissions: {},
+            accountStatus: 'active',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          
+          const testFacility: Facility = {
+            id: process.env.NEXT_PUBLIC_DEV_FACILITY_ID || 'dev-facility-test',
+            name: process.env.NEXT_PUBLIC_DEV_FACILITY_NAME || 'テスト施設',
+            code: process.env.NEXT_PUBLIC_DEV_FACILITY_CODE || 'TEST',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          
+          setUser(testUser);
+          setFacility(testFacility);
+          localStorage.setItem('user', JSON.stringify(testUser));
+          localStorage.setItem('facility', JSON.stringify(testFacility));
+          
+          console.log('🔧 開発モード: テストユーザーで自動ログインしました');
+          setLoading(false);
+          return;
+        }
+        
+        // 通常モード: ローカルストレージから復元
         const storedUser = localStorage.getItem('user');
         const storedFacility = localStorage.getItem('facility');
         

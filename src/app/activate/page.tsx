@@ -112,8 +112,12 @@ function ActivatePageContent() {
 
   // 画面A: アカウント作成フォーム
   const [accountForm, setAccountForm] = useState({
-    name: '',
-    nameKana: '', // 名前の振り仮名
+    lastName: '',
+    firstName: '',
+    lastNameKana: '',
+    firstNameKana: '',
+    birthDate: '',
+    gender: '' as 'male' | 'female' | 'other' | '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -159,9 +163,8 @@ function ActivatePageContent() {
     }
   }, [careerForm.birthDate]);
 
-  // ステップBの定義
+  // ステップBの定義（生年月日は画面Aで入力済みのため削除）
   const steps = [
-    { id: 'birthDate', label: '生年月日', icon: Calendar },
     { id: 'address', label: '住所', icon: MapPin },
     { id: 'qualifications', label: '資格', icon: Award },
     { id: 'certificates', label: '資格証', icon: Camera },
@@ -170,6 +173,36 @@ function ActivatePageContent() {
 
   // トークンから招待情報を取得（ユニバーサル・ゲート）
   useEffect(() => {
+    // 開発モード: 環境変数で有効化
+    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+    
+    // デバッグモード: URLパラメータでステップを指定できる
+    const debugStep = searchParams.get('debugStep');
+    const debugScreen = searchParams.get('debugScreen');
+    
+    // デバッグモードのチェックを最初に行う
+    if (debugStep !== null && debugScreen === 'B') {
+      setScreen('B');
+      setCurrentStep(parseInt(debugStep) || 0);
+      setFacilityName('テスト事業所');
+      setFacilityId('test-facility-id');
+      setUserId('test-user-id');
+      setInvitedName('テストユーザー');
+      setInvitedEmail('test@example.com');
+      setError(''); // エラーをクリア
+      return;
+    }
+
+    // 開発モードでトークンがない場合、テスト事業所情報を設定
+    if (isDevMode && !token) {
+      setFacilityName(process.env.NEXT_PUBLIC_DEV_FACILITY_NAME || 'テスト事業所');
+      setFacilityId(process.env.NEXT_PUBLIC_DEV_FACILITY_ID || 'dev-facility-id');
+      setScreen('welcome');
+      setError(''); // エラーをクリア
+      return;
+    }
+
+    // デバッグモードでない場合のみ通常の処理を実行
     if (!token) {
       setError('招待リンクが無効です');
       setScreen('welcome');
@@ -256,6 +289,9 @@ function ActivatePageContent() {
     e.preventDefault();
     setError('');
 
+    // 開発モード: 必須チェックをスキップ
+    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+
     if (accountForm.password !== accountForm.confirmPassword) {
       setError('パスワードが一致しません');
       return;
@@ -266,7 +302,7 @@ function ActivatePageContent() {
       return;
     }
 
-    if (!accountForm.agreedToTerms) {
+    if (!accountForm.agreedToTerms && !isDevMode) {
       setError('利用規約に同意してください');
       return;
     }
@@ -276,10 +312,58 @@ function ActivatePageContent() {
       return;
     }
 
-    if (!accountForm.name || !accountForm.email) {
-      setError('名前とメールアドレスを入力してください');
-      return;
+    // 開発モードでない場合のみ必須チェック
+    if (!isDevMode) {
+      // バリデーション
+      if (!accountForm.lastName || !accountForm.firstName) {
+        setError('姓と名を入力してください');
+        return;
+      }
+
+      if (!accountForm.lastNameKana || !accountForm.firstNameKana) {
+        setError('姓と名のフリガナを入力してください');
+        return;
+      }
+
+      if (!accountForm.birthDate) {
+        setError('生年月日を入力してください');
+        return;
+      }
+
+      if (!accountForm.gender) {
+        setError('性別を選択してください');
+        return;
+      }
+
+      if (!accountForm.email) {
+        setError('メールアドレスを入力してください');
+        return;
+      }
+
+      // 生年月日の形式チェック
+      const birthDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!birthDateRegex.test(accountForm.birthDate)) {
+        setError('生年月日はYYYY-MM-DD形式で入力してください');
+        return;
+      }
+
+      // 生年月日の妥当性チェック（未来の日付でないか）
+      const birthDateObj = new Date(accountForm.birthDate);
+      const today = new Date();
+      if (birthDateObj > today) {
+        setError('生年月日は未来の日付にできません');
+        return;
+      }
     }
+
+    // 名前を結合（後方互換性のため）
+    // 開発モードで空の場合はデフォルト値を設定
+    const fullName = accountForm.lastName && accountForm.firstName
+      ? `${accountForm.lastName} ${accountForm.firstName}`
+      : (isDevMode ? '開発テストユーザー' : '');
+    const fullNameKana = accountForm.lastNameKana && accountForm.firstNameKana
+      ? `${accountForm.lastNameKana} ${accountForm.firstNameKana}`
+      : (isDevMode ? 'カイハツテスト' : '');
 
     setLoading(true);
     try {
@@ -333,9 +417,15 @@ function ActivatePageContent() {
         const newUserId = generateUUID();
         const newUser: any = {
           id: newUserId,
-          name: accountForm.name,
-          name_kana: accountForm.nameKana || null,
-          email: accountForm.email,
+          name: fullName || '開発テストユーザー', // 後方互換性のため
+          last_name: accountForm.lastName || '開発',
+          first_name: accountForm.firstName || 'テスト',
+          last_name_kana: accountForm.lastNameKana || 'カイハツ',
+          first_name_kana: accountForm.firstNameKana || 'テスト',
+          name_kana: fullNameKana || 'カイハツテスト', // 後方互換性のため
+          birth_date: accountForm.birthDate || new Date('1990-01-01').toISOString().split('T')[0],
+          gender: accountForm.gender || 'other',
+          email: accountForm.email || `dev-${newUserId}@example.com`,
           password_hash: passwordHash,
           account_status: 'active',
           activated_at: new Date().toISOString(),
@@ -355,7 +445,7 @@ function ActivatePageContent() {
         }
 
         setUserId(newUserId);
-        setInvitedName(accountForm.name);
+        setInvitedName(fullName);
         setInvitedEmail(accountForm.email);
 
         // シャドウアカウントが見つかった場合、マージする
@@ -426,27 +516,25 @@ function ActivatePageContent() {
         email: accountForm.email || null,
       };
       
-      // nameKanaを更新
-      if (accountForm.nameKana) {
-        updateData.name_kana = accountForm.nameKana;
+      // 姓名を更新
+      if (accountForm.lastName && accountForm.firstName) {
+        updateData.last_name = accountForm.lastName;
+        updateData.first_name = accountForm.firstName;
+        updateData.name = fullName; // 後方互換性のため
       }
       
-      // 名前が変更されている場合のみ更新（重複チェック付き）
-      if (accountForm.name && accountForm.name !== invitedName) {
-        // 同じ施設内で同じ名前のユーザーが存在しないかチェック
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('facility_id', facilityId)
-          .eq('name', accountForm.name)
-          .neq('id', userId)
-          .single();
-        
-        if (!existingUser) {
-          // 重複がない場合のみ名前を更新
-          updateData.name = accountForm.name;
-        }
-        // 重複がある場合は既存の名前を保持
+      if (accountForm.lastNameKana && accountForm.firstNameKana) {
+        updateData.last_name_kana = accountForm.lastNameKana;
+        updateData.first_name_kana = accountForm.firstNameKana;
+        updateData.name_kana = fullNameKana; // 後方互換性のため
+      }
+
+      // 生年月日と性別を更新
+      if (accountForm.birthDate) {
+        updateData.birth_date = accountForm.birthDate;
+      }
+      if (accountForm.gender) {
+        updateData.gender = accountForm.gender;
       }
 
       const { data: updatedUser, error: updateError } = await supabase
@@ -547,6 +635,9 @@ function ActivatePageContent() {
       return;
     }
 
+    // 名前を結合（後方互換性のため）
+    const fullName = `${accountForm.lastName} ${accountForm.firstName}`;
+
     setLoading(true);
     try {
       // 1. ユーザー情報から招待時の雇用情報を取得（公開招待の場合はデフォルト値を使用）
@@ -646,11 +737,11 @@ function ActivatePageContent() {
         const staffData = {
           id: `staff_${userId}_${facilityId}`,
           facility_id: facilityId,
-          name: accountForm.name,
+          name: fullName,
           role: invitedRole === '管理者' ? 'マネージャー' : '一般スタッフ',
           type: '常勤',
           user_id: userId,
-          birth_date: careerForm.birthDate || null,
+          birth_date: accountForm.birthDate || null,
           address: careerForm.address || null,
         };
 
@@ -1145,32 +1236,129 @@ function ActivatePageContent() {
               )}
 
               <form onSubmit={handleAccountSubmit} className="space-y-6">
+                {/* 開発モード: テストデータ一括入力ボタン */}
+                {process.env.NEXT_PUBLIC_DEV_MODE === 'true' && (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // テストデータを一括入力
+                        const testData = {
+                          lastName: '山田',
+                          firstName: '太郎',
+                          lastNameKana: 'ヤマダ',
+                          firstNameKana: 'タロウ',
+                          birthDate: '1990-01-01',
+                          gender: 'male' as const,
+                          email: `test-${Date.now()}@example.com`,
+                          password: 'test123',
+                          confirmPassword: 'test123',
+                          agreedToTerms: true,
+                        };
+                        setAccountForm(prev => ({ ...prev, ...testData }));
+                        setError(''); // エラーをクリア
+                      }}
+                      className="w-full px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-md text-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      テストデータを入力（開発モード）
+                    </button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      姓 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={accountForm.lastName}
+                      onChange={(e) => setAccountForm(prev => ({ ...prev, lastName: e.target.value }))}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      placeholder="姓を入力"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      名 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={accountForm.firstName}
+                      onChange={(e) => setAccountForm(prev => ({ ...prev, firstName: e.target.value }))}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      placeholder="名を入力"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      姓（フリガナ） <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={accountForm.lastNameKana}
+                      onChange={(e) => setAccountForm(prev => ({ ...prev, lastNameKana: e.target.value }))}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      placeholder="セイを入力"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      名（フリガナ） <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={accountForm.firstNameKana}
+                      onChange={(e) => setAccountForm(prev => ({ ...prev, firstNameKana: e.target.value }))}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      placeholder="メイを入力"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">
-                    氏名 <span className="text-red-500">*</span>
+                    生年月日 <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="text"
-                    value={accountForm.name}
-                    onChange={(e) => setAccountForm(prev => ({ ...prev, name: e.target.value }))}
+                    type="date"
+                    value={accountForm.birthDate}
+                    onChange={(e) => setAccountForm(prev => ({ ...prev, birthDate: e.target.value }))}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
                     disabled={loading}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">
-                    フリガナ
+                    性別 <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={accountForm.nameKana}
-                    onChange={(e) => setAccountForm(prev => ({ ...prev, nameKana: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                    placeholder="カタカナで入力"
+                  <select
+                    value={accountForm.gender}
+                    onChange={(e) => setAccountForm(prev => ({ ...prev, gender: e.target.value as 'male' | 'female' | 'other' }))}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
                     disabled={loading}
-                  />
+                  >
+                    <option value="">選択してください</option>
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                    <option value="other">その他</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1347,75 +1535,8 @@ function ActivatePageContent() {
               {/* ステップコンテンツ */}
               <div className="p-6 min-h-[400px]">
                 <AnimatePresence mode="wait">
-                  {/* ステップB-1: 生年月日 */}
+                  {/* ステップB-1: 住所 */}
                   {currentStep === 0 && (
-                    <motion.div
-                      key="birthDate"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-4"
-                    >
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-[#00c4cc] rounded-full flex items-center justify-center">
-                          <Calendar className="w-6 h-6 text-white" />
-                        </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-800">生年月日を教えてください</h3>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">年</label>
-                        <select
-                          value={birthYear}
-                          onChange={(e) => updateBirthDate(e.target.value, birthMonth, birthDay)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-lg bg-white"
-                        >
-                          <option value="">選択</option>
-                          {years.map((year) => (
-                            <option key={year} value={year}>
-                              {year}年
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">月</label>
-                        <select
-                          value={birthMonth}
-                          onChange={(e) => updateBirthDate(birthYear, e.target.value, birthDay)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-lg bg-white"
-                        >
-                          <option value="">選択</option>
-                          {months.map((month) => (
-                            <option key={month} value={month}>
-                              {month}月
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">日</label>
-                        <select
-                          value={birthDay}
-                          onChange={(e) => updateBirthDate(birthYear, birthMonth, e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-lg bg-white"
-                        >
-                          <option value="">選択</option>
-                          {days.map((day) => (
-                            <option key={day} value={day}>
-                              {day}日
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    </motion.div>
-                  )}
-
-                  {/* ステップB-2: 住所 */}
-                  {currentStep === 1 && (
                     <motion.div
                       key="address"
                       initial={{ opacity: 0, x: 20 }}
@@ -1461,8 +1582,8 @@ function ActivatePageContent() {
                     </motion.div>
                   )}
 
-                  {/* ステップB-3: 資格 */}
-                  {currentStep === 2 && (
+                  {/* ステップB-2: 資格 */}
+                  {currentStep === 1 && (
                     <motion.div
                       key="qualifications"
                       initial={{ opacity: 0, x: 20 }}
@@ -1606,8 +1727,8 @@ function ActivatePageContent() {
                     </motion.div>
                   )}
 
-                  {/* ステップB-4: 資格証の写真 */}
-                  {currentStep === 3 && (
+                  {/* ステップB-3: 資格証の写真 */}
+                  {currentStep === 2 && (
                     <motion.div
                       key="certificates"
                       initial={{ opacity: 0, x: 20 }}
@@ -1684,8 +1805,8 @@ function ActivatePageContent() {
                     </motion.div>
                   )}
 
-                  {/* ステップB-5: 職歴・学歴 */}
-                  {currentStep === 4 && (
+                  {/* ステップB-4: 職歴・学歴 */}
+                  {currentStep === 3 && (
                     <motion.div
                       key="workHistory"
                       initial={{ opacity: 0, x: 20 }}
@@ -1886,8 +2007,8 @@ function ActivatePageContent() {
                     戻る
                   </button>
                   <div className="flex gap-2">
-                    {/* 生年月日以外のステップに「後で入力する」ボタンを表示 */}
-                    {currentStep !== 0 && (
+                    {/* 「後で入力する」ボタンを表示 */}
+                    {(
                       <button
                         type="button"
                         onClick={handleNextStep}

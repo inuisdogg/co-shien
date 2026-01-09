@@ -16,7 +16,7 @@ import { inviteStaff } from '@/utils/staffInvitationService';
 import { useAuth } from '@/contexts/AuthContext';
 
 const StaffView: React.FC = () => {
-  const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings } = useFacilityData();
+  const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings, saveShifts, fetchShifts } = useFacilityData();
   const { facility } = useAuth();
   const [subTab] = useState<'shift' | 'list'>('shift');
   
@@ -185,15 +185,23 @@ const StaffView: React.FC = () => {
   }, [facilitySettings.regularHolidays, facilitySettings.holidayPeriods, facilitySettings.customHolidays, facilitySettings.includeHolidays]);
 
   // シフトをトグル
-  const toggleShift = (staffId: string, date: string) => {
-    setShifts((prev) => ({
-      ...prev,
-      [staffId]: {
-        ...prev[staffId],
-        [date]: !prev[staffId]?.[date],
-      },
-    }));
-  };
+  const toggleShift = useCallback((staffId: string, date: string) => {
+    console.log('🔄 シフトをトグル:', staffId, date);
+    setShifts((prev) => {
+      const currentValue = prev[staffId]?.[date] || false;
+      const newValue = !currentValue;
+      
+      const newShifts = {
+        ...prev,
+        [staffId]: {
+          ...(prev[staffId] || {}),
+          [date]: newValue,
+        },
+      };
+      console.log('  新しいシフト状態:', newValue, '(スタッフ:', staffId, ', 日付:', date, ')');
+      return newShifts;
+    });
+  }, []);
 
   // スタッフ追加フォームの状態
   const [formData, setFormData] = useState<Partial<Staff>>({
@@ -700,6 +708,41 @@ const StaffView: React.FC = () => {
     alert('基本シフトパターンを一括反映しました');
   };
 
+  // シフトデータを保存
+  const handleSaveShifts = async () => {
+    try {
+      await saveShifts(shifts);
+      alert('シフトを保存しました');
+    } catch (error) {
+      console.error('Error saving shifts:', error);
+      alert('シフトの保存に失敗しました。もう一度お試しください。');
+    }
+  };
+
+  // シフトデータを取得（初回のみ、または週が変更されたときのみ）
+  const currentWeekRangeRef = useRef<string>('');
+  
+  React.useEffect(() => {
+    const loadShifts = async () => {
+      if (weekDates.length > 0) {
+        const startDate = weekDates[0].date;
+        const endDate = weekDates[weekDates.length - 1].date;
+        const weekRange = `${startDate}_${endDate}`;
+        
+        // 週が変更された場合のみ取得（refで比較して無限ループを防ぐ）
+        if (weekRange !== currentWeekRangeRef.current) {
+          console.log('🕐 シフトデータを取得中...', startDate, '～', endDate);
+          const fetchedShifts = await fetchShifts(startDate, endDate);
+          console.log('✅ シフトデータ取得成功:', Object.keys(fetchedShifts).length, '名分');
+          setShifts(fetchedShifts);
+          currentWeekRangeRef.current = weekRange;
+        }
+      }
+    };
+    loadShifts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekDates.length > 0 ? `${weekDates[0].date}_${weekDates[weekDates.length - 1].date}` : '']);
+
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -761,6 +804,14 @@ const StaffView: React.FC = () => {
                   <RotateCw size={14} className="mr-1 sm:mr-2 shrink-0" />
                   <span className="hidden sm:inline">パターン一括反映</span>
                   <span className="sm:hidden">一括反映</span>
+                </button>
+                <button
+                  onClick={handleSaveShifts}
+                  className="flex-1 sm:flex-none px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
+                >
+                  <CalendarCheck size={14} className="mr-1 sm:mr-2 shrink-0" />
+                  <span className="hidden sm:inline">シフトを保存</span>
+                  <span className="sm:hidden">保存</span>
                 </button>
               </div>
             </div>

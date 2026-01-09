@@ -270,13 +270,19 @@ const ManagementSettingsView: React.FC = () => {
 
   // 保存
   const handleSave = async () => {
-    if (currentTarget) {
-      await updateManagementTarget(currentTarget.id, formData);
-    } else {
-      await addManagementTarget(formData);
+    try {
+      console.log('💾 経営設定を保存中...', formData);
+      if (currentTarget) {
+        await updateManagementTarget(currentTarget.id, formData);
+      } else {
+        await addManagementTarget(formData);
+      }
+      alert('経営設定を保存しました');
+      setIsEditModalOpen(false);
+    } catch (error) {
+      console.error('❌ 経営設定の保存エラー:', error);
+      alert('経営設定の保存に失敗しました。もう一度お試しください。');
     }
-    alert('経営設定を保存しました');
-    setIsEditModalOpen(false);
   };
 
   // 削除

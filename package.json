@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate-dev-data": "tsx scripts/generate-dev-data.ts"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.2.2",
@@ -31,6 +32,7 @@
     "eslint-config-next": "^14.0.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.0"
   }
 }

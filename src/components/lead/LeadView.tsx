@@ -28,6 +28,14 @@ interface LeadViewProps {
 
 const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
   const { leads, children, addLead, updateLead, deleteLead } = useFacilityData();
+  
+  // デバッグ: リードデータの確認
+  useEffect(() => {
+    console.log('📞 LeadView: リードデータ:', leads.length, '件');
+    if (leads.length > 0) {
+      console.log('  最初のリード:', leads[0]);
+    }
+  }, [leads]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [selectedChildForDetail, setSelectedChildForDetail] = useState<Child | null>(null);
@@ -42,7 +50,7 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
   // フォームの初期値
   const initialFormData: LeadFormData = {
     name: '',
-    childName: '',
+    childName: '', // 後方互換性のため残すが、使用しない
     status: 'new-inquiry',
     phone: '',
     email: '',
@@ -103,7 +111,7 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
       setSelectedLead(lead);
       setFormData({
         name: lead.name,
-        childName: lead.childName || '',
+        childName: '', // 使用しないが、後方互換性のため空文字を設定
         status: lead.status,
         phone: lead.phone || '',
         email: lead.email || '',
@@ -113,7 +121,7 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
         pickupOption: lead.pickupOption || 'required',
         inquirySource: lead.inquirySource,
         inquirySourceDetail: lead.inquirySourceDetail || '',
-        childIds: lead.childIds,
+        childIds: lead.childIds || [],
         memo: lead.memo || '',
       });
     } else {
@@ -386,16 +394,6 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">児童名</label>
-                      <input
-                        type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
-                        placeholder="例: 田中 太郎"
-                        value={formData.childName}
-                        onChange={(e) => setFormData({ ...formData, childName: e.target.value })}
-                      />
-                    </div>
-                    <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1.5">ステータス</label>
                         <select
                         className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
@@ -552,45 +550,72 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
                 {/* 関連児童 */}
                 <div className="border-b border-gray-200 pb-4">
                   <h4 className="font-bold text-sm text-gray-700 mb-4">関連児童</h4>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {children.length === 0 ? (
                       <p className="text-xs text-gray-500">登録されている児童がありません</p>
                     ) : (
-                      children.map((child) => (
-                        <label
-                          key={child.id}
-                          className="flex items-center space-x-2 p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer"
+                      <>
+                        <select
+                          className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] transition-all"
+                          value=""
+                          onChange={(e) => {
+                            const selectedChildId = e.target.value;
+                            if (selectedChildId && !formData.childIds.includes(selectedChildId)) {
+                              setFormData({
+                                ...formData,
+                                childIds: [...formData.childIds, selectedChildId],
+                              });
+                            }
+                            // 選択後は初期値に戻す
+                            e.target.value = '';
+                          }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={formData.childIds.includes(child.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setFormData({
-                                  ...formData,
-                                  childIds: [...formData.childIds, child.id],
-                                });
-                              } else {
-                                setFormData({
-                                  ...formData,
-                                  childIds: formData.childIds.filter((id) => id !== child.id),
-                                });
-                              }
-                            }}
-                            className="accent-[#00c4cc]"
-                          />
-                          <span className="text-sm text-gray-700 font-bold">{child.name}</span>
-                        </label>
-                      ))
+                          <option value="">児童を選択してください</option>
+                          {children
+                            .filter(child => !formData.childIds.includes(child.id))
+                            .map((child) => (
+                              <option key={child.id} value={child.id}>
+                                {child.name}
+                              </option>
+                            ))}
+                        </select>
+                        {formData.childIds.length > 0 && (
+                          <div className="space-y-2">
+                            {formData.childIds.map((childId) => {
+                              const child = children.find(c => c.id === childId);
+                              if (!child) return null;
+                              return (
+                                <div
+                                  key={childId}
+                                  className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded"
+                                >
+                                  <span className="text-sm text-gray-700 font-bold">{child.name}</span>
+                                  <button
+                                    onClick={() => {
+                                      setFormData({
+                                        ...formData,
+                                        childIds: formData.childIds.filter((id) => id !== childId),
+                                      });
+                                    }}
+                                    className="text-red-500 hover:text-red-700 transition-colors"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
+                    <button
+                      onClick={() => handleGoToChildren()}
+                      className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-bold flex items-center"
+                    >
+                      児童管理で新規登録
+                      <ChevronRight size={12} className="ml-1" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleGoToChildren()}
-                    className="mt-2 text-xs text-[#00c4cc] hover:text-[#00b0b8] font-bold flex items-center"
-                  >
-                    児童管理で新規登録
-                    <ChevronRight size={12} className="ml-1" />
-                  </button>
                 </div>
 
                 {/* メモ */}

@@ -58,8 +58,23 @@ const FacilitySettingsView: React.FC = () => {
   ];
 
   const handleSave = async () => {
-    await updateFacilitySettings(settings, '施設情報を更新しました');
-    alert('施設情報を保存しました');
+    try {
+      console.log('💾 施設情報を保存中...', {
+        facilityName: settings.facilityName,
+        capacity: settings.capacity,
+        regularHolidays: settings.regularHolidays,
+        customHolidays: settings.customHolidays,
+        includeHolidays: settings.includeHolidays,
+        businessHours: settings.businessHours,
+        holidayPeriods: settings.holidayPeriods,
+        businessHoursPeriods: settings.businessHoursPeriods,
+      });
+      await updateFacilitySettings(settings, '施設情報を更新しました');
+      alert('施設情報を保存しました');
+    } catch (error: any) {
+      console.error('❌ Error saving facility settings:', error);
+      alert(`施設情報の保存に失敗しました: ${error.message || '不明なエラー'}`);
+    }
   };
 
   // 履歴を取得

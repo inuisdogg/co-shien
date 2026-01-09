@@ -19,7 +19,22 @@ CREATE INDEX IF NOT EXISTS idx_facility_settings_history_change_type ON facility
 -- RLS設定
 ALTER TABLE facility_settings_history ENABLE ROW LEVEL SECURITY;
 
--- 施設設定テーブルに営業時間の期間設定カラムを追加
+-- facility_settingsテーブルが存在しない場合は作成
+CREATE TABLE IF NOT EXISTS facility_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  facility_id TEXT NOT NULL,
+  facility_name TEXT,
+  regular_holidays INTEGER[] DEFAULT ARRAY[0],
+  custom_holidays TEXT[] DEFAULT ARRAY[]::TEXT[],
+  business_hours JSONB NOT NULL DEFAULT '{"AM": {"start": "09:00", "end": "12:00"}, "PM": {"start": "13:00", "end": "18:00"}}',
+  capacity JSONB NOT NULL DEFAULT '{"AM": 10, "PM": 10}',
+  business_hours_periods JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(facility_id)
+);
+
+-- 施設設定テーブルに営業時間の期間設定カラムを追加（既に存在する場合）
 ALTER TABLE facility_settings 
 ADD COLUMN IF NOT EXISTS business_hours_periods JSONB DEFAULT '[]'::jsonb;
 

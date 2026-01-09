@@ -16,13 +16,24 @@ import {
   UsageRecordFormData,
   Lead,
   LeadFormData,
+  LeadStatus,
   ManagementTarget,
   ManagementTargetFormData,
+  TimeSlot,
 } from '@/types';
 
 export const useFacilityData = () => {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
+
+  // デバッグ: facilityIdが設定されているか確認
+  useEffect(() => {
+    if (facilityId) {
+      console.log('✅ useFacilityData: facilityIdが設定されました:', facilityId);
+    } else {
+      console.warn('⚠️  useFacilityData: facilityIdが設定されていません。ログインが必要です。');
+    }
+  }, [facilityId]);
 
   // データの状態管理
   const [children, setChildren] = useState<Child[]>([]);
@@ -463,6 +474,105 @@ export const useFacilityData = () => {
     fetchStaff();
   }, [facilityId]);
 
+  // Supabaseからスケジュールデータを取得
+  useEffect(() => {
+    if (!facilityId) {
+      console.warn('⚠️  fetchSchedules: facilityIdが設定されていません');
+      return;
+    }
+
+    const fetchSchedules = async () => {
+      try {
+        console.log('📅 fetchSchedules: スケジュールデータを取得中... facilityId:', facilityId);
+        const { data, error } = await supabase
+          .from('schedules')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .order('date', { ascending: true })
+          .order('slot', { ascending: true });
+
+        if (error) {
+          console.error('❌ Error fetching schedules:', error);
+          return;
+        }
+
+        console.log('✅ fetchSchedules: スケジュールデータ取得成功:', data?.length || 0, '件');
+        if (data) {
+          const schedulesData: ScheduleItem[] = data.map((row) => ({
+            id: row.id,
+            facilityId: row.facility_id,
+            date: row.date,
+            childId: row.child_id,
+            childName: row.child_name,
+            slot: row.slot as TimeSlot,
+            hasPickup: row.has_pickup || false,
+            hasDropoff: row.has_dropoff || false,
+            staffId: row.staff_id || undefined,
+            createdAt: row.created_at || new Date().toISOString(),
+            updatedAt: row.updated_at || new Date().toISOString(),
+          }));
+          setSchedules(schedulesData);
+        }
+      } catch (error) {
+        console.error('❌ Error in fetchSchedules:', error);
+      }
+    };
+
+    fetchSchedules();
+  }, [facilityId]);
+
+  // Supabaseからリードデータを取得
+  useEffect(() => {
+    if (!facilityId) {
+      console.warn('⚠️  fetchLeads: facilityIdが設定されていません');
+      return;
+    }
+
+    const fetchLeads = async () => {
+      try {
+        console.log('📞 fetchLeads: リードデータを取得中... facilityId:', facilityId);
+        const { data, error } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching leads:', error);
+          return;
+        }
+
+        console.log('✅ fetchLeads: リードデータ取得成功:', data?.length || 0, '件');
+        if (data) {
+          const leadsData: Lead[] = data.map((row) => ({
+            id: row.id,
+            facilityId: row.facility_id,
+            name: row.name,
+            childName: row.child_name || '',
+            status: row.status as LeadStatus,
+            phone: row.phone || '',
+            email: row.email || '',
+            address: row.address || '',
+            expectedStartDate: row.expected_start_date || '',
+            preferredDays: row.preferred_days || [],
+            pickupOption: row.pickup_option || null,
+            inquirySource: row.inquiry_source || null,
+            inquirySourceDetail: row.inquiry_source_detail || null,
+            childIds: row.child_ids || [],
+            memo: row.memo || '',
+            createdAt: row.created_at || new Date().toISOString(),
+            updatedAt: row.updated_at || new Date().toISOString(),
+          }));
+          setLeads(leadsData);
+        }
+      } catch (error) {
+        console.error('❌ Error in fetchLeads:', error);
+      }
+    };
+
+    fetchLeads();
+  }, [facilityId]);
+
   // 施設IDでフィルタリングされたデータのみを返す
   const filteredChildren = useMemo(
     () => children.filter((c) => c.facilityId === facilityId),
@@ -649,16 +759,55 @@ export const useFacilityData = () => {
     }
   };
 
-  const addSchedule = (schedule: Omit<ScheduleItem, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
-    const newSchedule: ScheduleItem = {
-      ...schedule,
-      id: Date.now(),
-      facilityId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setSchedules([...schedules, newSchedule]);
-    return newSchedule;
+  const addSchedule = async (schedule: Omit<ScheduleItem, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
+    if (!facilityId) {
+      console.error('❌ addSchedule: facilityIdが設定されていません');
+      throw new Error('施設IDが設定されていません。ログインしてください。');
+    }
+
+    console.log('💾 addSchedule: スケジュールを保存中... facilityId:', facilityId, 'date:', schedule.date);
+    const scheduleId = `schedule-${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    try {
+      // Supabaseに保存
+      const { data, error } = await supabase
+        .from('schedules')
+        .insert({
+          id: scheduleId,
+          facility_id: facilityId,
+          child_id: schedule.childId,
+          child_name: schedule.childName,
+          date: schedule.date,
+          slot: schedule.slot,
+          has_pickup: schedule.hasPickup || false,
+          has_dropoff: schedule.hasDropoff || false,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error adding schedule to Supabase:', error);
+        throw error;
+      }
+
+      console.log('✅ addSchedule: スケジュールを保存しました:', schedule.childName, schedule.date, schedule.slot);
+      // ローカル状態を更新
+      const newSchedule: ScheduleItem = {
+        ...schedule,
+        id: scheduleId,
+        facilityId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setSchedules([...schedules, newSchedule]);
+      return newSchedule;
+    } catch (error) {
+      console.error('Error in addSchedule:', error);
+      throw error;
+    }
   };
 
   const addRequest = (request: Omit<BookingRequest, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
@@ -684,14 +833,20 @@ export const useFacilityData = () => {
     const { data: { user } } = await supabase.auth.getUser();
     const changedBy = user?.id || null;
     
-    // 変更タイプを判定
+    // 変更タイプを判定（複数のフィールドが変更される可能性があるため、より柔軟に判定）
     let changeType: 'business_hours' | 'holidays' | 'capacity' | 'all' = 'all';
-    if (settings.businessHours && !settings.regularHolidays && !settings.capacity) {
-      changeType = 'business_hours';
-    } else if (settings.regularHolidays && !settings.businessHours && !settings.capacity) {
-      changeType = 'holidays';
-    } else if (settings.capacity && !settings.businessHours && !settings.regularHolidays) {
+    const hasBusinessHoursChange = settings.businessHours !== undefined;
+    const hasHolidaysChange = settings.regularHolidays !== undefined || settings.holidayPeriods !== undefined || settings.customHolidays !== undefined || settings.includeHolidays !== undefined;
+    const hasCapacityChange = settings.capacity !== undefined;
+    
+    if (hasCapacityChange && !hasBusinessHoursChange && !hasHolidaysChange) {
       changeType = 'capacity';
+    } else if (hasHolidaysChange && !hasBusinessHoursChange && !hasCapacityChange) {
+      changeType = 'holidays';
+    } else if (hasBusinessHoursChange && !hasHolidaysChange && !hasCapacityChange) {
+      changeType = 'business_hours';
+    } else {
+      changeType = 'all';
     }
     
     // 変更前の値を保存
@@ -760,10 +915,12 @@ export const useFacilityData = () => {
           .single();
 
         if (error) {
-          console.error('Error updating facility settings:', error);
+          console.error('❌ Error updating facility settings:', error);
           // エラーが発生した場合はローカル状態を元に戻す
           setFacilitySettings(facilitySettings);
+          throw error;
         } else if (data) {
+          console.log('✅ updateFacilitySettings: 施設設定を保存しました');
           // 変更履歴を保存
           try {
             await supabase.from('facility_settings_history').insert({
@@ -809,10 +966,27 @@ export const useFacilityData = () => {
     }
   };
 
-  const deleteSchedule = (scheduleId: number) => {
-    setSchedules(schedules.filter((s) => s.id !== scheduleId));
-    // 関連する実績も削除
-    setUsageRecords(usageRecords.filter((r) => r.scheduleId !== scheduleId));
+  const deleteSchedule = async (scheduleId: string) => {
+    try {
+      // Supabaseから削除
+      const { error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', scheduleId);
+
+      if (error) {
+        console.error('Error deleting schedule from Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setSchedules(schedules.filter((s) => s.id !== scheduleId));
+      // 関連する実績も削除
+      setUsageRecords(usageRecords.filter((r) => r.scheduleId !== scheduleId));
+    } catch (error) {
+      console.error('Error in deleteSchedule:', error);
+      throw error;
+    }
   };
 
   const addUsageRecord = (recordData: UsageRecordFormData) => {
@@ -841,7 +1015,7 @@ export const useFacilityData = () => {
     setUsageRecords(usageRecords.filter((r) => r.id !== recordId));
   };
 
-  const getUsageRecordByScheduleId = (scheduleId: number): UsageRecord | undefined => {
+  const getUsageRecordByScheduleId = (scheduleId: string): UsageRecord | undefined => {
     return usageRecords.find((r) => r.scheduleId === scheduleId);
   };
 
@@ -861,30 +1035,128 @@ export const useFacilityData = () => {
   );
 
   // リード管理機能
-  const addLead = (leadData: LeadFormData) => {
-    const newLead: Lead = {
-      ...leadData,
-      id: `lead-${Date.now()}`,
-      facilityId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setLeads([...leads, newLead]);
-    return newLead;
+  const addLead = async (leadData: LeadFormData) => {
+    if (!facilityId) {
+      console.error('❌ addLead: facilityIdが設定されていません');
+      throw new Error('施設IDが設定されていません。ログインしてください。');
+    }
+
+    console.log('💾 addLead: リードを保存中... facilityId:', facilityId, 'name:', leadData.name);
+    const leadId = `lead-${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    try {
+      // Supabaseに保存
+      const { data, error } = await supabase
+        .from('leads')
+        .insert({
+          id: leadId,
+          facility_id: facilityId,
+          name: leadData.name,
+          child_name: null, // 関連児童登録で登録した児童と結びつけるため不要
+          status: leadData.status,
+          phone: leadData.phone,
+          email: leadData.email,
+          address: leadData.address,
+          expected_start_date: leadData.expectedStartDate || null,
+          preferred_days: leadData.preferredDays || [],
+          pickup_option: leadData.pickupOption || null,
+          inquiry_source: leadData.inquirySource || null,
+          inquiry_source_detail: leadData.inquirySourceDetail || null,
+          child_ids: leadData.childIds || [],
+          memo: leadData.memo || null,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error adding lead to Supabase:', error);
+        throw error;
+      }
+
+      console.log('✅ addLead: リードを保存しました:', leadData.name);
+      // ローカル状態を更新
+      const newLead: Lead = {
+        ...leadData,
+        id: leadId,
+        facilityId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setLeads([...leads, newLead]);
+      return newLead;
+    } catch (error) {
+      console.error('Error in addLead:', error);
+      throw error;
+    }
   };
 
-  const updateLead = (leadId: string, leadData: Partial<LeadFormData>) => {
-    setLeads(
-      leads.map((l) =>
-        l.id === leadId
-          ? { ...l, ...leadData, updatedAt: new Date().toISOString() }
-          : l
-      )
-    );
+  const updateLead = async (leadId: string, leadData: Partial<LeadFormData>) => {
+    try {
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (leadData.name !== undefined) updateData.name = leadData.name;
+      // childNameは関連児童登録で登録した児童と結びつけるため不要（nullを設定）
+      updateData.child_name = null;
+      if (leadData.status !== undefined) updateData.status = leadData.status;
+      if (leadData.phone !== undefined) updateData.phone = leadData.phone;
+      if (leadData.email !== undefined) updateData.email = leadData.email;
+      if (leadData.address !== undefined) updateData.address = leadData.address;
+      if (leadData.expectedStartDate !== undefined) updateData.expected_start_date = leadData.expectedStartDate || null;
+      if (leadData.preferredDays !== undefined) updateData.preferred_days = leadData.preferredDays || [];
+      if (leadData.pickupOption !== undefined) updateData.pickup_option = leadData.pickupOption || null;
+      if (leadData.inquirySource !== undefined) updateData.inquiry_source = leadData.inquirySource || null;
+      if (leadData.inquirySourceDetail !== undefined) updateData.inquiry_source_detail = leadData.inquirySourceDetail || null;
+      if (leadData.childIds !== undefined) updateData.child_ids = leadData.childIds || [];
+      if (leadData.memo !== undefined) updateData.memo = leadData.memo || null;
+
+      const { error } = await supabase
+        .from('leads')
+        .update(updateData)
+        .eq('id', leadId);
+
+      if (error) {
+        console.error('Error updating lead in Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setLeads(
+        leads.map((l) =>
+          l.id === leadId
+            ? { ...l, ...leadData, updatedAt: new Date().toISOString() }
+            : l
+        )
+      );
+    } catch (error) {
+      console.error('Error in updateLead:', error);
+      throw error;
+    }
   };
 
-  const deleteLead = (leadId: string) => {
-    setLeads(leads.filter((l) => l.id !== leadId));
+  const deleteLead = async (leadId: string) => {
+    try {
+      // Supabaseから削除
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', leadId);
+
+      if (error) {
+        console.error('Error deleting lead from Supabase:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setLeads(leads.filter((l) => l.id !== leadId));
+    } catch (error) {
+      console.error('Error in deleteLead:', error);
+      throw error;
+    }
   };
 
   const getLeadsByChildId = (childId: string): Lead[] => {
@@ -1158,6 +1430,103 @@ export const useFacilityData = () => {
     );
   };
 
+  // シフト管理機能
+  const saveShifts = async (shifts: Record<string, Record<string, boolean>>) => {
+    if (!facilityId) {
+      console.warn('⚠️  saveShifts: facilityIdが設定されていません');
+      return;
+    }
+
+    try {
+      console.log('💾 saveShifts: シフトデータを保存中...', Object.keys(shifts).length, '名分');
+      
+      // すべてのシフトデータを準備（has_shiftがfalseのものも含む）
+      const shiftData: Array<{
+        facility_id: string;
+        staff_id: string;
+        date: string;
+        has_shift: boolean;
+      }> = [];
+
+      for (const [staffId, dates] of Object.entries(shifts)) {
+        for (const [date, hasShift] of Object.entries(dates)) {
+          shiftData.push({
+            facility_id: facilityId,
+            staff_id: staffId,
+            date: date,
+            has_shift: hasShift,
+          });
+        }
+      }
+
+      if (shiftData.length === 0) {
+        console.log('⚠️  saveShifts: 保存するシフトデータがありません');
+        return;
+      }
+
+      // upsertを使用して保存（UNIQUE制約: facility_id, staff_id, date）
+      const now = new Date().toISOString();
+      const upsertData = shiftData.map(shift => ({
+        ...shift,
+        updated_at: now,
+      }));
+
+      const { error: upsertError } = await supabase
+        .from('shifts')
+        .upsert(upsertData, { onConflict: 'facility_id,staff_id,date' });
+
+      if (upsertError) {
+        console.error('❌ Error upserting shifts:', upsertError);
+        throw upsertError;
+      }
+
+      console.log('✅ saveShifts: シフトデータを保存しました', shiftData.length, '件');
+    } catch (error) {
+      console.error('❌ Error in saveShifts:', error);
+      throw error;
+    }
+  };
+
+  const fetchShifts = async (startDate: string, endDate: string): Promise<Record<string, Record<string, boolean>>> => {
+    if (!facilityId) {
+      console.warn('⚠️  fetchShifts: facilityIdが設定されていません');
+      return {};
+    }
+
+    try {
+      console.log('🕐 fetchShifts: シフトデータを取得中...', startDate, '～', endDate);
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('staff_id, date, has_shift')
+        .eq('facility_id', facilityId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (error) {
+        console.error('❌ Error fetching shifts:', error);
+        return {};
+      }
+
+      const shifts: Record<string, Record<string, boolean>> = {};
+      if (data) {
+        for (const row of data) {
+          if (!shifts[row.staff_id]) {
+            shifts[row.staff_id] = {};
+          }
+          shifts[row.staff_id][row.date] = row.has_shift;
+        }
+        console.log('✅ fetchShifts: シフトデータ取得成功:', data.length, '件');
+      } else {
+        console.log('⚠️  fetchShifts: シフトデータがありません');
+      }
+
+      return shifts;
+    } catch (error) {
+      console.error('❌ Error in fetchShifts:', error);
+      return {};
+    }
+  };
+
   // Supabaseから経営目標を取得
   useEffect(() => {
     if (!facilityId) return;
@@ -1241,6 +1610,8 @@ export const useFacilityData = () => {
     updateManagementTarget,
     deleteManagementTarget,
     getManagementTarget,
+    saveShifts,
+    fetchShifts,
   };
 };
 

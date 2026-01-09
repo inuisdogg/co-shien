@@ -254,6 +254,48 @@ const ScheduleView: React.FC = () => {
     };
   }, [schedules, weekDates, capacity, isHoliday]);
 
+  // 選択された日付と時間帯に基づいて児童をソート（基本利用設定がその曜日のその時間になっている子を優先）
+  // 重複を除去してユニークな児童のみを表示
+  const sortedChildrenForBooking = useMemo(() => {
+    // useFacilityDataから取得したchildrenは既にfilteredChildrenとしてフィルタリングされている
+    // 念のため、同じIDの児童は1つだけ残す（重複防止）
+    const uniqueChildrenMap = new Map<string, Child>();
+    children.forEach(child => {
+      if (!uniqueChildrenMap.has(child.id)) {
+        uniqueChildrenMap.set(child.id, child);
+      }
+    });
+    const uniqueChildren = Array.from(uniqueChildrenMap.values());
+    
+    if (!newBooking.date) return uniqueChildren;
+    
+    const selectedDate = new Date(newBooking.date);
+    const dayOfWeek = selectedDate.getDay();
+    
+    return uniqueChildren.sort((a, b) => {
+      // 基本利用設定を確認
+      const aHasPattern = a.patternDays?.includes(dayOfWeek) || false;
+      const bHasPattern = b.patternDays?.includes(dayOfWeek) || false;
+      
+      // 時間帯の確認
+      const aTimeSlot = a.patternTimeSlots?.[dayOfWeek];
+      const bTimeSlot = b.patternTimeSlots?.[dayOfWeek];
+      
+      const selectedSlot = newBooking.slots.AM ? 'AM' : (newBooking.slots.PM ? 'PM' : null);
+      const aMatchesSlot = selectedSlot ? (aTimeSlot === selectedSlot || aTimeSlot === 'AMPM') : false;
+      const bMatchesSlot = selectedSlot ? (bTimeSlot === selectedSlot || bTimeSlot === 'AMPM') : false;
+      
+      // 優先順位: 1. 基本利用設定がある + 時間帯が一致, 2. 基本利用設定がある, 3. その他
+      if (aHasPattern && aMatchesSlot && !(bHasPattern && bMatchesSlot)) return -1;
+      if (bHasPattern && bMatchesSlot && !(aHasPattern && aMatchesSlot)) return 1;
+      if (aHasPattern && !bHasPattern) return -1;
+      if (bHasPattern && !aHasPattern) return 1;
+      
+      // 同じ優先度の場合は名前順
+      return a.name.localeCompare(b.name, 'ja');
+    });
+  }, [children, newBooking.date, newBooking.slots]);
+
   // 日付をクリックしてモーダルを開く
   const handleDateClick = (date: string, slot?: TimeSlot) => {
     setSelectedDateForBooking(date);
@@ -269,7 +311,7 @@ const ScheduleView: React.FC = () => {
   };
 
   // 予約を追加
-  const handleAddBooking = () => {
+  const handleAddBooking = async () => {
     if (!newBooking.childId) {
       alert('児童を選択してください');
       return;
@@ -281,37 +323,56 @@ const ScheduleView: React.FC = () => {
     const child = children.find((c) => c.id === newBooking.childId);
     if (!child) return;
 
-    // 選択された時間帯ごとにスケジュールを追加
-    if (newBooking.slots.AM) {
-      addSchedule({
-        date: newBooking.date,
-        childId: child.id,
-        childName: child.name,
-        slot: 'AM',
-        hasPickup: newBooking.pickup,
-        hasDropoff: newBooking.dropoff,
-      });
+    // 重複チェック：同じ児童が同じ日付・同じ時間帯に既に登録されているか確認
+    const existingSchedules = schedules.filter(
+      (s) => s.childId === newBooking.childId && s.date === newBooking.date
+    );
+    
+    if (newBooking.slots.AM && existingSchedules.some((s) => s.slot === 'AM')) {
+      alert(`${child.name}さんは${newBooking.date}の午前中に既に予約が登録されています。`);
+      return;
     }
-    if (newBooking.slots.PM) {
-      addSchedule({
-        date: newBooking.date,
-        childId: child.id,
-        childName: child.name,
-        slot: 'PM',
-        hasPickup: newBooking.pickup,
-        hasDropoff: newBooking.dropoff,
-      });
+    if (newBooking.slots.PM && existingSchedules.some((s) => s.slot === 'PM')) {
+      alert(`${child.name}さんは${newBooking.date}の午後に既に予約が登録されています。`);
+      return;
     }
 
-    alert(`${child.name}さんの予約を追加しました`);
-    setIsModalOpen(false);
-    setNewBooking({
-      childId: '',
-      date: '',
-      slots: { AM: false, PM: false },
-      pickup: false,
-      dropoff: false,
-    });
+    try {
+      // 選択された時間帯ごとにスケジュールを追加
+      if (newBooking.slots.AM) {
+        await addSchedule({
+          date: newBooking.date,
+          childId: child.id,
+          childName: child.name,
+          slot: 'AM',
+          hasPickup: newBooking.pickup,
+          hasDropoff: newBooking.dropoff,
+        });
+      }
+      if (newBooking.slots.PM) {
+        await addSchedule({
+          date: newBooking.date,
+          childId: child.id,
+          childName: child.name,
+          slot: 'PM',
+          hasPickup: newBooking.pickup,
+          hasDropoff: newBooking.dropoff,
+        });
+      }
+
+      alert(`${child.name}さんの予約を追加しました`);
+      setIsModalOpen(false);
+      setNewBooking({
+        childId: '',
+        date: '',
+        slots: { AM: false, PM: false },
+        pickup: false,
+        dropoff: false,
+      });
+    } catch (error) {
+      console.error('Error adding booking:', error);
+      alert('予約の追加に失敗しました。もう一度お試しください。');
+    }
   };
 
   // 登録児童をクリックしたときの処理
@@ -328,11 +389,16 @@ const ScheduleView: React.FC = () => {
   };
 
   // 削除を選択
-  const handleSelectDelete = () => {
+  const handleSelectDelete = async () => {
     if (selectedScheduleItem && confirm(`${selectedScheduleItem.childName}さんの予約を削除しますか？`)) {
-      deleteSchedule(selectedScheduleItem.id);
-      setIsActionDialogOpen(false);
-      setSelectedScheduleItem(null);
+      try {
+        await deleteSchedule(selectedScheduleItem.id);
+        setIsActionDialogOpen(false);
+        setSelectedScheduleItem(null);
+      } catch (error) {
+        console.error('Error deleting schedule:', error);
+        alert('予約の削除に失敗しました。もう一度お試しください。');
+      }
     }
   };
 
@@ -822,7 +888,7 @@ const ScheduleView: React.FC = () => {
                   }}
                 >
                   <option value="">選択してください</option>
-                  {children.map((child) => (
+                  {sortedChildrenForBooking.map((child) => (
                     <option key={child.id} value={child.id}>
                       {child.name}
                     </option>
