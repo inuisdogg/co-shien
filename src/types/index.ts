@@ -348,7 +348,7 @@ export type ScheduleItem = {
 
 // 予約リクエスト（保護者からの申請）
 export type BookingRequest = {
-  id: number;
+  id: string; // データベース保存に対応するためstring型に変更
   facilityId: string; // 施設ID（マルチテナント対応）
   childName: string;
   date: string;

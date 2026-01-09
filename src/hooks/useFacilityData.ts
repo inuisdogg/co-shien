@@ -813,7 +813,7 @@ export const useFacilityData = () => {
   const addRequest = (request: Omit<BookingRequest, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
     const newRequest: BookingRequest = {
       ...request,
-      id: Date.now(),
+      id: `request-${Date.now()}`,
       facilityId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
