@@ -7,7 +7,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Facility, UserPermissions, UserRole } from '@/types';
+import { User, Facility, UserPermissions, UserRole, UserType } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
 
@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             lastNameKana: process.env.NEXT_PUBLIC_DEV_USER_LAST_NAME_KANA || 'カイハツ',
             firstNameKana: process.env.NEXT_PUBLIC_DEV_USER_FIRST_NAME_KANA || 'テスト',
             loginId: process.env.NEXT_PUBLIC_DEV_USER_LOGIN_ID || 'dev@example.com',
+            userType: (process.env.NEXT_PUBLIC_DEV_USER_TYPE as UserType) || 'staff',
             role: (process.env.NEXT_PUBLIC_DEV_USER_ROLE as UserRole) || 'admin',
             facilityId: process.env.NEXT_PUBLIC_DEV_FACILITY_ID || 'dev-facility-test',
             permissions: {},
@@ -78,6 +79,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (storedUser) {
           const userData = JSON.parse(storedUser);
+          // 古いデータにuserTypeがない場合はデフォルト値を設定
+          if (!userData.userType) {
+            userData.userType = 'staff';
+          }
           setUser(userData);
           
           if (storedFacility) {
@@ -156,6 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           birthDate: userData.birth_date,
           gender: userData.gender,
           loginId: userData.login_id || userData.name,
+          userType: (userData.user_type as UserType) || 'staff',
           role: userData.role as UserRole,
           facilityId: userData.facility_id || '',
           permissions: userData.permissions || {},
@@ -166,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setUser(user);
         localStorage.setItem('user', JSON.stringify(user));
-        
+
         // Personal側では施設情報は設定しない
         setFacility(null);
         localStorage.removeItem('facility');
@@ -267,6 +273,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           birthDate: userData.birth_date,
           gender: userData.gender,
           loginId: userData.login_id || userData.name,
+          userType: (userData.user_type as UserType) || 'staff',
           role: userData.role as UserRole,
           facilityId: userData.facility_id || '',
           permissions: userData.permissions || {},
@@ -277,7 +284,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setUser(user);
         localStorage.setItem('user', JSON.stringify(user));
-        
+
         // ログイン情報を保存（パスワードは保存しない）
         localStorage.setItem('savedFacilityCode', facilityCode);
         localStorage.setItem('savedLoginId', loginIdOrEmail);
@@ -350,6 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: staffData.email || '',
         name: staffData.name,
         loginId: staffData.login_id || staffData.name,
+        userType: 'staff', // 後方互換性のためstaffとして設定
         role: isAdmin ? 'admin' : 'staff',
         facilityId: staffData.facility_id,
         permissions: {},

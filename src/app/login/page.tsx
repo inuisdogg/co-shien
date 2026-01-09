@@ -1,7 +1,6 @@
 /**
- * 個人認証ページ（共通入口）
- * すべてのユーザーはまずここでログインする
- * ログイン後は /portal へ遷移し、所属施設を選択する
+ * スタッフアカウント用ログインページ
+ * スタッフ・管理者向けのログインページ
  */
 
 'use client';
@@ -33,8 +32,10 @@ export default function LoginPage() {
         if (userStr) {
           const user = JSON.parse(userStr);
           if (user?.id) {
-            // 既にログイン済みならダッシュボードへ
-            router.push('/staff-dashboard');
+            // 既にログイン済みならダッシュボードへ（スタッフのみ）
+            if (user.userType !== 'client') {
+              router.push('/staff-dashboard');
+            }
             return;
           }
         }
@@ -79,12 +80,13 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // usersテーブルからメールアドレスまたはログインIDで検索
+      // usersテーブルからメールアドレスまたはログインIDで検索（スタッフアカウントのみ）
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
         .or(`email.eq.${email.toLowerCase()},login_id.eq.${email.toLowerCase()}`)
         .eq('account_status', 'active')
+        .neq('user_type', 'client') // 利用者アカウントは除外
         .single();
 
       if (userError || !userData) {
@@ -108,6 +110,7 @@ export default function LoginPage() {
         firstName: userData.first_name,
         email: userData.email,
         role: userData.role,
+        userType: userData.user_type || 'staff',
         account_status: userData.account_status,
       };
       localStorage.setItem('user', JSON.stringify(user));
@@ -124,8 +127,7 @@ export default function LoginPage() {
         localStorage.removeItem('savedLoginData');
       }
 
-      // スタッフダッシュボードへリダイレクト（パーソナルモード）
-      // 施設への参加や切り替えはダッシュボードから行える
+      // スタッフダッシュボードへリダイレクト
       router.push('/staff-dashboard');
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
@@ -154,6 +156,11 @@ export default function LoginPage() {
             className="h-16 w-auto mx-auto mb-4"
             priority
           />
+          <div className="mb-2">
+            <span className="inline-block bg-[#00c4cc] text-white text-xs font-bold px-3 py-1 rounded-full">
+              スタッフ向け
+            </span>
+          </div>
           <h1 className="text-2xl font-bold text-gray-800">ログイン</h1>
           <p className="text-gray-600 text-sm mt-2">
             ログインIDとパスワードを入力してください
@@ -265,10 +272,21 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => router.push('/personal/signup')}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
+            className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm"
           >
-            新規アカウント作成
+            スタッフとして新規登録
           </button>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <p className="text-center text-xs text-gray-400">
+            <button
+              onClick={() => router.push('/client/login')}
+              className="hover:underline"
+            >
+              利用者（保護者）としてログインする場合はこちら
+            </button>
+          </p>
         </div>
       </div>
     </div>

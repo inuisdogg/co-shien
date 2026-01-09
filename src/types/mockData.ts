@@ -19,6 +19,7 @@ export const mockUser: User = {
   id: 'user-1',
   email: 'admin@himawari.example.com',
   name: '管理者 太郎',
+  userType: 'staff',
   role: 'admin',
   facilityId: 'facility-1',
   accountStatus: 'active',

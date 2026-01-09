@@ -19,7 +19,10 @@
       "Bash(supabase db dump --help:*)",
       "Bash(ls:*)",
       "Bash(supabase link:*)",
-      "Bash(supabase config push:*)"
+      "Bash(supabase config push:*)",
+      "Bash(find:*)",
+      "Bash(supabase projects list:*)",
+      "Bash(timeout 10 npm run dev:*)"
     ]
   }
 }

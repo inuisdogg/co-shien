@@ -16,6 +16,7 @@ import {
   BarChart3,
   DollarSign,
   CalendarCheck,
+  UserPlus,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -67,6 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       items: [
         { id: 'schedule', label: '利用調整・予約', icon: CalendarDays, permission: 'schedule' as const },
         { id: 'children', label: '児童管理', icon: Users, permission: 'children' as const },
+        { id: 'client-invitation', label: '利用者招待', icon: UserPlus, permission: 'children' as const },
         { id: 'lead', label: 'リード管理', icon: Target, permission: 'lead' as const },
       ],
     },

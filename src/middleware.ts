@@ -93,6 +93,23 @@ export function middleware(req: NextRequest) {
     return response;
   }
 
+  // 2.5. /client パスはリライトしない（利用者向けページ）
+  // 【理由】/client はサブドメインに関わらず同じパスでアクセスできる必要がある
+  // Personal側（my.co-shien.inu.co.jp）からも直接 /client にアクセス可能にする
+  if (pathname.startsWith('/client')) {
+    const response = NextResponse.next();
+    response.headers.set('x-debug-subdomain', 'client-path');
+
+    // HTMLファイルに対してキャッシュ無効化ヘッダーを設定
+    if (isHtmlRequest) {
+      response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+    }
+
+    return response;
+  }
+
   // 3. ドメインを分解してサブドメインを取得
   // 【理由】Netlifyのプロキシ環境では、x-forwarded-hostに実際のホスト名が含まれる
   // ポート番号を除去し、ドメイン構造を解析

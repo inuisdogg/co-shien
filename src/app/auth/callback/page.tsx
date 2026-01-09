@@ -62,6 +62,34 @@ export default function AuthCallbackPage() {
               // パスワードリセットの場合
               router.push('/login/reset-password');
               return;
+            } else if (type === 'client') {
+              // 利用者（保護者）アカウント認証完了
+              // usersテーブルを更新
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                // パスワードが設定されているか確認
+                const { data: userData } = await supabase
+                  .from('users')
+                  .select('password_hash')
+                  .eq('id', user.id)
+                  .single();
+                
+                if (!userData?.password_hash) {
+                  // パスワードが設定されていない場合は、パスワード設定ページへ
+                  router.push('/login/reset-password?email=' + encodeURIComponent(user.email || ''));
+                  return;
+                }
+                
+                await supabase
+                  .from('users')
+                  .update({
+                    account_status: 'active',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', user.id);
+              }
+              router.push('/client/dashboard');
+              return;
             } else if (type === 'personal') {
               // パーソナルアカウント認証完了
               router.push('/personal/setup?type=confirm');
@@ -91,9 +119,48 @@ export default function AuthCallbackPage() {
             if (type === 'recovery') {
               router.push('/login/reset-password');
               return;
+            } else if (type === 'client') {
+              // 利用者（保護者）アカウント認証完了
+              if (data.user) {
+                // パスワードが設定されているか確認
+                const { data: userData } = await supabase
+                  .from('users')
+                  .select('password_hash')
+                  .eq('id', data.user.id)
+                  .single();
+                
+                if (!userData?.password_hash) {
+                  // パスワードが設定されていない場合は、パスワード設定ページへ
+                  router.push('/login/reset-password?email=' + encodeURIComponent(data.user.email || ''));
+                  return;
+                }
+                
+                await supabase
+                  .from('users')
+                  .update({
+                    account_status: 'active',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', data.user.id);
+              }
+              router.push('/client/dashboard');
+              return;
             } else if (type === 'personal') {
               // usersテーブルを更新
               if (data.user) {
+                // パスワードが設定されているか確認
+                const { data: userData } = await supabase
+                  .from('users')
+                  .select('password_hash')
+                  .eq('id', data.user.id)
+                  .single();
+                
+                if (!userData?.password_hash) {
+                  // パスワードが設定されていない場合は、パスワード設定ページへ
+                  router.push('/login/reset-password?email=' + encodeURIComponent(data.user.email || ''));
+                  return;
+                }
+                
                 await supabase
                   .from('users')
                   .update({
@@ -147,7 +214,15 @@ export default function AuthCallbackPage() {
           <h2 className="text-xl font-bold text-gray-800 mb-2">認証エラー</h2>
           <p className="text-gray-600 text-sm mb-6">{errorMessage}</p>
           <button
-            onClick={() => router.push('/login')}
+            onClick={() => {
+              // typeに応じて適切なログインページにリダイレクト
+              const type = searchParams.get('type');
+              if (type === 'client') {
+                router.push('/client/login');
+              } else {
+                router.push('/login');
+              }
+            }}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
           >
             ログインページへ戻る

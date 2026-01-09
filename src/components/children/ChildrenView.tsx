@@ -18,11 +18,13 @@ import {
   Edit,
   ChevronDown,
   ChevronUp,
+  Mail,
 } from 'lucide-react';
 import { Child, ChildFormData, ContractStatus, Lead } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { saveDraft, getDrafts, deleteDraft, loadDraft } from '@/utils/draftStorage';
 import { Target, ChevronRight } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface ChildrenViewProps {
   setActiveTab?: (tab: string) => void;
@@ -37,6 +39,9 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const [sortStatus, setSortStatus] = useState<ContractStatus | 'all'>('all');
   const [drafts, setDrafts] = useState<ChildFormData[]>([]);
   const [selectedDraft, setSelectedDraft] = useState<string | null>(null);
+  const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
+  const [invitationEmail, setInvitationEmail] = useState('');
+  const [sendingInvitation, setSendingInvitation] = useState(false);
 
   // フォームの初期値
   const initialFormData: ChildFormData = {
@@ -1506,6 +1511,37 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                     </div>
                   </div>
                 </div>
+
+                {/* 利用者アカウントへの招待 */}
+                {selectedChild.ownerProfileId && (
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h4 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                      <Mail size={14} />
+                      利用者アカウントへの招待
+                    </h4>
+                    <p className="text-xs text-gray-600 mb-3">
+                      この児童の保護者アカウントに施設利用の招待を送信できます。
+                    </p>
+                    <button
+                      onClick={async () => {
+                        // 保護者のメールアドレスを取得
+                        const { data: ownerData } = await supabase
+                          .from('users')
+                          .select('email')
+                          .eq('id', selectedChild.ownerProfileId)
+                          .single();
+                        if (ownerData?.email) {
+                          setInvitationEmail(ownerData.email);
+                        }
+                        setIsInvitationModalOpen(true);
+                      }}
+                      className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm flex items-center justify-center gap-2"
+                    >
+                      <Mail size={16} />
+                      招待を送信
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

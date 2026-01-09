@@ -68,8 +68,11 @@ export type FacilitySettings = {
   updatedAt: string;
 };
 
+// ユーザー種別（スタッフ/利用者の区別）
+export type UserType = 'staff' | 'client';
+
 // ユーザーロール
-export type UserRole = 'admin' | 'manager' | 'staff';
+export type UserRole = 'admin' | 'manager' | 'staff' | 'client';
 
 // 権限設定（マネージャーとスタッフ用）
 export type UserPermissions = {
@@ -98,6 +101,7 @@ export type User = {
   gender?: 'male' | 'female' | 'other'; // 性別
   phone?: string;
   loginId?: string; // ログイン用ID
+  userType: UserType; // ユーザー種別（staff=スタッフ, client=利用者）
   role: UserRole; // ユーザーロール
   facilityId: string; // 施設ID（空文字列の場合は個人アカウント）
   permissions?: UserPermissions; // 権限設定
@@ -227,7 +231,8 @@ export type ContractStatus = 'pre-contract' | 'active' | 'inactive' | 'terminate
 // 児童データ
 export type Child = {
   id: string;
-  facilityId: string; // 施設ID（マルチテナント対応）
+  facilityId?: string; // 施設ID（マルチテナント対応、利用者登録の場合はnull）
+  ownerProfileId?: string; // 所有者（保護者）のユーザーID（利用者登録の場合に設定）
   // 基本情報
   name: string; // 児童名
   nameKana?: string; // 児童名（フリガナ）
@@ -239,6 +244,7 @@ export type Child = {
   guardianRelationship?: string; // 続柄（例: 母、父、祖母）
   // 受給者証情報
   beneficiaryNumber?: string; // 受給者証番号
+  beneficiaryCertificateImageUrl?: string; // 受給者証の最新版画像URL
   grantDays?: number; // 支給日数
   contractDays?: number; // 契約日数
   // 連絡先

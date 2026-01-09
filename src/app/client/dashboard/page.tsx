@@ -25,21 +25,125 @@ export default function ClientDashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
-          router.push('/login');
-          return;
+        // まずlocalStorageのuserデータをチェック（利用者ログインではSupabase Authのセッションがない可能性があるため）
+        const userStr = localStorage.getItem('user');
+        let userId: string | null = null;
+        let userType: string | null = null;
+        
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            if (user?.id) {
+              userId = user.id;
+              userType = user.userType;
+              
+              // 利用者アカウントでない場合はスタッフダッシュボードへ
+              if (userType && userType !== 'client') {
+                router.push('/staff-dashboard');
+                return;
+              }
+              
+              // 利用者アカウントの場合は、localStorageのデータを信頼して続行
+              if (userType === 'client') {
+                // usersテーブルからユーザー情報を取得して確認
+                const { data: userData, error: userError } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', userId)
+                  .single();
+
+                if (userError || !userData) {
+                  router.push('/client/login');
+                  return;
+                }
+
+                // 利用者アカウントか再確認
+                if (userData.user_type !== 'client') {
+                  router.push('/staff-dashboard');
+                  return;
+                }
+
+                setCurrentUser(userData);
+
+                // localStorageのuserデータを更新
+                const updatedUser = {
+                  id: userData.id,
+                  name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
+                  lastName: userData.last_name,
+                  firstName: userData.first_name,
+                  email: userData.email,
+                  role: userData.role,
+                  userType: 'client',
+                  account_status: userData.account_status,
+                };
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+
+                // 登録済みの児童を取得（owner_profile_idで紐付け）
+                const { data: childrenData, error: childrenError } = await supabase
+                  .from('children')
+                  .select('*')
+                  .eq('owner_profile_id', userId)
+                  .order('created_at', { ascending: false });
+
+                if (childrenError) {
+                  console.error('児童データ取得エラー:', childrenError);
+                } else if (childrenData) {
+                  const formattedChildren: Child[] = childrenData.map((c: any) => ({
+                    id: c.id,
+                    facilityId: c.facility_id,
+                    ownerProfileId: c.owner_profile_id,
+                    name: c.name,
+                    nameKana: c.name_kana,
+                    age: c.age,
+                    birthDate: c.birth_date,
+                    guardianName: c.guardian_name,
+                    guardianNameKana: c.guardian_name_kana,
+                    guardianRelationship: c.guardian_relationship,
+                    beneficiaryNumber: c.beneficiary_number,
+                    beneficiaryCertificateImageUrl: c.beneficiary_certificate_image_url,
+                    grantDays: c.grant_days,
+                    contractDays: c.contract_days,
+                    address: c.address,
+                    phone: c.phone,
+                    email: c.email,
+                    doctorName: c.doctor_name,
+                    doctorClinic: c.doctor_clinic,
+                    schoolName: c.school_name,
+                    pattern: c.pattern,
+                    patternDays: c.pattern_days,
+                    patternTimeSlots: c.pattern_time_slots,
+                    needsPickup: c.needs_pickup || false,
+                    needsDropoff: c.needs_dropoff || false,
+                    pickupLocation: c.pickup_location,
+                    pickupLocationCustom: c.pickup_location_custom,
+                    dropoffLocation: c.dropoff_location,
+                    dropoffLocationCustom: c.dropoff_location_custom,
+                    characteristics: c.characteristics,
+                    contractStatus: c.contract_status || 'pre-contract',
+                    contractStartDate: c.contract_start_date,
+                    contractEndDate: c.contract_end_date,
+                    registrationType: c.registration_type,
+                    plannedContractDays: c.planned_contract_days,
+                    plannedUsageStartDate: c.planned_usage_start_date,
+                    plannedUsageDays: c.planned_usage_days,
+                    createdAt: c.created_at,
+                    updatedAt: c.updated_at,
+                  }));
+                  setChildren(formattedChildren);
+                }
+
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('localStorage user parse error:', e);
+          }
         }
 
-        // usersテーブルからユーザー情報を取得
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        if (userError || !userData) {
-          router.push('/login');
+        // localStorageにuserデータがない場合はログインページへ
+        if (!userId) {
+          router.push('/client/login');
           return;
         }
 
@@ -118,7 +222,7 @@ export default function ClientDashboardPage() {
     await supabase.auth.signOut();
     localStorage.removeItem('user');
     localStorage.removeItem('selectedFacility');
-    router.push('/login');
+    router.push('/client/login');
   };
 
   // 年齢を計算

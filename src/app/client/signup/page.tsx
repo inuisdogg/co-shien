@@ -498,7 +498,7 @@ export default function ClientSignupPage() {
           <p className="text-center text-sm text-gray-600">
             既にアカウントをお持ちの方は{' '}
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/client/login')}
               className="text-orange-500 hover:underline font-bold"
             >
               ログイン

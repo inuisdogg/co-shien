@@ -72,7 +72,7 @@ export default function ChildRegisterPage() {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        router.push('/login');
+        router.push('/client/login');
         return;
       }
 
@@ -84,7 +84,7 @@ export default function ChildRegisterPage() {
         .single();
 
       if (error || !userData) {
-        router.push('/login');
+        router.push('/client/login');
         return;
       }
 

@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { hashPassword } from '@/utils/password';
 
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
@@ -175,8 +176,11 @@ export default function PersonalSignupPage() {
         throw new Error('ユーザー作成に失敗しました');
       }
 
+      // パスワードハッシュを生成
+      const passwordHash = await hashPassword(formData.password);
+
       // usersテーブルにユーザー情報を保存（Supabase Authのトリガーで自動作成される場合もあるが、念のため）
-      // パスワードはSupabase Authで管理するため、password_hashは設定しない
+      // 重要：user_typeとroleは必ず'staff'を明示的に設定する
       const { error: userCreateError } = await supabase
         .from('users')
         .upsert({
@@ -190,9 +194,11 @@ export default function PersonalSignupPage() {
           gender: formData.gender,
           email: formData.email,
           login_id: formData.email,
+          password_hash: passwordHash, // パスワードハッシュを設定
+          user_type: 'staff', // スタッフとして登録（必須：明示的に設定）
           account_status: 'pending', // メール認証待ち
           has_account: true,
-          role: 'staff',
+          role: 'staff', // roleもstaffに（必須：明示的に設定）
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }, {
@@ -201,7 +207,31 @@ export default function PersonalSignupPage() {
 
       if (userCreateError) {
         console.error('usersテーブルへの保存エラー:', userCreateError);
-        // エラーでも続行（Supabase Authのトリガーで作成される可能性がある）
+        throw new Error(`アカウント作成エラー: ${userCreateError.message}`);
+      }
+
+      // 念のため、作成されたユーザーのuser_typeを確認
+      const { data: createdUser, error: verifyError } = await supabase
+        .from('users')
+        .select('user_type, role')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (verifyError) {
+        console.error('ユーザー確認エラー:', verifyError);
+      } else if (createdUser) {
+        if (createdUser.user_type !== 'staff') {
+          console.error('警告: 作成されたユーザーのuser_typeがstaffではありません:', createdUser.user_type);
+          // 強制的に修正
+          await supabase
+            .from('users')
+            .update({
+              user_type: 'staff',
+              role: 'staff',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', authData.user.id);
+        }
       }
 
       // 登録したメールアドレスをlocalStorageに保存（認証後の確認用）

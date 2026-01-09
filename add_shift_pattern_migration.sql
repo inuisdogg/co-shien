@@ -16,3 +16,4 @@ COMMENT ON COLUMN staff.default_shift_pattern IS '基本シフトパターン（
 
 
 
+

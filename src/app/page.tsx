@@ -22,6 +22,7 @@ import ChildrenView from '@/components/children/ChildrenView';
 import StaffView from '@/components/staff/StaffView';
 import StaffManagementView from '@/components/staff/StaffManagementView';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
+import ClientInvitationView from '@/components/client/ClientInvitationView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
 import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
@@ -595,6 +596,8 @@ export default function Home() {
         return <ScheduleView />;
       case 'children':
         return <ChildrenView setActiveTab={setActiveTab} />;
+      case 'client-invitation':
+        return <ClientInvitationView />;
       case 'staff':
         return <StaffManagementView />;
       case 'shift':
