@@ -37,15 +37,15 @@ BEGIN
       NOW()
     );
   ELSE
-    -- 既存ユーザーを利用者アカウントに更新（パスワードハッシュがない場合は設定）
+    -- 既存ユーザーを利用者アカウントに更新（パスワードハッシュは保持）
     UPDATE users
     SET 
       user_type = 'client',
       role = 'client',
-      account_status = 'active',
-      password_hash = COALESCE(password_hash, 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3'), -- SHA-256('123') のハッシュ（テスト用）
+      account_status = COALESCE(account_status, 'active'), -- 既存のステータスを保持、なければactive
       updated_at = NOW()
     WHERE id = v_user_id;
+    -- パスワードハッシュがない場合のみ設定（別のマイグレーションで処理）
   END IF;
 
   RAISE NOTICE 'テストユーザー % を3つのデモ施設と紐付けました', v_user_id;

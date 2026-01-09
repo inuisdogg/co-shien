@@ -82,11 +82,14 @@ export default function ClientDashboardPage() {
                 localStorage.setItem('user', JSON.stringify(updatedUser));
 
                 // 登録済みの児童を取得（owner_profile_idで紐付け）
+                console.log('児童データ取得開始 - userId:', userId);
                 const { data: childrenData, error: childrenError } = await supabase
                   .from('children')
                   .select('*')
                   .eq('owner_profile_id', userId)
                   .order('created_at', { ascending: false });
+
+                console.log('児童データ取得結果:', { childrenData, childrenError });
 
                 if (childrenError) {
                   console.error('児童データ取得エラー:', childrenError);
@@ -159,11 +162,14 @@ export default function ClientDashboardPage() {
         setCurrentUser(userData);
 
         // 登録済みの児童を取得（owner_profile_idで紐付け）
+        console.log('児童データ取得開始（セッション経由） - userId:', session.user.id);
         const { data: childrenData, error: childrenError } = await supabase
           .from('children')
           .select('*')
           .eq('owner_profile_id', session.user.id)
           .order('created_at', { ascending: false });
+
+        console.log('児童データ取得結果（セッション経由）:', { childrenData, childrenError });
 
         if (childrenError) {
           console.error('児童データ取得エラー:', childrenError);
@@ -210,6 +216,65 @@ export default function ClientDashboardPage() {
             updatedAt: c.updated_at,
           }));
           setChildren(formattedChildren);
+          console.log('フォーマット済み児童データ（セッション経由）:', formattedChildren);
+
+          // 児童IDのリストを取得
+          const childIds = formattedChildren.map(c => c.id);
+          console.log('児童IDリスト（セッション経由）:', childIds);
+
+          if (childIds.length > 0) {
+            // 契約情報を取得
+            console.log('契約データ取得開始（セッション経由）');
+            const { data: contractsData, error: contractsError } = await supabase
+              .from('contracts')
+              .select(`
+                *,
+                facilities:facility_id (
+                  id,
+                  name,
+                  code
+                )
+              `)
+              .in('child_id', childIds)
+              .order('created_at', { ascending: false });
+
+            console.log('契約データ取得結果（セッション経由）:', { contractsData, contractsError });
+
+            if (!contractsError && contractsData) {
+              setContracts(contractsData);
+              
+              // 施設情報を取得
+              const facilityIds = [...new Set(contractsData.map((c: any) => c.facility_id))];
+              console.log('施設IDリスト（セッション経由）:', facilityIds);
+              if (facilityIds.length > 0) {
+                const { data: facilitiesData, error: facilitiesError } = await supabase
+                  .from('facilities')
+                  .select('*')
+                  .in('id', facilityIds);
+
+                console.log('施設データ取得結果（セッション経由）:', { facilitiesData, facilitiesError });
+                if (!facilitiesError && facilitiesData) {
+                  setFacilities(facilitiesData);
+                }
+              }
+
+              // 実績記録を取得（schedulesテーブルから）
+              const { data: schedulesData, error: schedulesError } = await supabase
+                .from('schedules')
+                .select('*')
+                .in('child_id', childIds)
+                .gte('date', new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString().split('T')[0])
+                .order('date', { ascending: false })
+                .limit(50);
+
+              console.log('実績記録データ取得結果（セッション経由）:', { schedulesData, schedulesError });
+              if (!schedulesError && schedulesData) {
+                setUsageRecords(schedulesData);
+              }
+            }
+          } else {
+            console.log('児童IDが空のため、契約データを取得しません（セッション経由）');
+          }
         }
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
