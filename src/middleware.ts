@@ -49,6 +49,13 @@ export function middleware(req: NextRequest) {
     response.headers.set('x-middleware-skip', 'true');
     return response;
   }
+
+  // 招待リンク用のactivateページはリライトしない（Personal側でもBiz側でも同じページを使用）
+  if (pathname === '/activate' || pathname.startsWith('/activate/')) {
+    const response = NextResponse.next();
+    response.headers.set('x-middleware-skip', 'true');
+    return response;
+  }
   
   // 静的ファイル（拡張子付き）- より包括的なチェック
   if (/\.(png|jpg|jpeg|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|otf|json|xml|txt|pdf|zip|map|webmanifest)$/i.test(pathname)) {
