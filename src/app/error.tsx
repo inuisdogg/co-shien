@@ -14,12 +14,12 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex h-screen items-center justify-center bg-[#f5f6f8]">
+    <div className="flex h-screen items-center justify-center bg-gray-50">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">エラーが発生しました</h2>
         <button
           onClick={() => reset()}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           再試行
         </button>
@@ -27,6 +27,7 @@ export default function Error({
     </div>
   );
 }
+
 
 
 
