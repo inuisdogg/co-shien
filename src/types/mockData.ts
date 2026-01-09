@@ -166,7 +166,7 @@ export const initialStaff: Staff[] = [
 // 初期スケジュールデータ
 export const initialSchedules: ScheduleItem[] = [
   {
-    id: 1,
+    id: '1',
     facilityId: 'facility-1',
     date: '2024-05-13',
     childId: 'c1',
@@ -179,7 +179,7 @@ export const initialSchedules: ScheduleItem[] = [
     updatedAt: '2024-01-01T00:00:00Z',
   },
   {
-    id: 2,
+    id: '2',
     facilityId: 'facility-1',
     date: '2024-05-13',
     childId: 'c2',
@@ -191,7 +191,7 @@ export const initialSchedules: ScheduleItem[] = [
     updatedAt: '2024-01-01T00:00:00Z',
   },
   {
-    id: 3,
+    id: '3',
     facilityId: 'facility-1',
     date: '2024-05-13',
     childId: 'c3',
@@ -203,7 +203,7 @@ export const initialSchedules: ScheduleItem[] = [
     updatedAt: '2024-01-01T00:00:00Z',
   },
   {
-    id: 4,
+    id: '4',
     facilityId: 'facility-1',
     date: '2024-05-13',
     childId: 'c4',
@@ -215,7 +215,7 @@ export const initialSchedules: ScheduleItem[] = [
     updatedAt: '2024-01-01T00:00:00Z',
   },
   {
-    id: 5,
+    id: '5',
     facilityId: 'facility-1',
     date: '2024-05-14',
     childId: 'c1',
@@ -231,7 +231,7 @@ export const initialSchedules: ScheduleItem[] = [
 // 初期リクエストデータ
 export const initialRequests: BookingRequest[] = [
   {
-    id: 1,
+    id: '1',
     facilityId: 'facility-1',
     childName: '田中 蓮',
     date: '2024-05-15',
@@ -242,7 +242,7 @@ export const initialRequests: BookingRequest[] = [
     updatedAt: '2024-01-01T00:00:00Z',
   },
   {
-    id: 2,
+    id: '2',
     facilityId: 'facility-1',
     childName: '佐藤 陽菜',
     date: '2024-05-15',
@@ -253,7 +253,7 @@ export const initialRequests: BookingRequest[] = [
     updatedAt: '2024-01-01T00:00:00Z',
   },
   {
-    id: 3,
+    id: '3',
     facilityId: 'facility-1',
     childName: '鈴木 健太',
     date: '2024-05-16',
