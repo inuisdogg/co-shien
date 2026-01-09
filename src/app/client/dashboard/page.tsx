@@ -82,60 +82,129 @@ export default function ClientDashboardPage() {
                 localStorage.setItem('user', JSON.stringify(updatedUser));
 
                 // 登録済みの児童を取得（owner_profile_idで紐付け）
-                console.log('児童データ取得開始 - userId:', userId);
+                console.log('児童データ取得開始 - userId:', userId, 'userEmail:', userData.email);
                 const { data: childrenData, error: childrenError } = await supabase
                   .from('children')
                   .select('*')
                   .eq('owner_profile_id', userId)
                   .order('created_at', { ascending: false });
 
-                console.log('児童データ取得結果:', { childrenData, childrenError });
+                console.log('児童データ取得結果:', { childrenData, childrenError, childrenDataLength: childrenData?.length });
 
                 if (childrenError) {
                   console.error('児童データ取得エラー:', childrenError);
+                  setChildren([]);
                 } else if (childrenData) {
-                  const formattedChildren: Child[] = childrenData.map((c: any) => ({
-                    id: c.id,
-                    facilityId: c.facility_id,
-                    ownerProfileId: c.owner_profile_id,
-                    name: c.name,
-                    nameKana: c.name_kana,
-                    age: c.age,
-                    birthDate: c.birth_date,
-                    guardianName: c.guardian_name,
-                    guardianNameKana: c.guardian_name_kana,
-                    guardianRelationship: c.guardian_relationship,
-                    beneficiaryNumber: c.beneficiary_number,
-                    beneficiaryCertificateImageUrl: c.beneficiary_certificate_image_url,
-                    grantDays: c.grant_days,
-                    contractDays: c.contract_days,
-                    address: c.address,
-                    phone: c.phone,
-                    email: c.email,
-                    doctorName: c.doctor_name,
-                    doctorClinic: c.doctor_clinic,
-                    schoolName: c.school_name,
-                    pattern: c.pattern,
-                    patternDays: c.pattern_days,
-                    patternTimeSlots: c.pattern_time_slots,
-                    needsPickup: c.needs_pickup || false,
-                    needsDropoff: c.needs_dropoff || false,
-                    pickupLocation: c.pickup_location,
-                    pickupLocationCustom: c.pickup_location_custom,
-                    dropoffLocation: c.dropoff_location,
-                    dropoffLocationCustom: c.dropoff_location_custom,
-                    characteristics: c.characteristics,
-                    contractStatus: c.contract_status || 'pre-contract',
-                    contractStartDate: c.contract_start_date,
-                    contractEndDate: c.contract_end_date,
-                    registrationType: c.registration_type,
-                    plannedContractDays: c.planned_contract_days,
-                    plannedUsageStartDate: c.planned_usage_start_date,
-                    plannedUsageDays: c.planned_usage_days,
-                    createdAt: c.created_at,
-                    updatedAt: c.updated_at,
-                  }));
-                  setChildren(formattedChildren);
+                  if (childrenData.length === 0) {
+                    console.log('児童データが空です');
+                    setChildren([]);
+                  } else {
+                    console.log('児童データの詳細:', childrenData);
+                    const formattedChildren: Child[] = childrenData.map((c: any) => ({
+                      id: c.id,
+                      facilityId: c.facility_id,
+                      ownerProfileId: c.owner_profile_id,
+                      name: c.name,
+                      nameKana: c.name_kana,
+                      age: c.age,
+                      birthDate: c.birth_date,
+                      guardianName: c.guardian_name,
+                      guardianNameKana: c.guardian_name_kana,
+                      guardianRelationship: c.guardian_relationship,
+                      beneficiaryNumber: c.beneficiary_number,
+                      beneficiaryCertificateImageUrl: c.beneficiary_certificate_image_url,
+                      grantDays: c.grant_days,
+                      contractDays: c.contract_days,
+                      address: c.address,
+                      phone: c.phone,
+                      email: c.email,
+                      doctorName: c.doctor_name,
+                      doctorClinic: c.doctor_clinic,
+                      schoolName: c.school_name,
+                      pattern: c.pattern,
+                      patternDays: c.pattern_days,
+                      patternTimeSlots: c.pattern_time_slots,
+                      needsPickup: c.needs_pickup || false,
+                      needsDropoff: c.needs_dropoff || false,
+                      pickupLocation: c.pickup_location,
+                      pickupLocationCustom: c.pickup_location_custom,
+                      dropoffLocation: c.dropoff_location,
+                      dropoffLocationCustom: c.dropoff_location_custom,
+                      characteristics: c.characteristics,
+                      contractStatus: c.contract_status || 'pre-contract',
+                      contractStartDate: c.contract_start_date,
+                      contractEndDate: c.contract_end_date,
+                      registrationType: c.registration_type,
+                      plannedContractDays: c.planned_contract_days,
+                      plannedUsageStartDate: c.planned_usage_start_date,
+                      plannedUsageDays: c.planned_usage_days,
+                      createdAt: c.created_at,
+                      updatedAt: c.updated_at,
+                    }));
+                    setChildren(formattedChildren);
+                    console.log('フォーマット済み児童データ:', formattedChildren);
+
+                    // 児童IDのリストを取得
+                    const childIds = formattedChildren.map(c => c.id);
+                    console.log('児童IDリスト:', childIds);
+
+                    if (childIds.length > 0) {
+                      // 契約情報を取得
+                      console.log('契約データ取得開始');
+                      const { data: contractsData, error: contractsError } = await supabase
+                        .from('contracts')
+                        .select(`
+                          *,
+                          facilities:facility_id (
+                            id,
+                            name,
+                            code
+                          )
+                        `)
+                        .in('child_id', childIds)
+                        .order('created_at', { ascending: false });
+
+                      console.log('契約データ取得結果:', { contractsData, contractsError });
+
+                      if (!contractsError && contractsData) {
+                        setContracts(contractsData);
+                        
+                        // 施設情報を取得
+                        const facilityIds = [...new Set(contractsData.map((c: any) => c.facility_id))];
+                        console.log('施設IDリスト:', facilityIds);
+                        if (facilityIds.length > 0) {
+                          const { data: facilitiesData, error: facilitiesError } = await supabase
+                            .from('facilities')
+                            .select('*')
+                            .in('id', facilityIds);
+
+                          console.log('施設データ取得結果:', { facilitiesData, facilitiesError });
+                          if (!facilitiesError && facilitiesData) {
+                            setFacilities(facilitiesData);
+                          }
+                        }
+
+                        // 実績記録を取得（schedulesテーブルから）
+                        const { data: schedulesData, error: schedulesError } = await supabase
+                          .from('schedules')
+                          .select('*')
+                          .in('child_id', childIds)
+                          .gte('date', new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString().split('T')[0])
+                          .order('date', { ascending: false })
+                          .limit(50);
+
+                        console.log('実績記録データ取得結果:', { schedulesData, schedulesError });
+                        if (!schedulesError && schedulesData) {
+                          setUsageRecords(schedulesData);
+                        }
+                      }
+                    } else {
+                      console.log('児童IDが空のため、契約データを取得しません');
+                    }
+                  }
+                } else {
+                  console.log('児童データがnullまたはundefinedです');
+                  setChildren([]);
                 }
 
                 setLoading(false);
@@ -169,11 +238,12 @@ export default function ClientDashboardPage() {
           .eq('owner_profile_id', session.user.id)
           .order('created_at', { ascending: false });
 
-        console.log('児童データ取得結果（セッション経由）:', { childrenData, childrenError });
+        console.log('児童データ取得結果（セッション経由）:', { childrenData, childrenError, childrenDataLength: childrenData?.length });
 
         if (childrenError) {
           console.error('児童データ取得エラー:', childrenError);
-        } else {
+          setChildren([]);
+        } else if (childrenData && childrenData.length > 0) {
           // キャメルケースに変換
           const formattedChildren: Child[] = (childrenData || []).map((c: any) => ({
             id: c.id,
