@@ -86,6 +86,12 @@ export function getPersonalBaseUrl(): string {
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       // ローカルホストの場合は現在のポートを使用
+      // BizとPersonalが同じホストで動作している場合を想定
+      return `${window.location.protocol}//${window.location.host}`;
+    }
+    // 本番環境: 現在のホストがPersonal側かどうかを確認
+    if (hostname.includes('my.co-shien') || hostname === 'my.co-shien.inu.co.jp') {
+      // 既にPersonal側にいる場合は現在のホストを使用
       return `${window.location.protocol}//${window.location.host}`;
     }
   }
