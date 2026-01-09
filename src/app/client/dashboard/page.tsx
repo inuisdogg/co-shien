@@ -82,11 +82,37 @@ export default function ClientDashboardPage() {
                 localStorage.setItem('user', JSON.stringify(updatedUser));
 
                 // 登録済みの児童を取得（owner_profile_idで紐付け）
+                // まず、userIdで検索を試み、見つからない場合はメールアドレスでusersテーブルから正しいIDを取得
                 console.log('児童データ取得開始 - userId:', userId, 'userEmail:', userData.email);
+                
+                let searchUserId = userId;
+                
+                // userIdでusersテーブルに存在するか確認
+                const { data: userCheckData } = await supabase
+                  .from('users')
+                  .select('id')
+                  .eq('id', userId)
+                  .single();
+                
+                if (!userCheckData) {
+                  // userIdが存在しない場合、メールアドレスで検索
+                  console.log('userIdが存在しないため、メールアドレスで検索します');
+                  const { data: userByEmail } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('email', userData.email)
+                    .single();
+                  
+                  if (userByEmail) {
+                    searchUserId = userByEmail.id;
+                    console.log('メールアドレスで見つかったuserId:', searchUserId);
+                  }
+                }
+                
                 const { data: childrenData, error: childrenError } = await supabase
                   .from('children')
                   .select('*')
-                  .eq('owner_profile_id', userId)
+                  .eq('owner_profile_id', searchUserId)
                   .order('created_at', { ascending: false });
 
                 console.log('児童データ取得結果:', { childrenData, childrenError, childrenDataLength: childrenData?.length });
