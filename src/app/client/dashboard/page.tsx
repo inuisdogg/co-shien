@@ -106,9 +106,16 @@ export default function ClientDashboardPage() {
                   if (userByEmail) {
                     searchUserId = userByEmail.id;
                     console.log('メールアドレスで見つかったuserId:', searchUserId);
+                  } else {
+                    console.error('メールアドレスでユーザーが見つかりませんでした');
+                    setLoading(false);
+                    return;
                   }
+                } else {
+                  console.log('userIdが存在します:', searchUserId);
                 }
                 
+                console.log('児童データ検索に使用するuserId:', searchUserId);
                 const { data: childrenData, error: childrenError } = await supabase
                   .from('children')
                   .select('*')
