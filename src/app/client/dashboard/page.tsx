@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Plus, User, Calendar, LogOut, ChevronRight, AlertCircle } from 'lucide-react';
+import { Plus, User, Calendar, LogOut, ChevronRight, AlertCircle, Building2, FileText, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Child } from '@/types';
 
@@ -19,6 +19,9 @@ export default function ClientDashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [children, setChildren] = useState<Child[]>([]);
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [facilities, setFacilities] = useState<any[]>([]);
+  const [usageRecords, setUsageRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -354,7 +357,7 @@ export default function ClientDashboardPage() {
                     key={child.id}
                     className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-orange-200 transition-colors cursor-pointer"
                     onClick={() => {
-                      // TODO: 児童詳細ページへ遷移
+                      router.push(`/client/children/${child.id}`);
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -398,22 +401,152 @@ export default function ClientDashboardPage() {
           )}
         </div>
 
+        {/* 施設ごとの契約情報 */}
+        {contracts.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">契約中の施設</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {contracts
+                .filter(c => c.status === 'active')
+                .map((contract) => {
+                  const facility = facilities.find(f => f.id === contract.facility_id) || contract.facilities;
+                  const child = children.find(c => c.id === contract.child_id);
+                  return (
+                    <div
+                      key={contract.id}
+                      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-orange-200 transition-colors cursor-pointer"
+                      onClick={() => child && router.push(`/client/children/${child.id}?facility=${contract.facility_id}`)}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center">
+                            <Building2 className="w-5 h-5 text-orange-500" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-gray-800">{facility?.name || '施設名不明'}</h3>
+                            {child && (
+                              <p className="text-xs text-gray-500 mt-1">{child.name} さん</p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                          契約中
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        {contract.contract_start_date && (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            <span>契約開始: {contract.contract_start_date}</span>
+                          </div>
+                        )}
+                        {contract.approved_at && (
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <span>承認済み</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* 最近の利用実績 */}
+        {usageRecords.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800">最近の利用実績</h2>
+              {children.length > 0 && (
+                <button
+                  onClick={() => router.push(`/client/children/${children[0].id}`)}
+                  className="text-sm text-orange-500 hover:text-orange-600 font-bold"
+                >
+                  詳細を見る →
+                </button>
+              )}
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="space-y-3">
+                {usageRecords.slice(0, 5).map((record) => {
+                  const facility = facilities.find(f => f.id === record.facility_id);
+                  const child = children.find(c => c.id === record.child_id);
+                  return (
+                    <div
+                      key={record.id}
+                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${
+                          record.service_status === '利用' ? 'bg-green-500' :
+                          record.service_status === '欠席(加算なし)' ? 'bg-gray-400' :
+                          'bg-yellow-500'
+                        }`} />
+                        <div>
+                          <p className="text-sm font-bold text-gray-800">{record.date}</p>
+                          <p className="text-xs text-gray-500">
+                            {child?.name} - {facility?.name || '施設名不明'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          record.service_status === '利用' ? 'bg-green-100 text-green-800' :
+                          record.service_status === '欠席(加算なし)' ? 'bg-gray-100 text-gray-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {record.service_status}
+                        </span>
+                        {record.calculated_time > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">{record.calculated_time}時間</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* クイックアクション */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
             onClick={() => router.push('/client/children/register')}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left hover:border-orange-200 transition-colors"
           >
             <Plus className="w-8 h-8 text-orange-500 mb-2" />
-            <h3 className="font-bold text-gray-800">お子様を追加</h3>
+            <h3 className="font-bold text-gray-800 text-sm">お子様を追加</h3>
             <p className="text-xs text-gray-500 mt-1">新しいお子様を登録</p>
           </button>
+          {children.length > 0 && (
+            <button
+              onClick={() => router.push(`/client/children/${children[0].id}`)}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left hover:border-orange-200 transition-colors"
+            >
+              <FileText className="w-8 h-8 text-blue-500 mb-2" />
+              <h3 className="font-bold text-gray-800 text-sm">詳細を見る</h3>
+              <p className="text-xs text-gray-500 mt-1">お子様の詳細情報</p>
+            </button>
+          )}
+          {children.length > 0 && (
+            <button
+              onClick={() => router.push(`/client/children/${children[0].id}/usage-request`)}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left hover:border-orange-200 transition-colors"
+            >
+              <Calendar className="w-8 h-8 text-purple-500 mb-2" />
+              <h3 className="font-bold text-gray-800 text-sm">利用申請</h3>
+              <p className="text-xs text-gray-500 mt-1">利用曜日を申請</p>
+            </button>
+          )}
           <button
             disabled
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left opacity-50 cursor-not-allowed"
           >
-            <Calendar className="w-8 h-8 text-gray-400 mb-2" />
-            <h3 className="font-bold text-gray-800">施設を探す</h3>
+            <Clock className="w-8 h-8 text-gray-400 mb-2" />
+            <h3 className="font-bold text-gray-800 text-sm">施設を探す</h3>
             <p className="text-xs text-gray-500 mt-1">近日公開予定</p>
           </button>
         </div>

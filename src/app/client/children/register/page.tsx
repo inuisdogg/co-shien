@@ -70,38 +70,71 @@ export default function ChildRegisterPage() {
   // ユーザー情報を取得
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
+      try {
+        // まずlocalStorageのuserデータをチェック（利用者ログインではSupabase Authのセッションがない可能性があるため）
+        const userStr = localStorage.getItem('user');
+        let userId: string | null = null;
+        
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            if (user?.id && user?.userType === 'client') {
+              userId = user.id;
+            } else if (user?.id && user?.userType !== 'client') {
+              // 利用者アカウントでない場合はスタッフダッシュボードへ
+              router.push('/staff-dashboard');
+              return;
+            }
+          } catch (e) {
+            console.error('localStorage user parse error:', e);
+          }
+        }
+
+        // Supabase Authのセッションもチェック（メール認証後の場合）
+        if (!userId) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            userId = session.user.id;
+          }
+        }
+
+        // どちらもない場合はログインページへ
+        if (!userId) {
+          router.push('/client/login');
+          return;
+        }
+
+        // usersテーブルからユーザー情報を取得
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (error || !userData) {
+          router.push('/client/login');
+          return;
+        }
+
+        // 利用者アカウントかチェック（重要：スタッフアカウントは絶対に除外）
+        if (userData.user_type !== 'client') {
+          // スタッフアカウントの場合はスタッフダッシュボードへ
+          router.push('/staff-dashboard');
+          return;
+        }
+
+        setCurrentUser(userData);
+
+        // 保護者の連絡先を初期値として設定
+        setFormData(prev => ({
+          ...prev,
+          phone: userData.phone || '',
+          email: userData.email || '',
+        }));
+      } catch (err: any) {
+        console.error('User fetch error:', err);
         router.push('/client/login');
-        return;
       }
-
-      // usersテーブルからユーザー情報を取得
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error || !userData) {
-        router.push('/client/login');
-        return;
-      }
-
-      // 利用者アカウントかチェック
-      if (userData.user_type !== 'client') {
-        router.push('/staff-dashboard');
-        return;
-      }
-
-      setCurrentUser(userData);
-
-      // 保護者の連絡先を初期値として設定
-      setFormData(prev => ({
-        ...prev,
-        phone: userData.phone || '',
-        email: userData.email || '',
-      }));
     };
 
     fetchUser();
