@@ -263,7 +263,7 @@ export default function ClientLoginPage() {
         <div className="mt-4 pt-4 border-t border-gray-200">
           <p className="text-center text-xs text-gray-400">
             <button
-              onClick={() => router.push('/client/login')}
+              onClick={() => router.push('/login')}
               className="hover:underline"
             >
               スタッフとしてログインする場合はこちら

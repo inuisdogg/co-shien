@@ -30,6 +30,21 @@ interface ChildrenViewProps {
   setActiveTab?: (tab: string) => void;
 }
 
+// 招待枠の型定義
+type PendingInvitation = {
+  id: string;
+  facility_id: string;
+  temp_child_name: string;
+  temp_child_name_kana?: string;
+  email: string;
+  invitation_token: string;
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+  expires_at: string;
+  invited_by: string;
+  child_id?: string;
+  created_at: string;
+};
+
 const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const { children, addChild, updateChild, getLeadsByChildId } = useFacilityData();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,6 +57,16 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState('');
   const [sendingInvitation, setSendingInvitation] = useState(false);
+
+  // 招待枠作成モーダル用の状態
+  const [isInvitationSlotModalOpen, setIsInvitationSlotModalOpen] = useState(false);
+  const [invitationSlotData, setInvitationSlotData] = useState({
+    tempChildName: '',
+    tempChildNameKana: '',
+    email: '',
+  });
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+  const [creatingInvitation, setCreatingInvitation] = useState(false);
 
   // フォームの初期値
   const initialFormData: ChildFormData = {
@@ -86,6 +111,132 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   useEffect(() => {
     setDrafts(getDrafts());
   }, []);
+
+  // 招待枠一覧を取得
+  useEffect(() => {
+    const fetchPendingInvitations = async () => {
+      try {
+        // 現在のユーザーの施設IDを取得
+        const facilityId = localStorage.getItem('selectedFacilityId');
+        if (!facilityId) return;
+
+        const { data, error } = await supabase
+          .from('contract_invitations')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .eq('status', 'pending')
+          .not('temp_child_name', 'is', null)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching pending invitations:', error);
+          return;
+        }
+
+        setPendingInvitations(data || []);
+      } catch (error) {
+        console.error('Error fetching pending invitations:', error);
+      }
+    };
+
+    fetchPendingInvitations();
+  }, []);
+
+  // 招待枠を作成する関数
+  const handleCreateInvitationSlot = async () => {
+    if (!invitationSlotData.tempChildName.trim() || !invitationSlotData.email.trim()) {
+      alert('児童名（仮）とメールアドレスを入力してください');
+      return;
+    }
+
+    setCreatingInvitation(true);
+    try {
+      const facilityId = localStorage.getItem('selectedFacilityId');
+      const userId = localStorage.getItem('userId');
+      if (!facilityId || !userId) {
+        throw new Error('施設IDまたはユーザーIDが見つかりません');
+      }
+
+      // 招待トークンを生成
+      const invitationToken = crypto.randomUUID();
+
+      // 招待枠を作成
+      const { data, error } = await supabase
+        .from('contract_invitations')
+        .insert({
+          facility_id: facilityId,
+          temp_child_name: invitationSlotData.tempChildName,
+          temp_child_name_kana: invitationSlotData.tempChildNameKana || null,
+          email: invitationSlotData.email,
+          invitation_token: invitationToken,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7日後
+          invited_by: userId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // 招待メールを送信（オプション）
+      try {
+        const { data: facilityData } = await supabase
+          .from('facilities')
+          .select('name')
+          .eq('id', facilityId)
+          .single();
+
+        const invitationUrl = `${window.location.origin}/client/invitation/accept?token=${invitationToken}`;
+
+        await fetch('/api/send-contract-invitation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: invitationSlotData.email,
+            facilityName: facilityData?.name || '施設',
+            childName: invitationSlotData.tempChildName,
+            invitationUrl,
+          }),
+        });
+      } catch (emailError) {
+        console.error('メール送信エラー:', emailError);
+        // メール送信に失敗しても招待枠は作成済み
+      }
+
+      // 招待枠一覧を更新
+      setPendingInvitations(prev => [data, ...prev]);
+
+      // モーダルを閉じてフォームをリセット
+      setIsInvitationSlotModalOpen(false);
+      setInvitationSlotData({ tempChildName: '', tempChildNameKana: '', email: '' });
+      alert('招待を送信しました');
+    } catch (error: any) {
+      console.error('招待枠作成エラー:', error);
+      alert('招待の作成に失敗しました: ' + error.message);
+    } finally {
+      setCreatingInvitation(false);
+    }
+  };
+
+  // 招待をキャンセルする関数
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!confirm('この招待をキャンセルしますか？')) return;
+
+    try {
+      const { error } = await supabase
+        .from('contract_invitations')
+        .update({ status: 'cancelled' })
+        .eq('id', invitationId);
+
+      if (error) throw error;
+
+      setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
+      alert('招待をキャンセルしました');
+    } catch (error: any) {
+      console.error('招待キャンセルエラー:', error);
+      alert('招待のキャンセルに失敗しました');
+    }
+  };
 
   // 下書きを読み込む
   const handleLoadDraft = (childName: string) => {
@@ -312,14 +463,77 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             利用児童の台帳管理、受給者証情報の更新を行います。
           </p>
         </div>
-        <button
-          onClick={handleOpenModal}
-          className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all w-full sm:w-auto justify-center"
-        >
-          <UserPlus size={16} className="mr-2 shrink-0" />
-          新規児童登録
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setIsInvitationSlotModalOpen(true)}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all flex-1 sm:flex-none justify-center"
+          >
+            <Mail size={16} className="mr-2 shrink-0" />
+            利用者招待
+          </button>
+          <button
+            onClick={handleOpenModal}
+            className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all flex-1 sm:flex-none justify-center"
+          >
+            <UserPlus size={16} className="mr-2 shrink-0" />
+            新規児童登録
+          </button>
+        </div>
       </div>
+
+      {/* 招待中の利用者一覧 */}
+      {pendingInvitations.length > 0 && (
+        <div className="bg-orange-50 rounded-lg border border-orange-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-orange-800 flex items-center">
+              <Mail size={16} className="mr-2 text-orange-500" />
+              招待中の利用者 ({pendingInvitations.length})
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pendingInvitations.map((invitation) => {
+              const expiresAt = new Date(invitation.expires_at);
+              const isExpired = expiresAt < new Date();
+              const daysLeft = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+              return (
+                <div
+                  key={invitation.id}
+                  className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                    isExpired
+                      ? 'bg-gray-100 border-gray-300'
+                      : 'bg-white border-orange-200 hover:bg-orange-50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3 flex-1">
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                      <span className="text-orange-600 font-bold text-sm">仮</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm text-gray-800 truncate">
+                        {invitation.temp_child_name}
+                        <span className="text-orange-500 text-xs ml-1">（招待中）</span>
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {invitation.email}
+                      </div>
+                      <div className={`text-xs mt-1 ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
+                        {isExpired ? '期限切れ' : `あと${daysLeft}日で期限切れ`}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCancelInvitation(invitation.id)}
+                    className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1 rounded transition-colors ml-2"
+                  >
+                    取消
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 下書き一覧 */}
       {drafts.length > 0 && (
@@ -1559,6 +1773,124 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               >
                 <Edit size={16} />
                 <span>編集</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 招待枠作成モーダル */}
+      {isInvitationSlotModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
+            {/* ヘッダー */}
+            <div className="border-b border-gray-200 px-6 py-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-lg text-gray-800">利用者招待</h3>
+                <button
+                  onClick={() => {
+                    setIsInvitationSlotModalOpen(false);
+                    setInvitationSlotData({ tempChildName: '', tempChildNameKana: '', email: '' });
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                保護者のメールアドレスに招待を送信します。<br />
+                保護者が招待を承認すると、児童情報が自動的に連携されます。
+              </p>
+            </div>
+
+            {/* フォーム */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">
+                  児童名（仮） <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                  placeholder="例: 山田 太郎"
+                  value={invitationSlotData.tempChildName}
+                  onChange={(e) =>
+                    setInvitationSlotData({ ...invitationSlotData, tempChildName: e.target.value })
+                  }
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  保護者が承認後、正式な児童情報に置き換わります
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">
+                  児童名カナ（仮）
+                </label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                  placeholder="例: ヤマダ タロウ"
+                  value={invitationSlotData.tempChildNameKana}
+                  onChange={(e) =>
+                    setInvitationSlotData({ ...invitationSlotData, tempChildNameKana: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">
+                  保護者メールアドレス <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                  placeholder="example@email.com"
+                  value={invitationSlotData.email}
+                  onChange={(e) =>
+                    setInvitationSlotData({ ...invitationSlotData, email: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                <h4 className="text-xs font-bold text-orange-800 mb-1">招待の流れ</h4>
+                <ol className="text-xs text-orange-700 space-y-1 list-decimal list-inside">
+                  <li>保護者にメールで招待リンクを送信</li>
+                  <li>保護者がリンクからログイン/登録</li>
+                  <li>保護者が児童情報を選択・連携</li>
+                  <li>施設と児童の契約が完了</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* フッター */}
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setIsInvitationSlotModalOpen(false);
+                  setInvitationSlotData({ tempChildName: '', tempChildNameKana: '', email: '' });
+                }}
+                className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md text-sm font-bold transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleCreateInvitationSlot}
+                disabled={creatingInvitation}
+                className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-bold shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {creatingInvitation ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    送信中...
+                  </>
+                ) : (
+                  <>
+                    <Mail size={16} />
+                    招待を送信
+                  </>
+                )}
               </button>
             </div>
           </div>

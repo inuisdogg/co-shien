@@ -5,7 +5,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// ビルド時にエラーにならないよう、遅延初期化
+const getResend = () => {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(apiKey);
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // メール送信
+    const resend = getResend();
     const { data, error } = await resend.emails.send({
       from: 'co-shien <noreply@co-shien.inu.co.jp>',
       to: email,
