@@ -48,6 +48,11 @@ export type FacilitySettings = {
   id: string;
   facilityId: string; // 施設ID（マルチテナント対応）
   facilityName?: string; // 施設名
+  // 施設住所（送迎の起点/終点）
+  address?: string; // 施設住所
+  postalCode?: string; // 郵便番号
+  latitude?: number; // 緯度（Google Maps用）
+  longitude?: number; // 経度（Google Maps用）
   // 営業日設定
   regularHolidays: number[]; // デフォルトの定休日（0=日, 1=月, ..., 6=土）
   holidayPeriods?: HolidayPeriod[]; // 期間ごとの定休日設定
@@ -63,6 +68,11 @@ export type FacilitySettings = {
   capacity: {
     AM: number; // 午前の定員
     PM: number; // 午後の定員
+  };
+  // 送迎設定
+  transportCapacity?: {
+    pickup: number; // お迎え可能人数（デフォルト: 4）
+    dropoff: number; // お送り可能人数（デフォルト: 4）
   };
   createdAt: string;
   updatedAt: string;
@@ -248,9 +258,10 @@ export type Child = {
   grantDays?: number; // 支給日数
   contractDays?: number; // 契約日数
   // 連絡先
+  postalCode?: string; // 郵便番号（ハイフンなし7桁）
   address?: string; // 住所
   phone?: string; // 電話番号
-  email?: string; // メールアドレス
+  email?: string; // メールアドレス（保護者メールアドレス）
   // 医療情報
   doctorName?: string; // かかりつけ医名
   doctorClinic?: string; // 医療機関名
@@ -262,10 +273,18 @@ export type Child = {
   patternTimeSlots?: Record<number, 'AM' | 'PM' | 'AMPM'>; // 曜日ごとの時間帯設定（0=日, 1=月, ..., 6=土）
   needsPickup: boolean; // お迎え有無
   needsDropoff: boolean; // お送り有無
-  pickupLocation?: string; // 乗車地（選択肢または自由入力）
+  pickupLocation?: string; // 乗車地（選択肢：事業所/自宅/その他）
   pickupLocationCustom?: string; // 乗車地（自由記入）
-  dropoffLocation?: string; // 降車地（選択肢または自由入力）
+  pickupAddress?: string; // お迎え場所の住所（ルート計算用）
+  pickupPostalCode?: string; // お迎え場所の郵便番号
+  pickupLatitude?: number; // お迎え場所の緯度（Google Maps用）
+  pickupLongitude?: number; // お迎え場所の経度（Google Maps用）
+  dropoffLocation?: string; // 降車地（選択肢：事業所/自宅/その他）
   dropoffLocationCustom?: string; // 降車地（自由記入）
+  dropoffAddress?: string; // お送り場所の住所（ルート計算用）
+  dropoffPostalCode?: string; // お送り場所の郵便番号
+  dropoffLatitude?: number; // お送り場所の緯度（Google Maps用）
+  dropoffLongitude?: number; // お送り場所の経度（Google Maps用）
   // 特性・メモ
   characteristics?: string; // 特性・メモ
   // 契約ステータス
@@ -281,10 +300,147 @@ export type Child = {
   // メタデータ
   createdAt: string;
   updatedAt: string;
+  // 施設記録（連携前の施設側ヒアリング情報）
+  facilityIntakeData?: FacilityIntakeData;
+  facilityIntakeRecordedAt?: string;
+  facilityIntakeRecordedBy?: string;
+};
+
+// 施設側ヒアリング記録（連携前の情報を保持）
+export type FacilityIntakeData = {
+  name?: string;
+  nameKana?: string;
+  birthDate?: string;
+  guardianName?: string;
+  guardianNameKana?: string;
+  guardianRelationship?: string;
+  beneficiaryNumber?: string;
+  grantDays?: number;
+  contractDays?: number;
+  address?: string;
+  phone?: string;
+  email?: string;
+  doctorName?: string;
+  doctorClinic?: string;
+  schoolName?: string;
+  pattern?: string;
+  patternDays?: number[];
+  needsPickup?: boolean;
+  needsDropoff?: boolean;
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  characteristics?: string;
+  memo?: string; // 施設スタッフのメモ
 };
 
 // 児童登録フォームデータ（下書き保存用）
-export type ChildFormData = Omit<Child, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
+export type ChildFormData = Omit<Child, 'id' | 'facilityId' | 'createdAt' | 'updatedAt' | 'facilityIntakeData' | 'facilityIntakeRecordedAt' | 'facilityIntakeRecordedBy'>;
+
+// 施設別児童設定（施設固有の情報）
+export type FacilityChildrenSettings = {
+  id: string;
+  facilityId: string;
+  childId: string;
+  // 利用パターン
+  patternDays?: number[];
+  patternTimeSlots?: Record<number, 'AM' | 'PM' | 'AMPM'>;
+  // 送迎設定
+  needsPickup: boolean;
+  needsDropoff: boolean;
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  // 契約情報
+  contractDays?: number;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  // 担当職員
+  assignedStaffIds?: string[];
+  // 加算設定
+  defaultAddonItems?: string[];
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 書類タイプ
+export type DocumentType =
+  | 'contract'           // 契約書
+  | 'assessment'         // アセスメントシート
+  | 'support_plan'       // 個別支援計画書
+  | 'beneficiary_cert'   // 受給者証
+  | 'medical_cert'       // 診断書・医療証明
+  | 'insurance_card'     // 保険証
+  | 'emergency_contact'  // 緊急連絡先
+  | 'photo_consent'      // 写真掲載同意書
+  | 'other';             // その他
+
+// 書類ステータス
+export type DocumentStatus =
+  | 'required'    // 必要（未提出）
+  | 'submitted'   // 提出済み（確認中）
+  | 'approved'    // 承認済み
+  | 'expired'     // 期限切れ
+  | 'rejected';   // 差し戻し
+
+// 児童書類
+export type ChildDocument = {
+  id: string;
+  facilityId: string;
+  childId: string;
+  documentType: DocumentType;
+  documentName: string;
+  description?: string;
+  status: DocumentStatus;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  dueDate?: string;
+  expiryDate?: string;
+  submittedAt?: string;
+  submittedBy?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+};
+
+// 書類テンプレート
+export type DocumentTemplate = {
+  id: string;
+  facilityId: string;
+  documentType: DocumentType;
+  documentName: string;
+  description?: string;
+  isRequired: boolean;
+  defaultDueDays?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 書類タイプのラベル
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  contract: '契約書',
+  assessment: 'アセスメントシート',
+  support_plan: '個別支援計画書',
+  beneficiary_cert: '受給者証',
+  medical_cert: '診断書・医療証明',
+  insurance_card: '保険証',
+  emergency_contact: '緊急連絡先',
+  photo_consent: '写真掲載同意書',
+  other: 'その他',
+};
+
+// 書類ステータスのラベル
+export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, { label: string; color: string }> = {
+  required: { label: '未提出', color: 'bg-orange-100 text-orange-700' },
+  submitted: { label: '確認中', color: 'bg-blue-100 text-blue-700' },
+  approved: { label: '承認済', color: 'bg-green-100 text-green-700' },
+  expired: { label: '期限切', color: 'bg-red-100 text-red-700' },
+  rejected: { label: '差戻し', color: 'bg-red-100 text-red-700' },
+};
 
 // スタッフデータ（後方互換性のため保持、将来的にはEmploymentRecordに統合）
 export type Staff = {
@@ -521,4 +677,151 @@ export type ManagementTarget = {
 
 // 経営目標フォームデータ
 export type ManagementTargetFormData = Omit<ManagementTarget, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
+
+// チャットメッセージ（保護者と施設スタッフ間のコミュニケーション）
+export type ChatMessage = {
+  id: string;
+  facilityId: string; // 施設ID
+  clientUserId: string; // 保護者（クライアント）のユーザーID
+  senderId: string; // 送信者のユーザーID
+  senderType: 'staff' | 'client'; // 送信者種別
+  senderName: string; // 送信者の表示名
+  message: string; // メッセージ本文
+  isRead: boolean; // 既読フラグ
+  readAt?: string; // 既読日時
+  createdAt: string;
+  updatedAt: string;
+};
+
+// ==========================================
+// コネクト（連絡会調整）機能
+// ==========================================
+
+// 連絡会ステータス
+export type ConnectMeetingStatus = 'scheduling' | 'confirmed' | 'completed' | 'cancelled';
+
+// 参加者ステータス
+export type ConnectParticipantStatus = 'pending' | 'responded' | 'declined';
+
+// 日程回答タイプ
+export type ConnectResponseType = 'available' | 'maybe' | 'unavailable';
+
+// 連絡会メインデータ
+export type ConnectMeeting = {
+  id: string;
+  facilityId: string; // 施設ID
+  childId: string; // 対象児童ID
+  // 会議情報
+  title: string; // 会議名
+  purpose?: string; // 目的
+  location?: string; // 場所
+  estimatedDuration?: number; // 所要時間（分）
+  description?: string; // 詳細説明
+  // ステータス
+  status: ConnectMeetingStatus;
+  // 確定日程
+  confirmedDateOptionId?: string;
+  confirmedAt?: string;
+  confirmedBy?: string;
+  // メタデータ
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  childName?: string;
+  dateOptions?: ConnectMeetingDateOption[];
+  participants?: ConnectMeetingParticipant[];
+};
+
+// 日程候補
+export type ConnectMeetingDateOption = {
+  id: string;
+  meetingId: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime?: string; // HH:mm
+  // 集計
+  availableCount: number;
+  maybeCount: number;
+  unavailableCount: number;
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  responses?: ConnectMeetingResponse[];
+};
+
+// 参加依頼先
+export type ConnectMeetingParticipant = {
+  id: string;
+  meetingId: string;
+  // 組織情報
+  organizationName: string; // 組織名（行政、保育園、学校など）
+  representativeEmail: string; // 担当者メールアドレス
+  representativeName?: string; // 担当者名
+  // アクセストークン
+  accessToken: string;
+  tokenExpiresAt: string;
+  // ステータス
+  status: ConnectParticipantStatus;
+  // 回答情報
+  respondedAt?: string;
+  responderName?: string;
+  // メール送信履歴
+  invitationSentAt?: string;
+  reminderSentAt?: string;
+  confirmationSentAt?: string;
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  responses?: ConnectMeetingResponse[];
+};
+
+// 日程回答
+export type ConnectMeetingResponse = {
+  id: string;
+  participantId: string;
+  dateOptionId: string;
+  response: ConnectResponseType;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// コネクト作成フォームデータ
+export type ConnectMeetingFormData = {
+  childId: string;
+  title: string;
+  purpose?: string;
+  location?: string;
+  estimatedDuration?: number;
+  description?: string;
+  dateOptions: Array<{
+    date: string;
+    startTime: string;
+    endTime?: string;
+  }>;
+  participants: Array<{
+    organizationName: string;
+    representativeEmail: string;
+    representativeName?: string;
+  }>;
+};
+
+// ==========================================
+// 施設別時間枠設定
+// ==========================================
+
+// 施設別時間枠
+export type FacilityTimeSlot = {
+  id: string;
+  facilityId: string;
+  name: string; // "午前", "午後", "放課後" など
+  startTime: string; // HH:mm形式
+  endTime: string; // HH:mm形式
+  capacity: number; // 定員
+  displayOrder: number; // 表示順
+  createdAt: string;
+  updatedAt: string;
+};
 

@@ -13,6 +13,7 @@ import {
   User, Edit, ChevronLeft, ChevronRight, MessageSquare, Send, Plus
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import type { Child } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -401,19 +402,6 @@ export default function ChildDetailPage() {
     }
   };
 
-  // 年齢を計算
-  const calculateAge = (birthDate?: string): number | null => {
-    if (!birthDate) return null;
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -441,7 +429,7 @@ export default function ChildDetailPage() {
     );
   }
 
-  const age = calculateAge(child.birthDate);
+  const ageInfo = child.birthDate ? calculateAgeWithMonths(child.birthDate) : null;
   const activeContracts = contracts.filter(c => c.status === 'active');
 
   return (
@@ -463,7 +451,7 @@ export default function ChildDetailPage() {
             <div>
               <h1 className="text-xl font-bold text-gray-800">{child.name}</h1>
               <div className="flex items-center gap-3 text-sm text-gray-500">
-                {age !== null && <span>{age}歳</span>}
+                {ageInfo && <span>{ageInfo.display}</span>}
                 {child.birthDate && <span>{child.birthDate}</span>}
                 <span className={`px-2 py-0.5 rounded-full text-xs ${
                   activeContracts.length > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -580,7 +568,7 @@ export default function ChildDetailPage() {
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500">年齢</label>
-                        <p className="text-gray-800">{age !== null ? `${age}歳` : '-'}</p>
+                        <p className="text-gray-800">{ageInfo ? ageInfo.display : '-'}</p>
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500">受給者証番号</label>

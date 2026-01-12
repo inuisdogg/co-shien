@@ -20,6 +20,7 @@ import {
   ManagementTarget,
   ManagementTargetFormData,
   TimeSlot,
+  FacilityTimeSlot,
 } from '@/types';
 
 export const useFacilityData = () => {
@@ -66,6 +67,8 @@ export const useFacilityData = () => {
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [managementTargets, setManagementTargets] = useState<ManagementTarget[]>([]);
+  const [timeSlots, setTimeSlots] = useState<FacilityTimeSlot[]>([]);
+  const [loadingTimeSlots, setLoadingTimeSlots] = useState(true);
 
   // Supabaseから施設設定を取得
   useEffect(() => {
@@ -100,6 +103,11 @@ export const useFacilityData = () => {
             id: data.id,
             facilityId: data.facility_id,
             facilityName: data.facility_name || '',
+            // 施設住所（送迎起点/終点）
+            address: data.address || undefined,
+            postalCode: data.postal_code || undefined,
+            latitude: data.latitude || undefined,
+            longitude: data.longitude || undefined,
             regularHolidays: data.regular_holidays || [0],
             holidayPeriods: data.holiday_periods || [],
             customHolidays: data.custom_holidays || [],
@@ -113,6 +121,8 @@ export const useFacilityData = () => {
               AM: 10,
               PM: 10,
             },
+            // 送迎可能人数
+            transportCapacity: data.transport_capacity || { pickup: 4, dropoff: 4 },
             createdAt: data.created_at || new Date().toISOString(),
             updatedAt: data.updated_at || new Date().toISOString(),
           });
@@ -125,6 +135,53 @@ export const useFacilityData = () => {
     };
 
     fetchFacilitySettings();
+  }, [facilityId]);
+
+  // Supabaseから施設時間枠を取得
+  useEffect(() => {
+    if (!facilityId) {
+      setLoadingTimeSlots(false);
+      return;
+    }
+
+    const fetchTimeSlots = async () => {
+      try {
+        console.log('=== Biz側: 施設時間枠取得 ===');
+        const { data, error } = await supabase
+          .from('facility_time_slots')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .order('display_order', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching time slots:', error);
+          setLoadingTimeSlots(false);
+          return;
+        }
+
+        if (data) {
+          const timeSlotsData: FacilityTimeSlot[] = data.map((row) => ({
+            id: row.id,
+            facilityId: row.facility_id,
+            name: row.name,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            capacity: row.capacity || 10,
+            displayOrder: row.display_order || 0,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }));
+          setTimeSlots(timeSlotsData);
+          console.log('✅ 施設時間枠取得成功:', timeSlotsData.length, '件');
+        }
+      } catch (error) {
+        console.error('Error in fetchTimeSlots:', error);
+      } finally {
+        setLoadingTimeSlots(false);
+      }
+    };
+
+    fetchTimeSlots();
   }, [facilityId]);
 
   // Supabaseから児童データを取得
@@ -155,26 +212,26 @@ export const useFacilityData = () => {
             let patternDays: number[] | undefined = undefined;
             if (row.pattern_days) {
               try {
-                patternDays = typeof row.pattern_days === 'string' 
+                patternDays = typeof row.pattern_days === 'string'
                   ? JSON.parse(row.pattern_days)
-                  : row.pattern_days;
+                  : Array.isArray(row.pattern_days) ? row.pattern_days : undefined;
               } catch (e) {
                 console.error('Error parsing pattern_days:', e);
               }
             }
-            
+
             // pattern_time_slotsをパース（JSON文字列の場合）
             let patternTimeSlots: Record<number, 'AM' | 'PM' | 'AMPM'> | undefined = undefined;
             if (row.pattern_time_slots) {
               try {
                 patternTimeSlots = typeof row.pattern_time_slots === 'string'
                   ? JSON.parse(row.pattern_time_slots)
-                  : row.pattern_time_slots;
+                  : typeof row.pattern_time_slots === 'object' ? row.pattern_time_slots : undefined;
               } catch (e) {
                 console.error('Error parsing pattern_time_slots:', e);
               }
             }
-            
+
             // 送迎場所を復元（pickup_location_customがある場合は「その他」として扱う）
             let pickupLocation = row.pickup_location;
             let pickupLocationCustom = row.pickup_location_custom;
@@ -214,8 +271,17 @@ export const useFacilityData = () => {
               needsDropoff: row.needs_dropoff || false,
               pickupLocation: pickupLocation,
               pickupLocationCustom: pickupLocationCustom,
+              // 送迎場所の住所・座標
+              pickupAddress: row.pickup_address || undefined,
+              pickupPostalCode: row.pickup_postal_code || undefined,
+              pickupLatitude: row.pickup_latitude || undefined,
+              pickupLongitude: row.pickup_longitude || undefined,
               dropoffLocation: dropoffLocation,
               dropoffLocationCustom: dropoffLocationCustom,
+              dropoffAddress: row.dropoff_address || undefined,
+              dropoffPostalCode: row.dropoff_postal_code || undefined,
+              dropoffLatitude: row.dropoff_latitude || undefined,
+              dropoffLongitude: row.dropoff_longitude || undefined,
               characteristics: row.characteristics,
               contractStatus: row.contract_status,
               contractStartDate: row.contract_start_date,
@@ -631,14 +697,23 @@ export const useFacilityData = () => {
           doctor_clinic: child.doctorClinic,
           school_name: child.schoolName,
           pattern: child.pattern,
-          pattern_days: child.patternDays ? JSON.stringify(child.patternDays) : null,
-          pattern_time_slots: child.patternTimeSlots ? JSON.stringify(child.patternTimeSlots) : null,
+          pattern_days: child.patternDays || null,
+          pattern_time_slots: child.patternTimeSlots || null,
           needs_pickup: child.needsPickup || false,
           needs_dropoff: child.needsDropoff || false,
           pickup_location: finalPickupLocation,
           pickup_location_custom: child.pickupLocationCustom,
+          // 送迎場所の住所・座標
+          pickup_address: child.pickupAddress || null,
+          pickup_postal_code: child.pickupPostalCode || null,
+          pickup_latitude: child.pickupLatitude || null,
+          pickup_longitude: child.pickupLongitude || null,
           dropoff_location: finalDropoffLocation,
           dropoff_location_custom: child.dropoffLocationCustom,
+          dropoff_address: child.dropoffAddress || null,
+          dropoff_postal_code: child.dropoffPostalCode || null,
+          dropoff_latitude: child.dropoffLatitude || null,
+          dropoff_longitude: child.dropoffLongitude || null,
           characteristics: child.characteristics,
           contract_status: child.contractStatus,
           contract_start_date: child.contractStartDate,
@@ -705,14 +780,23 @@ export const useFacilityData = () => {
           doctor_clinic: child.doctorClinic,
           school_name: child.schoolName,
           pattern: child.pattern,
-          pattern_days: child.patternDays ? JSON.stringify(child.patternDays) : null,
-          pattern_time_slots: child.patternTimeSlots ? JSON.stringify(child.patternTimeSlots) : null,
+          pattern_days: child.patternDays || null,
+          pattern_time_slots: child.patternTimeSlots || null,
           needs_pickup: child.needsPickup || false,
           needs_dropoff: child.needsDropoff || false,
           pickup_location: finalPickupLocation,
           pickup_location_custom: child.pickupLocationCustom,
+          // 送迎場所の住所・座標
+          pickup_address: child.pickupAddress || null,
+          pickup_postal_code: child.pickupPostalCode || null,
+          pickup_latitude: child.pickupLatitude || null,
+          pickup_longitude: child.pickupLongitude || null,
           dropoff_location: finalDropoffLocation,
           dropoff_location_custom: child.dropoffLocationCustom,
+          dropoff_address: child.dropoffAddress || null,
+          dropoff_postal_code: child.dropoffPostalCode || null,
+          dropoff_latitude: child.dropoffLatitude || null,
+          dropoff_longitude: child.dropoffLongitude || null,
           characteristics: child.characteristics,
           contract_status: child.contractStatus,
           contract_start_date: child.contractStartDate,
@@ -885,6 +969,11 @@ export const useFacilityData = () => {
         const upsertData: any = {
           facility_id: facilityId,
           facility_name: updatedSettings.facilityName || null,
+          // 施設住所（送迎起点/終点）
+          address: updatedSettings.address || null,
+          postal_code: updatedSettings.postalCode || null,
+          latitude: updatedSettings.latitude || null,
+          longitude: updatedSettings.longitude || null,
           regular_holidays: updatedSettings.regularHolidays,
           holiday_periods: updatedSettings.holidayPeriods || [],
           custom_holidays: updatedSettings.customHolidays,
@@ -892,6 +981,8 @@ export const useFacilityData = () => {
           business_hours: updatedSettings.businessHours,
           business_hours_periods: updatedSettings.businessHoursPeriods || [],
           capacity: updatedSettings.capacity,
+          // 送迎可能人数
+          transport_capacity: updatedSettings.transportCapacity || { pickup: 4, dropoff: 4 },
           updated_at: updatedSettings.updatedAt,
         };
 
@@ -947,6 +1038,11 @@ export const useFacilityData = () => {
             id: data.id,
             facilityId: data.facility_id,
             facilityName: data.facility_name || '',
+            // 施設住所（送迎起点/終点）
+            address: data.address || undefined,
+            postalCode: data.postal_code || undefined,
+            latitude: data.latitude || undefined,
+            longitude: data.longitude || undefined,
             regularHolidays: data.regular_holidays,
             holidayPeriods: data.holiday_periods || [],
             customHolidays: data.custom_holidays,
@@ -954,6 +1050,8 @@ export const useFacilityData = () => {
             businessHours: data.business_hours,
             businessHoursPeriods: data.business_hours_periods || [],
             capacity: data.capacity,
+            // 送迎可能人数
+            transportCapacity: data.transport_capacity || { pickup: 4, dropoff: 4 },
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           });
@@ -987,6 +1085,183 @@ export const useFacilityData = () => {
       console.error('Error in deleteSchedule:', error);
       throw error;
     }
+  };
+
+  // スケジュールを別の時間枠に移動
+  const moveSchedule = async (scheduleId: string, newSlot: TimeSlot) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    if (!schedule) {
+      throw new Error('スケジュールが見つかりません');
+    }
+
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('schedules')
+        .update({
+          slot: newSlot,
+          updated_at: now,
+        })
+        .eq('id', scheduleId);
+
+      if (error) {
+        console.error('Error moving schedule:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setSchedules(schedules.map(s =>
+        s.id === scheduleId
+          ? { ...s, slot: newSlot, updatedAt: now }
+          : s
+      ));
+    } catch (error) {
+      console.error('Error in moveSchedule:', error);
+      throw error;
+    }
+  };
+
+  // パターンに基づいて月間一括登録
+  const bulkRegisterFromPatterns = async (
+    year: number,
+    month: number
+  ): Promise<{ added: number; skipped: number }> => {
+    if (!facilityId) {
+      throw new Error('施設IDが設定されていません');
+    }
+
+    let added = 0;
+    let skipped = 0;
+
+    // 月の日数を取得
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    // 既存のスケジュールを取得（重複チェック用）
+    const existingSchedules = new Set(
+      schedules
+        .filter(s => {
+          const [y, m] = s.date.split('-').map(Number);
+          return y === year && m === month;
+        })
+        .map(s => `${s.date}-${s.childId}-${s.slot}`)
+    );
+
+    // 施設設定から休日情報を取得
+    const regularHolidays = facilitySettings.regularHolidays || [0];
+    const customHolidays = facilitySettings.customHolidays || [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateObj = new Date(year, month - 1, day);
+      const dayOfWeek = dateObj.getDay();
+
+      // 定休日チェック
+      if (regularHolidays.includes(dayOfWeek)) {
+        continue;
+      }
+
+      // カスタム休日チェック
+      if (customHolidays.includes(date)) {
+        continue;
+      }
+
+      for (const child of children) {
+        // パターンに含まれる曜日かチェック
+        if (!child.patternDays?.includes(dayOfWeek)) {
+          continue;
+        }
+
+        // 時間枠を取得
+        const timeSlot = child.patternTimeSlots?.[dayOfWeek];
+        if (!timeSlot) {
+          continue;
+        }
+
+        // AMPM の場合は両方に登録
+        const slotsToRegister: TimeSlot[] = timeSlot === 'AMPM' ? ['AM', 'PM'] : [timeSlot as TimeSlot];
+
+        for (const slot of slotsToRegister) {
+          // 重複チェック
+          const key = `${date}-${child.id}-${slot}`;
+          if (existingSchedules.has(key)) {
+            skipped++;
+            continue;
+          }
+
+          // 登録
+          try {
+            await addSchedule({
+              date,
+              childId: child.id,
+              childName: child.name,
+              slot,
+              hasPickup: child.needsPickup || false,
+              hasDropoff: child.needsDropoff || false,
+            });
+            existingSchedules.add(key); // 重複防止のため追加
+            added++;
+          } catch (error) {
+            console.error(`Error adding schedule for ${child.name} on ${date}:`, error);
+            skipped++;
+          }
+        }
+      }
+    }
+
+    return { added, skipped };
+  };
+
+  // 日次リセット（実績登録済みは除外）
+  const resetDaySchedules = async (date: string): Promise<number> => {
+    if (!facilityId) {
+      throw new Error('施設IDが設定されていません');
+    }
+
+    // この日のスケジュールを取得
+    const daySchedules = schedules.filter(s => s.date === date);
+
+    // 実績登録済みでないもののみ削除
+    const schedulesToDelete = daySchedules.filter(s => !getUsageRecordByScheduleId(s.id));
+
+    let deleted = 0;
+    for (const schedule of schedulesToDelete) {
+      try {
+        await deleteSchedule(schedule.id);
+        deleted++;
+      } catch (error) {
+        console.error(`Error deleting schedule ${schedule.id}:`, error);
+      }
+    }
+
+    return deleted;
+  };
+
+  // 月次リセット（実績登録済みは除外）
+  const resetMonthSchedules = async (year: number, month: number): Promise<number> => {
+    if (!facilityId) {
+      throw new Error('施設IDが設定されていません');
+    }
+
+    // 指定月のスケジュールを取得
+    const monthSchedules = schedules.filter(s => {
+      const [y, m] = s.date.split('-').map(Number);
+      return y === year && m === month;
+    });
+
+    // 実績登録済みでないもののみ削除
+    const schedulesToDelete = monthSchedules.filter(s => !getUsageRecordByScheduleId(s.id));
+
+    let deleted = 0;
+    for (const schedule of schedulesToDelete) {
+      try {
+        await deleteSchedule(schedule.id);
+        deleted++;
+      } catch (error) {
+        console.error(`Error deleting schedule ${schedule.id}:`, error);
+      }
+    }
+
+    return deleted;
   };
 
   const addUsageRecord = (recordData: UsageRecordFormData) => {
@@ -1572,6 +1847,93 @@ export const useFacilityData = () => {
     fetchManagementTargets();
   }, [facilityId]);
 
+  // 時間枠管理機能
+  const addTimeSlot = async (slotData: Omit<FacilityTimeSlot, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>) => {
+    if (!facilityId) {
+      throw new Error('施設IDが設定されていません');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('facility_time_slots')
+        .insert({
+          facility_id: facilityId,
+          name: slotData.name,
+          start_time: slotData.startTime,
+          end_time: slotData.endTime,
+          capacity: slotData.capacity,
+          display_order: slotData.displayOrder,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newSlot: FacilityTimeSlot = {
+        id: data.id,
+        facilityId: data.facility_id,
+        name: data.name,
+        startTime: data.start_time,
+        endTime: data.end_time,
+        capacity: data.capacity,
+        displayOrder: data.display_order,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+      setTimeSlots([...timeSlots, newSlot].sort((a, b) => a.displayOrder - b.displayOrder));
+      return newSlot;
+    } catch (error) {
+      console.error('Error adding time slot:', error);
+      throw error;
+    }
+  };
+
+  const updateTimeSlot = async (slotId: string, slotData: Partial<Omit<FacilityTimeSlot, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>>) => {
+    try {
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (slotData.name !== undefined) updateData.name = slotData.name;
+      if (slotData.startTime !== undefined) updateData.start_time = slotData.startTime;
+      if (slotData.endTime !== undefined) updateData.end_time = slotData.endTime;
+      if (slotData.capacity !== undefined) updateData.capacity = slotData.capacity;
+      if (slotData.displayOrder !== undefined) updateData.display_order = slotData.displayOrder;
+
+      const { error } = await supabase
+        .from('facility_time_slots')
+        .update(updateData)
+        .eq('id', slotId);
+
+      if (error) throw error;
+
+      setTimeSlots(
+        timeSlots
+          .map((s) => (s.id === slotId ? { ...s, ...slotData, updatedAt: new Date().toISOString() } : s))
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+      );
+    } catch (error) {
+      console.error('Error updating time slot:', error);
+      throw error;
+    }
+  };
+
+  const deleteTimeSlot = async (slotId: string) => {
+    try {
+      const { error } = await supabase
+        .from('facility_time_slots')
+        .delete()
+        .eq('id', slotId);
+
+      if (error) throw error;
+
+      setTimeSlots(timeSlots.filter((s) => s.id !== slotId));
+    } catch (error) {
+      console.error('Error deleting time slot:', error);
+      throw error;
+    }
+  };
+
   return {
     children: filteredChildren,
     staff: filteredStaff,
@@ -1584,6 +1946,8 @@ export const useFacilityData = () => {
     usageRecords: filteredUsageRecords,
     leads: filteredLeads,
     managementTargets: filteredManagementTargets,
+    timeSlots,
+    loadingTimeSlots,
     setChildren,
     setStaff,
     setSchedules,
@@ -1595,6 +1959,10 @@ export const useFacilityData = () => {
     addRequest,
     updateFacilitySettings,
     deleteSchedule,
+    moveSchedule,
+    bulkRegisterFromPatterns,
+    resetDaySchedules,
+    resetMonthSchedules,
     addUsageRecord,
     updateUsageRecord,
     deleteUsageRecord,
@@ -1612,6 +1980,9 @@ export const useFacilityData = () => {
     getManagementTarget,
     saveShifts,
     fetchShifts,
+    addTimeSlot,
+    updateTimeSlot,
+    deleteTimeSlot,
   };
 };
 

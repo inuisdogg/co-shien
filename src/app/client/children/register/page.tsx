@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { AlertCircle, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
@@ -140,19 +141,6 @@ export default function ChildRegisterPage() {
     fetchUser();
   }, [router]);
 
-  // 年齢を計算
-  const calculateAge = (birthDate: string): number | null => {
-    if (!birthDate) return null;
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -184,7 +172,7 @@ export default function ChildRegisterPage() {
     try {
       const childId = `c${Date.now()}`;
       const now = new Date().toISOString();
-      const age = calculateAge(formData.birthDate);
+      const ageInfo = calculateAgeWithMonths(formData.birthDate);
 
       const { error: insertError } = await supabase
         .from('children')
@@ -195,7 +183,7 @@ export default function ChildRegisterPage() {
           name: formData.name,
           name_kana: formData.nameKana || null,
           birth_date: formData.birthDate,
-          age: age,
+          age: ageInfo.years,
           gender: formData.gender || null,
           // 保護者情報（ログインユーザーの情報を使用）
           guardian_name: currentUser.name,
@@ -350,7 +338,7 @@ export default function ChildRegisterPage() {
                       年齢
                     </label>
                     <div className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700">
-                      {formData.birthDate ? `${calculateAge(formData.birthDate)}歳` : '-'}
+                      {formData.birthDate ? calculateAgeWithMonths(formData.birthDate).display : '-'}
                     </div>
                   </div>
                 </div>

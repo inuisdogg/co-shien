@@ -9,9 +9,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
-  ArrowLeft, Building2, Calendar, FileText, CheckCircle, Clock,
-  MessageSquare, PenTool, Download, ChevronLeft, ChevronRight,
-  User, AlertCircle, Send, XCircle, Phone
+  ArrowLeft, Building2, Calendar, FileText, CheckCircle,
+  MessageSquare, PenTool, ChevronLeft, ChevronRight,
+  User, AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -50,7 +50,7 @@ export default function FacilityDetailPage() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'records' | 'calendar' | 'contact'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'calendar'>('records');
 
   // サイン用のstate
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
@@ -405,7 +405,6 @@ export default function FacilityDetailPage() {
             {[
               { id: 'records', label: '実績記録表', icon: FileText },
               { id: 'calendar', label: '予約カレンダー', icon: Calendar },
-              { id: 'contact', label: '施設への連絡', icon: MessageSquare },
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -720,64 +719,18 @@ export default function FacilityDetailPage() {
               </div>
             )}
 
-            {/* 連絡タブ */}
-            {activeTab === 'contact' && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-bold text-gray-800 mb-4">施設への連絡</h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* 欠席連絡 */}
-                  <button
-                    onClick={() => router.push(`/client/facilities/${facilityId}/contact?child=${selectedChildId}&type=absence`)}
-                    className="bg-red-50 border border-red-200 rounded-lg p-6 text-left hover:border-red-300 transition-colors"
-                  >
-                    <XCircle className="w-10 h-10 text-red-500 mb-3" />
-                    <h3 className="font-bold text-gray-800 mb-1">欠席連絡</h3>
-                    <p className="text-sm text-gray-600">当日または事前の欠席連絡</p>
-                  </button>
-
-                  {/* 利用希望 */}
-                  <button
-                    onClick={() => router.push(`/client/facilities/${facilityId}/contact?child=${selectedChildId}&type=schedule`)}
-                    className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-left hover:border-blue-300 transition-colors"
-                  >
-                    <Calendar className="w-10 h-10 text-blue-500 mb-3" />
-                    <h3 className="font-bold text-gray-800 mb-1">利用希望</h3>
-                    <p className="text-sm text-gray-600">追加利用や振替の希望</p>
-                  </button>
-
-                  {/* 一般連絡 */}
-                  <button
-                    onClick={() => router.push(`/client/facilities/${facilityId}/contact?child=${selectedChildId}&type=message`)}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-left hover:border-gray-300 transition-colors"
-                  >
-                    <Send className="w-10 h-10 text-gray-500 mb-3" />
-                    <h3 className="font-bold text-gray-800 mb-1">メッセージ</h3>
-                    <p className="text-sm text-gray-600">その他のご連絡</p>
-                  </button>
-
-                  {/* 緊急連絡 */}
-                  <button
-                    onClick={() => {
-                      // 施設の電話番号があれば電話発信
-                      if (facility.phone) {
-                        window.location.href = `tel:${facility.phone}`;
-                      } else {
-                        alert('施設の電話番号が登録されていません');
-                      }
-                    }}
-                    className="bg-orange-50 border border-orange-200 rounded-lg p-6 text-left hover:border-orange-300 transition-colors"
-                  >
-                    <Phone className="w-10 h-10 text-orange-500 mb-3" />
-                    <h3 className="font-bold text-gray-800 mb-1">緊急連絡</h3>
-                    <p className="text-sm text-gray-600">お電話でのご連絡</p>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </main>
+
+      {/* フローティングチャットボタン */}
+      <button
+        onClick={() => router.push(`/client/facilities/${facilityId}/chat`)}
+        className="fixed bottom-6 right-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all active:scale-95 z-50 flex items-center gap-2"
+      >
+        <MessageSquare className="w-6 h-6" />
+        <span className="font-bold pr-1">施設に連絡</span>
+      </button>
 
       {/* サインモーダル */}
       {isSignatureModalOpen && (

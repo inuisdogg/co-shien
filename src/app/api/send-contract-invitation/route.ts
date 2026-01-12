@@ -16,7 +16,7 @@ const getResend = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, facilityName, childName, invitationUrl } = await request.json();
+    const { email, facilityName, childName, invitationUrl, loginUrl } = await request.json();
 
     if (!email || !facilityName || !childName || !invitationUrl) {
       return NextResponse.json(
@@ -24,6 +24,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // 既存アカウント用のリンクセクション（loginUrlが提供された場合のみ表示）
+    const existingAccountSection = loginUrl ? `
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+        <p style="font-size: 14px; color: #6b7280;">
+          既にアカウントをお持ちの方は
+          <a href="${loginUrl}" style="color: #f97316; text-decoration: underline;">こちらからログイン</a>
+          してください
+        </p>
+      </div>
+    ` : '';
 
     // メール送信
     const resend = getResend();
@@ -55,8 +66,9 @@ export async function POST(request: NextRequest) {
               <p>${facilityName}から、${childName}さんの施設利用に関する招待が届きました。</p>
               <p>以下のリンクから招待を承認してください。</p>
               <div style="text-align: center;">
-                <a href="${invitationUrl}" class="button">招待を承認する</a>
+                <a href="${invitationUrl}" class="button">新規登録して招待を承認</a>
               </div>
+              ${existingAccountSection}
               <p style="font-size: 12px; color: #6b7280; margin-top: 30px;">
                 このリンクは7日間有効です。<br>
                 心当たりがない場合は、このメールを無視してください。

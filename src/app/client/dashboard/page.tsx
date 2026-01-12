@@ -11,9 +11,10 @@ import Image from 'next/image';
 import {
   Plus, User, Calendar, LogOut, ChevronRight, AlertCircle, Building2,
   FileText, Clock, CheckCircle, XCircle, MessageSquare, Bell,
-  CalendarDays, ClipboardList, Send, Settings
+  CalendarDays, ClipboardList, Send, Settings, PenLine, Mail
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import type { Child } from '@/types';
 
 // 静的生成をスキップ
@@ -58,9 +59,33 @@ type Notification = {
   id: string;
   title: string;
   message: string;
-  type: 'info' | 'warning' | 'success';
+  type: 'info' | 'warning' | 'success' | 'chat' | 'sign_request';
+  linkTo?: string;
+  facilityId?: string;
+  facilityName?: string;
   created_at: string;
   is_read: boolean;
+};
+
+// 未読チャット情報の型
+type UnreadChatInfo = {
+  facilityId: string;
+  facilityName: string;
+  unreadCount: number;
+  lastMessageAt: string;
+};
+
+// 署名依頼の型
+type SignRequest = {
+  id: string;
+  facilityId: string;
+  facilityName: string;
+  childId: string;
+  childName: string;
+  month: string;
+  type: 'monthly_record' | 'service_plan';
+  status: 'pending' | 'signed';
+  requestedAt: string;
 };
 
 export default function ClientDashboardPage() {
@@ -71,6 +96,8 @@ export default function ClientDashboardPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadChats, setUnreadChats] = useState<UnreadChatInfo[]>([]);
+  const [signRequests, setSignRequests] = useState<SignRequest[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -224,7 +251,40 @@ export default function ClientDashboardPage() {
           const childIds = formattedChildren.map(c => c.id);
 
           if (childIds.length > 0) {
-            // 契約情報を取得
+            // 施設情報を抽出するためのMap
+            const uniqueFacilities = new Map<string, Facility>();
+
+            // 方法1: childrenのfacility_idから施設を取得
+            const childFacilityIds = formattedChildren
+              .filter(c => c.facilityId)
+              .map(c => c.facilityId as string);
+
+            if (childFacilityIds.length > 0) {
+              const { data: childFacilitiesData } = await supabase
+                .from('facilities')
+                .select('id, name, code')
+                .in('id', childFacilityIds);
+
+              if (childFacilitiesData) {
+                childFacilitiesData.forEach((f: any) => {
+                  uniqueFacilities.set(f.id, f);
+                });
+
+                // childrenベースの仮想契約を作成
+                const virtualContracts: Contract[] = formattedChildren
+                  .filter(c => c.facilityId)
+                  .map(c => ({
+                    id: `virtual-${c.id}-${c.facilityId}`,
+                    child_id: c.id,
+                    facility_id: c.facilityId as string,
+                    status: 'active' as const,
+                    facilities: uniqueFacilities.get(c.facilityId as string),
+                  }));
+                setContracts(virtualContracts);
+              }
+            }
+
+            // 方法2: 契約情報を取得（RLSがあるため結果が空でもエラーにしない）
             const { data: contractsData, error: contractsError } = await supabase
               .from('contracts')
               .select(`
@@ -238,37 +298,36 @@ export default function ClientDashboardPage() {
               .in('child_id', childIds)
               .order('created_at', { ascending: false });
 
-            if (!contractsError && contractsData) {
+            if (!contractsError && contractsData && contractsData.length > 0) {
+              // 契約データがある場合は上書き
               setContracts(contractsData);
 
-              // 施設情報を抽出
-              const uniqueFacilities = new Map<string, Facility>();
+              // 契約から施設を追加
               contractsData.forEach((c: any) => {
                 if (c.facilities && !uniqueFacilities.has(c.facility_id)) {
                   uniqueFacilities.set(c.facility_id, c.facilities);
                 }
               });
-              setFacilities(Array.from(uniqueFacilities.values()));
+            }
 
-              // アクティブな契約の施設IDを取得
-              const activeFacilityIds = contractsData
-                .filter((c: any) => c.status === 'active')
-                .map((c: any) => c.facility_id);
+            setFacilities(Array.from(uniqueFacilities.values()));
 
-              if (activeFacilityIds.length > 0) {
-                // 実績記録を取得（schedulesテーブルから）
-                const { data: schedulesData, error: schedulesError } = await supabase
-                  .from('schedules')
-                  .select('*')
-                  .in('child_id', childIds)
-                  .in('facility_id', activeFacilityIds)
-                  .gte('date', new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString().split('T')[0])
-                  .order('date', { ascending: false })
-                  .limit(50);
+            // アクティブな契約/関連の施設IDを取得
+            const activeFacilityIds = Array.from(uniqueFacilities.keys());
 
-                if (!schedulesError && schedulesData) {
-                  setUsageRecords(schedulesData);
-                }
+            if (activeFacilityIds.length > 0) {
+              // 実績記録を取得（schedulesテーブルから）
+              const { data: schedulesData, error: schedulesError } = await supabase
+                .from('schedules')
+                .select('*')
+                .in('child_id', childIds)
+                .in('facility_id', activeFacilityIds)
+                .gte('date', new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString().split('T')[0])
+                .order('date', { ascending: false })
+                .limit(50);
+
+              if (!schedulesError && schedulesData) {
+                setUsageRecords(schedulesData);
               }
             }
           }
@@ -295,6 +354,54 @@ export default function ClientDashboardPage() {
           }
         }
 
+        // 未読チャットメッセージを取得
+        if (userId) {
+          const { data: unreadData } = await supabase
+            .from('chat_messages')
+            .select(`
+              facility_id,
+              created_at,
+              facilities:facility_id (
+                id,
+                name
+              )
+            `)
+            .eq('client_user_id', userId)
+            .eq('sender_type', 'staff')
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+          if (unreadData && unreadData.length > 0) {
+            // 施設ごとにグループ化
+            const chatMap = new Map<string, UnreadChatInfo>();
+            unreadData.forEach((msg: any) => {
+              const facilityId = msg.facility_id;
+              const existing = chatMap.get(facilityId);
+              if (existing) {
+                existing.unreadCount++;
+              } else {
+                chatMap.set(facilityId, {
+                  facilityId,
+                  facilityName: msg.facilities?.name || '施設',
+                  unreadCount: 1,
+                  lastMessageAt: msg.created_at,
+                });
+              }
+            });
+            setUnreadChats(Array.from(chatMap.values()));
+          }
+        }
+
+        // 署名依頼を取得（sign_requestsテーブルがある場合）
+        // TODO: 署名依頼テーブルができたら実装
+        // 現在はダミーデータで表示テスト
+        // const { data: signData } = await supabase
+        //   .from('sign_requests')
+        //   .select('*')
+        //   .eq('client_user_id', userId)
+        //   .eq('status', 'pending');
+        // if (signData) setSignRequests(signData);
+
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
       } finally {
@@ -310,19 +417,6 @@ export default function ClientDashboardPage() {
     localStorage.removeItem('user');
     localStorage.removeItem('selectedFacility');
     router.push('/client/login');
-  };
-
-  // 年齢を計算
-  const calculateAge = (birthDate?: string): number | null => {
-    if (!birthDate) return null;
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
   };
 
   // 契約ステータスのラベルを取得
@@ -368,10 +462,10 @@ export default function ClientDashboardPage() {
         router.push(`/client/children/${childId}?tab=calendar`);
         break;
       case 'message':
-        // 契約中の施設があればそこへ、なければメッセージタブへ
+        // 契約中の施設があればチャット画面へ、なければメッセージタブへ
         const childContracts = contracts.filter(c => c.child_id === childId && c.status === 'active');
         if (childContracts.length > 0) {
-          router.push(`/client/facilities/${childContracts[0].facility_id}/contact?child=${childId}`);
+          router.push(`/client/facilities/${childContracts[0].facility_id}/chat`);
         } else {
           setActiveTab('messages');
         }
@@ -424,11 +518,11 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            {pendingInvitations.length > 0 && (
+            {(pendingInvitations.length > 0 || unreadChats.length > 0 || signRequests.length > 0) && (
               <div className="relative">
                 <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {pendingInvitations.length}
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
+                  {pendingInvitations.length + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length}
                 </span>
               </div>
             )}
@@ -488,6 +582,74 @@ export default function ClientDashboardPage() {
             ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
           </h1>
         </div>
+
+        {/* お知らせセクション */}
+        {(unreadChats.length > 0 || signRequests.length > 0) && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-white" />
+              <h2 className="font-bold text-white">お知らせ</h2>
+              <span className="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
+                {unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length}件
+              </span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {/* 未読チャットメッセージ */}
+              {unreadChats.map((chat) => (
+                <button
+                  key={chat.facilityId}
+                  onClick={() => router.push(`/client/facilities/${chat.facilityId}/chat`)}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-blue-50 transition-colors text-left"
+                >
+                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <MessageSquare className="w-6 h-6 text-orange-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                        新着メッセージ
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-gray-800 truncate">
+                      {chat.facilityName}から{chat.unreadCount}件のメッセージ
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      タップして確認する
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                </button>
+              ))}
+
+              {/* 署名依頼 */}
+              {signRequests.map((request) => (
+                <button
+                  key={request.id}
+                  onClick={() => router.push(`/client/facilities/${request.facilityId}/records?sign=${request.id}`)}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-purple-50 transition-colors text-left"
+                >
+                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <PenLine className="w-6 h-6 text-purple-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-purple-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                        署名依頼
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-gray-800 truncate">
+                      {request.month}の{request.type === 'monthly_record' ? '実績記録表' : 'サービス計画'}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {request.facilityName} - {request.childName}さん
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* タブナビゲーション */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
@@ -553,7 +715,7 @@ export default function ClientDashboardPage() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {children.map((child) => {
-                        const age = calculateAge(child.birthDate);
+                        const ageInfo = child.birthDate ? calculateAgeWithMonths(child.birthDate) : null;
                         const childContracts = contracts.filter(c => c.child_id === child.id && c.status === 'active');
 
                         return (
@@ -569,8 +731,8 @@ export default function ClientDashboardPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <h3 className="font-bold text-gray-800 truncate">{child.name}</h3>
-                                  {age !== null && (
-                                    <span className="text-sm text-gray-500 flex-shrink-0">{age}歳</span>
+                                  {ageInfo && (
+                                    <span className="text-sm text-gray-500 flex-shrink-0">{ageInfo.display}</span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -616,11 +778,11 @@ export default function ClientDashboardPage() {
                     <button
                       onClick={() => handleQuickAction('message')}
                       disabled={children.length === 0}
-                      className="bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-orange-50 hover:bg-orange-100 rounded-lg p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-orange-200 hover:border-orange-300"
                     >
-                      <MessageSquare className="w-8 h-8 text-green-500 mb-2" />
-                      <h3 className="font-bold text-gray-800 text-sm">連絡する</h3>
-                      <p className="text-xs text-gray-500 mt-1">施設への連絡</p>
+                      <MessageSquare className="w-8 h-8 text-orange-500 mb-2" />
+                      <h3 className="font-bold text-gray-800 text-sm">施設にチャット</h3>
+                      <p className="text-xs text-gray-500 mt-1">施設とメッセージ</p>
                     </button>
                   </div>
                 </div>
@@ -691,18 +853,20 @@ export default function ClientDashboardPage() {
                                         e.stopPropagation();
                                         router.push(`/client/facilities/${contract.facility_id}/records?child=${child?.id}`);
                                       }}
-                                      className="flex-1 text-sm bg-white hover:bg-gray-50 text-gray-700 py-2 px-3 rounded border border-gray-200 transition-colors"
+                                      className="flex-1 text-sm bg-white hover:bg-gray-50 text-gray-700 py-2 px-3 rounded border border-gray-200 transition-colors flex items-center justify-center gap-1.5"
                                     >
+                                      <FileText className="w-4 h-4" />
                                       実績記録
                                     </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        router.push(`/client/facilities/${contract.facility_id}/contact?child=${child?.id}`);
+                                        router.push(`/client/facilities/${contract.facility_id}/chat`);
                                       }}
-                                      className="flex-1 text-sm bg-white hover:bg-gray-50 text-gray-700 py-2 px-3 rounded border border-gray-200 transition-colors"
+                                      className="flex-1 text-sm bg-orange-400 hover:bg-orange-500 text-white py-2 px-3 rounded border border-orange-500 transition-colors font-bold flex items-center justify-center gap-1.5 shadow-md"
                                     >
-                                      連絡する
+                                      <MessageSquare className="w-4 h-4" />
+                                      チャット
                                     </button>
                                   </div>
                                 </div>
@@ -817,7 +981,12 @@ export default function ClientDashboardPage() {
             {activeTab === 'messages' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-gray-800">施設への連絡</h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800">施設への連絡</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      施設カードをクリックしてチャットを開き、メッセージ・欠席連絡・利用希望を送ることができます
+                    </p>
+                  </div>
                 </div>
 
                 {contracts.filter(c => c.status === 'active').length === 0 ? (
@@ -832,9 +1001,6 @@ export default function ClientDashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <p className="text-sm text-gray-600 mb-4">
-                      連絡したい施設を選択してください。
-                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {contracts
                         .filter(c => c.status === 'active')
@@ -843,41 +1009,27 @@ export default function ClientDashboardPage() {
                           return (
                             <div
                               key={contract.id}
-                              className="bg-white border border-gray-200 rounded-lg p-4 hover:border-orange-300 transition-colors"
+                              className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer group"
+                              onClick={() => router.push(`/client/facilities/${contract.facility_id}/chat`)}
                             >
-                              <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                                  <Building2 className="w-5 h-5 text-orange-600" />
+                              <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
+                                  <Building2 className="w-7 h-7 text-white" />
                                 </div>
-                                <div>
-                                  <h4 className="font-bold text-gray-800">{contract.facilities?.name}</h4>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-bold text-gray-800 text-lg mb-1">{contract.facilities?.name}</h4>
                                   {child && (
-                                    <p className="text-sm text-gray-600">{child.name} さん</p>
+                                    <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                                      <User className="w-4 h-4" />
+                                      {child.name} さん
+                                    </p>
                                   )}
+                                  <p className="text-xs text-gray-400 mt-2 flex items-center gap-1.5">
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                    チャットで連絡する
+                                  </p>
                                 </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <button
-                                  onClick={() => router.push(`/client/facilities/${contract.facility_id}/contact?child=${child?.id}&type=absence`)}
-                                  className="flex items-center justify-center gap-1 text-sm bg-red-50 hover:bg-red-100 text-red-700 py-2 px-3 rounded border border-red-200 transition-colors"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                  欠席連絡
-                                </button>
-                                <button
-                                  onClick={() => router.push(`/client/facilities/${contract.facility_id}/contact?child=${child?.id}&type=schedule`)}
-                                  className="flex items-center justify-center gap-1 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-3 rounded border border-blue-200 transition-colors"
-                                >
-                                  <Calendar className="w-4 h-4" />
-                                  利用希望
-                                </button>
-                                <button
-                                  onClick={() => router.push(`/client/facilities/${contract.facility_id}/contact?child=${child?.id}&type=message`)}
-                                  className="flex items-center justify-center gap-1 text-sm bg-gray-50 hover:bg-gray-100 text-gray-700 py-2 px-3 rounded border border-gray-200 transition-colors col-span-2"
-                                >
-                                  <Send className="w-4 h-4" />
-                                  メッセージを送る
-                                </button>
+                                <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0 group-hover:text-orange-400 transition-colors" />
                               </div>
                             </div>
                           );
@@ -914,7 +1066,7 @@ export default function ClientDashboardPage() {
             </div>
             <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
               {children.map((child) => {
-                const age = calculateAge(child.birthDate);
+                const ageInfo = child.birthDate ? calculateAgeWithMonths(child.birthDate) : null;
                 const childContracts = contracts.filter(c => c.child_id === child.id && c.status === 'active');
 
                 return (
@@ -929,8 +1081,8 @@ export default function ClientDashboardPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-bold text-gray-800 truncate">{child.name}</h4>
-                        {age !== null && (
-                          <span className="text-sm text-gray-500 flex-shrink-0">{age}歳</span>
+                        {ageInfo && (
+                          <span className="text-sm text-gray-500 flex-shrink-0">{ageInfo.display}</span>
                         )}
                       </div>
                       <p className="text-sm text-gray-500">

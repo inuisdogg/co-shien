@@ -14,6 +14,7 @@ import { hashPassword } from '@/utils/password';
 import { supabase } from '@/lib/supabase';
 import { inviteStaff } from '@/utils/staffInvitationService';
 import { useAuth } from '@/contexts/AuthContext';
+import { getInvitationBaseUrl } from '@/utils/domain';
 
 const StaffView: React.FC = () => {
   const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings, saveShifts, fetchShifts } = useFacilityData();
@@ -2260,13 +2261,13 @@ const StaffView: React.FC = () => {
                         <input
                           type="text"
                           readOnly
-                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/activate?token=${inviteToken}`}
+                          value={`${getInvitationBaseUrl()}/activate?token=${inviteToken}`}
                           className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-mono text-xs"
                           onClick={(e) => (e.target as HTMLInputElement).select()}
                         />
                         <button
                           onClick={() => {
-                            const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/activate?token=${inviteToken}`;
+                            const link = `${getInvitationBaseUrl()}/activate?token=${inviteToken}`;
                             navigator.clipboard.writeText(link);
                             alert('リンクをコピーしました');
                           }}

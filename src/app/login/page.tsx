@@ -32,8 +32,10 @@ export default function LoginPage() {
         if (userStr) {
           const user = JSON.parse(userStr);
           if (user?.id) {
-            // 既にログイン済みならダッシュボードへ（スタッフのみ）
-            if (user.userType !== 'client') {
+            // 既にログイン済みなら適切なダッシュボードへ
+            if (user.userType === 'client') {
+              router.push('/client/dashboard');
+            } else {
               router.push('/staff-dashboard');
             }
             return;
@@ -271,10 +273,10 @@ export default function LoginPage() {
           </p>
           <button
             type="button"
-            onClick={() => router.push('/personal/signup')}
+            onClick={() => router.push('/signup')}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm"
           >
-            スタッフとして新規登録
+            新規登録
           </button>
         </div>
 
@@ -284,7 +286,7 @@ export default function LoginPage() {
               onClick={() => router.push('/client/login')}
               className="hover:underline"
             >
-              利用者（保護者）としてログインする場合はこちら
+              利用者（保護者）の方はこちら
             </button>
           </p>
         </div>

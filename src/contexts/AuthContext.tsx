@@ -351,9 +351,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('facility', JSON.stringify(facility));
 
       // スタッフ情報からユーザー情報を作成（後方互換性）
-      const isAdmin = staffData.role === 'マネージャー';
+      const isAdmin = staffData.role === 'マネージャー' || staffData.role === '管理者';
+      // staff.user_idがあればそれを使用（usersテーブルのID）、なければstaff.idを使用
+      const userId = staffData.user_id || staffData.id;
       const user: User = {
-        id: staffData.id,
+        id: userId,
         email: staffData.email || '',
         name: staffData.name,
         loginId: staffData.login_id || staffData.name,

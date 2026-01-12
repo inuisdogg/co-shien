@@ -5,10 +5,11 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { CalendarDays, X, Plus, Trash2, Car } from 'lucide-react';
+import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap } from 'lucide-react';
 import { TimeSlot, ScheduleItem, Child } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import UsageRecordForm from './UsageRecordForm';
+import SlotAssignmentPanel from './SlotAssignmentPanel';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
 const ScheduleView: React.FC = () => {
@@ -18,6 +19,9 @@ const ScheduleView: React.FC = () => {
     addSchedule,
     facilitySettings,
     deleteSchedule,
+    moveSchedule,
+    bulkRegisterFromPatterns,
+    resetMonthSchedules,
     addUsageRecord,
     updateUsageRecord,
     deleteUsageRecord,
@@ -32,6 +36,13 @@ const ScheduleView: React.FC = () => {
   const [selectedScheduleItem, setSelectedScheduleItem] = useState<ScheduleItem | null>(null);
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
   const [isUsageRecordFormOpen, setIsUsageRecordFormOpen] = useState(false);
+
+  // スロット割り当てパネル用の状態
+  const [isSlotPanelOpen, setIsSlotPanelOpen] = useState(false);
+  const [selectedDateForSlotPanel, setSelectedDateForSlotPanel] = useState('');
+
+  // 一括操作用の状態
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const [newBooking, setNewBooking] = useState({
     childId: '',
@@ -296,8 +307,15 @@ const ScheduleView: React.FC = () => {
     });
   }, [children, newBooking.date, newBooking.slots]);
 
-  // 日付をクリックしてモーダルを開く
+  // 日付をクリックして新しいスロット割り当てパネルを開く
   const handleDateClick = (date: string, slot?: TimeSlot) => {
+    // 新しいスロット割り当てパネルを開く
+    setSelectedDateForSlotPanel(date);
+    setIsSlotPanelOpen(true);
+  };
+
+  // 旧モーダルを開く（週間ビュー用など、必要に応じて）
+  const handleOpenLegacyModal = (date: string, slot?: TimeSlot) => {
     setSelectedDateForBooking(date);
     setSelectedSlotForBooking(slot || null);
     setNewBooking({
@@ -308,6 +326,54 @@ const ScheduleView: React.FC = () => {
       dropoff: false,
     });
     setIsModalOpen(true);
+  };
+
+  // パターン一括登録
+  const handleBulkRegister = async () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+
+    if (!confirm(`${year}年${month}月の利用パターンに基づいて一括登録します。よろしいですか？`)) {
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const result = await bulkRegisterFromPatterns(year, month);
+      alert(`一括登録が完了しました。\n追加: ${result.added}件\nスキップ: ${result.skipped}件`);
+    } catch (error) {
+      console.error('Error in bulk register:', error);
+      alert('一括登録に失敗しました。もう一度お試しください。');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // 月次リセット
+  const handleMonthReset = async () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+
+    if (!confirm(`${year}年${month}月の予約をすべて削除します。\n※実績登録済みの予約は除外されます。\n\nよろしいですか？`)) {
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const deleted = await resetMonthSchedules(year, month);
+      alert(`${deleted}件の予約を削除しました。`);
+    } catch (error) {
+      console.error('Error in month reset:', error);
+      alert('リセットに失敗しました。もう一度お試しください。');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // スロットパネル内でのスケジュールアイテムクリック
+  const handleScheduleItemClickFromPanel = (item: ScheduleItem) => {
+    setSelectedScheduleItem(item);
+    setIsActionDialogOpen(true);
   };
 
   // 予約を追加
@@ -443,7 +509,7 @@ const ScheduleView: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-100px)] animate-in fade-in duration-500">
+    <div className="h-[calc(100vh-100px)] sm:h-[calc(100vh-100px)] animate-in fade-in duration-500">
       {/* Calendar Panel */}
       <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white z-10">
@@ -519,6 +585,24 @@ const ScheduleView: React.FC = () => {
               </div>
               <div className="bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-100">
                 利用児童数: <span className="font-bold text-gray-800 text-xs sm:text-sm ml-1">{monthlyStats.uniqueChildrenCount}名</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleBulkRegister}
+                  disabled={isBulkProcessing}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  パターン一括登録
+                </button>
+                <button
+                  onClick={handleMonthReset}
+                  disabled={isBulkProcessing}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-md text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  月間リセット
+                </button>
               </div>
             </div>
           )}
@@ -855,20 +939,20 @@ const ScheduleView: React.FC = () => {
       {/* 予約追加モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-gray-800 flex items-center">
-                <Plus size={20} className="mr-2 text-[#00c4cc]" />
+          <div className="bg-white rounded-xl w-full max-w-sm max-h-[80vh] shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 flex-shrink-0">
+              <h3 className="font-bold text-base text-gray-800 flex items-center">
+                <Plus size={18} className="mr-2 text-[#00c4cc]" />
                 利用予定を追加
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-200 rounded-full"
               >
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-3 overflow-y-auto flex-1">
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">児童を選択</label>
                 <select
@@ -957,74 +1041,66 @@ const ScheduleView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-md border border-gray-200 space-y-3">
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
                 <label className="text-xs font-bold text-gray-500 block">送迎オプション</label>
                 {(() => {
                   const selectedChild = children.find(c => c.id === newBooking.childId);
-                  const pickupLocation = selectedChild?.pickupLocation === 'その他' 
-                    ? selectedChild?.pickupLocationCustom 
+                  const pickupLocation = selectedChild?.pickupLocation === 'その他'
+                    ? selectedChild?.pickupLocationCustom
                     : selectedChild?.pickupLocation || '未設定';
                   const dropoffLocation = selectedChild?.dropoffLocation === 'その他'
                     ? selectedChild?.dropoffLocationCustom
                     : selectedChild?.dropoffLocation || '未設定';
-                  
+
                   return (
-                    <>
-                      <label className="flex items-center space-x-3 cursor-pointer group">
+                    <div className="flex gap-3">
+                      <label className="flex-1 flex items-center gap-2 cursor-pointer group p-2 rounded border border-gray-200 hover:bg-white">
                         <input
                           type="checkbox"
                           checked={newBooking.pickup}
                           onChange={(e) => setNewBooking({ ...newBooking, pickup: e.target.checked })}
                           className="accent-[#00c4cc] w-4 h-4"
                         />
-                        <div className="flex-1">
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
-                            お迎え
-                          </span>
+                        <div>
+                          <span className="text-sm text-gray-700 font-medium">お迎え</span>
                           {selectedChild && (
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              登録情報: {pickupLocation}
-                            </p>
+                            <p className="text-[10px] text-gray-400 truncate max-w-[100px]">{pickupLocation}</p>
                           )}
                         </div>
                       </label>
-                      <label className="flex items-center space-x-3 cursor-pointer group">
+                      <label className="flex-1 flex items-center gap-2 cursor-pointer group p-2 rounded border border-gray-200 hover:bg-white">
                         <input
                           type="checkbox"
                           checked={newBooking.dropoff}
                           onChange={(e) => setNewBooking({ ...newBooking, dropoff: e.target.checked })}
                           className="accent-[#00c4cc] w-4 h-4"
                         />
-                        <div className="flex-1">
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
-                            お送り
-                          </span>
+                        <div>
+                          <span className="text-sm text-gray-700 font-medium">お送り</span>
                           {selectedChild && (
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              登録情報: {dropoffLocation}
-                            </p>
+                            <p className="text-[10px] text-gray-400 truncate max-w-[100px]">{dropoffLocation}</p>
                           )}
                         </div>
                       </label>
-                    </>
+                    </div>
                   );
                 })()}
               </div>
+            </div>
 
-              <div className="flex space-x-3 pt-2">
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
-                >
-                  キャンセル
-                </button>
-                <button
-                  onClick={handleAddBooking}
-                  className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all"
-                >
-                  登録する
-                </button>
-              </div>
+            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 py-2 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-lg text-sm transition-colors border border-gray-200"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleAddBooking}
+                className="flex-1 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg text-sm transition-all"
+              >
+                登録する
+              </button>
             </div>
           </div>
         </div>
@@ -1078,6 +1154,45 @@ const ScheduleView: React.FC = () => {
           onSave={handleSaveUsageRecord}
           onDelete={handleDeleteUsageRecord}
         />
+      )}
+
+      {/* 新しいスロット割り当てパネル */}
+      {isSlotPanelOpen && selectedDateForSlotPanel && (
+        <SlotAssignmentPanel
+          date={selectedDateForSlotPanel}
+          schedules={schedules}
+          childList={children}
+          capacity={capacity}
+          transportCapacity={{ pickup: 3, dropoff: 3 }}
+          onClose={() => {
+            setIsSlotPanelOpen(false);
+            setSelectedDateForSlotPanel('');
+          }}
+          onAddSchedule={async (data) => {
+            await addSchedule({
+              date: data.date,
+              childId: data.childId,
+              childName: data.childName,
+              slot: data.slot,
+              hasPickup: data.hasPickup,
+              hasDropoff: data.hasDropoff,
+            });
+          }}
+          onDeleteSchedule={deleteSchedule}
+          onMoveSchedule={moveSchedule}
+          getUsageRecordByScheduleId={getUsageRecordByScheduleId}
+          onScheduleItemClick={handleScheduleItemClickFromPanel}
+        />
+      )}
+
+      {/* 一括処理中オーバーレイ */}
+      {isBulkProcessing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-lg px-8 py-6 shadow-xl">
+            <div className="animate-spin w-8 h-8 border-3 border-[#00c4cc] border-t-transparent rounded-full mx-auto mb-3" />
+            <p className="text-gray-700 font-bold">処理中...</p>
+          </div>
+        </div>
       )}
     </div>
   );

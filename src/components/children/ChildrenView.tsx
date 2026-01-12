@@ -19,12 +19,24 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
+  BookOpen,
+  MessageSquare,
+  CalendarDays,
+  ClipboardList,
+  UserCheck,
+  FileWarning,
 } from 'lucide-react';
-import { Child, ChildFormData, ContractStatus, Lead } from '@/types';
+import { Child, ChildFormData, ContractStatus, Lead, FacilityIntakeData } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { saveDraft, getDrafts, deleteDraft, loadDraft } from '@/utils/draftStorage';
-import { Target, ChevronRight } from 'lucide-react';
+import { calculateAgeWithMonths } from '@/utils/ageCalculation';
+import { Target, ChevronRight, Settings } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import ChildRegistrationWizard from './ChildRegistrationWizard';
+import FacilitySettingsEditor from './FacilitySettingsEditor';
+import ChildDocumentsManager from './ChildDocumentsManager';
+import InvitationModal from '@/components/common/InvitationModal';
 
 interface ChildrenViewProps {
   setActiveTab?: (tab: string) => void;
@@ -46,9 +58,11 @@ type PendingInvitation = {
 };
 
 const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
+  const { facility } = useAuth();
   const { children, addChild, updateChild, getLeadsByChildId } = useFacilityData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'user' | 'facility'>('user');
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [sortStatus, setSortStatus] = useState<ContractStatus | 'all'>('all');
@@ -58,15 +72,15 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const [invitationEmail, setInvitationEmail] = useState('');
   const [sendingInvitation, setSendingInvitation] = useState(false);
 
+  // ウィザード・施設設定用の状態
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardMode, setWizardMode] = useState<'create' | 'edit'>('create');
+  const [isFacilitySettingsOpen, setIsFacilitySettingsOpen] = useState(false);
+  const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
+
   // 招待枠作成モーダル用の状態
   const [isInvitationSlotModalOpen, setIsInvitationSlotModalOpen] = useState(false);
-  const [invitationSlotData, setInvitationSlotData] = useState({
-    tempChildName: '',
-    tempChildNameKana: '',
-    email: '',
-  });
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
-  const [creatingInvitation, setCreatingInvitation] = useState(false);
 
   // フォームの初期値
   const initialFormData: ChildFormData = {
@@ -93,8 +107,12 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     needsDropoff: false,
     pickupLocation: '',
     pickupLocationCustom: '',
+    pickupAddress: '',
+    pickupPostalCode: '',
     dropoffLocation: '',
     dropoffLocationCustom: '',
+    dropoffAddress: '',
+    dropoffPostalCode: '',
     characteristics: '',
     contractStatus: 'pre-contract',
     contractStartDate: '',
@@ -142,79 +160,153 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     fetchPendingInvitations();
   }, []);
 
-  // 招待枠を作成する関数
-  const handleCreateInvitationSlot = async () => {
-    if (!invitationSlotData.tempChildName.trim() || !invitationSlotData.email.trim()) {
-      alert('児童名（仮）とメールアドレスを入力してください');
-      return;
-    }
+  // 招待送信完了時のコールバック
+  const handleInvitationSent = (invitation: any) => {
+    setPendingInvitations(prev => [invitation, ...prev]);
+  };
 
-    setCreatingInvitation(true);
+  // 契約ステータスをインライン更新する関数
+  const handleQuickUpdateContractStatus = async (childId: string, newStatus: ContractStatus) => {
     try {
-      const facilityId = localStorage.getItem('selectedFacilityId');
-      const userId = localStorage.getItem('userId');
-      if (!facilityId || !userId) {
-        throw new Error('施設IDまたはユーザーIDが見つかりません');
-      }
-
-      // 招待トークンを生成
-      const invitationToken = crypto.randomUUID();
-
-      // 招待枠を作成
-      const { data, error } = await supabase
-        .from('contract_invitations')
-        .insert({
-          facility_id: facilityId,
-          temp_child_name: invitationSlotData.tempChildName,
-          temp_child_name_kana: invitationSlotData.tempChildNameKana || null,
-          email: invitationSlotData.email,
-          invitation_token: invitationToken,
-          status: 'pending',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7日後
-          invited_by: userId,
+      const { error } = await supabase
+        .from('children')
+        .update({
+          contract_status: newStatus,
+          updated_at: new Date().toISOString()
         })
-        .select()
-        .single();
+        .eq('id', childId);
 
       if (error) throw error;
 
-      // 招待メールを送信（オプション）
-      try {
-        const { data: facilityData } = await supabase
-          .from('facilities')
-          .select('name')
-          .eq('id', facilityId)
-          .single();
-
-        const invitationUrl = `${window.location.origin}/client/invitation/accept?token=${invitationToken}`;
-
-        await fetch('/api/send-contract-invitation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: invitationSlotData.email,
-            facilityName: facilityData?.name || '施設',
-            childName: invitationSlotData.tempChildName,
-            invitationUrl,
-          }),
-        });
-      } catch (emailError) {
-        console.error('メール送信エラー:', emailError);
-        // メール送信に失敗しても招待枠は作成済み
+      // ローカルの状態も更新
+      if (selectedChild && selectedChild.id === childId) {
+        setSelectedChild({ ...selectedChild, contractStatus: newStatus });
       }
 
-      // 招待枠一覧を更新
-      setPendingInvitations(prev => [data, ...prev]);
-
-      // モーダルを閉じてフォームをリセット
-      setIsInvitationSlotModalOpen(false);
-      setInvitationSlotData({ tempChildName: '', tempChildNameKana: '', email: '' });
-      alert('招待を送信しました');
+      // リストの再取得（useFacilityDataから）
+      window.location.reload(); // 簡易的なリロード
     } catch (error: any) {
-      console.error('招待枠作成エラー:', error);
-      alert('招待の作成に失敗しました: ' + error.message);
-    } finally {
-      setCreatingInvitation(false);
+      console.error('契約ステータス更新エラー:', error);
+      alert('契約ステータスの更新に失敗しました: ' + error.message);
+    }
+  };
+
+  // 契約日付をインライン更新する関数
+  const handleQuickUpdateContractDate = async (childId: string, field: 'contract_start_date' | 'contract_end_date', value: string) => {
+    try {
+      const { error } = await supabase
+        .from('children')
+        .update({
+          [field]: value || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', childId);
+
+      if (error) throw error;
+
+      // ローカルの状態も更新
+      if (selectedChild && selectedChild.id === childId) {
+        const updatedChild = { ...selectedChild };
+        if (field === 'contract_start_date') {
+          updatedChild.contractStartDate = value;
+        } else {
+          updatedChild.contractEndDate = value;
+        }
+        setSelectedChild(updatedChild);
+      }
+    } catch (error: any) {
+      console.error('契約日付更新エラー:', error);
+      alert('契約日付の更新に失敗しました: ' + error.message);
+    }
+  };
+
+  // 利用パターンをインライン更新する関数
+  const handleQuickUpdatePattern = async (
+    childId: string,
+    dayIndex: number,
+    isChecked: boolean,
+    timeSlot: 'AM' | 'PM' | 'AMPM'
+  ) => {
+    if (!selectedChild) return;
+
+    try {
+      const currentDays = selectedChild.patternDays || [];
+      const currentTimeSlots = selectedChild.patternTimeSlots || {};
+
+      // 新しいpatternDaysを計算
+      let newDays: number[];
+      const newTimeSlots = { ...currentTimeSlots };
+
+      if (isChecked) {
+        newDays = [...currentDays, dayIndex].sort((a, b) => a - b);
+        newTimeSlots[dayIndex] = timeSlot;
+      } else {
+        newDays = currentDays.filter(d => d !== dayIndex);
+        delete newTimeSlots[dayIndex];
+      }
+
+      // パターン文字列も更新（後方互換性のため）
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      const pattern = newDays.map(d => dayNames[d]).join('・');
+
+      const { error } = await supabase
+        .from('children')
+        .update({
+          pattern_days: newDays,
+          pattern_time_slots: newTimeSlots,
+          pattern: pattern,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', childId)
+        .select();
+
+      if (error) throw error;
+
+      // ローカルの状態も更新
+      setSelectedChild({
+        ...selectedChild,
+        patternDays: newDays,
+        patternTimeSlots: newTimeSlots,
+        pattern: pattern,
+      });
+    } catch (error: any) {
+      console.error('利用パターン更新エラー:', error);
+      alert('利用パターンの更新に失敗しました: ' + error.message);
+    }
+  };
+
+  // 利用パターンの時間帯のみを更新する関数
+  const handleQuickUpdateTimeSlot = async (
+    childId: string,
+    dayIndex: number,
+    timeSlot: 'AM' | 'PM' | 'AMPM'
+  ) => {
+    if (!selectedChild) return;
+
+    try {
+      const newTimeSlots = {
+        ...selectedChild.patternTimeSlots,
+        [dayIndex]: timeSlot,
+      };
+
+      const { error } = await supabase
+        .from('children')
+        .update({
+          pattern_time_slots: newTimeSlots,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', childId);
+
+      if (error) throw error;
+
+      // ローカルの状態も更新
+      setSelectedChild({
+        ...selectedChild,
+        patternTimeSlots: newTimeSlots,
+      });
+    } catch (error: any) {
+      console.error('時間帯更新エラー:', error);
+      alert('時間帯の更新に失敗しました: ' + error.message);
     }
   };
 
@@ -278,6 +370,11 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       return;
     }
 
+    if (!formData.birthDate) {
+      alert('生年月日を入力してください');
+      return;
+    }
+
     // 編集モードの場合は更新
     if (selectedChild) {
       await handleUpdateChild();
@@ -305,7 +402,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     }
   };
 
-  // モーダルを開く
+  // モーダルを開く（従来のフォーム - 下書き用に残す）
   const handleOpenModal = () => {
     setFormData(initialFormData);
     setSelectedDraft(null);
@@ -320,6 +417,40 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     setFormData(initialFormData);
     setSelectedDraft(null);
     setSelectedChild(null);
+  };
+
+  // ウィザードを開く（新規登録）
+  const handleOpenWizard = () => {
+    setSelectedChild(null);
+    setWizardMode('create');
+    setIsWizardOpen(true);
+  };
+
+  // ウィザードを開く（編集）
+  const handleEditWithWizard = (child: Child) => {
+    setSelectedChild(child);
+    setWizardMode('edit');
+    setIsWizardOpen(true);
+  };
+
+  // ウィザード完了時の処理
+  const handleWizardComplete = async (data: ChildFormData) => {
+    if (wizardMode === 'create') {
+      await addChild(data);
+      alert('児童を登録しました');
+    } else if (selectedChild) {
+      await updateChild({ ...selectedChild, ...data });
+      alert('児童情報を更新しました');
+    }
+    setIsWizardOpen(false);
+    setSelectedChild(null);
+  };
+
+  // 施設別設定を開く
+  const handleOpenFacilitySettings = () => {
+    if (selectedChild && facility?.id) {
+      setIsFacilitySettingsOpen(true);
+    }
   };
 
   // 契約ステータスの表示ラベル
@@ -369,6 +500,8 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const handleOpenDetail = (child: Child) => {
     setSelectedChild(child);
     setIsEditMode(false);
+    // デフォルトはユーザー情報タブ
+    setDetailTab('user');
     setIsDetailModalOpen(true);
   };
 
@@ -411,8 +544,12 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
         needsDropoff: selectedChild.needsDropoff,
         pickupLocation: selectedChild.pickupLocation || '',
         pickupLocationCustom: selectedChild.pickupLocationCustom || '',
+        pickupAddress: selectedChild.pickupAddress || '',
+        pickupPostalCode: selectedChild.pickupPostalCode || '',
         dropoffLocation: selectedChild.dropoffLocation || '',
         dropoffLocationCustom: selectedChild.dropoffLocationCustom || '',
+        dropoffAddress: selectedChild.dropoffAddress || '',
+        dropoffPostalCode: selectedChild.dropoffPostalCode || '',
         characteristics: selectedChild.characteristics || '',
         contractStatus: selectedChild.contractStatus,
         contractStartDate: selectedChild.contractStartDate,
@@ -472,12 +609,23 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             利用者招待
           </button>
           <button
-            onClick={handleOpenModal}
+            onClick={handleOpenWizard}
             className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all flex-1 sm:flex-none justify-center"
           >
             <UserPlus size={16} className="mr-2 shrink-0" />
             新規児童登録
           </button>
+        </div>
+        {/* 登録方法の案内 */}
+        <div className="hidden lg:flex items-center gap-4 text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+            利用者招待: 保護者アカウントと児童を紐付け
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[#00c4cc]"></span>
+            新規登録: 施設で児童情報を直接入力
+          </span>
         </div>
       </div>
 
@@ -668,15 +816,27 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       className="hover:bg-[#f0fdfe] transition-colors group"
                     >
                       <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <button
-                          onClick={() => handleOpenDetail(child)}
-                          className="font-bold text-gray-800 group-hover:text-[#00c4cc] hover:underline transition-colors text-left text-xs sm:text-sm"
-                        >
-                          {child.name}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleOpenDetail(child)}
+                            className="font-bold text-gray-800 group-hover:text-[#00c4cc] hover:underline transition-colors text-left text-xs sm:text-sm"
+                          >
+                            {child.name}
+                          </button>
+                          {child.ownerProfileId ? (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium" title="利用者アカウント連携済み">
+                              <UserCheck size={12} />
+                              <span className="hidden sm:inline">連携</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium" title="利用者アカウント未連携">
+                              <span className="hidden sm:inline">未連携</span>
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 text-xs sm:text-sm">
-                        {child.age ? `${child.age}歳` : '-'}
+                        {child.birthDate ? calculateAgeWithMonths(child.birthDate).display : child.age ? `${child.age}歳` : '-'}
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 text-xs sm:text-sm hidden sm:table-cell">
                         {child.guardianName || '-'}
@@ -885,9 +1045,9 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                           });
                         }}
                       />
-                      {formData.birthDate && formData.age !== undefined && (
+                      {formData.birthDate && (
                         <p className="text-xs text-gray-500 mt-1">
-                          年齢: {formData.age}歳
+                          年齢: {calculateAgeWithMonths(formData.birthDate).display}
                         </p>
                       )}
                     </div>
@@ -1182,6 +1342,50 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                 選択: {formData.pickupLocation}
                               </p>
                             )}
+
+                            {/* お迎え場所の住所（送迎ルート計算用） */}
+                            {formData.pickupLocation && formData.pickupLocation !== '事業所' && (
+                              <div className="mt-3 p-3 bg-white rounded border border-gray-200">
+                                <label className="block text-xs font-bold text-gray-500 mb-2">
+                                  お迎え場所の住所（ルート計算用）
+                                </label>
+                                {formData.pickupLocation === '自宅' && formData.address ? (
+                                  <div>
+                                    <p className="text-xs text-gray-600 mb-2">
+                                      自宅住所を使用: {formData.address}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => setFormData({
+                                        ...formData,
+                                        pickupAddress: formData.address || ''
+                                      })}
+                                      className="text-xs text-[#00c4cc] hover:underline"
+                                    >
+                                      自宅住所をお迎え場所にコピー
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      placeholder="〒番号（例: 1234567）"
+                                      value={formData.pickupPostalCode || ''}
+                                      onChange={(e) => setFormData({ ...formData, pickupPostalCode: e.target.value.replace(/-/g, '') })}
+                                      maxLength={7}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      placeholder="住所（例: 東京都○○区1-2-3）"
+                                      value={formData.pickupAddress || ''}
+                                      onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1233,6 +1437,50 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                               <p className="text-[10px] text-gray-500">
                                 選択: {formData.dropoffLocation}
                               </p>
+                            )}
+
+                            {/* お送り場所の住所（送迎ルート計算用） */}
+                            {formData.dropoffLocation && formData.dropoffLocation !== '事業所' && (
+                              <div className="mt-3 p-3 bg-white rounded border border-gray-200">
+                                <label className="block text-xs font-bold text-gray-500 mb-2">
+                                  お送り場所の住所（ルート計算用）
+                                </label>
+                                {formData.dropoffLocation === '自宅' && formData.address ? (
+                                  <div>
+                                    <p className="text-xs text-gray-600 mb-2">
+                                      自宅住所を使用: {formData.address}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => setFormData({
+                                        ...formData,
+                                        dropoffAddress: formData.address || ''
+                                      })}
+                                      className="text-xs text-[#00c4cc] hover:underline"
+                                    >
+                                      自宅住所をお送り場所にコピー
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      placeholder="〒番号（例: 1234567）"
+                                      value={formData.dropoffPostalCode || ''}
+                                      onChange={(e) => setFormData({ ...formData, dropoffPostalCode: e.target.value.replace(/-/g, '') })}
+                                      maxLength={7}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      placeholder="住所（例: 東京都○○区1-2-3）"
+                                      value={formData.dropoffAddress || ''}
+                                      onChange={(e) => setFormData({ ...formData, dropoffAddress: e.target.value })}
+                                    />
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
@@ -1453,308 +1701,552 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               </button>
             </div>
 
+            {/* タブ切り替え */}
+            <div className="border-b border-gray-200 px-6">
+              <div className="flex gap-1">
+                {/* 詳細情報タブ（常に表示） */}
+                <button
+                  onClick={() => setDetailTab('user')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    detailTab === 'user'
+                      ? 'border-[#00c4cc] text-[#00c4cc]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  詳細情報
+                </button>
+                <button
+                  onClick={() => setDetailTab('facility')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    detailTab === 'facility'
+                      ? 'border-[#00c4cc] text-[#00c4cc]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  施設別設定
+                </button>
+              </div>
+            </div>
+
             {/* 詳細情報 */}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
               <div className="space-y-6">
-                {/* 基本情報 */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">基本情報</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">児童氏名</label>
-                      <p className="text-sm text-gray-800 mt-1">{selectedChild.name}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">生年月日</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.birthDate 
-                          ? `${selectedChild.birthDate} ${selectedChild.age ? `(${selectedChild.age}歳)` : ''}`
-                          : selectedChild.age ? `${selectedChild.age}歳` : '-'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 保護者情報 */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">保護者情報</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">保護者名</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.guardianName || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">続柄</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.guardianRelationship || '-'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 受給者証情報 */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">受給者証情報</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">受給者証番号</label>
-                      <p className="text-sm text-gray-800 mt-1 font-mono">
-                        {selectedChild.beneficiaryNumber || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">支給日数</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.grantDays ? `${selectedChild.grantDays}日` : '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">契約日数</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.contractDays ? `${selectedChild.contractDays}日` : '-'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 連絡先 */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">連絡先</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">住所</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.address || '-'}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-bold text-gray-500">電話番号</label>
-                        <p className="text-sm text-gray-800 mt-1">
-                          {selectedChild.phone || '-'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-gray-500">メールアドレス</label>
-                        <p className="text-sm text-gray-800 mt-1">
-                          {selectedChild.email || '-'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 医療情報 */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">医療情報</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">かかりつけ医名</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.doctorName || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">医療機関名</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.doctorClinic || '-'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 通園情報 */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">通園情報</h4>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500">通園場所名</label>
-                    <p className="text-sm text-gray-800 mt-1">
-                      {selectedChild.schoolName || '-'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 利用パターン・送迎 */}
-                <div className="border-b border-gray-200 pb-4">
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">利用パターン・送迎</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">基本利用パターン</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.pattern || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">送迎</label>
-                      <div className="mt-2 space-y-2">
-                        {selectedChild.needsPickup && (
-                          <div>
-                            <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
-                              お迎え
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              {selectedChild.pickupLocation === 'その他' 
-                                ? selectedChild.pickupLocationCustom || '（未入力）'
-                                : selectedChild.pickupLocation || '（未入力）'}
-                            </span>
-                          </div>
-                        )}
-                        {selectedChild.needsDropoff && (
-                          <div>
-                            <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
-                              お送り
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              {selectedChild.dropoffLocation === 'その他'
-                                ? selectedChild.dropoffLocationCustom || '（未入力）'
-                                : selectedChild.dropoffLocation || '（未入力）'}
-                            </span>
-                          </div>
-                        )}
-                        {!selectedChild.needsPickup && !selectedChild.needsDropoff && (
-                          <span className="text-sm text-gray-500">送迎なし</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 特性・メモ */}
-                {selectedChild.characteristics && (
+                {/* クイックアクセス */}
+                {setActiveTab && detailTab === 'user' && (
                   <div className="border-b border-gray-200 pb-4">
-                    <h4 className="font-bold text-sm text-gray-700 mb-4">特性・メモ</h4>
-                    <div>
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                        {selectedChild.characteristics}
-                      </p>
+                    <h4 className="font-bold text-sm text-gray-700 mb-3">クイックアクセス</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      <button
+                        onClick={() => {
+                          setActiveTab('daily-log');
+                          setIsDetailModalOpen(false);
+                        }}
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                      >
+                        <BookOpen size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">連絡帳</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveTab('chat');
+                          setIsDetailModalOpen(false);
+                        }}
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                      >
+                        <MessageSquare size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">チャット</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveTab('schedule');
+                          setIsDetailModalOpen(false);
+                        }}
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                      >
+                        <CalendarDays size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">予約</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveTab('support-plan');
+                          setIsDetailModalOpen(false);
+                        }}
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                      >
+                        <ClipboardList size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">支援計画</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsDocumentsOpen(true);
+                        }}
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                      >
+                        <FileText size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">書類管理</span>
+                      </button>
                     </div>
                   </div>
                 )}
 
-                {/* リード案件 */}
-                {(() => {
-                  const relatedLeads = getLeadsByChildId(selectedChild.id);
-                  if (relatedLeads.length > 0) {
-                    const getStatusLabel = (status: string) => {
-                      const labels: Record<string, { label: string; color: string }> = {
-                        'new-inquiry': { label: '新規問い合わせ', color: 'bg-blue-100 text-blue-700' },
-                        'visit-scheduled': { label: '見学/面談予定', color: 'bg-yellow-100 text-yellow-700' },
-                        'considering': { label: '検討中', color: 'bg-orange-100 text-orange-700' },
-                        'waiting-benefit': { label: '受給者証待ち', color: 'bg-purple-100 text-purple-700' },
-                        'contract-progress': { label: '契約手続き中', color: 'bg-cyan-100 text-cyan-700' },
-                        'contracted': { label: '契約済み', color: 'bg-green-100 text-green-700' },
-                        'lost': { label: '失注', color: 'bg-red-100 text-red-700' },
-                      };
-                      return labels[status] || { label: status, color: 'bg-gray-100 text-gray-700' };
-                    };
-                    return (
-                      <div className="border-b border-gray-200 pb-4">
-                        <h4 className="font-bold text-sm text-gray-700 mb-4 flex items-center">
-                          <Target size={14} className="mr-2" />
-                          関連リード案件
-                        </h4>
-                        <div className="space-y-2">
-                          {relatedLeads.map((lead) => {
-                            const statusInfo = getStatusLabel(lead.status);
-                            return (
-                              <button
-                                key={lead.id}
-                                onClick={() => {
-                                  setIsDetailModalOpen(false);
-                                  if (setActiveTab) {
-                                    setActiveTab('lead');
-                                  }
-                                }}
-                                className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 transition-colors group"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="font-bold text-sm text-gray-800 mb-1">{lead.name}</div>
-                                    <div className="flex items-center space-x-2">
-                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${statusInfo.color}`}>
-                                        {statusInfo.label}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <ChevronRight size={16} className="text-gray-400 group-hover:text-[#00c4cc]" />
-                                </div>
-                              </button>
-                            );
-                          })}
+                {/* 利用者情報タブ（デフォルト） */}
+                {detailTab === 'user' && (
+                  <>
+                    {/* データソース表示 */}
+                    {selectedChild.ownerProfileId ? (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+                        <UserCheck size={16} className="text-green-600 flex-shrink-0" />
+                        <p className="text-sm text-green-800">
+                          <span className="font-bold">利用者アカウント連動</span>
+                          <span className="text-green-600 ml-1">- 保護者が登録した情報を表示しています</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+                        <FileWarning size={16} className="text-amber-600 flex-shrink-0" />
+                        <p className="text-sm text-amber-800">
+                          <span className="font-bold">施設入力情報</span>
+                          <span className="text-amber-600 ml-1">- 施設スタッフが登録した情報を表示しています</span>
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 基本情報 */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4">基本情報</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">児童氏名</label>
+                          <p className="text-sm text-gray-800 mt-1">{selectedChild.name}</p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">生年月日</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.birthDate
+                              ? `${selectedChild.birthDate} (${calculateAgeWithMonths(selectedChild.birthDate).display})`
+                              : selectedChild.age ? `${selectedChild.age}歳` : '-'}
+                          </p>
                         </div>
                       </div>
-                    );
-                  }
-                  return null;
-                })()}
+                    </div>
 
-                {/* 契約情報 */}
-                <div>
-                  <h4 className="font-bold text-sm text-gray-700 mb-4">契約情報</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">契約ステータス</label>
-                      <div className="mt-1">
-                        {(() => {
-                          const statusInfo = getStatusLabel(selectedChild.contractStatus);
-                          const StatusIcon = statusInfo.icon;
-                          return (
-                            <span
-                              className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs font-bold ${statusInfo.color}`}
-                            >
-                              <StatusIcon size={12} />
-                              <span>{statusInfo.label}</span>
-                            </span>
-                          );
-                        })()}
+                    {/* 保護者情報 */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4">保護者情報</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">保護者名</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.guardianName || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">続柄</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.guardianRelationship || '-'}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">契約開始日</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.contractStartDate || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">契約終了日</label>
-                      <p className="text-sm text-gray-800 mt-1">
-                        {selectedChild.contractEndDate || '-'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
-                {/* 利用者アカウントへの招待 */}
-                {selectedChild.ownerProfileId && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
-                    <h4 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
-                      <Mail size={14} />
-                      利用者アカウントへの招待
-                    </h4>
-                    <p className="text-xs text-gray-600 mb-3">
-                      この児童の保護者アカウントに施設利用の招待を送信できます。
-                    </p>
-                    <button
-                      onClick={async () => {
-                        // 保護者のメールアドレスを取得
-                        const { data: ownerData } = await supabase
-                          .from('users')
-                          .select('email')
-                          .eq('id', selectedChild.ownerProfileId)
-                          .single();
-                        if (ownerData?.email) {
-                          setInvitationEmail(ownerData.email);
-                        }
-                        setIsInvitationModalOpen(true);
-                      }}
-                      className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm flex items-center justify-center gap-2"
-                    >
-                      <Mail size={16} />
-                      招待を送信
-                    </button>
-                  </div>
+                    {/* 受給者証情報 */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4">受給者証情報</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">受給者証番号</label>
+                          <p className="text-sm text-gray-800 mt-1 font-mono">
+                            {selectedChild.beneficiaryNumber || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">支給日数</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.grantDays ? `${selectedChild.grantDays}日` : '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">契約日数</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.contractDays ? `${selectedChild.contractDays}日` : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 連絡先 */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4">連絡先</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">住所</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.address || '-'}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-bold text-gray-500">電話番号</label>
+                            <p className="text-sm text-gray-800 mt-1">
+                              {selectedChild.phone || '-'}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-gray-500">メールアドレス</label>
+                            <p className="text-sm text-gray-800 mt-1">
+                              {selectedChild.email || '-'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 医療情報 */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4">医療情報</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">かかりつけ医名</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.doctorName || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">医療機関名</label>
+                          <p className="text-sm text-gray-800 mt-1">
+                            {selectedChild.doctorClinic || '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 通園情報 */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4">通園情報</h4>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">通園場所名</label>
+                        <p className="text-sm text-gray-800 mt-1">
+                          {selectedChild.schoolName || '-'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 特性・メモ */}
+                    {selectedChild.characteristics && (
+                      <div className="border-b border-gray-200 pb-4">
+                        <h4 className="font-bold text-sm text-gray-700 mb-4">特性・メモ</h4>
+                        <div>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                            {selectedChild.characteristics}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* リード案件 */}
+                    {(() => {
+                      const relatedLeads = getLeadsByChildId(selectedChild.id);
+                      if (relatedLeads.length > 0) {
+                        const getStatusLabel = (status: string) => {
+                          const labels: Record<string, { label: string; color: string }> = {
+                            'new-inquiry': { label: '新規問い合わせ', color: 'bg-blue-100 text-blue-700' },
+                            'visit-scheduled': { label: '見学/面談予定', color: 'bg-yellow-100 text-yellow-700' },
+                            'considering': { label: '検討中', color: 'bg-orange-100 text-orange-700' },
+                            'waiting-benefit': { label: '受給者証待ち', color: 'bg-purple-100 text-purple-700' },
+                            'contract-progress': { label: '契約手続き中', color: 'bg-cyan-100 text-cyan-700' },
+                            'contracted': { label: '契約済み', color: 'bg-green-100 text-green-700' },
+                            'lost': { label: '失注', color: 'bg-red-100 text-red-700' },
+                          };
+                          return labels[status] || { label: status, color: 'bg-gray-100 text-gray-700' };
+                        };
+                        return (
+                          <div className="border-b border-gray-200 pb-4">
+                            <h4 className="font-bold text-sm text-gray-700 mb-4 flex items-center">
+                              <Target size={14} className="mr-2" />
+                              関連リード案件
+                            </h4>
+                            <div className="space-y-2">
+                              {relatedLeads.map((lead) => {
+                                const statusInfo = getStatusLabel(lead.status);
+                                return (
+                                  <button
+                                    key={lead.id}
+                                    onClick={() => {
+                                      setIsDetailModalOpen(false);
+                                      if (setActiveTab) {
+                                        setActiveTab('lead');
+                                      }
+                                    }}
+                                    className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 transition-colors group"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1">
+                                        <div className="font-bold text-sm text-gray-800 mb-1">{lead.name}</div>
+                                        <div className="flex items-center space-x-2">
+                                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${statusInfo.color}`}>
+                                            {statusInfo.label}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <ChevronRight size={16} className="text-gray-400 group-hover:text-[#00c4cc]" />
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* 利用者アカウントへの招待 */}
+                    {selectedChild.ownerProfileId && (
+                      <div className="border-t border-gray-200 pt-4 mt-4">
+                        <h4 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                          <Mail size={14} />
+                          利用者アカウントへの招待
+                        </h4>
+                        <p className="text-xs text-gray-600 mb-3">
+                          この児童の保護者アカウントに施設利用の招待を送信できます。
+                        </p>
+                        <button
+                          onClick={async () => {
+                            // 保護者のメールアドレスを取得
+                            const { data: ownerData } = await supabase
+                              .from('users')
+                              .select('email')
+                              .eq('id', selectedChild.ownerProfileId)
+                              .single();
+                            if (ownerData?.email) {
+                              setInvitationEmail(ownerData.email);
+                            }
+                            setIsInvitationModalOpen(true);
+                          }}
+                          className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm flex items-center justify-center gap-2"
+                        >
+                          <Mail size={16} />
+                          招待を送信
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* 施設別設定タブ */}
+                {detailTab === 'facility' && (
+                  <>
+                    {/* 利用パターン・送迎（編集可能・カレンダー連動） */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4 flex items-center gap-2">
+                        利用パターン・送迎
+                        <span className="text-xs font-normal text-gray-400">（カレンダー連動）</span>
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 mb-2 block">基本利用パターン</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => {
+                              const isChecked = selectedChild.patternDays?.includes(index) || false;
+                              const timeSlot = selectedChild.patternTimeSlots?.[index] || 'PM';
+                              return (
+                                <div key={index} className={`flex flex-col items-start p-1.5 border rounded-md min-w-[70px] ${isChecked ? 'border-[#00c4cc] bg-[#e0f7fa]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                  <label className="flex items-center space-x-1 cursor-pointer w-full mb-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        handleQuickUpdatePattern(
+                                          selectedChild.id,
+                                          index,
+                                          e.target.checked,
+                                          timeSlot as 'AM' | 'PM' | 'AMPM'
+                                        );
+                                      }}
+                                      className="accent-[#00c4cc] w-3 h-3"
+                                    />
+                                    <span className={`text-xs font-medium ${isChecked ? 'text-[#006064]' : 'text-gray-700'}`}>
+                                      {day}
+                                    </span>
+                                  </label>
+                                  {isChecked && (
+                                    <div className="flex flex-col items-start space-y-0.5 w-full pl-4">
+                                      {(['AM', 'PM', 'AMPM'] as const).map((slot) => (
+                                        <label key={slot} className="flex items-center cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`facility-timeSlot-${index}`}
+                                            value={slot}
+                                            checked={timeSlot === slot}
+                                            onChange={() => {
+                                              handleQuickUpdateTimeSlot(selectedChild.id, index, slot);
+                                            }}
+                                            className="accent-[#00c4cc] w-2.5 h-2.5"
+                                          />
+                                          <span className="text-[10px] text-gray-600 ml-0.5">
+                                            {slot === 'AM' ? '午前' : slot === 'PM' ? '午後' : '終日'}
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">送迎</label>
+                          <div className="mt-2 space-y-2">
+                            {selectedChild.needsPickup && (
+                              <div>
+                                <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
+                                  お迎え
+                                </span>
+                                <span className="text-sm text-gray-600">
+                                  {selectedChild.pickupLocation === 'その他'
+                                    ? selectedChild.pickupLocationCustom || '（未入力）'
+                                    : selectedChild.pickupLocation || '（未入力）'}
+                                </span>
+                              </div>
+                            )}
+                            {selectedChild.needsDropoff && (
+                              <div>
+                                <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
+                                  お送り
+                                </span>
+                                <span className="text-sm text-gray-600">
+                                  {selectedChild.dropoffLocation === 'その他'
+                                    ? selectedChild.dropoffLocationCustom || '（未入力）'
+                                    : selectedChild.dropoffLocation || '（未入力）'}
+                                </span>
+                              </div>
+                            )}
+                            {!selectedChild.needsPickup && !selectedChild.needsDropoff && (
+                              <span className="text-sm text-gray-500">送迎なし</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 契約情報 */}
+                    <div className="border-b border-gray-200 pb-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-4">契約情報</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">契約ステータス</label>
+                          <div className="mt-1">
+                            <select
+                              value={selectedChild.contractStatus}
+                              onChange={(e) => handleQuickUpdateContractStatus(selectedChild.id, e.target.value as ContractStatus)}
+                              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc] focus:border-[#00c4cc]"
+                            >
+                              <option value="pre-contract">契約前</option>
+                              <option value="active">契約中</option>
+                              <option value="inactive">休止中</option>
+                              <option value="terminated">解約</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">契約開始日</label>
+                          <input
+                            type="date"
+                            value={selectedChild.contractStartDate || ''}
+                            onChange={(e) => handleQuickUpdateContractDate(selectedChild.id, 'contract_start_date', e.target.value)}
+                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 mt-1 focus:outline-none focus:ring-1 focus:ring-[#00c4cc] focus:border-[#00c4cc]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500">契約終了日</label>
+                          <input
+                            type="date"
+                            value={selectedChild.contractEndDate || ''}
+                            onChange={(e) => handleQuickUpdateContractDate(selectedChild.id, 'contract_end_date', e.target.value)}
+                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 mt-1 focus:outline-none focus:ring-1 focus:ring-[#00c4cc] focus:border-[#00c4cc]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ヒアリング記録（facilityIntakeDataがある場合のみ） */}
+                    {selectedChild.facilityIntakeData && (
+                      <>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                          <p className="text-sm text-amber-800">
+                            以下はヒアリング時に施設が入力した記録です。
+                            {selectedChild.facilityIntakeRecordedAt && (
+                              <span className="block text-xs text-amber-600 mt-1">
+                                記録日時: {new Date(selectedChild.facilityIntakeRecordedAt).toLocaleString('ja-JP')}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        {/* 施設記録：基本情報 */}
+                        <div className="border-b border-gray-200 pb-4">
+                          <h4 className="font-bold text-sm text-gray-700 mb-4">基本情報（ヒアリング記録）</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-xs font-bold text-gray-500">児童氏名</label>
+                              <p className="text-sm text-gray-800 mt-1">{selectedChild.facilityIntakeData.name || '-'}</p>
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-gray-500">生年月日</label>
+                              <p className="text-sm text-gray-800 mt-1">
+                                {selectedChild.facilityIntakeData.birthDate
+                                  ? `${selectedChild.facilityIntakeData.birthDate} (${calculateAgeWithMonths(selectedChild.facilityIntakeData.birthDate).display})`
+                                  : '-'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 施設記録：保護者情報 */}
+                        <div className="border-b border-gray-200 pb-4">
+                          <h4 className="font-bold text-sm text-gray-700 mb-4">保護者情報（ヒアリング記録）</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-xs font-bold text-gray-500">保護者名</label>
+                              <p className="text-sm text-gray-800 mt-1">
+                                {selectedChild.facilityIntakeData.guardianName || '-'}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-gray-500">続柄</label>
+                              <p className="text-sm text-gray-800 mt-1">
+                                {selectedChild.facilityIntakeData.guardianRelationship || '-'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 施設記録：特性・メモ */}
+                        {(selectedChild.facilityIntakeData.characteristics || selectedChild.facilityIntakeData.memo) && (
+                          <div>
+                            <h4 className="font-bold text-sm text-gray-700 mb-4">特性・メモ（ヒアリング記録）</h4>
+                            {selectedChild.facilityIntakeData.characteristics && (
+                              <div className="mb-3">
+                                <label className="text-xs font-bold text-gray-500">特性</label>
+                                <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">
+                                  {selectedChild.facilityIntakeData.characteristics}
+                                </p>
+                              </div>
+                            )}
+                            {selectedChild.facilityIntakeData.memo && (
+                              <div>
+                                <label className="text-xs font-bold text-gray-500">スタッフメモ</label>
+                                <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">
+                                  {selectedChild.facilityIntakeData.memo}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1780,121 +2272,70 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       )}
 
       {/* 招待枠作成モーダル */}
-      {isInvitationSlotModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
-            {/* ヘッダー */}
-            <div className="border-b border-gray-200 px-6 py-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold text-lg text-gray-800">利用者招待</h3>
-                <button
-                  onClick={() => {
-                    setIsInvitationSlotModalOpen(false);
-                    setInvitationSlotData({ tempChildName: '', tempChildNameKana: '', email: '' });
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                保護者のメールアドレスに招待を送信します。<br />
-                保護者が招待を承認すると、児童情報が自動的に連携されます。
-              </p>
-            </div>
+      <InvitationModal
+        isOpen={isInvitationSlotModalOpen}
+        onClose={() => setIsInvitationSlotModalOpen(false)}
+        facilityId={facility?.id || localStorage.getItem('selectedFacilityId') || ''}
+        facilityName={facility?.name || '施設'}
+        userId={localStorage.getItem('userId') || ''}
+        childList={children}
+        onInvitationSent={handleInvitationSent}
+      />
 
-            {/* フォーム */}
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">
-                  児童名（仮） <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                  placeholder="例: 山田 太郎"
-                  value={invitationSlotData.tempChildName}
-                  onChange={(e) =>
-                    setInvitationSlotData({ ...invitationSlotData, tempChildName: e.target.value })
-                  }
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  保護者が承認後、正式な児童情報に置き換わります
-                </p>
-              </div>
+      {/* 児童登録ウィザード */}
+      {isWizardOpen && (
+        <ChildRegistrationWizard
+          onComplete={handleWizardComplete}
+          onCancel={() => {
+            setIsWizardOpen(false);
+            setSelectedChild(null);
+          }}
+          initialData={selectedChild ? {
+            name: selectedChild.name,
+            nameKana: selectedChild.nameKana,
+            birthDate: selectedChild.birthDate,
+            age: selectedChild.age,
+            guardianName: selectedChild.guardianName,
+            guardianNameKana: selectedChild.guardianNameKana,
+            guardianRelationship: selectedChild.guardianRelationship,
+            beneficiaryNumber: selectedChild.beneficiaryNumber,
+            grantDays: selectedChild.grantDays,
+            contractDays: selectedChild.contractDays,
+            address: selectedChild.address,
+            phone: selectedChild.phone,
+            email: selectedChild.email,
+            doctorName: selectedChild.doctorName,
+            doctorClinic: selectedChild.doctorClinic,
+            schoolName: selectedChild.schoolName,
+            characteristics: selectedChild.characteristics,
+            contractStatus: selectedChild.contractStatus,
+            contractEndDate: selectedChild.contractEndDate,
+          } : undefined}
+          mode={wizardMode}
+        />
+      )}
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">
-                  児童名カナ（仮）
-                </label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                  placeholder="例: ヤマダ タロウ"
-                  value={invitationSlotData.tempChildNameKana}
-                  onChange={(e) =>
-                    setInvitationSlotData({ ...invitationSlotData, tempChildNameKana: e.target.value })
-                  }
-                />
-              </div>
+      {/* 施設別設定エディタ */}
+      {isFacilitySettingsOpen && selectedChild && facility?.id && (
+        <FacilitySettingsEditor
+          childId={selectedChild.id}
+          childName={selectedChild.name}
+          facilityId={facility.id}
+          onSave={() => {
+            // 必要に応じてデータを再読み込み
+          }}
+          onClose={() => setIsFacilitySettingsOpen(false)}
+        />
+      )}
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">
-                  保護者メールアドレス <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                  placeholder="example@email.com"
-                  value={invitationSlotData.email}
-                  onChange={(e) =>
-                    setInvitationSlotData({ ...invitationSlotData, email: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
-                <h4 className="text-xs font-bold text-orange-800 mb-1">招待の流れ</h4>
-                <ol className="text-xs text-orange-700 space-y-1 list-decimal list-inside">
-                  <li>保護者にメールで招待リンクを送信</li>
-                  <li>保護者がリンクからログイン/登録</li>
-                  <li>保護者が児童情報を選択・連携</li>
-                  <li>施設と児童の契約が完了</li>
-                </ol>
-              </div>
-            </div>
-
-            {/* フッター */}
-            <div className="border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setIsInvitationSlotModalOpen(false);
-                  setInvitationSlotData({ tempChildName: '', tempChildNameKana: '', email: '' });
-                }}
-                className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md text-sm font-bold transition-colors"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={handleCreateInvitationSlot}
-                disabled={creatingInvitation}
-                className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-bold shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {creatingInvitation ? (
-                  <>
-                    <span className="animate-spin">⏳</span>
-                    送信中...
-                  </>
-                ) : (
-                  <>
-                    <Mail size={16} />
-                    招待を送信
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* 書類管理 */}
+      {isDocumentsOpen && selectedChild && facility?.id && (
+        <ChildDocumentsManager
+          childId={selectedChild.id}
+          childName={selectedChild.name}
+          facilityId={facility.id}
+          onClose={() => setIsDocumentsOpen(false)}
+        />
       )}
     </div>
   );

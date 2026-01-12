@@ -19,21 +19,50 @@ import ManagementSettingsView from '@/components/management/ManagementSettingsVi
 import LeadView from '@/components/lead/LeadView';
 import ScheduleView from '@/components/schedule/ScheduleView';
 import ChildrenView from '@/components/children/ChildrenView';
+import TransportRouteView from '@/components/transport/TransportRouteView';
 import StaffView from '@/components/staff/StaffView';
 import StaffManagementView from '@/components/staff/StaffManagementView';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 import ClientInvitationView from '@/components/client/ClientInvitationView';
+import ChatManagementView from '@/components/chat/ChatManagementView';
+import DailyLogView from '@/components/logs/DailyLogView';
+import ServicePlanView from '@/components/logs/ServicePlanView';
+import IncidentReportView from '@/components/logs/IncidentReportView';
+import TrainingRecordView from '@/components/staff/TrainingRecordView';
+import CommitteeView from '@/components/management/CommitteeView';
+import AuditPreparationView from '@/components/management/AuditPreparationView';
+import DocumentManagementView from '@/components/management/DocumentManagementView';
+import ExpenseManagementView from '@/components/management/ExpenseManagementView';
+import ProfitLossView from '@/components/management/ProfitLossView';
+import CashFlowView from '@/components/management/CashFlowView';
+import ConnectView from '@/components/connect/ConnectView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
 import { usePasskeyAuth } from '@/components/auth/PasskeyAuth';
-import { getAppType } from '@/utils/domain';
 import { supabase } from '@/lib/supabase';
 
 // 静的生成をスキップ（useAuthを使用するため）
 export const dynamic = 'force-dynamic';
 
+// 未実装機能のプレースホルダー
+function ComingSoon({ title }: { title: string }) {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">{title}</h2>
+        <p className="text-gray-500">この機能は準備中です</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
-  const { isAuthenticated, isAdmin, hasPermission, login } = useAuth();
+  const { isAuthenticated, isAdmin, hasPermission, login, facility, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>('');
@@ -45,7 +74,7 @@ export default function Home() {
   const redirectTo = searchParams?.get('redirect') || null;
   const facilityIdFromQuery = searchParams?.get('facilityId') || null;
 
-  // 新フロー: 未ログインなら /login へ、ログイン済み+施設未選択なら /portal へ
+  // 新フロー: 未ログインなら /login へ、利用者なら /client/dashboard へ、ログイン済み+施設未選択なら /portal へ
   useEffect(() => {
     const checkAuthFlow = async () => {
       const userStr = localStorage.getItem('user');
@@ -53,6 +82,19 @@ export default function Home() {
 
       if (!userStr) {
         // 未ログイン → /login へ
+        router.push('/login');
+        return;
+      }
+
+      // 利用者（クライアント）の場合は利用者ダッシュボードへリダイレクト
+      try {
+        const userData = JSON.parse(userStr);
+        if (userData?.userType === 'client') {
+          router.push('/client/dashboard');
+          return;
+        }
+      } catch (e) {
+        // パースエラーの場合はログインページへ
         router.push('/login');
         return;
       }
@@ -163,7 +205,6 @@ export default function Home() {
   }, [router, isAuthenticated, facilityIdFromQuery]);
   
   // ログインフォーム用の状態
-  const [facilityCode, setFacilityCode] = useState('');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -179,23 +220,17 @@ export default function Home() {
     }
   }, [checkSupport]);
 
-  // アプリタイプを取得
-  const appType = getAppType();
-  
   // 保存されたログイン情報を読み込む（30日間有効）
   useEffect(() => {
-    const savedData = localStorage.getItem(`savedLoginData_${appType}`);
+    const savedData = localStorage.getItem('savedLoginData_staff');
     if (savedData) {
       try {
         const data = JSON.parse(savedData);
         const savedDate = new Date(data.savedAt);
         const daysSinceSaved = (Date.now() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
-        
+
         // 30日以内なら読み込む
         if (daysSinceSaved <= 30) {
-          if (data.facilityCode) {
-            setFacilityCode(data.facilityCode);
-          }
           if (data.loginId) {
             setLoginId(data.loginId);
           }
@@ -205,14 +240,14 @@ export default function Home() {
           setRememberMe(true);
         } else {
           // 30日を超えていたら削除
-          localStorage.removeItem(`savedLoginData_${appType}`);
+          localStorage.removeItem('savedLoginData_staff');
         }
       } catch (e) {
         // パースエラーの場合は削除
-        localStorage.removeItem(`savedLoginData_${appType}`);
+        localStorage.removeItem('savedLoginData_staff');
       }
     }
-  }, [appType]);
+  }, []);
 
   // ログイン処理
   const handleLogin = async (e: React.FormEvent) => {
@@ -221,33 +256,32 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Personal側では施設IDが不要（空文字列を渡す）
-      const facilityCodeToUse = appType === 'personal' ? '' : facilityCode;
-      await login(facilityCodeToUse, loginId, password);
+      // スタッフログインは施設コード不要（空文字列を渡す）
+      await login('', loginId, password);
       // ログイン情報を保存するかどうか（30日間有効）
       if (rememberMe) {
         const savedData = {
-          facilityCode,
           loginId,
           password, // パスワードも保存（30日間）
           savedAt: new Date().toISOString(),
         };
-        localStorage.setItem(`savedLoginData_${appType}`, JSON.stringify(savedData));
+        localStorage.setItem('savedLoginData_staff', JSON.stringify(savedData));
       } else {
-        localStorage.removeItem(`savedLoginData_${appType}`);
+        localStorage.removeItem('savedLoginData_staff');
       }
       // ログイン成功後、パスワードをリセット（保存しない場合のみ）
       if (!rememberMe) {
         setPassword('');
       }
-      // リダイレクト先が指定されている場合はそこに移動
+      // リダイレクト先が指定されている場合はそこに移動、そうでなければスタッフダッシュボードへ
       if (redirectTo) {
-        // 外部URL（httpで始まる）の場合はwindow.location.hrefを使用
         if (redirectTo.startsWith('http')) {
           window.location.href = redirectTo;
         } else {
           router.push(redirectTo);
         }
+      } else {
+        router.push('/staff-dashboard');
       }
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
@@ -331,12 +365,8 @@ export default function Home() {
   const facilityStr = typeof window !== 'undefined' ? localStorage.getItem('facility') : null;
   const hasFacility = facilityStr !== null;
 
-  // 未認証の場合はログイン画面を表示（従来のフォールバック）
-  // ただし、パーソナルアカウントでログイン済みでfacilityIdクエリパラメータがある場合は認証をスキップ
+  // 未認証の場合はログイン画面を表示
   if (!isAuthenticated && !(hasUser && facilityIdFromQuery)) {
-    const isBiz = appType === 'biz';
-    const isPersonal = appType === 'personal';
-    
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
@@ -349,23 +379,9 @@ export default function Home() {
               className="h-16 w-auto mx-auto mb-4"
               priority
             />
-            <div className="mb-2">
-              {isBiz && (
-                <span className="inline-block px-3 py-1 bg-[#00c4cc] text-white text-xs font-bold rounded-full mb-2">
-                  Biz（事業所向け）
-                </span>
-              )}
-              {isPersonal && (
-                <span className="inline-block px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-full mb-2">
-                  Personal（スタッフ向け）
-                </span>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800">ログイン</h1>
+            <h1 className="text-2xl font-bold text-gray-800">スタッフログイン</h1>
             <p className="text-gray-600 text-sm mt-2">
-              {isBiz 
-                ? '施設ID、メールアドレス（またはログインID）、パスワードを入力してください'
-                : 'メールアドレス（またはログインID）、パスワードを入力してください'}
+              メールアドレス（またはログインID）とパスワードを入力してください
             </p>
           </div>
 
@@ -376,24 +392,6 @@ export default function Home() {
           )}
 
           <form onSubmit={handleLogin} className="space-y-6">
-            {isBiz && (
-              <div>
-                <label htmlFor="facilityCode" className="block text-sm font-bold text-gray-700 mb-2">
-                  施設ID
-                </label>
-                <input
-                  id="facilityCode"
-                  type="text"
-                  value={facilityCode}
-                  onChange={(e) => setFacilityCode(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                  placeholder="施設IDを入力"
-                  disabled={loading}
-                />
-              </div>
-            )}
-
             <div>
               <label htmlFor="loginId" className="block text-sm font-bold text-gray-700 mb-2">
                 メールアドレスまたはログインID
@@ -481,28 +479,19 @@ export default function Home() {
               <button
                 type="button"
                 onClick={async () => {
-                  if (isBiz && !facilityCode) {
-                    setError('施設IDを入力してください');
-                    return;
-                  }
                   if (!loginId) {
-                    setError(isBiz 
-                      ? 'メールアドレス（またはログインID）を入力してください'
-                      : 'メールアドレスを入力してください');
+                    setError('メールアドレス（またはログインID）を入力してください');
                     return;
                   }
                   setError('');
                   try {
-                    const facilityCodeToUse = isBiz ? facilityCode : '';
-                    await authenticatePasskey(facilityCodeToUse, loginId);
-                    // パスキー認証が成功した場合、通常のログインフローを実行
-                    // 実際の実装では、パスキー認証の結果に基づいてログイン処理を行う
+                    await authenticatePasskey('', loginId);
                     setError('パスキー認証機能は現在開発中です');
                   } catch (err: any) {
                     setError(err.message || 'パスキー認証に失敗しました');
                   }
                 }}
-                disabled={loading || isAuthenticating || (isBiz && !facilityCode) || !loginId}
+                disabled={loading || isAuthenticating || !loginId}
                 className="mt-4 w-full bg-white hover:bg-gray-50 text-[#00c4cc] border-2 border-[#00c4cc] font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isAuthenticating ? (
@@ -525,49 +514,24 @@ export default function Home() {
             </div>
           )}
 
-          <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
-            {isPersonal ? (
-              <>
-                <p className="text-center text-sm text-gray-600">
-                  アカウントをお持ちでない方は{' '}
-                  <button
-                    onClick={() => router.push('/personal/signup')}
-                    className="text-[#00c4cc] hover:underline font-bold"
-                  >
-                    こちらから新規登録
-                  </button>
-                </p>
-                <p className="text-center text-xs text-gray-400">
-                  <button
-                    onClick={() => window.location.href = 'https://biz.co-shien.inu.co.jp/'}
-                    className="hover:underline"
-                  >
-                    Biz側でログイン
-                  </button>
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-center text-sm text-gray-600 mb-3">
-                  初めてご利用の方は新規登録してください
-                </p>
-                <button
-                  type="button"
-                  onClick={() => router.push('/signup')}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors text-sm"
-                >
-                  新規登録（施設ID発行）
-                </button>
-                <p className="text-center text-xs text-gray-400 mt-2">
-                  <button
-                    onClick={() => window.location.href = 'https://my.co-shien.inu.co.jp/'}
-                    className="hover:underline"
-                  >
-                    Personal側でログイン
-                  </button>
-                </p>
-              </>
-            )}
+          <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
+            <p className="text-center text-sm text-gray-600">
+              アカウントをお持ちでない方は{' '}
+              <button
+                onClick={() => router.push('/signup')}
+                className="text-[#00c4cc] hover:underline font-bold"
+              >
+                こちらから新規登録
+              </button>
+            </p>
+            <p className="text-center text-xs text-gray-400">
+              <button
+                onClick={() => router.push('/client/login')}
+                className="hover:underline"
+              >
+                利用者（保護者）の方はこちら
+              </button>
+            </p>
           </div>
         </div>
       </div>
@@ -594,16 +558,51 @@ export default function Home() {
         return <LeadView setActiveTab={setActiveTab} />;
       case 'schedule':
         return <ScheduleView />;
+      case 'transport':
+        return <TransportRouteView />;
       case 'children':
         return <ChildrenView setActiveTab={setActiveTab} />;
       case 'client-invitation':
         return <ClientInvitationView />;
+      case 'connect':
+        return <ConnectView />;
+      case 'chat':
+        return <ChatManagementView />;
       case 'staff':
         return <StaffManagementView />;
       case 'shift':
         return <StaffView />;
       case 'facility':
         return <FacilitySettingsView />;
+      // 日誌・記録
+      case 'daily-log':
+        return <DailyLogView />;
+      case 'support-plan':
+        return <ServicePlanView />;
+      case 'incident':
+        return <IncidentReportView />;
+      // 運営管理
+      case 'training':
+        return <TrainingRecordView />;
+      case 'audit-preparation':
+        return <AuditPreparationView setActiveTab={setActiveTab} />;
+      case 'committee':
+        return <CommitteeView />;
+      case 'documents':
+        return <DocumentManagementView />;
+      // 経営管理
+      case 'profit-loss':
+        return facility?.id ? <ProfitLossView facilityId={facility.id} /> : null;
+      case 'cash-flow':
+        return facility?.id ? <CashFlowView facilityId={facility.id} /> : null;
+      case 'expense-management':
+        return facility?.id && user?.id ? (
+          <ExpenseManagementView
+            facilityId={facility.id}
+            approverId={user.id}
+            approverName={user.name || ''}
+          />
+        ) : null;
       default:
         return null;
     }

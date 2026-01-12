@@ -13,7 +13,7 @@ import { Staff, UserPermissions, StaffInvitation } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { inviteStaff } from '@/utils/staffInvitationService';
 import { useAuth } from '@/contexts/AuthContext';
-import { getPersonalBaseUrl } from '@/utils/domain';
+import { getPersonalBaseUrl, getInvitationBaseUrl } from '@/utils/domain';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
@@ -492,8 +492,8 @@ const StaffManagementView: React.FC = () => {
       const invitationToken = result.invitationToken;
       setInviteToken(invitationToken);
 
-      // 招待リンクを生成
-      const baseUrl = getPersonalBaseUrl();
+      // 招待リンクを生成（サブドメイン問題を避けるためBizドメインを使用）
+      const baseUrl = getInvitationBaseUrl();
       const invitationLink = `${baseUrl}/activate?token=${invitationToken}`;
       
       setInviteSuccess(true);
@@ -648,7 +648,7 @@ const StaffManagementView: React.FC = () => {
                           try {
                             setInviteLoading(true);
                             // 公開招待用のトークンを生成
-                            const baseUrl = getPersonalBaseUrl();
+                            const baseUrl = getInvitationBaseUrl();
                             const publicToken = btoa(JSON.stringify({ facilityId: facility.id, type: 'public' }));
                             const link = `${baseUrl}/activate?token=${publicToken}`;
                             setInviteToken(publicToken);
@@ -678,7 +678,7 @@ const StaffManagementView: React.FC = () => {
                         setInviteMethod('qr');
                         // QRコード用のリンクを生成
                         if (facility?.id) {
-                          const baseUrl = getPersonalBaseUrl();
+                          const baseUrl = getInvitationBaseUrl();
                           const publicToken = btoa(JSON.stringify({ facilityId: facility.id, type: 'public' }));
                           const link = `${baseUrl}/activate?token=${publicToken}`;
                           setPublicInviteLink(link);
@@ -1901,12 +1901,12 @@ const StaffManagementView: React.FC = () => {
                       <input
                         type="text"
                         readOnly
-                        value={typeof window !== 'undefined' ? `${getPersonalBaseUrl()}/activate?token=${inviteToken}` : ''}
+                        value={typeof window !== 'undefined' ? `${getInvitationBaseUrl()}/activate?token=${inviteToken}` : ''}
                         className="flex-1 px-4 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
                       />
                       <button
                         onClick={async () => {
-                          const link = typeof window !== 'undefined' ? `${getPersonalBaseUrl()}/activate?token=${inviteToken}` : '';
+                          const link = typeof window !== 'undefined' ? `${getInvitationBaseUrl()}/activate?token=${inviteToken}` : '';
                           if (navigator.clipboard) {
                             await navigator.clipboard.writeText(link);
                             alert('リンクをコピーしました');

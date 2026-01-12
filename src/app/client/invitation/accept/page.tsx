@@ -8,6 +8,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import {
   Building2,
   User,
@@ -26,6 +27,7 @@ type Invitation = {
   email: string;
   status: string;
   expires_at: string;
+  child_id?: string; // 施設が既存児童を選択した場合
   facility?: {
     id: string;
     name: string;
@@ -155,6 +157,44 @@ function AcceptInvitationContent() {
     if (!invitation || !currentUser) return;
 
     let childIdToLink = selectedChildId;
+    let facilityChildData: any = null;
+
+    // 施設が既存児童を選択していた場合、その児童データを取得して保存準備
+    if (invitation.child_id) {
+      const { data: facilityChild } = await supabase
+        .from('children')
+        .select('*')
+        .eq('id', invitation.child_id)
+        .single();
+
+      if (facilityChild) {
+        // 施設が入力した情報を保存用に整形
+        facilityChildData = {
+          name: facilityChild.name,
+          nameKana: facilityChild.name_kana,
+          birthDate: facilityChild.birth_date,
+          guardianName: facilityChild.guardian_name,
+          guardianNameKana: facilityChild.guardian_name_kana,
+          guardianRelationship: facilityChild.guardian_relationship,
+          beneficiaryNumber: facilityChild.beneficiary_number,
+          grantDays: facilityChild.grant_days,
+          contractDays: facilityChild.contract_days,
+          address: facilityChild.address,
+          phone: facilityChild.phone,
+          email: facilityChild.email,
+          doctorName: facilityChild.doctor_name,
+          doctorClinic: facilityChild.doctor_clinic,
+          schoolName: facilityChild.school_name,
+          pattern: facilityChild.pattern,
+          patternDays: facilityChild.pattern_days,
+          needsPickup: facilityChild.needs_pickup,
+          needsDropoff: facilityChild.needs_dropoff,
+          pickupLocation: facilityChild.pickup_location,
+          dropoffLocation: facilityChild.dropoff_location,
+          characteristics: facilityChild.characteristics,
+        };
+      }
+    }
 
     // 新規児童を作成する場合
     if (showNewChildForm && !selectedChildId) {
@@ -165,28 +205,66 @@ function AcceptInvitationContent() {
 
       setProcessing(true);
       try {
-        // 新規児童を作成
-        const { data: newChild, error: childError } = await supabase
-          .from('children')
-          .insert({
-            name: newChildData.name,
-            name_kana: newChildData.nameKana || null,
-            birth_date: newChildData.birthDate || null,
-            owner_profile_id: currentUser.id,
-            facility_id: invitation.facility_id,
-            contract_status: 'active',
-            contract_start_date: new Date().toISOString().split('T')[0],
-          })
-          .select()
-          .single();
+        // 新規児童を作成（施設の既存児童がある場合はそれを更新）
+        if (invitation.child_id && facilityChildData) {
+          // 施設の既存児童を利用者アカウントにリンク
+          const { error: updateError } = await supabase
+            .from('children')
+            .update({
+              name: newChildData.name,
+              name_kana: newChildData.nameKana || null,
+              birth_date: newChildData.birthDate || null,
+              owner_profile_id: currentUser.id,
+              facility_intake_data: facilityChildData,
+              facility_intake_recorded_at: new Date().toISOString(),
+              contract_status: 'active',
+            })
+            .eq('id', invitation.child_id);
 
-        if (childError) throw childError;
-        childIdToLink = newChild.id;
+          if (updateError) throw updateError;
+          childIdToLink = invitation.child_id;
+        } else {
+          // 完全に新規の児童を作成
+          const { data: newChild, error: childError } = await supabase
+            .from('children')
+            .insert({
+              name: newChildData.name,
+              name_kana: newChildData.nameKana || null,
+              birth_date: newChildData.birthDate || null,
+              owner_profile_id: currentUser.id,
+              facility_id: invitation.facility_id,
+              contract_status: 'active',
+              contract_start_date: new Date().toISOString().split('T')[0],
+            })
+            .select()
+            .single();
+
+          if (childError) throw childError;
+          childIdToLink = newChild.id;
+        }
       } catch (err: any) {
-        console.error('Error creating child:', err);
+        console.error('Error creating/updating child:', err);
         alert('児童の作成に失敗しました: ' + err.message);
         setProcessing(false);
         return;
+      }
+    }
+
+    // 既存の自分の児童を選択した場合
+    if (selectedChildId && !showNewChildForm) {
+      // 施設の既存児童データがある場合は、選択した児童に施設記録を保存
+      if (facilityChildData) {
+        try {
+          await supabase
+            .from('children')
+            .update({
+              facility_intake_data: facilityChildData,
+              facility_intake_recorded_at: new Date().toISOString(),
+            })
+            .eq('id', selectedChildId);
+        } catch (err) {
+          console.error('Error saving facility intake data:', err);
+        }
       }
     }
 
@@ -242,19 +320,6 @@ function AcceptInvitationContent() {
     } finally {
       setProcessing(false);
     }
-  };
-
-  // 年齢を計算
-  const calculateAge = (birthDate: string) => {
-    if (!birthDate) return null;
-    const birth = new Date(birthDate);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
   };
 
   if (loading) {
@@ -330,7 +395,7 @@ function AcceptInvitationContent() {
               {children.length > 0 && (
                 <div className="space-y-2 mb-4">
                   {children.map((child) => {
-                    const age = child.birth_date ? calculateAge(child.birth_date) : null;
+                    const ageInfo = child.birth_date ? calculateAgeWithMonths(child.birth_date) : null;
                     return (
                       <button
                         key={child.id}
@@ -349,8 +414,8 @@ function AcceptInvitationContent() {
                         </div>
                         <div className="flex-1">
                           <div className="font-bold text-gray-800">{child.name}</div>
-                          {age !== null && (
-                            <div className="text-sm text-gray-500">{age}歳</div>
+                          {ageInfo && (
+                            <div className="text-sm text-gray-500">{ageInfo.display}</div>
                           )}
                         </div>
                         {selectedChildId === child.id && (

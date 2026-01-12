@@ -5,15 +5,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X } from 'lucide-react';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck } from 'lucide-react';
 import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
+import DocumentConfigView from './DocumentConfigView';
 
 const FacilitySettingsView: React.FC = () => {
-  const { facilitySettings, updateFacilitySettings } = useFacilityData();
+  const { facilitySettings, updateFacilitySettings, timeSlots, addTimeSlot, updateTimeSlot, deleteTimeSlot } = useFacilityData();
   const { facility } = useAuth();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
 
@@ -41,6 +42,41 @@ const FacilitySettingsView: React.FC = () => {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [historyType, setHistoryType] = useState<'business_hours' | 'holidays' | 'all'>('all');
   const [historyData, setHistoryData] = useState<FacilitySettingsHistory[]>([]);
+  const [isAddingTimeSlot, setIsAddingTimeSlot] = useState(false);
+  const [newTimeSlot, setNewTimeSlot] = useState({ name: '', startTime: '09:00', endTime: '12:00', capacity: 10 });
+  const [editingTimeSlotId, setEditingTimeSlotId] = useState<string | null>(null);
+  const [isAddressLoading, setIsAddressLoading] = useState(false);
+
+  // 郵便番号から住所を検索
+  const lookupAddress = async () => {
+    const postalCode = settings.postalCode?.replace(/-/g, '');
+    if (!postalCode || postalCode.length !== 7) {
+      alert('7桁の郵便番号を入力してください');
+      return;
+    }
+
+    setIsAddressLoading(true);
+    try {
+      const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${postalCode}`);
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        const fullAddress = `${result.address1}${result.address2}${result.address3}`;
+        setSettings({
+          ...settings,
+          address: fullAddress,
+        });
+      } else {
+        alert('住所が見つかりませんでした');
+      }
+    } catch (error) {
+      console.error('Error looking up address:', error);
+      alert('住所検索に失敗しました');
+    } finally {
+      setIsAddressLoading(false);
+    }
+  };
 
   // facilitySettingsが更新されたらローカル状態も更新
   useEffect(() => {
@@ -292,6 +328,135 @@ const FacilitySettingsView: React.FC = () => {
             />
             <p className="text-xs text-gray-500 mt-1">
               この施設名はサイドバーの下部に表示されます
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 施設住所設定 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+          <MapPin size={20} className="mr-2 text-[#00c4cc]" />
+          施設住所設定
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          送迎ルート計算時の起点・終点として使用されます。
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">
+              郵便番号
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={settings.postalCode || ''}
+                onChange={(e) => {
+                  // ハイフンを自動的に除去して保存
+                  const value = e.target.value.replace(/-/g, '');
+                  setSettings({
+                    ...settings,
+                    postalCode: value,
+                  });
+                }}
+                placeholder="1234567"
+                maxLength={7}
+                className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+              />
+              <button
+                onClick={lookupAddress}
+                disabled={isAddressLoading}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md text-sm font-bold transition-colors disabled:opacity-50"
+              >
+                {isAddressLoading ? '検索中...' : '住所検索'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              郵便番号を入力して「住所検索」をクリックすると、住所が自動入力されます
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">
+              住所
+            </label>
+            <input
+              type="text"
+              value={settings.address || ''}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  address: e.target.value,
+                })
+              }
+              placeholder="東京都○○区1-2-3 ビル名"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 送迎設定 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+          <Truck size={20} className="mr-2 text-[#00c4cc]" />
+          送迎設定
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          1回の送迎で乗車できる最大人数を設定します。送迎ルート計算時に使用されます。
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">
+              お迎え可能人数
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={settings.transportCapacity?.pickup ?? 4}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    transportCapacity: {
+                      ...(settings.transportCapacity || { pickup: 4, dropoff: 4 }),
+                      pickup: parseInt(e.target.value) || 4,
+                    },
+                  })
+                }
+                className="w-20 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+              />
+              <span className="text-sm text-gray-600">名</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              朝のお迎え時に1回で乗車できる最大人数
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">
+              お送り可能人数
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={settings.transportCapacity?.dropoff ?? 4}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    transportCapacity: {
+                      ...(settings.transportCapacity || { pickup: 4, dropoff: 4 }),
+                      dropoff: parseInt(e.target.value) || 4,
+                    },
+                  })
+                }
+                className="w-20 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+              />
+              <span className="text-sm text-gray-600">名</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              帰りのお送り時に1回で乗車できる最大人数
             </p>
           </div>
         </div>
@@ -685,56 +850,199 @@ const FacilitySettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 受け入れ人数設定 */}
+      {/* 時間枠設定 */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
-          <Users size={20} className="mr-2 text-[#00c4cc]" />
-          受け入れ人数設定
+          <Clock size={20} className="mr-2 text-[#00c4cc]" />
+          利用時間枠設定
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="text-sm font-bold text-gray-700 block mb-2">
-              午前の定員（1日あたり）
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={settings.capacity.AM}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  capacity: {
-                    ...settings.capacity,
-                    AM: parseInt(e.target.value) || 0,
-                  },
-                })
-              }
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-            />
-            <p className="text-xs text-gray-500 mt-1">名</p>
-          </div>
-          <div>
-            <label className="text-sm font-bold text-gray-700 block mb-2">
-              午後の定員（1日あたり）
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={settings.capacity.PM}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  capacity: {
-                    ...settings.capacity,
-                    PM: parseInt(e.target.value) || 0,
-                  },
-                })
-              }
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-            />
-            <p className="text-xs text-gray-500 mt-1">名</p>
-          </div>
+        <p className="text-sm text-gray-500 mb-4">
+          午前・午後以外の時間枠も設定できます。放課後デイなど複数の時間区分がある施設向けの設定です。
+        </p>
+
+        {/* 既存の時間枠一覧 */}
+        <div className="space-y-3 mb-4">
+          {timeSlots.map((slot) => (
+            <div
+              key={slot.id}
+              className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+            >
+              {editingTimeSlotId === slot.id ? (
+                // 編集モード
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">枠名</label>
+                      <input
+                        type="text"
+                        value={slot.name}
+                        onChange={(e) => updateTimeSlot(slot.id, { name: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">開始時間</label>
+                      <input
+                        type="time"
+                        value={slot.startTime}
+                        onChange={(e) => updateTimeSlot(slot.id, { startTime: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">終了時間</label>
+                      <input
+                        type="time"
+                        value={slot.endTime}
+                        onChange={(e) => updateTimeSlot(slot.id, { endTime: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">定員</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={slot.capacity}
+                        onChange={(e) => updateTimeSlot(slot.id, { capacity: parseInt(e.target.value) || 10 })}
+                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setEditingTimeSlotId(null)}
+                      className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      完了
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // 表示モード
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="font-bold text-gray-800">{slot.name}</span>
+                    <span className="text-sm text-gray-500">
+                      {slot.startTime} - {slot.endTime}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      定員: {slot.capacity}名
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditingTimeSlotId(slot.id)}
+                      className="text-sm text-[#00c4cc] hover:underline"
+                    >
+                      編集
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm(`「${slot.name}」を削除しますか？`)) {
+                          await deleteTimeSlot(slot.id);
+                        }
+                      }}
+                      className="text-sm text-red-500 hover:underline"
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
+
+        {/* 新規追加フォーム */}
+        {isAddingTimeSlot ? (
+          <div className="border border-[#00c4cc] rounded-lg p-4 bg-cyan-50">
+            <h4 className="font-bold text-sm text-gray-700 mb-3">新しい時間枠を追加</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">枠名</label>
+                <input
+                  type="text"
+                  value={newTimeSlot.name}
+                  onChange={(e) => setNewTimeSlot({ ...newTimeSlot, name: e.target.value })}
+                  placeholder="例: 放課後"
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">開始時間</label>
+                <input
+                  type="time"
+                  value={newTimeSlot.startTime}
+                  onChange={(e) => setNewTimeSlot({ ...newTimeSlot, startTime: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">終了時間</label>
+                <input
+                  type="time"
+                  value={newTimeSlot.endTime}
+                  onChange={(e) => setNewTimeSlot({ ...newTimeSlot, endTime: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">定員</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newTimeSlot.capacity}
+                  onChange={(e) => setNewTimeSlot({ ...newTimeSlot, capacity: parseInt(e.target.value) || 10 })}
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setIsAddingTimeSlot(false);
+                  setNewTimeSlot({ name: '', startTime: '09:00', endTime: '12:00', capacity: 10 });
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={async () => {
+                  if (!newTimeSlot.name.trim()) {
+                    alert('枠名を入力してください');
+                    return;
+                  }
+                  try {
+                    await addTimeSlot({
+                      name: newTimeSlot.name,
+                      startTime: newTimeSlot.startTime,
+                      endTime: newTimeSlot.endTime,
+                      capacity: newTimeSlot.capacity,
+                      displayOrder: timeSlots.length + 1,
+                    });
+                    setIsAddingTimeSlot(false);
+                    setNewTimeSlot({ name: '', startTime: '09:00', endTime: '12:00', capacity: 10 });
+                  } catch (error) {
+                    alert('時間枠の追加に失敗しました');
+                  }
+                }}
+                className="px-4 py-2 text-sm bg-[#00c4cc] text-white rounded font-bold hover:bg-[#00b0b8] transition-colors"
+              >
+                追加
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAddingTimeSlot(true)}
+            className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-[#00c4cc] hover:text-[#00c4cc] transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus size={18} />
+            時間枠を追加
+          </button>
+        )}
       </div>
 
       {/* 保存ボタン */}
@@ -748,6 +1056,11 @@ const FacilitySettingsView: React.FC = () => {
             保存
           </button>
         </div>
+      </div>
+
+      {/* 書類管理設定 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <DocumentConfigView />
       </div>
 
       {/* 履歴モーダル */}

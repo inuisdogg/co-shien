@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -36,12 +36,17 @@ import {
   FileCheck,
   Plus,
   X,
+  MessageSquare,
+  Receipt,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { User as UserType, EmploymentRecord, FacilitySettings } from '@/types';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import { getBizBaseUrl } from '@/utils/domain';
-import { Shield } from 'lucide-react';
+import { Shield, Download, Loader2, Eye } from 'lucide-react';
+import ExpenseReportView from '@/components/staff/ExpenseReportView';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // 運営管理画面へのアクセスリンクコンポーネント
 function AdminAccessLink({ userId }: { userId?: string }) {
@@ -105,7 +110,7 @@ export default function StaffDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [currentFacility, setCurrentFacility] = useState<EmploymentRecord | null>(null);
   const [timeTrackingStatus, setTimeTrackingStatus] = useState<'idle' | 'working' | 'break'>('idle');
-  const [activeTab, setActiveTab] = useState<'home' | 'career' | 'work' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'career' | 'work' | 'expense' | 'settings'>('home');
   const [showAttendanceCalendar, setShowAttendanceCalendar] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [remainingPaidLeave, setRemainingPaidLeave] = useState(10); // 残有給日数
@@ -210,6 +215,183 @@ export default function StaffDashboardPage() {
     pdfUrl?: string;
     certificateStatus: 'approved' | 'pending' | 'not_requested';
   }>>([]);
+  const [generatingPDF, setGeneratingPDF] = useState<'resume' | 'cv' | null>(null);
+  const [showResumePreview, setShowResumePreview] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [usePhotoInResume, setUsePhotoInResume] = useState(true);
+  const [resumeEditData, setResumeEditData] = useState({
+    nearestStation: '',
+    commuteTime: '',
+    motivation: '',
+    personalRequests: '貴社規定に従います',
+    healthStatus: '良好',
+  });
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const resumeRef = useRef<HTMLDivElement>(null);
+  const cvRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // 日付を和暦に変換
+  const toJapaneseDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    if (year >= 2019 && (year > 2019 || month >= 5)) {
+      return `令和${year - 2018}年${month}月`;
+    }
+    if (year >= 1989) {
+      return `平成${year - 1988}年${month}月`;
+    }
+    return `昭和${year - 1925}年${month}月`;
+  };
+
+  // 年齢計算
+  const calculateAge = (birthDate: string): number => {
+    if (!birthDate) return 0;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // 履歴書PDF生成
+  const generateResumePDF = async () => {
+    setGeneratingPDF('resume');
+    try {
+      if (!resumeRef.current) throw new Error('PDF生成に失敗しました');
+      resumeRef.current.style.display = 'block';
+      const canvas = await html2canvas(resumeRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      resumeRef.current.style.display = 'none';
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
+      const fileName = `履歴書_${profileData.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('PDF生成エラー:', error);
+      alert('PDF生成に失敗しました');
+    } finally {
+      setGeneratingPDF(null);
+    }
+  };
+
+  // 職務経歴書PDF生成
+  const generateCVPDF = async () => {
+    setGeneratingPDF('cv');
+    try {
+      if (!cvRef.current) throw new Error('PDF生成に失敗しました');
+      cvRef.current.style.display = 'block';
+      const canvas = await html2canvas(cvRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      cvRef.current.style.display = 'none';
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
+      const fileName = `職務経歴書_${profileData.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('PDF生成エラー:', error);
+      alert('PDF生成に失敗しました');
+    } finally {
+      setGeneratingPDF(null);
+    }
+  };
+
+  // 顔写真アップロード
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/profile-photo.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-photos')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(fileName);
+
+      setProfilePhotoUrl(publicUrl);
+
+      // DBに保存
+      await supabase
+        .from('users')
+        .update({ profile_photo_url: publicUrl })
+        .eq('id', user.id);
+
+    } catch (error) {
+      console.error('写真アップロードエラー:', error);
+      alert('写真のアップロードに失敗しました');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  // プレビューからPDF生成
+  const generateFromPreview = async () => {
+    setGeneratingPDF('resume');
+    try {
+      if (!resumeRef.current) throw new Error('PDF生成に失敗しました');
+      resumeRef.current.style.display = 'block';
+      const canvas = await html2canvas(resumeRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      resumeRef.current.style.display = 'none';
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
+      const fileName = `履歴書_${profileData.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      setShowResumePreview(false);
+    } catch (error) {
+      console.error('PDF生成エラー:', error);
+      alert('PDF生成に失敗しました');
+    } finally {
+      setGeneratingPDF(null);
+    }
+  };
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -222,7 +404,13 @@ export default function StaffDashboardPage() {
         }
 
         const userData = JSON.parse(storedUser);
-        
+
+        // 利用者（クライアント）の場合は利用者ダッシュボードへリダイレクト
+        if (userData.userType === 'client') {
+          router.push('/client/dashboard');
+          return;
+        }
+
         // データベースから最新のユーザー情報を取得（lastName、firstNameを取得するため）
         const { data: latestUserData, error: userFetchError } = await supabase
           .from('users')
@@ -242,6 +430,11 @@ export default function StaffDashboardPage() {
           };
           setUser(updatedUser);
           localStorage.setItem('user', JSON.stringify(updatedUser));
+
+          // 顔写真URL読み込み
+          if (latestUserData.profile_photo_url) {
+            setProfilePhotoUrl(latestUserData.profile_photo_url);
+          }
           
           setProfileData({
             name: updatedUser.name || '',
@@ -643,13 +836,38 @@ export default function StaffDashboardPage() {
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-[#8b5cf6] rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-white" />
-              </div>
+              {/* 顔写真 - クリックでアップロード */}
+              <button
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-[#8b5cf6] hover:border-[#7c3aed] transition-colors group"
+              >
+                {profilePhotoUrl ? (
+                  <img src={profilePhotoUrl} alt="プロフィール写真" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-[#8b5cf6] flex items-center justify-center">
+                    <User className="w-8 h-8 text-white" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-white" />
+                  )}
+                </div>
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">
-                  {user.lastName && user.firstName 
-                    ? `${user.lastName} ${user.firstName}` 
+                  {user.lastName && user.firstName
+                    ? `${user.lastName} ${user.firstName}`
                     : user.name || user.email}
                 </h1>
                 <p className="text-sm text-gray-500">{user.email}</p>
@@ -1785,6 +2003,46 @@ export default function StaffDashboardPage() {
 
       {activeTab === 'career' && (
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+          {/* 履歴書・職務経歴書出力ボタン */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] rounded-lg shadow-sm p-4"
+          >
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="text-white">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  履歴書・職務経歴書
+                </h2>
+                <p className="text-sm text-white/80 mt-1">
+                  下記の情報を元にワンクリックでPDFを生成
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowResumePreview(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#8b5cf6] font-bold rounded-lg hover:bg-white/90 transition-colors"
+                >
+                  <FileText className="w-5 h-5" />
+                  履歴書を作成
+                </button>
+                <button
+                  onClick={generateCVPDF}
+                  disabled={generatingPDF !== null}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/20 text-white font-bold rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50"
+                >
+                  {generatingPDF === 'cv' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5" />
+                  )}
+                  職務経歴書
+                </button>
+              </div>
+            </div>
+          </motion.div>
+
           {/* A. 基本情報（履歴書） */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -2917,6 +3175,17 @@ export default function StaffDashboardPage() {
         </div>
       )}
 
+      {activeTab === 'expense' && (
+        <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
+          <ExpenseReportView
+            userId={user?.id || ''}
+            staffId={currentFacility?.id || ''}
+            facilityId={currentFacility?.facilityId || ''}
+            staffName={user?.name || ''}
+          />
+        </div>
+      )}
+
       {activeTab === 'settings' && (
         <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
           <h2 className="text-xl font-bold text-gray-800 mb-6">設定</h2>
@@ -2984,6 +3253,21 @@ export default function StaffDashboardPage() {
           {/* 運営管理画面へのアクセス（施設発行権限がある場合のみ） */}
           <AdminAccessLink userId={user?.id} />
 
+          {/* 保護者とのチャット */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+            <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-[#00c4cc]" />
+              保護者とのチャット
+            </h3>
+            <button
+              onClick={() => router.push('/staff-dashboard/chat')}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors"
+            >
+              <MessageSquare className="w-5 h-5" />
+              チャット一覧を開く
+            </button>
+          </div>
+
           {/* ログアウト */}
           <button
             onClick={() => {
@@ -3021,7 +3305,7 @@ export default function StaffDashboardPage() {
               <Award className="w-6 h-6" />
               <span className="text-xs font-bold">キャリア</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('work')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
                 activeTab === 'work' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
@@ -3030,7 +3314,16 @@ export default function StaffDashboardPage() {
               <FileText className="w-6 h-6" />
               <span className="text-xs font-bold">業務</span>
             </button>
-            <button 
+            <button
+              onClick={() => setActiveTab('expense')}
+              className={`flex flex-col items-center gap-1 p-2 transition-colors ${
+                activeTab === 'expense' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
+              }`}
+            >
+              <Receipt className="w-6 h-6" />
+              <span className="text-xs font-bold">経費</span>
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
                 activeTab === 'settings' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
@@ -3041,6 +3334,470 @@ export default function StaffDashboardPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* 履歴書プレビューモーダル */}
+      {showResumePreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
+          >
+            {/* ヘッダー */}
+            <div className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6" />
+                <h2 className="text-xl font-bold">履歴書プレビュー</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={generateFromPreview}
+                  disabled={generatingPDF === 'resume'}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#8b5cf6] font-bold rounded-md hover:bg-white/90 transition-colors disabled:opacity-50"
+                >
+                  {generatingPDF === 'resume' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5" />
+                  )}
+                  PDF出力
+                </button>
+                <button
+                  onClick={() => setShowResumePreview(false)}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* プレビュー内容 */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {/* 顔写真オプション */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-300">
+                    {profilePhotoUrl ? (
+                      <img src={profilePhotoUrl} alt="顔写真" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                        <User className="w-6 h-6 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-700">顔写真</span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={usePhotoInResume}
+                    onChange={(e) => setUsePhotoInResume(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#8b5cf6] focus:ring-[#8b5cf6]"
+                  />
+                  <span className="text-sm text-gray-700">履歴書に掲載する</span>
+                </label>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-4">※ 各項目をクリックして編集できます（提出先に応じて調整してください）</p>
+
+              {/* 履歴書形式のプレビュー */}
+              <div className="border border-gray-300 rounded-lg overflow-hidden">
+                <table className="w-full border-collapse">
+                  <tbody>
+                    {/* 氏名 */}
+                    <tr>
+                      <td className="border border-gray-300 p-3 bg-gray-100 w-24 text-sm font-bold">氏名</td>
+                      <td className="border border-gray-300 p-3 text-lg font-bold" colSpan={3}>
+                        {profileData.name || '（未入力）'}
+                      </td>
+                    </tr>
+                    {/* 生年月日 */}
+                    <tr>
+                      <td className="border border-gray-300 p-3 bg-gray-100 text-sm font-bold">生年月日</td>
+                      <td className="border border-gray-300 p-3 text-sm" colSpan={3}>
+                        {profileData.birthDate ? `${toJapaneseDate(profileData.birthDate)} （満${calculateAge(profileData.birthDate)}歳）` : '（未入力）'}
+                        {profileData.gender && ` ・ ${profileData.gender}`}
+                      </td>
+                    </tr>
+                    {/* 住所 */}
+                    <tr>
+                      <td className="border border-gray-300 p-3 bg-gray-100 text-sm font-bold">現住所</td>
+                      <td className="border border-gray-300 p-3 text-sm" colSpan={3}>
+                        {profileData.address || '（未入力）'}
+                      </td>
+                    </tr>
+                    {/* 連絡先 */}
+                    <tr>
+                      <td className="border border-gray-300 p-3 bg-gray-100 text-sm font-bold">電話</td>
+                      <td className="border border-gray-300 p-3 text-sm">{profileData.phone || '（未入力）'}</td>
+                      <td className="border border-gray-300 p-3 bg-gray-100 text-sm font-bold w-24">E-mail</td>
+                      <td className="border border-gray-300 p-3 text-sm">{profileData.email || '（未入力）'}</td>
+                    </tr>
+                    {/* 通勤情報（編集可能） */}
+                    <tr>
+                      <td className="border border-gray-300 p-3 bg-gray-100 text-sm font-bold">最寄駅</td>
+                      <td
+                        className="border border-gray-300 p-3 text-sm cursor-pointer hover:bg-blue-50"
+                        onClick={() => setEditingField('nearestStation')}
+                      >
+                        {editingField === 'nearestStation' ? (
+                          <input
+                            type="text"
+                            value={resumeEditData.nearestStation}
+                            onChange={(e) => setResumeEditData({ ...resumeEditData, nearestStation: e.target.value })}
+                            onBlur={() => setEditingField(null)}
+                            onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
+                            autoFocus
+                            className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none"
+                            placeholder="例: 渋谷駅"
+                          />
+                        ) : (
+                          <span className={resumeEditData.nearestStation ? '' : 'text-gray-400'}>
+                            {resumeEditData.nearestStation || 'クリックして入力'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="border border-gray-300 p-3 bg-gray-100 text-sm font-bold">通勤時間</td>
+                      <td
+                        className="border border-gray-300 p-3 text-sm cursor-pointer hover:bg-blue-50"
+                        onClick={() => setEditingField('commuteTime')}
+                      >
+                        {editingField === 'commuteTime' ? (
+                          <input
+                            type="text"
+                            value={resumeEditData.commuteTime}
+                            onChange={(e) => setResumeEditData({ ...resumeEditData, commuteTime: e.target.value })}
+                            onBlur={() => setEditingField(null)}
+                            onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
+                            autoFocus
+                            className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none"
+                            placeholder="例: 約30分"
+                          />
+                        ) : (
+                          <span className={resumeEditData.commuteTime ? '' : 'text-gray-400'}>
+                            {resumeEditData.commuteTime || 'クリックして入力'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* 学歴・職歴 */}
+                <div className="p-3 border-t border-gray-300">
+                  <h3 className="font-bold text-sm mb-2">学歴・職歴</h3>
+                  <div className="text-sm space-y-1">
+                    <p className="font-bold text-center text-gray-600">学歴</p>
+                    {educationHistory.length === 0 ? (
+                      <p className="text-gray-400 text-center">（学歴が登録されていません）</p>
+                    ) : (
+                      educationHistory.map((edu) => (
+                        <p key={edu.id}>{toJapaneseDate(edu.graduationDate)}　{edu.schoolName} {edu.degree}</p>
+                      ))
+                    )}
+                    <p className="font-bold text-center text-gray-600 mt-2">職歴</p>
+                    {experienceRecords.length === 0 ? (
+                      <p className="text-gray-400 text-center">（職歴が登録されていません）</p>
+                    ) : (
+                      experienceRecords.map((exp) => (
+                        <div key={exp.id}>
+                          <p>{toJapaneseDate(exp.startDate)}　{exp.facilityName} 入社</p>
+                          {exp.endDate && <p>{toJapaneseDate(exp.endDate)}　一身上の都合により退職</p>}
+                        </div>
+                      ))
+                    )}
+                    <p className="text-right">以上</p>
+                  </div>
+                </div>
+
+                {/* 資格・免許 */}
+                <div className="p-3 border-t border-gray-300">
+                  <h3 className="font-bold text-sm mb-2">資格・免許</h3>
+                  <div className="text-sm">
+                    {qualifications.length === 0 ? (
+                      <p className="text-gray-400">（資格が登録されていません）</p>
+                    ) : (
+                      qualifications.map((qual) => (
+                        <p key={qual.id}>{qual.name}</p>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* 志望動機（編集可能） */}
+                <div className="p-3 border-t border-gray-300">
+                  <h3 className="font-bold text-sm mb-2">志望動機</h3>
+                  <div
+                    className="text-sm cursor-pointer hover:bg-blue-50 p-2 rounded min-h-[60px]"
+                    onClick={() => setEditingField('motivation')}
+                  >
+                    {editingField === 'motivation' ? (
+                      <textarea
+                        value={resumeEditData.motivation}
+                        onChange={(e) => setResumeEditData({ ...resumeEditData, motivation: e.target.value })}
+                        onBlur={() => setEditingField(null)}
+                        autoFocus
+                        rows={3}
+                        className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none resize-none"
+                        placeholder="志望動機を入力してください"
+                      />
+                    ) : (
+                      <span className={resumeEditData.motivation ? 'whitespace-pre-wrap' : 'text-gray-400'}>
+                        {resumeEditData.motivation || 'クリックして入力（提出先に応じて記入）'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 本人希望（編集可能） */}
+                <div className="p-3 border-t border-gray-300">
+                  <h3 className="font-bold text-sm mb-2">本人希望記入欄</h3>
+                  <div
+                    className="text-sm cursor-pointer hover:bg-blue-50 p-2 rounded"
+                    onClick={() => setEditingField('personalRequests')}
+                  >
+                    {editingField === 'personalRequests' ? (
+                      <textarea
+                        value={resumeEditData.personalRequests}
+                        onChange={(e) => setResumeEditData({ ...resumeEditData, personalRequests: e.target.value })}
+                        onBlur={() => setEditingField(null)}
+                        autoFocus
+                        rows={2}
+                        className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none resize-none"
+                      />
+                    ) : (
+                      <span className="whitespace-pre-wrap">{resumeEditData.personalRequests}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 健康状態（編集可能） */}
+                <div className="p-3 border-t border-gray-300">
+                  <h3 className="font-bold text-sm mb-2">健康状態</h3>
+                  <div
+                    className="text-sm cursor-pointer hover:bg-blue-50 p-2 rounded"
+                    onClick={() => setEditingField('healthStatus')}
+                  >
+                    {editingField === 'healthStatus' ? (
+                      <input
+                        type="text"
+                        value={resumeEditData.healthStatus}
+                        onChange={(e) => setResumeEditData({ ...resumeEditData, healthStatus: e.target.value })}
+                        onBlur={() => setEditingField(null)}
+                        onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
+                        autoFocus
+                        className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none"
+                      />
+                    ) : (
+                      <span>{resumeEditData.healthStatus}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 履歴書PDFテンプレート（非表示） */}
+      <div ref={resumeRef} style={{ display: 'none', width: '794px', padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#fff' }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '5px' }}>履 歴 書</h1>
+          <p style={{ fontSize: '12px', color: '#666' }}>
+            {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}現在
+          </p>
+        </div>
+
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+          <tbody>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', width: '80px', fontSize: '12px' }}>氏名</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '18px', fontWeight: 'bold' }} colSpan={2}>
+                {profileData.name}
+              </td>
+              <td style={{ border: '1px solid #333', width: '100px', textAlign: 'center', verticalAlign: 'middle' }} rowSpan={4}>
+                {usePhotoInResume && profilePhotoUrl ? (
+                  <img src={profilePhotoUrl} alt="写真" style={{ width: '80px', height: '100px', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: '80px', height: '100px', margin: '0 auto', backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#999' }}>
+                    写真
+                  </div>
+                )}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>生年月日</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }} colSpan={2}>
+                {profileData.birthDate && toJapaneseDate(profileData.birthDate)}
+                {profileData.birthDate && ` （満${calculateAge(profileData.birthDate)}歳）`}
+                {profileData.gender && ` ・ ${profileData.gender}`}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>現住所</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }} colSpan={2}>
+                {profileData.address}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>電話</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }} colSpan={2}>{profileData.phone}</td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>E-mail</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }} colSpan={3}>{profileData.email}</td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>最寄駅</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{resumeEditData.nearestStation || '-'}</td>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px', width: '80px' }}>通勤時間</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{resumeEditData.commuteTime || '-'}</td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>配偶者</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{profileData.hasSpouse ? 'あり' : 'なし'}</td>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>扶養家族</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{profileData.dependentCount}人</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* 学歴・職歴 */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', width: '100px', fontSize: '12px' }}>年月</th>
+              <th style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>学歴・職歴</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center', fontSize: '12px' }} colSpan={2}>学歴</td>
+            </tr>
+            {educationHistory.map((edu) => (
+              <tr key={edu.id}>
+                <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px', textAlign: 'center' }}>{toJapaneseDate(edu.graduationDate)}</td>
+                <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{edu.schoolName} {edu.degree}</td>
+              </tr>
+            ))}
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center', fontSize: '12px' }} colSpan={2}>職歴</td>
+            </tr>
+            {experienceRecords.length === 0 ? (
+              <tr>
+                <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center', fontSize: '12px' }} colSpan={2}>なし</td>
+              </tr>
+            ) : (
+              experienceRecords.map((exp) => (
+                <React.Fragment key={exp.id}>
+                  <tr>
+                    <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px', textAlign: 'center' }}>{toJapaneseDate(exp.startDate)}</td>
+                    <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{exp.facilityName} 入社</td>
+                  </tr>
+                  {exp.endDate && (
+                    <tr>
+                      <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px', textAlign: 'center' }}>{toJapaneseDate(exp.endDate)}</td>
+                      <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>一身上の都合により退職</td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))
+            )}
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'right', fontSize: '12px' }} colSpan={2}>以上</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* 資格・免許 */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>免許・資格</th>
+            </tr>
+          </thead>
+          <tbody>
+            {qualifications.length === 0 ? (
+              <tr>
+                <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center', fontSize: '12px' }}>特になし</td>
+              </tr>
+            ) : (
+              qualifications.map((qual) => (
+                <tr key={qual.id}>
+                  <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{qual.name}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        {/* 志望動機・本人希望・健康状態 */}
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', width: '120px', fontSize: '12px', verticalAlign: 'top' }}>志望動機</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px', minHeight: '60px', whiteSpace: 'pre-wrap' }}>
+                {resumeEditData.motivation || ''}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px', verticalAlign: 'top' }}>本人希望</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px', whiteSpace: 'pre-wrap' }}>
+                {resumeEditData.personalRequests}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>健康状態</td>
+              <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{resumeEditData.healthStatus}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* 職務経歴書PDFテンプレート（非表示） */}
+      <div ref={cvRef} style={{ display: 'none', width: '794px', padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#fff' }}>
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '5px' }}>職 務 経 歴 書</h1>
+          <p style={{ fontSize: '12px', color: '#666' }}>
+            {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}現在
+          </p>
+        </div>
+
+        <div style={{ textAlign: 'right', marginBottom: '20px', fontSize: '14px' }}>
+          <p>{profileData.name}</p>
+        </div>
+
+        {/* 職務経歴 */}
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '2px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>職務経歴</h2>
+          {experienceRecords.length === 0 ? (
+            <p style={{ fontSize: '12px', color: '#666' }}>職歴なし</p>
+          ) : (
+            experienceRecords.map((exp) => (
+              <div key={exp.id} style={{ marginBottom: '20px', paddingLeft: '10px', borderLeft: '3px solid #8b5cf6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{exp.facilityName}</span>
+                  <span style={{ fontSize: '12px', color: '#666' }}>
+                    {toJapaneseDate(exp.startDate)} ～ {exp.endDate ? toJapaneseDate(exp.endDate) : '現在'}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 保有資格 */}
+        {qualifications.length > 0 && (
+          <div style={{ marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '2px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>保有資格</h2>
+            <ul style={{ fontSize: '12px', listStyle: 'disc', paddingLeft: '20px' }}>
+              {qualifications.map((qual) => (
+                <li key={qual.id} style={{ marginBottom: '5px' }}>{qual.name}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

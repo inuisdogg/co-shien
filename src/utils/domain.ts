@@ -1,28 +1,26 @@
 /**
  * ドメイン設定ユーティリティ
- * Biz側とPersonal側のドメインを管理
+ *
+ * ドメイン構成:
+ * - biz.co-shien.inu.co.jp → スタッフ用（ログイン、ダッシュボード、施設管理）
+ * - my.co-shien.inu.co.jp → 利用者（クライアント）専用
  */
 
 /**
  * 現在のアプリケーションタイプを取得
+ * @returns 'staff' | 'client'
  */
 export function getAppType(): 'biz' | 'personal' {
   if (typeof window === 'undefined') {
-    // サーバーサイド
-    return (process.env.NEXT_PUBLIC_APP_TYPE as 'biz' | 'personal') || 'biz';
-  }
-  
-  // クライアントサイド: ホスト名から判定
-  const hostname = window.location.hostname;
-  if (hostname.includes('biz.co-shien') || hostname === 'biz.co-shien.inu.co.jp') {
     return 'biz';
   }
+
+  const hostname = window.location.hostname;
   if (hostname.includes('my.co-shien') || hostname === 'my.co-shien.inu.co.jp') {
-    return 'personal';
+    return 'personal'; // クライアント用ドメイン
   }
-  
-  // デフォルトは環境変数から
-  return (process.env.NEXT_PUBLIC_APP_TYPE as 'biz' | 'personal') || 'biz';
+
+  return 'biz'; // スタッフ用ドメイン（デフォルト）
 }
 
 /**
@@ -30,75 +28,83 @@ export function getAppType(): 'biz' | 'personal' {
  */
 export function getBaseUrl(): string {
   if (typeof window !== 'undefined') {
-    // クライアントサイド: 現在のoriginを使用
     return window.location.origin;
   }
-  
-  // サーバーサイド: 環境変数から取得
-  const appType = getAppType();
-  if (appType === 'biz') {
-    return process.env.NEXT_PUBLIC_BIZ_DOMAIN 
-      ? `https://${process.env.NEXT_PUBLIC_BIZ_DOMAIN}`
-      : 'https://biz.co-shien.inu.co.jp';
-  } else {
-    return process.env.NEXT_PUBLIC_PERSONAL_DOMAIN
-      ? `https://${process.env.NEXT_PUBLIC_PERSONAL_DOMAIN}`
-      : 'https://my.co-shien.inu.co.jp';
-  }
+
+  return 'https://biz.co-shien.inu.co.jp';
 }
 
 /**
- * Biz側のドメインを取得
+ * スタッフ用ドメインを取得
  */
 export function getBizDomain(): string {
   return process.env.NEXT_PUBLIC_BIZ_DOMAIN || 'biz.co-shien.inu.co.jp';
 }
 
 /**
- * Personal側のドメインを取得
+ * クライアント用ドメインを取得
  */
-export function getPersonalDomain(): string {
-  return process.env.NEXT_PUBLIC_PERSONAL_DOMAIN || 'my.co-shien.inu.co.jp';
+export function getClientDomain(): string {
+  return process.env.NEXT_PUBLIC_CLIENT_DOMAIN || 'my.co-shien.inu.co.jp';
 }
 
 /**
- * Biz側のベースURLを取得（ローカルホスト対応）
+ * @deprecated Use getClientDomain instead
+ */
+export function getPersonalDomain(): string {
+  return getClientDomain();
+}
+
+/**
+ * スタッフ用ベースURLを取得（ローカルホスト対応）
  */
 export function getBizBaseUrl(): string {
   if (typeof window !== 'undefined') {
-    // クライアントサイド: 現在のホスト名を確認
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // ローカルホストの場合は現在のポートを使用
       return `${window.location.protocol}//${window.location.host}`;
     }
   }
-  // 本番環境またはサーバーサイド
   return `https://${getBizDomain()}`;
 }
 
 /**
- * Personal側のベースURLを取得（ローカルホスト対応）
+ * クライアント用ベースURLを取得（ローカルホスト対応）
  */
-export function getPersonalBaseUrl(): string {
+export function getClientBaseUrl(): string {
   if (typeof window !== 'undefined') {
-    // クライアントサイド: 現在のホスト名を確認
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // ローカルホストの場合は現在のポートを使用
-      // BizとPersonalが同じホストで動作している場合を想定
       return `${window.location.protocol}//${window.location.host}`;
     }
-    // 本番環境: 現在のホストがPersonal側かどうかを確認
     if (hostname.includes('my.co-shien') || hostname === 'my.co-shien.inu.co.jp') {
-      // 既にPersonal側にいる場合は現在のホストを使用
       return `${window.location.protocol}//${window.location.host}`;
     }
   }
-  // 本番環境またはサーバーサイド
-  return `https://${getPersonalDomain()}`;
+  return `https://${getClientDomain()}`;
 }
 
+/**
+ * @deprecated Use getClientBaseUrl instead
+ */
+export function getPersonalBaseUrl(): string {
+  return getClientBaseUrl();
+}
 
+/**
+ * 招待リンク用のベースURLを取得
+ * クライアント招待はmy.ドメイン、スタッフ招待はbiz.ドメインを使用
+ */
+export function getInvitationBaseUrl(forClient: boolean = false): string {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `${window.location.protocol}//${window.location.host}`;
+    }
+  }
 
-
+  if (forClient) {
+    return `https://${getClientDomain()}`;
+  }
+  return `https://${getBizDomain()}`;
+}

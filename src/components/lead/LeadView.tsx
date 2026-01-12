@@ -18,17 +18,21 @@ import {
   ChevronRight,
   MoreVertical,
   CheckCircle,
+  UserPlus,
 } from 'lucide-react';
 import { Lead, LeadStatus, LeadFormData, Child, PreferenceOption } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LeadViewProps {
   setActiveTab?: (tab: string) => void;
 }
 
 const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
-  const { leads, children, addLead, updateLead, deleteLead } = useFacilityData();
-  
+  const { facility } = useAuth();
+  const { leads, children, addLead, updateLead, deleteLead, addChild } = useFacilityData();
+
   // デバッグ: リードデータの確認
   useEffect(() => {
     console.log('📞 LeadView: リードデータ:', leads.length, '件');
@@ -43,6 +47,11 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
   const [actionMenuLeadId, setActionMenuLeadId] = useState<string | null>(null);
   const [isStatusChangeModalOpen, setIsStatusChangeModalOpen] = useState(false);
   const [leadForStatusChange, setLeadForStatusChange] = useState<Lead | null>(null);
+
+  // 児童仮登録用の状態
+  const [isQuickChildModalOpen, setIsQuickChildModalOpen] = useState(false);
+  const [quickChildName, setQuickChildName] = useState('');
+  const [creatingChild, setCreatingChild] = useState(false);
 
   // 曜日の配列
   const daysOfWeek = ['月', '火', '水', '木', '金', '土', '日'];
@@ -180,6 +189,83 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
   const handleGoToChildren = (childId?: string) => {
     if (setActiveTab) {
       setActiveTab('children');
+    }
+  };
+
+  // リード情報から児童を仮登録する関数
+  const handleQuickChildRegistration = async () => {
+    if (!quickChildName.trim()) {
+      alert('児童名を入力してください');
+      return;
+    }
+
+    if (!facility?.id) {
+      alert('施設情報が取得できません');
+      return;
+    }
+
+    setCreatingChild(true);
+    try {
+      // リード情報から児童データを作成
+      const childId = `child-${crypto.randomUUID()}`;
+
+      // 曜日配列をパターン日オブジェクトに変換
+      const patternDays: Record<string, boolean> = {};
+      if (formData.preferredDays && formData.preferredDays.length > 0) {
+        const dayMapping: Record<string, string> = {
+          '月': 'mon', '火': 'tue', '水': 'wed', '木': 'thu',
+          '金': 'fri', '土': 'sat', '日': 'sun'
+        };
+        formData.preferredDays.forEach(day => {
+          const key = dayMapping[day];
+          if (key) patternDays[key] = true;
+        });
+      }
+
+      // 送迎設定の変換
+      const needsPickup = formData.pickupOption === 'required' || formData.pickupOption === 'preferred';
+      const needsDropoff = formData.pickupOption === 'required' || formData.pickupOption === 'preferred';
+
+      const childData = {
+        id: childId,
+        facility_id: facility.id,
+        name: quickChildName.trim(),
+        guardian_name: formData.name || null, // リード名を保護者名として使用
+        phone: formData.phone || null,
+        email: formData.email || null,
+        address: formData.address || null,
+        pattern_days: Object.keys(patternDays).length > 0 ? patternDays : null,
+        needs_pickup: needsPickup,
+        needs_dropoff: needsDropoff,
+        contract_status: 'pre-contract', // 仮登録は契約前ステータス
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Supabaseに児童を作成
+      const { error: childError } = await supabase
+        .from('children')
+        .insert(childData);
+
+      if (childError) throw childError;
+
+      // リードの childIds 配列を更新
+      const updatedChildIds = [...formData.childIds, childId];
+      setFormData({ ...formData, childIds: updatedChildIds });
+
+      // モーダルを閉じてリセット
+      setIsQuickChildModalOpen(false);
+      setQuickChildName('');
+
+      alert(`児童「${quickChildName}」を仮登録しました。リードに紐付けられました。`);
+
+      // ページをリロードして児童リストを更新
+      window.location.reload();
+    } catch (error: any) {
+      console.error('児童仮登録エラー:', error);
+      alert('児童の仮登録に失敗しました: ' + error.message);
+    } finally {
+      setCreatingChild(false);
     }
   };
 
@@ -608,13 +694,25 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
                         )}
                       </>
                     )}
-                    <button
-                      onClick={() => handleGoToChildren()}
-                      className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-bold flex items-center"
-                    >
-                      児童管理で新規登録
-                      <ChevronRight size={12} className="ml-1" />
-                    </button>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => {
+                          setQuickChildName('');
+                          setIsQuickChildModalOpen(true);
+                        }}
+                        className="flex-1 text-xs bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-3 rounded-md flex items-center justify-center gap-1 transition-colors"
+                      >
+                        <UserPlus size={14} />
+                        児童を仮登録
+                      </button>
+                      <button
+                        onClick={() => handleGoToChildren()}
+                        className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-bold flex items-center"
+                      >
+                        児童管理で詳細登録
+                        <ChevronRight size={12} className="ml-1" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -770,6 +868,126 @@ const LeadView: React.FC<LeadViewProps> = ({ setActiveTab }) => {
                 className="px-6 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold shadow-md transition-colors"
               >
                 児童管理で詳細確認
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 児童仮登録モーダル */}
+      {isQuickChildModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-lg text-gray-800">児童を仮登録</h3>
+                <button
+                  onClick={() => setIsQuickChildModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                リード情報を引き継いで児童を仮登録します。<br />
+                詳細情報は後から児童管理で編集できます。
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* 児童名入力 */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">
+                  児童名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                  placeholder="例: 山田 太郎"
+                  value={quickChildName}
+                  onChange={(e) => setQuickChildName(e.target.value)}
+                />
+              </div>
+
+              {/* 引き継がれる情報の表示 */}
+              <div className="bg-gray-50 rounded-md p-4">
+                <h4 className="text-xs font-bold text-gray-700 mb-3">リードから引き継がれる情報</h4>
+                <div className="space-y-2 text-xs">
+                  {formData.name && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">保護者名:</span>
+                      <span className="text-gray-800 font-medium">{formData.name}</span>
+                    </div>
+                  )}
+                  {formData.phone && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">電話番号:</span>
+                      <span className="text-gray-800 font-medium">{formData.phone}</span>
+                    </div>
+                  )}
+                  {formData.email && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">メールアドレス:</span>
+                      <span className="text-gray-800 font-medium">{formData.email}</span>
+                    </div>
+                  )}
+                  {formData.address && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">住所:</span>
+                      <span className="text-gray-800 font-medium truncate max-w-[200px]">{formData.address}</span>
+                    </div>
+                  )}
+                  {formData.preferredDays && formData.preferredDays.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">利用希望曜日:</span>
+                      <span className="text-gray-800 font-medium">{formData.preferredDays.join('・')}</span>
+                    </div>
+                  )}
+                  {formData.pickupOption && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">送迎:</span>
+                      <span className="text-gray-800 font-medium">
+                        {formData.pickupOption === 'required' ? '必須' : formData.pickupOption === 'preferred' ? 'あれば使いたい' : '不要'}
+                      </span>
+                    </div>
+                  )}
+                  {!formData.name && !formData.phone && !formData.email && !formData.address && (
+                    <p className="text-gray-400">引き継ぐ情報がありません</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 注意事項 */}
+              <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                <p className="text-xs text-orange-700">
+                  仮登録後、児童管理から「利用者招待」を送信できます。
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setIsQuickChildModalOpen(false)}
+                className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md text-sm font-bold transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleQuickChildRegistration}
+                disabled={creatingChild || !quickChildName.trim()}
+                className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-bold shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {creatingChild ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    登録中...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={16} />
+                    仮登録する
+                  </>
+                )}
               </button>
             </div>
           </div>
