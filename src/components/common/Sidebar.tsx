@@ -1,15 +1,15 @@
 /**
  * サイドバーコンポーネント
+ * アコーディオン形式のメニューでUXを改善
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import {
   CalendarDays,
   Users,
-  Briefcase,
   Settings,
   Target,
   Building2,
@@ -30,6 +30,8 @@ import {
   TrendingUp,
   Link2,
   Truck,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -47,6 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
   const { facility } = useAuth();
   const { facilitySettings } = useFacilityData();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const { isAdmin, isMaster, hasPermission } = useAuth();
   const isPersonal = mode === 'personal';
@@ -61,25 +64,26 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
           .select('code')
           .eq('id', facility.id)
           .single();
-        
+
         if (!error && data) {
           setCurrentFacilityCode(data.code || '');
         }
       }
     };
-    
+
     fetchFacilityCode();
     // 定期的に更新（30秒ごと）
     const interval = setInterval(fetchFacilityCode, 30000);
     return () => clearInterval(interval);
   }, [facility?.id]);
-  
-  // メニューを用途ごとに定義（各メニューに個別の権限を設定）
+
+  // メニューを用途ごとに定義（整理・統合済み）
   const menuCategories = [
     {
-      category: '利用者管理',
+      category: '利用者',
+      icon: Users,
       items: [
-        { id: 'schedule', label: '利用調整・予約', icon: CalendarDays, permission: 'schedule' as const },
+        { id: 'schedule', label: '利用予約', icon: CalendarDays, permission: 'schedule' as const },
         { id: 'children', label: '児童管理', icon: Users, permission: 'children' as const },
         { id: 'transport', label: '送迎ルート', icon: Truck, permission: 'transport' as const },
         { id: 'chat', label: 'チャット', icon: MessageSquare, permission: 'chat' as const },
@@ -89,7 +93,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       ],
     },
     {
-      category: '日誌・記録',
+      category: '記録',
+      icon: BookOpen,
       items: [
         { id: 'daily-log', label: '業務日誌', icon: BookOpen, permission: 'dailyLog' as const },
         { id: 'support-plan', label: '個別支援計画', icon: ClipboardList, permission: 'supportPlan' as const },
@@ -97,7 +102,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       ],
     },
     {
-      category: 'スタッフ管理',
+      category: 'スタッフ',
+      icon: CalendarCheck,
       items: [
         { id: 'staff', label: 'スタッフ管理', icon: Users, permission: 'staff' as const },
         { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'shift' as const },
@@ -105,7 +111,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       ],
     },
     {
-      category: '運営管理',
+      category: '運営',
+      icon: ClipboardCheck,
       items: [
         { id: 'audit-preparation', label: '運営指導準備', icon: ClipboardCheck, permission: 'auditPreparation' as const },
         { id: 'committee', label: '委員会管理', icon: UsersRound, permission: 'committee' as const },
@@ -113,7 +120,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       ],
     },
     {
-      category: '売上・経営管理',
+      category: '経営',
+      icon: BarChart3,
       items: [
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
         { id: 'profit-loss', label: '損益計算書', icon: TrendingUp, permission: 'profitLoss' as const },
@@ -124,6 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
     },
     {
       category: '設定',
+      icon: Settings,
       items: [
         { id: 'facility', label: '施設情報', icon: Settings, permission: 'facility' as const },
       ],
@@ -131,13 +140,37 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
   ];
 
   // 権限に基づいてメニューをフィルタリング
-  const filteredCategories = menuCategories.map((category) => ({
+  const filteredCategories = useMemo(() => menuCategories.map((category) => ({
     ...category,
     items: category.items.filter((item) => {
       if (isAdmin) return true; // 管理者は全メニューにアクセス可能
       return hasPermission(item.permission);
     }),
-  })).filter((category) => category.items.length > 0); // 空のカテゴリを除外
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  })).filter((category) => category.items.length > 0), [isAdmin]);
+
+  // アクティブなタブが含まれるカテゴリを自動展開
+  useEffect(() => {
+    const activeCategory = filteredCategories.find(cat =>
+      cat.items.some(item => item.id === activeTab)
+    );
+    if (activeCategory) {
+      setExpandedCategories(prev => new Set(prev).add(activeCategory.category));
+    }
+  }, [activeTab, filteredCategories]);
+
+  // カテゴリの展開/折りたたみ切り替え
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <>
@@ -168,33 +201,63 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         </button>
       </div>
 
-      <div className="px-3 py-4 flex-1 overflow-y-auto">
-        {filteredCategories.map((category, categoryIndex) => (
-          <div key={category.category} className={categoryIndex > 0 ? 'mt-6' : ''}>
-            <div className="text-[11px] text-gray-500 font-bold mb-3 px-3 uppercase tracking-wider">
-              {category.category}
+      <div className="px-2 py-3 flex-1 overflow-y-auto">
+        {filteredCategories.map((category, categoryIndex) => {
+          const isExpanded = expandedCategories.has(category.category);
+          const hasActiveItem = category.items.some(item => item.id === activeTab);
+          const CategoryIcon = category.icon;
+
+          return (
+            <div key={category.category} className={categoryIndex > 0 ? 'mt-1' : ''}>
+              {/* カテゴリヘッダー（クリックで展開/折りたたみ） */}
+              <button
+                onClick={() => toggleCategory(category.category)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
+                  hasActiveItem
+                    ? `${isPersonal ? 'bg-purple-50 text-purple-700' : 'bg-teal-50 text-teal-700'}`
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <CategoryIcon size={16} strokeWidth={2} />
+                  <span className="text-[13px] font-bold">{category.category}</span>
+                </div>
+                {isExpanded ? (
+                  <ChevronDown size={14} className="text-gray-400" />
+                ) : (
+                  <ChevronRight size={14} className="text-gray-400" />
+                )}
+              </button>
+
+              {/* サブメニュー（展開時のみ表示） */}
+              <div
+                className={`overflow-hidden transition-all duration-200 ease-in-out ${
+                  isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                }`}
+              >
+                <nav className="pl-3 pt-1 space-y-0.5">
+                  {category.items.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        onClose?.();
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-[13px] ${
+                        activeTab === item.id
+                          ? `${isPersonal ? 'bg-[#8b5cf6]' : 'bg-[#00c4cc]'} text-white font-bold shadow-sm`
+                          : 'text-gray-600 hover:bg-gray-100 font-medium'
+                      }`}
+                    >
+                      <item.icon size={15} strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
             </div>
-            <nav className="space-y-1">
-              {category.items.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    onClose?.();
-                  }}
-                  className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-md transition-all text-sm font-medium ${
-                    activeTab === item.id
-                      ? `${isPersonal ? 'bg-[#8b5cf6]' : 'bg-[#00c4cc]'} text-white shadow-md`
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <item.icon size={18} strokeWidth={2} />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-auto p-4 border-t border-gray-200">
