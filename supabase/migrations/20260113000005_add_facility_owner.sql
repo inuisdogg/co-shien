@@ -24,7 +24,9 @@ SET owner_user_id = (
 )
 WHERE f.owner_user_id IS NULL;
 
--- dev施設のオーナーをdev-staff-user-001に設定（開発用）
+-- dev施設のオーナーをdev-staff-user-001に設定（開発用、ユーザーが存在する場合のみ）
 UPDATE facilities
 SET owner_user_id = 'dev-staff-user-001'
-WHERE id = 'facility-demo-001' AND owner_user_id IS NULL;
+WHERE id = 'facility-demo-001'
+  AND owner_user_id IS NULL
+  AND EXISTS (SELECT 1 FROM users WHERE id = 'dev-staff-user-001');
