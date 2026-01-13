@@ -91,7 +91,18 @@ function TimeTrackingButtons({
     }
   };
 
-  const buttonBase = "flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+  // co-shienカラーベースのボタンスタイル
+  const buttonBase = "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed";
+
+  // アクティブ時のスタイル（co-shienティール系）
+  const activeStyles = {
+    start: 'bg-[#00c4cc] hover:bg-[#00b0b8] text-white shadow-md',
+    break: 'bg-[#00a3aa] hover:bg-[#009299] text-white shadow-md',
+    resume: 'bg-[#00c4cc] hover:bg-[#00b0b8] text-white shadow-md',
+    end: 'bg-[#008b92] hover:bg-[#007a80] text-white shadow-md',
+  };
+
+  const inactiveStyle = 'bg-gray-100 text-gray-400 border border-gray-200';
 
   return (
     <div className="space-y-3">
@@ -105,33 +116,31 @@ function TimeTrackingButtons({
 
       {/* 打刻時間表示 */}
       {attendance?.startTime && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600">
-          <div>始業: <span className="font-medium text-gray-800">{attendance.startTime}</span></div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 bg-white/50 rounded-lg px-3 py-2">
+          <div>始業: <span className="font-bold text-[#00c4cc]">{attendance.startTime}</span></div>
           {attendance.breakStartTime && (
-            <div>休憩: <span className="font-medium text-gray-800">{attendance.breakStartTime}</span></div>
+            <div>休憩: <span className="font-bold text-[#00a3aa]">{attendance.breakStartTime}</span></div>
           )}
           {attendance.breakEndTime && (
-            <div>戻り: <span className="font-medium text-gray-800">{attendance.breakEndTime}</span></div>
+            <div>戻り: <span className="font-bold text-[#00c4cc]">{attendance.breakEndTime}</span></div>
           )}
           {attendance.endTime && (
-            <div>退勤: <span className="font-medium text-gray-800">{attendance.endTime}</span></div>
+            <div>退勤: <span className="font-bold text-[#008b92]">{attendance.endTime}</span></div>
           )}
         </div>
       )}
 
-      {/* 打刻ボタン */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* 打刻ボタン - 横一列 */}
+      <div className="flex gap-2">
         {/* 始業ボタン */}
         <button
           onClick={() => handleAction(() => onClockIn(facilityId))}
           disabled={isProcessing || status !== 'not_started'}
           className={`${buttonBase} ${
-            status === 'not_started'
-              ? 'bg-green-500 hover:bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-400'
+            status === 'not_started' ? activeStyles.start : inactiveStyle
           }`}
         >
-          <PlayCircle className="w-5 h-5" />
+          <PlayCircle className="w-4 h-4" />
           始業
         </button>
 
@@ -140,12 +149,10 @@ function TimeTrackingButtons({
           onClick={() => handleAction(() => onStartBreak(facilityId))}
           disabled={isProcessing || status !== 'working'}
           className={`${buttonBase} ${
-            status === 'working'
-              ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-              : 'bg-gray-100 text-gray-400'
+            status === 'working' ? activeStyles.break : inactiveStyle
           }`}
         >
-          <Coffee className="w-5 h-5" />
+          <Coffee className="w-4 h-4" />
           休憩
         </button>
 
@@ -154,12 +161,10 @@ function TimeTrackingButtons({
           onClick={() => handleAction(() => onEndBreak(facilityId))}
           disabled={isProcessing || status !== 'on_break'}
           className={`${buttonBase} ${
-            status === 'on_break'
-              ? 'bg-blue-500 hover:bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-400'
+            status === 'on_break' ? activeStyles.resume : inactiveStyle
           }`}
         >
-          <PauseCircle className="w-5 h-5" />
+          <PauseCircle className="w-4 h-4" />
           戻り
         </button>
 
@@ -168,12 +173,10 @@ function TimeTrackingButtons({
           onClick={() => handleAction(() => onClockOut(facilityId))}
           disabled={isProcessing || (status !== 'working' && status !== 'on_break')}
           className={`${buttonBase} ${
-            status === 'working' || status === 'on_break'
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-gray-100 text-gray-400'
+            status === 'working' || status === 'on_break' ? activeStyles.end : inactiveStyle
           }`}
         >
-          <LogOut className="w-5 h-5" />
+          <LogOut className="w-4 h-4" />
           退勤
         </button>
       </div>
