@@ -48,6 +48,29 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   UNIQUE(user_id, facility_id, date, type)
 );
 
+-- 既存テーブルに不足カラムを追加（存在しない場合のみ）
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'attendance_records' AND column_name = 'is_manual_correction') THEN
+    ALTER TABLE attendance_records ADD COLUMN is_manual_correction BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'attendance_records' AND column_name = 'correction_reason') THEN
+    ALTER TABLE attendance_records ADD COLUMN correction_reason TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'attendance_records' AND column_name = 'corrected_by') THEN
+    ALTER TABLE attendance_records ADD COLUMN corrected_by TEXT REFERENCES users(id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'attendance_records' AND column_name = 'location_lat') THEN
+    ALTER TABLE attendance_records ADD COLUMN location_lat DECIMAL(10, 8);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'attendance_records' AND column_name = 'location_lng') THEN
+    ALTER TABLE attendance_records ADD COLUMN location_lng DECIMAL(11, 8);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'attendance_records' AND column_name = 'memo') THEN
+    ALTER TABLE attendance_records ADD COLUMN memo TEXT;
+  END IF;
+END$$;
+
 -- インデックス
 CREATE INDEX IF NOT EXISTS idx_attendance_records_user_facility
   ON attendance_records(user_id, facility_id);
