@@ -325,6 +325,25 @@ export async function activateAccount(
       }
     }
 
+    // アカウント有効化の通知を施設管理者に送信
+    if (!isAlreadyActive && facilityId) {
+      try {
+        await supabase
+          .from('notifications')
+          .insert({
+            facility_id: facilityId,
+            user_id: null, // 施設全体への通知（管理者向け）
+            type: 'staff_activated',
+            title: 'スタッフがアカウントを有効化しました',
+            message: `${user.name}さんがアカウントを有効化し、連携が完了しました。ダッシュボードの権限を設定してください。`,
+            related_user_id: userId,
+          });
+      } catch (notificationError) {
+        // 通知の送信に失敗しても、アクティベーション自体は成功とする
+        console.error('通知の送信に失敗:', notificationError);
+      }
+    }
+
     return { user: user as any, employmentRecord };
   } catch (error) {
     console.error('Error activating account:', error);

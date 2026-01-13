@@ -21,6 +21,8 @@ import {
   ManagementTargetFormData,
   TimeSlot,
   FacilityTimeSlot,
+  AccountStatus,
+  UserPermissions,
 } from '@/types';
 
 export const useFacilityData = () => {
@@ -315,6 +317,16 @@ export const useFacilityData = () => {
 
     const fetchStaff = async () => {
       try {
+        // 0. 施設のオーナーユーザーIDを取得
+        const { data: facilityData, error: facilityError } = await supabase
+          .from('facilities')
+          .select('owner_user_id')
+          .eq('id', facilityId)
+          .single();
+
+        const ownerUserId = facilityData?.owner_user_id || null;
+        console.log('✅ fetchStaff: ownerUserId:', ownerUserId);
+
         // 1. staffテーブルから取得（従来の方法）
         const { data: staffData, error: staffError } = await supabase
           .from('staff')
@@ -326,10 +338,10 @@ export const useFacilityData = () => {
           console.error('Error fetching staff:', staffError);
         }
 
-        // 2. employment_recordsから取得（新規招待されたスタッフ）
+        // 2. employment_recordsから取得（新規招待されたスタッフ）※permissionsも含む
         const { data: employmentData, error: employmentError } = await supabase
           .from('employment_records')
-          .select('id, user_id, facility_id, role, employment_type, start_date, end_date')
+          .select('id, user_id, facility_id, role, employment_type, start_date, end_date, permissions')
           .eq('facility_id', facilityId)
           .is('end_date', null)
           .order('start_date', { ascending: false });
@@ -353,7 +365,7 @@ export const useFacilityData = () => {
             // usersテーブルからユーザー情報を取得（個人情報も含む）
             const { data: usersData, error: usersError } = await supabase
               .from('users')
-              .select('id, name, email, phone, birth_date, gender, address, postal_code, my_number, spouse_name, basic_pension_symbol, basic_pension_number, employment_insurance_status, employment_insurance_number, previous_retirement_date, previous_name, social_insurance_status, has_dependents, dependent_count, dependents')
+              .select('id, name, email, phone, birth_date, gender, address, postal_code, my_number, spouse_name, basic_pension_symbol, basic_pension_number, employment_insurance_status, employment_insurance_number, previous_retirement_date, previous_name, social_insurance_status, has_dependents, dependent_count, dependents, account_status')
               .in('id', userIds);
 
             if (usersError) {
@@ -388,7 +400,14 @@ export const useFacilityData = () => {
                 if (user) {
                   // staffテーブルからfacilityRoleを取得
                   const facilityRoleFromStaff = staffRoleMap.get(user.id) || '';
-                  
+
+                  // 権限情報を取得
+                  const permissions = (emp.permissions as UserPermissions) || {};
+                  // ダッシュボード権限があるかどうか（いずれかの権限がtrueならtrue）
+                  const hasDashboardAccess = Object.values(permissions).some(v => v === true);
+                  // マスター管理者かどうか（施設オーナー）
+                  const isMaster = ownerUserId === user.id;
+
                   const staffFromEmployment: Staff = {
                     id: `emp-${emp.id}`, // employment_recordのIDを使用（重複を避けるためプレフィックス）
                     facilityId: emp.facility_id,
@@ -397,6 +416,10 @@ export const useFacilityData = () => {
                     role: (emp.role as '一般スタッフ' | 'マネージャー' | '管理者') || '一般スタッフ',
                     type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as '常勤' | '非常勤',
                     facilityRole: facilityRoleFromStaff, // staffテーブルのmemoフィールドから取得した施設での役割
+                    accountStatus: (user.account_status as AccountStatus) || 'pending', // アカウントステータス
+                    permissions: permissions, // ダッシュボード権限
+                    hasDashboardAccess: hasDashboardAccess || isMaster, // ダッシュボード権限があるかどうか（マスターは常にtrue）
+                    isMaster: isMaster, // マスター管理者かどうか
                     birthDate: user.birth_date || '',
                     gender: user.gender as '男性' | '女性' | 'その他' | undefined,
                     address: user.address || '',

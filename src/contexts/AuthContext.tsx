@@ -16,6 +16,7 @@ interface AuthContextType {
   facility: Facility | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isMaster: boolean; // マスター管理者（施設オーナー）かどうか
   login: (facilityCode: string, loginId: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: keyof UserPermissions) => boolean;
@@ -255,6 +256,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: facilityData.id,
           name: facilitySettings?.facility_name || facilityData.name,
           code: facilityData.code || facilityData.id,
+          ownerUserId: facilityData.owner_user_id,
           createdAt: facilityData.created_at,
           updatedAt: facilityData.updated_at,
         };
@@ -342,10 +344,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const facility: Facility = {
         id: staffData.facility_id,
-        name: facilitySettings?.facility_name || staffData.facility_id,
-        code: staffData.facility_id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        name: facilitySettings?.facility_name || facilityData.name,
+        code: facilityData.code || staffData.facility_id,
+        ownerUserId: facilityData.owner_user_id,
+        createdAt: facilityData.created_at || new Date().toISOString(),
+        updatedAt: facilityData.updated_at || new Date().toISOString(),
       };
       setFacility(facility);
       localStorage.setItem('facility', JSON.stringify(facility));
@@ -389,11 +392,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isAuthenticated = user !== null;
   const isAdmin = user?.role === 'admin';
-  
+  // マスター管理者（施設オーナー）かどうか
+  const isMaster = !!(user && facility?.ownerUserId && user.id === facility.ownerUserId);
+
   // 権限チェック関数
   const hasPermission = (permission: keyof UserPermissions): boolean => {
     if (!user) return false;
-    if (isAdmin) return true; // 管理者は全権限
+    if (isAdmin || isMaster) return true; // 管理者およびマスターは全権限
     if (user.role === 'manager' || user.role === 'staff') {
       return user.permissions?.[permission] === true;
     }
@@ -410,6 +415,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     facility,
     isAuthenticated,
     isAdmin,
+    isMaster,
     login,
     logout,
     hasPermission,

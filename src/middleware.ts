@@ -59,7 +59,7 @@ export function middleware(req: NextRequest) {
   }
 
   // 無限ループ防止
-  if (pathname.startsWith('/biz') || pathname.startsWith('/personal')) {
+  if (pathname.startsWith('/biz') || pathname.startsWith('/personal-dashboard')) {
     return NextResponse.next();
   }
 
@@ -70,6 +70,13 @@ export function middleware(req: NextRequest) {
   // ローカル開発環境 → すべてのパスにアクセス可能
   // ========================================
   if (hostWithoutPort === 'localhost' || hostWithoutPort === '127.0.0.1') {
+    // /staff-dashboard → /personal-dashboard リダイレクト（ローカルでも有効）
+    if (pathname === '/staff-dashboard' || pathname.startsWith('/staff-dashboard/')) {
+      const newPath = pathname.replace('/staff-dashboard', '/personal-dashboard');
+      const redirectUrl = new URL(newPath, req.url);
+      return NextResponse.redirect(redirectUrl, 302);
+    }
+
     const response = NextResponse.next();
     if (isHtmlRequest) {
       response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -106,8 +113,9 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl, 302);
     }
 
-    // その他のパス（/staff-dashboard など）へのアクセスは biz 側にリダイレクト
-    if (pathname.startsWith('/staff-dashboard') ||
+    // その他のパス（/personal-dashboard, /staff-dashboard など）へのアクセスは biz 側にリダイレクト
+    if (pathname.startsWith('/personal-dashboard') ||
+        pathname.startsWith('/staff-dashboard') ||
         pathname.startsWith('/portal') ||
         pathname.startsWith('/facility') ||
         pathname.startsWith('/signup') ||
@@ -134,10 +142,10 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl, 302);
   }
 
-  // /personal へのアクセスは /staff-dashboard にリダイレクト（後方互換性）
-  if (pathname === '/personal' || pathname.startsWith('/personal/')) {
-    const newPath = pathname.replace('/personal', '/staff-dashboard');
-    const redirectUrl = new URL(newPath || '/staff-dashboard', req.url);
+  // /staff-dashboard へのアクセスは /personal-dashboard にリダイレクト（後方互換性）
+  if (pathname === '/staff-dashboard' || pathname.startsWith('/staff-dashboard/')) {
+    const newPath = pathname.replace('/staff-dashboard', '/personal-dashboard');
+    const redirectUrl = new URL(newPath, req.url);
     return NextResponse.redirect(redirectUrl, 302);
   }
 

@@ -8,6 +8,7 @@ export type Facility = {
   id: string;
   name: string;
   code: string; // 施設コード
+  ownerUserId?: string; // マスター管理者（施設オーナー）のユーザーID
   createdAt: string;
   updatedAt: string;
 };
@@ -84,19 +85,91 @@ export type UserType = 'staff' | 'client';
 // ユーザーロール
 export type UserRole = 'admin' | 'manager' | 'staff' | 'client';
 
-// 権限設定（マネージャーとスタッフ用）
+// 権限設定（マネージャーとスタッフ用）- 各メニュー項目ごとに設定可能
 export type UserPermissions = {
-  dashboard?: boolean;
-  management?: boolean;
-  lead?: boolean;
-  schedule?: boolean;
-  children?: boolean;
-  staff?: boolean;
-  facility?: boolean;
+  // 利用者管理
+  schedule?: boolean;         // 利用調整・予約
+  children?: boolean;         // 児童管理
+  transport?: boolean;        // 送迎ルート
+  chat?: boolean;             // チャット
+  connect?: boolean;          // コネクト
+  clientInvitation?: boolean; // 利用者招待
+  lead?: boolean;             // リード管理
+
+  // 日誌・記録
+  dailyLog?: boolean;         // 業務日誌
+  supportPlan?: boolean;      // 個別支援計画
+  incident?: boolean;         // 苦情・事故報告
+
+  // スタッフ管理
+  staff?: boolean;            // スタッフ管理
+  shift?: boolean;            // シフト管理
+  training?: boolean;         // 研修記録
+
+  // 運営管理
+  auditPreparation?: boolean; // 運営指導準備
+  committee?: boolean;        // 委員会管理
+  documents?: boolean;        // 書類管理
+
+  // 売上・経営管理
+  dashboard?: boolean;        // ダッシュボード
+  profitLoss?: boolean;       // 損益計算書
+  cashFlow?: boolean;         // キャッシュフロー
+  expenseManagement?: boolean;// 経費管理
+  management?: boolean;       // 経営設定
+
+  // 設定
+  facility?: boolean;         // 施設情報
+};
+
+// 権限キーの型
+export type PermissionKey = keyof UserPermissions;
+
+// 権限カテゴリー定義
+export const PERMISSION_CATEGORIES = {
+  '利用者管理': ['schedule', 'children', 'transport', 'chat', 'connect', 'clientInvitation', 'lead'] as PermissionKey[],
+  '日誌・記録': ['dailyLog', 'supportPlan', 'incident'] as PermissionKey[],
+  'スタッフ管理': ['staff', 'shift', 'training'] as PermissionKey[],
+  '運営管理': ['auditPreparation', 'committee', 'documents'] as PermissionKey[],
+  '売上・経営管理': ['dashboard', 'profitLoss', 'cashFlow', 'expenseManagement', 'management'] as PermissionKey[],
+  '設定': ['facility'] as PermissionKey[],
+} as const;
+
+// 権限ラベル
+export const PERMISSION_LABELS: Record<PermissionKey, string> = {
+  schedule: '利用調整・予約',
+  children: '児童管理',
+  transport: '送迎ルート',
+  chat: 'チャット',
+  connect: 'コネクト',
+  clientInvitation: '利用者招待',
+  lead: 'リード管理',
+  dailyLog: '業務日誌',
+  supportPlan: '個別支援計画',
+  incident: '苦情・事故報告',
+  staff: 'スタッフ管理',
+  shift: 'シフト管理',
+  training: '研修記録',
+  auditPreparation: '運営指導準備',
+  committee: '委員会管理',
+  documents: '書類管理',
+  dashboard: 'ダッシュボード',
+  profitLoss: '損益計算書',
+  cashFlow: 'キャッシュフロー',
+  expenseManagement: '経費管理',
+  management: '経営設定',
+  facility: '施設情報',
 };
 
 // アカウントステータス
 export type AccountStatus = 'pending' | 'active' | 'suspended';
+
+// アカウントステータスのラベルと色
+export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, { label: string; color: string; bgColor: string }> = {
+  pending: { label: '招待中', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
+  active: { label: '連携中', color: 'text-green-700', bgColor: 'bg-green-100' },
+  suspended: { label: '停止中', color: 'text-red-700', bgColor: 'bg-red-100' },
+};
 
 // ユーザーデータ（個人アカウント - 施設に依存しない）
 export type User = {
@@ -452,6 +525,10 @@ export type Staff = {
   type: '常勤' | '非常勤';
   facilityRole?: string; // 施設での役割（児童発達管理責任者、指導員など）
   user_id?: string; // ユーザーアカウントID（usersテーブルへの参照）
+  accountStatus?: AccountStatus; // アカウントステータス（招待中/連携中/停止中）
+  permissions?: UserPermissions; // ダッシュボード権限（employment_recordsから取得）
+  hasDashboardAccess?: boolean; // ダッシュボード権限があるかどうか
+  isMaster?: boolean; // マスター管理者（施設オーナー）かどうか
   // 基本情報
   birthDate?: string; // 生年月日 (YYYY-MM-DD)
   gender?: '男性' | '女性' | 'その他';
@@ -823,5 +900,245 @@ export type FacilityTimeSlot = {
   displayOrder: number; // 表示順
   createdAt: string;
   updatedAt: string;
+};
+
+// ==========================================
+// 業務ツール設定
+// ==========================================
+
+// 業務ツールID
+export type WorkToolId =
+  | 'time_tracking'      // 打刻（勤怠）
+  | 'daily_report'       // 日報作成
+  | 'expense'            // 経費精算
+  | 'document_output'    // 書類出力
+  | 'attendance_calendar'// 勤怠カレンダー
+  | 'shift_view'         // シフト確認
+  | 'training_record'    // 研修記録
+  | 'announcements'      // お知らせ
+  | 'task_management';   // タスク管理
+
+// 業務ツール定義
+export type WorkToolDefinition = {
+  id: WorkToolId;
+  name: string;
+  icon: string; // Lucide icon name
+  description: string;
+};
+
+// 業務ツール一覧
+export const WORK_TOOLS: WorkToolDefinition[] = [
+  { id: 'time_tracking', name: '打刻（勤怠）', icon: 'Clock', description: '始業・終業・休憩の打刻' },
+  { id: 'daily_report', name: '日報作成', icon: 'FileText', description: '日報の作成・提出' },
+  { id: 'expense', name: '経費精算', icon: 'Receipt', description: '経費の申請・管理' },
+  { id: 'document_output', name: '書類出力', icon: 'FileOutput', description: '各種書類の出力' },
+  { id: 'attendance_calendar', name: '勤怠カレンダー', icon: 'Calendar', description: '勤怠状況の確認' },
+  { id: 'shift_view', name: 'シフト確認', icon: 'CalendarDays', description: 'シフト表の確認' },
+  { id: 'training_record', name: '研修記録', icon: 'GraduationCap', description: '研修履歴の管理' },
+  { id: 'announcements', name: 'お知らせ', icon: 'Bell', description: '施設からのお知らせ' },
+  { id: 'task_management', name: 'タスク管理', icon: 'CheckSquare', description: 'タスクの管理' },
+];
+
+// 施設業務ツール設定
+export type FacilityWorkToolSettings = {
+  id: string;
+  facilityId: string;
+  enabledTools: Record<WorkToolId, boolean>;
+  toolOrder: WorkToolId[];
+  customSettings?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// ==========================================
+// 打刻・勤怠管理
+// ==========================================
+
+// 打刻タイプ
+export type AttendanceType = 'start' | 'end' | 'break_start' | 'break_end';
+
+// 勤務ステータス
+export type WorkStatus = 'not_started' | 'working' | 'on_break' | 'completed';
+
+// 打刻記録
+export type AttendanceRecord = {
+  id: string;
+  userId: string;
+  facilityId: string;
+  date: string; // YYYY-MM-DD
+  type: AttendanceType;
+  time: string; // HH:mm
+  recordedAt: string; // ISO timestamp
+  isManualCorrection: boolean;
+  correctionReason?: string;
+  correctedBy?: string;
+  locationLat?: number;
+  locationLng?: number;
+  memo?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 日次勤怠サマリー
+export type AttendanceDailySummary = {
+  userId: string;
+  facilityId: string;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  breakStartTime?: string;
+  breakEndTime?: string;
+  status: WorkStatus;
+};
+
+// 打刻タイプのラベル
+export const ATTENDANCE_TYPE_LABELS: Record<AttendanceType, string> = {
+  start: '始業',
+  end: '退勤',
+  break_start: '休憩開始',
+  break_end: '休憩終了',
+};
+
+// 勤務ステータスのラベル
+export const WORK_STATUS_LABELS: Record<WorkStatus, { label: string; color: string }> = {
+  not_started: { label: '未出勤', color: 'bg-gray-100 text-gray-600' },
+  working: { label: '勤務中', color: 'bg-green-100 text-green-700' },
+  on_break: { label: '休憩中', color: 'bg-yellow-100 text-yellow-700' },
+  completed: { label: '退勤済', color: 'bg-blue-100 text-blue-700' },
+};
+
+// ==========================================
+// 通知機能
+// ==========================================
+
+// 通知タイプ
+export type NotificationType =
+  | 'staff_activated'      // スタッフがアカウントを有効化
+  | 'permission_granted'   // 権限が付与された
+  | 'permission_revoked'   // 権限が取り消された
+  | 'general';             // 一般的な通知
+
+// 通知データ
+export type Notification = {
+  id: string;
+  facilityId: string;
+  userId?: string;           // 通知対象のユーザー（NULL=施設全体）
+  type: NotificationType;
+  title: string;
+  message: string;
+  relatedUserId?: string;    // 関連するユーザー
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  relatedUserName?: string;
+};
+
+// ===== 実務経験証明書関連 =====
+
+// 実務経験証明書のステータス
+export type WorkExperienceStatus = 'draft' | 'pending' | 'signed' | 'rejected';
+
+// 事業種別
+export const BUSINESS_TYPES = [
+  { id: 1, name: '障害児入所施設等', description: '障害児入所施設、乳児院、児童家庭支援センター、児童養護施設、障害者支援施設' },
+  { id: 2, name: '認可保育園等', description: '認可保育園、幼保連携型認定保育園、地域型認定保育園' },
+  { id: 3, name: '学校・幼稚園等', description: '学校、幼稚園、幼稚園型認定保育園、事業所内保育事業、居宅訪問型保育事業、家庭的保育事業' },
+  { id: 4, name: '障害通所支援等', description: '障害通所支援事業、放課後児童健全育成事業' },
+  { id: 5, name: '小規模保育等', description: '小規模保育事業、病児保育事業、地域子育て支援拠点事業、子育て援助活動支援事業' },
+  { id: 6, name: '障害福祉サービス', description: '障害福祉サービス事業（生活介護、共同生活援助、居宅介護、就労継続支援など）' },
+  { id: 7, name: '老人福祉施設等', description: '老人福祉施設、老人居宅介護、老人通所介護、地域包括支援センター、更生施設' },
+  { id: 8, name: '相談支援事業等', description: '障害児（者）相談支援事業、児童相談所、地域生活支援事業、障害者就業支援センター' },
+  { id: 9, name: 'その他', description: 'その他' },
+  { id: 10, name: '認可外保育園等', description: '認可外保育園、企業主導型保育事業' },
+] as const;
+
+// 実務経験記録（実務経験証明書発行用）
+export type WorkExperienceRecord = {
+  id: string;
+  userId: string;
+
+  // 施設・法人情報
+  facilityName: string;           // 施設又は事業所名
+  corporateName?: string;         // 法人名
+  corporateAddress?: string;      // 法人所在地
+  corporatePhone?: string;        // 電話番号
+  representativeName?: string;    // 代表者氏名
+  contactEmail?: string;          // 発行依頼送信先メール
+  contactPersonName?: string;     // 担当者名（宛名用）
+
+  // 事業種別（1〜10）
+  businessType?: number;
+  businessTypeOther?: string;     // その他の場合の記載
+
+  // 業務期間
+  startDate: string;
+  endDate?: string;
+  totalWorkDays?: number;         // 実勤務日数
+  weeklyAverageDays?: number;     // 週平均勤務日数
+
+  // 業務内容
+  jobTitle?: string;              // 職名（保育士、児童指導員など）
+  employmentType?: 'fulltime' | 'parttime'; // 常勤/非常勤
+  jobDescription?: string;        // 業務内容詳細
+
+  // 証明書ステータス
+  status: WorkExperienceStatus;
+  signatureToken?: string;        // 電子署名用トークン
+  signatureRequestedAt?: string;
+  signedAt?: string;
+  signedPdfUrl?: string;
+  rejectionReason?: string;
+
+  // メール関連
+  emailSubject?: string;          // カスタマイズされたメール件名
+  emailBody?: string;             // カスタマイズされたメール本文
+
+  // 署名データ
+  signatureImageUrl?: string;     // 署名画像URL
+  sealImageUrl?: string;          // 印影画像URL
+  signerName?: string;            // 署名者名
+  signerTitle?: string;           // 署名者役職
+
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 発行依頼メールのデフォルトテンプレート生成
+export const generateCertificateRequestEmail = (
+  applicantName: string,
+  facilityName: string,
+  contactPersonName: string,
+  startDate: string,
+  endDate?: string
+): { subject: string; body: string } => {
+  const periodStr = endDate
+    ? `${startDate}〜${endDate}`
+    : `${startDate}〜現在`;
+
+  return {
+    subject: `【実務経験証明書発行のお願い】${applicantName}`,
+    body: `${contactPersonName || '担当者'} 様
+
+お世話になっております。
+${applicantName}と申します。
+
+この度、資格取得のため実務経験証明書が必要となり、
+ご連絡させていただきました。
+
+貴施設「${facilityName}」にて勤務しておりました期間
+（${periodStr}）の実務経験証明書の発行をお願いできますでしょうか。
+
+下記リンクより、証明書の内容をご確認いただき、
+電子署名をお願いできれば幸いです。
+
+ご多忙のところ恐れ入りますが、
+何卒よろしくお願い申し上げます。
+
+────────────────────────
+${applicantName}
+────────────────────────`,
+  };
 };
 

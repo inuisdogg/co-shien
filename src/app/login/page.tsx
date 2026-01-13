@@ -36,7 +36,7 @@ export default function LoginPage() {
             if (user.userType === 'client') {
               router.push('/client/dashboard');
             } else {
-              router.push('/staff-dashboard');
+              router.push('/personal-dashboard');
             }
             return;
           }
@@ -129,8 +129,8 @@ export default function LoginPage() {
         localStorage.removeItem('savedLoginData');
       }
 
-      // スタッフダッシュボードへリダイレクト
-      router.push('/staff-dashboard');
+      // パーソナルダッシュボードへリダイレクト
+      router.push('/personal-dashboard');
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
     } finally {

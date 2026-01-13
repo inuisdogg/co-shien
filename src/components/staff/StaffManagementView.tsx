@@ -9,7 +9,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Users, Plus, Mail, X, Clock, Calendar, User, Phone, MapPin, Briefcase, Award, FileText, QrCode, Download, Upload, Trash2, Edit } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Staff, UserPermissions, StaffInvitation } from '@/types';
+import { Staff, UserPermissions, StaffInvitation, ACCOUNT_STATUS_LABELS, AccountStatus, PERMISSION_CATEGORIES, PERMISSION_LABELS, PermissionKey } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { inviteStaff } from '@/utils/staffInvitationService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -109,6 +109,32 @@ const QUALIFICATIONS = [
   'その他'
 ];
 
+// デフォルトの権限オブジェクト（全権限OFF）
+const getDefaultPermissions = (): UserPermissions => ({
+  schedule: false,
+  children: false,
+  transport: false,
+  chat: false,
+  connect: false,
+  clientInvitation: false,
+  lead: false,
+  dailyLog: false,
+  supportPlan: false,
+  incident: false,
+  staff: false,
+  shift: false,
+  training: false,
+  auditPreparation: false,
+  committee: false,
+  documents: false,
+  dashboard: false,
+  profitLoss: false,
+  cashFlow: false,
+  expenseManagement: false,
+  management: false,
+  facility: false,
+});
+
 const StaffManagementView: React.FC = () => {
   const { staff, facilitySettings } = useFacilityData();
   const { facility, isAdmin } = useAuth();
@@ -123,12 +149,34 @@ const StaffManagementView: React.FC = () => {
   const [publicInviteLink, setPublicInviteLink] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDashboardInviteModalOpen, setIsDashboardInviteModalOpen] = useState(false);
-  const [dashboardPermissions, setDashboardPermissions] = useState({
-    dashboard: false,
-    management: false,
-    lead: false,
+  const [dashboardPermissions, setDashboardPermissions] = useState<UserPermissions>({
+    // 利用者管理
+    schedule: false,
     children: false,
+    transport: false,
+    chat: false,
+    connect: false,
+    clientInvitation: false,
+    lead: false,
+    // 日誌・記録
+    dailyLog: false,
+    supportPlan: false,
+    incident: false,
+    // スタッフ管理
     staff: false,
+    shift: false,
+    training: false,
+    // 運営管理
+    auditPreparation: false,
+    committee: false,
+    documents: false,
+    // 売上・経営管理
+    dashboard: false,
+    profitLoss: false,
+    cashFlow: false,
+    expenseManagement: false,
+    management: false,
+    // 設定
     facility: false,
   });
   const [editingStaffData, setEditingStaffData] = useState<Staff | null>(null);
@@ -552,6 +600,8 @@ const StaffManagementView: React.FC = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="p-3 text-left font-bold text-gray-700">名前</th>
+                <th className="p-3 text-left font-bold text-gray-700">ステータス</th>
+                <th className="p-3 text-left font-bold text-gray-700">ダッシュボード</th>
                 <th className="p-3 text-left font-bold text-gray-700">役職</th>
                 <th className="p-3 text-left font-bold text-gray-700">雇用形態</th>
                 <th className="p-3 text-left font-bold text-gray-700">施設での役割</th>
@@ -560,18 +610,40 @@ const StaffManagementView: React.FC = () => {
             </thead>
             <tbody>
               {sortedStaff.map((s) => {
-                const isShadowAccount = !s.user_id;
+                // ステータスを判定: user_idがなければ「招待中」、あればaccountStatusから
+                const status: AccountStatus = !s.user_id
+                  ? 'pending'
+                  : (s.accountStatus || 'active');
+                const statusInfo = ACCOUNT_STATUS_LABELS[status];
                 return (
                 <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="p-3 font-medium text-gray-800">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {s.name}
-                      {isShadowAccount && (
-                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">
-                          未確認
-                        </span>
+                      {s.isMaster && (
+                        <span className="text-yellow-500" title="マスター管理者">★</span>
                       )}
                     </div>
+                  </td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 ${statusInfo.bgColor} ${statusInfo.color} text-xs font-bold rounded`}>
+                      {statusInfo.label}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    {s.isMaster ? (
+                      <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-bold rounded">
+                        マスター
+                      </span>
+                    ) : s.hasDashboardAccess ? (
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded">
+                        表示中
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs font-bold rounded">
+                        未設定
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-gray-600">{s.role}</td>
                   <td className="p-3 text-gray-600">{s.type}</td>
@@ -601,7 +673,7 @@ const StaffManagementView: React.FC = () => {
               })}
               {sortedStaff.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-gray-500">
+                  <td colSpan={7} className="p-8 text-center text-gray-500">
                     スタッフが登録されていません
                   </td>
                 </tr>
@@ -2245,43 +2317,49 @@ const StaffManagementView: React.FC = () => {
               {/* アクションボタン */}
               {selectedStaff.user_id && (
                 <div className="border-t border-gray-200 pt-4 mt-6">
-                  <button
-                    onClick={async () => {
-                      setIsDetailModalOpen(false);
-                      setIsDashboardInviteModalOpen(true);
-                      // 現在の権限を初期値として設定（employment_recordsから取得）
-                      if (selectedStaff.user_id && facility?.id) {
-                        try {
-                          const { data: employmentData, error } = await supabase
-                            .from('employment_records')
-                            .select('permissions')
-                            .eq('user_id', selectedStaff.user_id)
-                            .eq('facility_id', facility.id)
-                            .is('end_date', null)
-                            .single();
-                          
-                          if (!error && employmentData?.permissions) {
-                            const permissions = employmentData.permissions as UserPermissions;
-                            // undefinedをfalseに変換
-                            setDashboardPermissions({
-                              dashboard: permissions.dashboard ?? false,
-                              management: permissions.management ?? false,
-                              lead: permissions.lead ?? false,
-                              children: permissions.children ?? false,
-                              staff: permissions.staff ?? false,
-                              facility: permissions.facility ?? false,
-                            });
+                  {selectedStaff.isMaster ? (
+                    <div className="w-full px-4 py-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md text-sm font-bold flex items-center justify-center gap-2">
+                      <span className="text-yellow-500">★</span>
+                      マスター管理者（全機能にアクセス可能）
+                    </div>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        setIsDetailModalOpen(false);
+                        setIsDashboardInviteModalOpen(true);
+                        // 現在の権限を初期値として設定（employment_recordsから取得）
+                        if (selectedStaff.user_id && facility?.id) {
+                          try {
+                            const { data: employmentData, error } = await supabase
+                              .from('employment_records')
+                              .select('permissions')
+                              .eq('user_id', selectedStaff.user_id)
+                              .eq('facility_id', facility.id)
+                              .is('end_date', null)
+                              .single();
+
+                            if (!error && employmentData?.permissions) {
+                              const permissions = employmentData.permissions as UserPermissions;
+                              // undefinedをfalseに変換
+                              const defaultPerms = getDefaultPermissions();
+                              setDashboardPermissions({
+                                ...defaultPerms,
+                                ...Object.fromEntries(
+                                  Object.entries(permissions).map(([k, v]) => [k, v ?? false])
+                                ),
+                              } as UserPermissions);
+                            }
+                          } catch (err) {
+                            console.error('Error fetching permissions:', err);
                           }
-                        } catch (err) {
-                          console.error('Error fetching permissions:', err);
                         }
-                      }
-                    }}
-                    className="w-full px-4 py-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Mail size={18} />
-                    スタッフをダッシュボードに招待
-                  </button>
+                      }}
+                      className="w-full px-4 py-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Mail size={18} />
+                      {selectedStaff.hasDashboardAccess ? 'ダッシュボード表示設定を更新' : 'ダッシュボードを表示させる'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -2289,26 +2367,19 @@ const StaffManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* ダッシュボード招待モーダル */}
+      {/* ダッシュボード表示設定モーダル */}
       {isDashboardInviteModalOpen && selectedStaff && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-2xl shadow-2xl border border-gray-100">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+          <div className="bg-white rounded-lg w-full max-w-3xl shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
                 <Mail size={20} className="text-[#00c4cc]" />
-                ダッシュボード招待
+                ダッシュボード表示設定
               </h3>
               <button
                 onClick={() => {
                   setIsDashboardInviteModalOpen(false);
-                  setDashboardPermissions({
-                    dashboard: false,
-                    management: false,
-                    lead: false,
-                    children: false,
-                    staff: false,
-                    facility: false,
-                  });
+                  setDashboardPermissions(getDefaultPermissions());
                 }}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
@@ -2318,105 +2389,77 @@ const StaffManagementView: React.FC = () => {
             <div className="p-6 space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                 <p className="text-sm text-blue-800">
-                  {selectedStaff.name}さんに閲覧可能なダッシュボードの範囲を選択してください。
+                  {selectedStaff.name}さんに閲覧・操作可能な機能を選択してください。
                 </p>
               </div>
-              
-              <div>
-                <h4 className="text-sm font-bold text-gray-700 mb-3">閲覧可能なダッシュボード</h4>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={dashboardPermissions.dashboard}
-                      onChange={(e) => setDashboardPermissions(prev => ({ ...prev, dashboard: e.target.checked }))}
-                      className="w-5 h-5 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-800">ダッシュボード</span>
-                      <p className="text-xs text-gray-500">全体の統計情報を閲覧</p>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={dashboardPermissions.management}
-                      onChange={(e) => setDashboardPermissions(prev => ({ ...prev, management: e.target.checked }))}
-                      className="w-5 h-5 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-800">管理</span>
-                      <p className="text-xs text-gray-500">管理機能を閲覧・操作</p>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={dashboardPermissions.lead}
-                      onChange={(e) => setDashboardPermissions(prev => ({ ...prev, lead: e.target.checked }))}
-                      className="w-5 h-5 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-800">リード</span>
-                      <p className="text-xs text-gray-500">リード機能を閲覧・操作</p>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={dashboardPermissions.children}
-                      onChange={(e) => setDashboardPermissions(prev => ({ ...prev, children: e.target.checked }))}
-                      className="w-5 h-5 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-800">児童</span>
-                      <p className="text-xs text-gray-500">児童情報を閲覧・操作</p>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={dashboardPermissions.staff}
-                      onChange={(e) => setDashboardPermissions(prev => ({ ...prev, staff: e.target.checked }))}
-                      className="w-5 h-5 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-800">スタッフ</span>
-                      <p className="text-xs text-gray-500">スタッフ情報を閲覧・操作</p>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={dashboardPermissions.facility}
-                      onChange={(e) => setDashboardPermissions(prev => ({ ...prev, facility: e.target.checked }))}
-                      className="w-5 h-5 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-800">施設</span>
-                      <p className="text-xs text-gray-500">施設情報を閲覧・操作</p>
-                    </div>
-                  </label>
-                </div>
+
+              {/* 一括操作 */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const allPermissions = getDefaultPermissions();
+                    Object.keys(allPermissions).forEach(key => {
+                      (allPermissions as any)[key] = true;
+                    });
+                    setDashboardPermissions(allPermissions);
+                  }}
+                  className="px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-xs font-bold transition-colors"
+                >
+                  すべて選択
+                </button>
+                <button
+                  onClick={() => setDashboardPermissions(getDefaultPermissions())}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-xs font-bold transition-colors"
+                >
+                  すべて解除
+                </button>
               </div>
-              
+
+              {/* カテゴリごとの権限設定 */}
+              <div className="space-y-6">
+                {Object.entries(PERMISSION_CATEGORIES).map(([category, keys]) => (
+                  <div key={category} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-bold text-gray-700">{category}</h4>
+                      <button
+                        onClick={() => {
+                          const newPermissions = { ...dashboardPermissions };
+                          const allChecked = keys.every(k => dashboardPermissions[k]);
+                          keys.forEach(k => {
+                            (newPermissions as any)[k] = !allChecked;
+                          });
+                          setDashboardPermissions(newPermissions);
+                        }}
+                        className="text-xs text-[#00c4cc] hover:underline"
+                      >
+                        {keys.every(k => dashboardPermissions[k]) ? 'すべて解除' : 'すべて選択'}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {keys.map((permKey) => (
+                        <label
+                          key={permKey}
+                          className="flex items-center gap-2 p-2 border border-gray-100 rounded hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={dashboardPermissions[permKey] ?? false}
+                            onChange={(e) => setDashboardPermissions(prev => ({ ...prev, [permKey]: e.target.checked }))}
+                            className="w-4 h-4 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
+                          />
+                          <span className="text-sm text-gray-700">{PERMISSION_LABELS[permKey]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => {
                     setIsDashboardInviteModalOpen(false);
-                    setDashboardPermissions({
-                      dashboard: false,
-                      management: false,
-                      lead: false,
-                      children: false,
-                      staff: false,
-                      facility: false,
-                    });
+                    setDashboardPermissions(getDefaultPermissions());
                   }}
                   className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
                 >
@@ -2428,7 +2471,7 @@ const StaffManagementView: React.FC = () => {
                       alert('スタッフ情報が不正です');
                       return;
                     }
-                    
+
                     try {
                       // employment_recordsのpermissionsを更新
                       const { error: updateError } = await supabase
@@ -2437,35 +2480,28 @@ const StaffManagementView: React.FC = () => {
                         .eq('user_id', selectedStaff.user_id)
                         .eq('facility_id', facility.id)
                         .is('end_date', null);
-                      
+
                       if (updateError) {
                         throw updateError;
                       }
-                      
+
                       // ユーザーに通知（将来的にはメールやプッシュ通知を実装）
-                      alert(`${selectedStaff.name}さんにダッシュボードへの招待を送信しました。\nパーソナル画面でBizダッシュボードへのリンクが表示されます。`);
-                      
+                      alert(`${selectedStaff.name}さんのダッシュボード表示設定を保存しました。`);
+
                       setIsDashboardInviteModalOpen(false);
-                      setDashboardPermissions({
-                        dashboard: false,
-                        management: false,
-                        lead: false,
-                        children: false,
-                        staff: false,
-                        facility: false,
-                      });
-                      
+                      setDashboardPermissions(getDefaultPermissions());
+
                       // 詳細モーダルを閉じて一覧を更新
                       setIsDetailModalOpen(false);
                       setSelectedStaff(null);
                     } catch (error: any) {
-                      console.error('ダッシュボード招待エラー:', error);
-                      alert(`エラー: ${error.message || 'ダッシュボード招待に失敗しました'}`);
+                      console.error('権限設定エラー:', error);
+                      alert(`エラー: ${error.message || '権限設定に失敗しました'}`);
                     }
                   }}
                   className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors"
                 >
-                  招待を送信
+                  設定を保存
                 </button>
               </div>
             </div>

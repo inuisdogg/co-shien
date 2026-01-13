@@ -48,7 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
   const { facilitySettings } = useFacilityData();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
 
-  const { isAdmin, hasPermission } = useAuth();
+  const { isAdmin, isMaster, hasPermission } = useAuth();
   const isPersonal = mode === 'personal';
   const primaryColor = isPersonal ? '#8b5cf6' : '#00c4cc';
 
@@ -74,51 +74,51 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
     return () => clearInterval(interval);
   }, [facility?.id]);
   
-  // メニューを用途ごとに定義
+  // メニューを用途ごとに定義（各メニューに個別の権限を設定）
   const menuCategories = [
     {
       category: '利用者管理',
       items: [
         { id: 'schedule', label: '利用調整・予約', icon: CalendarDays, permission: 'schedule' as const },
         { id: 'children', label: '児童管理', icon: Users, permission: 'children' as const },
-        { id: 'transport', label: '送迎ルート', icon: Truck, permission: 'schedule' as const },
-        { id: 'chat', label: 'チャット', icon: MessageSquare, permission: 'children' as const },
-        { id: 'connect', label: 'コネクト', icon: Link2, permission: 'children' as const },
-        { id: 'client-invitation', label: '利用者招待', icon: UserPlus, permission: 'children' as const },
+        { id: 'transport', label: '送迎ルート', icon: Truck, permission: 'transport' as const },
+        { id: 'chat', label: 'チャット', icon: MessageSquare, permission: 'chat' as const },
+        { id: 'connect', label: 'コネクト', icon: Link2, permission: 'connect' as const },
+        { id: 'client-invitation', label: '利用者招待', icon: UserPlus, permission: 'clientInvitation' as const },
         { id: 'lead', label: 'リード管理', icon: Target, permission: 'lead' as const },
       ],
     },
     {
       category: '日誌・記録',
       items: [
-        { id: 'daily-log', label: '業務日誌', icon: BookOpen, permission: 'children' as const },
-        { id: 'support-plan', label: '個別支援計画', icon: ClipboardList, permission: 'children' as const },
-        { id: 'incident', label: '苦情・事故報告', icon: AlertTriangle, permission: 'children' as const },
+        { id: 'daily-log', label: '業務日誌', icon: BookOpen, permission: 'dailyLog' as const },
+        { id: 'support-plan', label: '個別支援計画', icon: ClipboardList, permission: 'supportPlan' as const },
+        { id: 'incident', label: '苦情・事故報告', icon: AlertTriangle, permission: 'incident' as const },
       ],
     },
     {
       category: 'スタッフ管理',
       items: [
         { id: 'staff', label: 'スタッフ管理', icon: Users, permission: 'staff' as const },
-        { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'staff' as const },
-        { id: 'training', label: '研修記録', icon: GraduationCap, permission: 'staff' as const },
+        { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'shift' as const },
+        { id: 'training', label: '研修記録', icon: GraduationCap, permission: 'training' as const },
       ],
     },
     {
       category: '運営管理',
       items: [
-        { id: 'audit-preparation', label: '運営指導準備', icon: ClipboardCheck, permission: 'facility' as const },
-        { id: 'committee', label: '委員会管理', icon: UsersRound, permission: 'facility' as const },
-        { id: 'documents', label: '書類管理', icon: FileText, permission: 'facility' as const },
+        { id: 'audit-preparation', label: '運営指導準備', icon: ClipboardCheck, permission: 'auditPreparation' as const },
+        { id: 'committee', label: '委員会管理', icon: UsersRound, permission: 'committee' as const },
+        { id: 'documents', label: '書類管理', icon: FileText, permission: 'documents' as const },
       ],
     },
     {
       category: '売上・経営管理',
       items: [
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
-        { id: 'profit-loss', label: '損益計算書', icon: TrendingUp, permission: 'dashboard' as const },
-        { id: 'cash-flow', label: 'キャッシュフロー', icon: Wallet, permission: 'dashboard' as const },
-        { id: 'expense-management', label: '経費管理', icon: Receipt, permission: 'dashboard' as const },
+        { id: 'profit-loss', label: '損益計算書', icon: TrendingUp, permission: 'profitLoss' as const },
+        { id: 'cash-flow', label: 'キャッシュフロー', icon: Wallet, permission: 'cashFlow' as const },
+        { id: 'expense-management', label: '経費管理', icon: Receipt, permission: 'expenseManagement' as const },
         { id: 'management', label: '経営設定', icon: DollarSign, permission: 'management' as const },
       ],
     },
