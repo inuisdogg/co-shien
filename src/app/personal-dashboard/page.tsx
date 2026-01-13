@@ -177,6 +177,11 @@ export default function PersonalDashboardPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
     name: '',
+    lastName: '',
+    firstName: '',
+    nameKana: '',
+    lastNameKana: '',
+    firstNameKana: '',
     email: '',
     birthDate: '',
     address: '',
@@ -471,6 +476,11 @@ export default function PersonalDashboardPage() {
           
           setProfileData({
             name: updatedUser.name || '',
+            lastName: latestUserData.last_name || '',
+            firstName: latestUserData.first_name || '',
+            nameKana: latestUserData.name_kana || '',
+            lastNameKana: latestUserData.last_name_kana || '',
+            firstNameKana: latestUserData.first_name_kana || '',
             email: updatedUser.email || '',
             birthDate: updatedUser.birthDate || '',
             address: userData.address || '',
@@ -496,6 +506,11 @@ export default function PersonalDashboardPage() {
           setUser(userData);
           setProfileData({
             name: userData.name || '',
+            lastName: userData.lastName || userData.last_name || '',
+            firstName: userData.firstName || userData.first_name || '',
+            nameKana: userData.nameKana || userData.name_kana || '',
+            lastNameKana: userData.lastNameKana || userData.last_name_kana || '',
+            firstNameKana: userData.firstNameKana || userData.first_name_kana || '',
             email: userData.email || '',
             birthDate: userData.birthDate || userData.birth_date || '',
             address: userData.address || '',
@@ -2052,13 +2067,84 @@ export default function PersonalDashboardPage() {
             {isEditingProfile ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">氏名</label>
-                  <input
-                    type="text"
-                    value={profileData.name}
-                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
-                  />
+                  <label className="block text-sm font-bold text-gray-700 mb-2">氏名 <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">姓</label>
+                      <input
+                        type="text"
+                        value={profileData.lastName}
+                        onChange={(e) => {
+                          const lastName = e.target.value;
+                          setProfileData({
+                            ...profileData,
+                            lastName,
+                            name: `${lastName} ${profileData.firstName}`.trim()
+                          });
+                        }}
+                        placeholder="山田"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">名</label>
+                      <input
+                        type="text"
+                        value={profileData.firstName}
+                        onChange={(e) => {
+                          const firstName = e.target.value;
+                          setProfileData({
+                            ...profileData,
+                            firstName,
+                            name: `${profileData.lastName} ${firstName}`.trim()
+                          });
+                        }}
+                        placeholder="太郎"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">フリガナ</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">セイ</label>
+                      <input
+                        type="text"
+                        value={profileData.lastNameKana}
+                        onChange={(e) => {
+                          const lastNameKana = e.target.value;
+                          setProfileData({
+                            ...profileData,
+                            lastNameKana,
+                            nameKana: `${lastNameKana} ${profileData.firstNameKana}`.trim()
+                          });
+                        }}
+                        placeholder="ヤマダ"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">メイ</label>
+                      <input
+                        type="text"
+                        value={profileData.firstNameKana}
+                        onChange={(e) => {
+                          const firstNameKana = e.target.value;
+                          setProfileData({
+                            ...profileData,
+                            firstNameKana,
+                            nameKana: `${profileData.lastNameKana} ${firstNameKana}`.trim()
+                          });
+                        }}
+                        placeholder="タロウ"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">メールアドレス（ログインID）</label>
@@ -2573,6 +2659,11 @@ export default function PersonalDashboardPage() {
                         // facility_idは更新しない（既存の値を使用）
                         const updateData: any = {
                           name: profileData.name,
+                          last_name: profileData.lastName || null,
+                          first_name: profileData.firstName || null,
+                          name_kana: profileData.nameKana || null,
+                          last_name_kana: profileData.lastNameKana || null,
+                          first_name_kana: profileData.firstNameKana || null,
                           email: profileData.email || null,
                           birth_date: profileData.birthDate || null,
                           address: profileData.address || null,
@@ -2639,6 +2730,11 @@ export default function PersonalDashboardPage() {
                         const userData = JSON.parse(storedUser);
                         setProfileData({
                           name: userData.name || '',
+                          lastName: userData.lastName || userData.last_name || '',
+                          firstName: userData.firstName || userData.first_name || '',
+                          nameKana: userData.nameKana || userData.name_kana || '',
+                          lastNameKana: userData.lastNameKana || userData.last_name_kana || '',
+                          firstNameKana: userData.firstNameKana || userData.first_name_kana || '',
                           email: userData.email || '',
                           birthDate: userData.birth_date || '',
                           address: userData.address || '',

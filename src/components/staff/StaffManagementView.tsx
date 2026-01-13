@@ -149,6 +149,7 @@ const StaffManagementView: React.FC = () => {
   const [publicInviteLink, setPublicInviteLink] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDashboardInviteModalOpen, setIsDashboardInviteModalOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'profile' | 'facility'>('profile');
   const [dashboardPermissions, setDashboardPermissions] = useState<UserPermissions>({
     // 利用者管理
     schedule: false,
@@ -182,7 +183,11 @@ const StaffManagementView: React.FC = () => {
   const [editingStaffData, setEditingStaffData] = useState<Staff | null>(null);
   const [editFormData, setEditFormData] = useState<{
     name: string;
+    lastName: string;
+    firstName: string;
     nameKana: string;
+    lastNameKana: string;
+    firstNameKana: string;
     email: string;
     phone: string;
     birthDate: string;
@@ -419,7 +424,11 @@ const StaffManagementView: React.FC = () => {
       ...careerData,
       // フォームデータに変換（string | undefined の可能性があるフィールドを安全に文字列として扱う）
       name: staff.name || '',
+      lastName: staff.lastName || '',
+      firstName: staff.firstName || '',
       nameKana: staff.nameKana || '',
+      lastNameKana: staff.lastNameKana || '',
+      firstNameKana: staff.firstNameKana || '',
       email: staff.email || '',
       phone: staff.phone || '',
       address: staff.address || '',
@@ -2029,11 +2038,12 @@ const StaffManagementView: React.FC = () => {
       {isDetailModalOpen && selectedStaff && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-3xl shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+            {/* ヘッダー */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center z-10">
               <div className="flex items-center gap-3">
                 <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
                   <User size={20} className="text-[#00c4cc]" />
-                  {selectedStaff.name} さんの詳細情報
+                  {selectedStaff.name} さん
                 </h3>
                 {selectedStaff.user_id && (
                   <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-1">
@@ -2049,39 +2059,44 @@ const StaffManagementView: React.FC = () => {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {(!selectedStaff.user_id || isAdmin) && (
-                  <button
-                    onClick={() => {
-                      setIsDetailModalOpen(false);
-                      handleOpenEdit(selectedStaff);
-                    }}
-                    className="px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors flex items-center gap-2"
-                  >
-                    <Edit size={16} />
-                    編集
-                  </button>
-                )}
+              <button
+                onClick={() => {
+                  setIsDetailModalOpen(false);
+                  setSelectedStaff(null);
+                  setDetailTab('profile');
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* タブ切り替え */}
+            <div className="border-b border-gray-200 px-6">
+              <div className="flex gap-1">
                 <button
-                  onClick={() => {
-                    setIsDetailModalOpen(false);
-                    setSelectedStaff(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={() => setDetailTab('profile')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    detailTab === 'profile'
+                      ? 'border-[#00c4cc] text-[#00c4cc]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
                 >
-                  <X size={24} />
+                  基本プロフィール
+                </button>
+                <button
+                  onClick={() => setDetailTab('facility')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    detailTab === 'facility'
+                      ? 'border-[#00c4cc] text-[#00c4cc]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  事業所固有情報
                 </button>
               </div>
             </div>
-            <div className="p-6 space-y-6">
-              {selectedStaff.user_id && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 rounded-md p-3">
-                  <p className="text-xs text-blue-700">
-                    <strong>本人認証済み</strong> - 個人のマスターデータは本人のみが編集できます。
-                  </p>
-                </div>
-              )}
-
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               {(() => {
                 let careerData: CareerData | null = null;
                 try {
@@ -2089,7 +2104,7 @@ const StaffManagementView: React.FC = () => {
                     careerData = JSON.parse(selectedStaff.memo);
                   }
                 } catch (e) {}
-                
+
                 const facilityRole = careerData?.facilityRole || selectedStaff.facilityRole;
                 const displayData: StaffDisplayData = selectedStaff.user_id ? {
                   postalCode: selectedStaff.postalCode || null,
@@ -2118,199 +2133,143 @@ const StaffManagementView: React.FC = () => {
                 };
 
                 return (
-                  <>
-                    {/* 基本プロフィール */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                          <User className="w-5 h-5 text-[#8b5cf6]" />
-                          基本プロフィール
-                        </h2>
-                        {(!selectedStaff.user_id || isAdmin) && (
-                          <button
-                            onClick={() => {
-                              setIsDetailModalOpen(false);
-                              handleOpenEdit(selectedStaff);
-                            }}
-                            className="flex items-center gap-1 text-sm text-[#8b5cf6] hover:text-[#7c3aed] font-bold"
-                          >
-                            <Edit className="w-4 h-4" />
-                            編集
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <span className="text-sm text-gray-500">氏名:</span>
-                          <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.name}</span>
-                        </div>
-                        {selectedStaff.email && (
-                          <div>
-                            <span className="text-sm text-gray-500">メールアドレス:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.email}</span>
+                  <div className="space-y-6">
+                    {/* 基本プロフィールタブ（閲覧のみ） */}
+                    {detailTab === 'profile' && (
+                      <>
+                        {selectedStaff.user_id && (
+                          <div className="bg-blue-50 border-l-4 border-blue-500 rounded-md p-3">
+                            <p className="text-xs text-blue-700">
+                              <strong>本人認証済み</strong> - 基本プロフィールは本人のみがパーソナルページで編集できます。
+                            </p>
                           </div>
                         )}
-                        {selectedStaff.birthDate ? (
-                          <div>
-                            <span className="text-sm text-gray-500">生年月日:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.birthDate}</span>
-                          </div>
-                        ) : (
-                          <div>
-                            <span className="text-sm text-gray-500">生年月日:</span>
-                            <span className="ml-2 text-sm text-gray-400">未登録</span>
+                        {!selectedStaff.user_id && (
+                          <div className="bg-orange-50 border-l-4 border-orange-500 rounded-md p-3">
+                            <p className="text-xs text-orange-700">
+                              <strong>代理登録アカウント</strong> - 本人がパーソナルページでアクティベートすると、基本プロフィールは本人管理になります。
+                            </p>
                           </div>
                         )}
-                        {selectedStaff.address ? (
-                          <div>
-                            <span className="text-sm text-gray-500">住所:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.address}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">氏名</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.name || '未登録'}</span>
                           </div>
-                        ) : (
-                          <div>
-                            <span className="text-sm text-gray-500">住所:</span>
-                            <span className="ml-2 text-sm text-gray-400">未登録</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">メールアドレス</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.email || '未登録'}</span>
                           </div>
-                        )}
-                        {selectedStaff.phone ? (
-                          <div>
-                            <span className="text-sm text-gray-500">電話番号:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.phone}</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">生年月日</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.birthDate || '未登録'}</span>
                           </div>
-                        ) : (
-                          <div>
-                            <span className="text-sm text-gray-500">電話番号:</span>
-                            <span className="ml-2 text-sm text-gray-400">未登録</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">性別</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.gender || '未登録'}</span>
                           </div>
-                        )}
-                        {selectedStaff.gender ? (
-                          <div>
-                            <span className="text-sm text-gray-500">性別:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.gender}</span>
+                          <div className="bg-gray-50 rounded-lg p-3 md:col-span-2">
+                            <span className="text-xs text-gray-500 block mb-1">住所</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.address || '未登録'}</span>
                           </div>
-                        ) : (
-                          <div>
-                            <span className="text-sm text-gray-500">性別:</span>
-                            <span className="ml-2 text-sm text-gray-400">未登録</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">電話番号</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.phone || '未登録'}</span>
                           </div>
-                        )}
-                        {displayData?.myNumber ? (
-                          <div>
-                            <span className="text-sm text-gray-500">マイナンバー:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">
-                              ***-****-{String(displayData.myNumber || '').slice(-4)}
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">マイナンバー</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {displayData?.myNumber ? `***-****-${String(displayData.myNumber).slice(-4)}` : '未登録'}
                             </span>
                           </div>
-                        ) : (
-                          <div>
-                            <span className="text-sm text-gray-500">マイナンバー:</span>
-                            <span className="ml-2 text-sm text-gray-400">未登録</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-sm text-gray-500">配偶者:</span>
-                          <span className="ml-2 text-sm font-medium text-gray-800">
-                            {String(displayData?.hasSpouse ? (displayData.spouseName || '氏名未入力') : '無')}
-                          </span>
-                        </div>
-                        {displayData?.basicPensionSymbol && displayData?.basicPensionNumber ? (
-                          <div>
-                            <span className="text-sm text-gray-500">基礎年金番号:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">
-                              {displayData.basicPensionSymbol}-{displayData.basicPensionNumber}
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">配偶者</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {displayData?.hasSpouse ? (displayData.spouseName || '氏名未入力') : '無'}
                             </span>
                           </div>
-                        ) : (
-                          <div>
-                            <span className="text-sm text-gray-500">基礎年金番号:</span>
-                            <span className="ml-2 text-sm text-gray-400">未登録</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">基礎年金番号</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {displayData?.basicPensionSymbol && displayData?.basicPensionNumber
+                                ? `${displayData.basicPensionSymbol}-${displayData.basicPensionNumber}`
+                                : '未登録'}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      </>
+                    )}
 
-                    {/* 現在の所属事業所での契約内容 */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                          <FileText className="w-5 h-5 text-[#8b5cf6]" />
-                          現在の所属事業所での契約内容
-                        </h2>
-                        {(!selectedStaff.user_id || isAdmin) && (
+                    {/* 事業所固有情報タブ（編集可能） */}
+                    {detailTab === 'facility' && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <p className="text-xs text-gray-500">この事業所での契約内容・雇用条件を管理します</p>
                           <button
                             onClick={() => {
                               setIsDetailModalOpen(false);
                               handleOpenEdit(selectedStaff);
                             }}
-                            className="flex items-center gap-1 text-sm text-[#8b5cf6] hover:text-[#7c3aed] font-bold"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors"
                           >
                             <Edit className="w-4 h-4" />
                             編集
                           </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {selectedStaff.qualifications && (
-                          <div>
-                            <span className="text-sm text-gray-500">資格:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.qualifications}</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-sm text-gray-500">役職:</span>
-                          <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.role || '-'}</span>
                         </div>
-                        <div>
-                          <span className="text-sm text-gray-500">雇用形態:</span>
-                          <span className="ml-2 text-sm font-medium text-gray-800">{selectedStaff.type || '-'}</span>
-                        </div>
-                        {facilityRole ? (
-                          <div>
-                            <span className="text-sm text-gray-500">施設での役割:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">{facilityRole}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">役職</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.role || '未登録'}</span>
                           </div>
-                        ) : (
-                          <div>
-                            <span className="text-sm text-gray-500">施設での役割:</span>
-                            <span className="ml-2 text-sm text-gray-400">未登録</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">雇用形態</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.type || '未登録'}</span>
                           </div>
-                        )}
-                        {selectedStaff.monthlySalary !== undefined && (
-                          <div>
-                            <span className="text-sm text-gray-500">月給:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">¥{selectedStaff.monthlySalary?.toLocaleString()}</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">施設での役割</span>
+                            <span className="text-sm font-medium text-gray-800">{facilityRole || '未登録'}</span>
                           </div>
-                        )}
-                        {selectedStaff.hourlyWage !== undefined && (
-                          <div>
-                            <span className="text-sm text-gray-500">時給:</span>
-                            <span className="ml-2 text-sm font-medium text-gray-800">¥{selectedStaff.hourlyWage?.toLocaleString()}</span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">資格</span>
+                            <span className="text-sm font-medium text-gray-800">{selectedStaff.qualifications || '未登録'}</span>
                           </div>
-                        )}
-                        <div>
-                          <span className="text-sm text-gray-500">雇用保険:</span>
-                          <span className="ml-2 text-sm font-medium text-gray-800">
-                            {displayData?.employmentInsuranceStatus === 'joined' ? '加入' :
-                             displayData?.employmentInsuranceStatus === 'not_joined' ? '非加入' :
-                             displayData?.employmentInsuranceStatus === 'first_time' ? '初めて加入' : '未登録'}
-                          </span>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">月給</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {selectedStaff.monthlySalary ? `¥${selectedStaff.monthlySalary.toLocaleString()}` : '未登録'}
+                            </span>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">時給</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {selectedStaff.hourlyWage ? `¥${selectedStaff.hourlyWage.toLocaleString()}` : '未登録'}
+                            </span>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">雇用保険</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {displayData?.employmentInsuranceStatus === 'joined' ? '加入' :
+                               displayData?.employmentInsuranceStatus === 'not_joined' ? '非加入' :
+                               displayData?.employmentInsuranceStatus === 'first_time' ? '初めて加入' : '未登録'}
+                            </span>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">社会保険</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {displayData?.socialInsuranceStatus === 'joined' ? '加入' :
+                               displayData?.socialInsuranceStatus === 'not_joined' ? '非加入' : '未登録'}
+                            </span>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <span className="text-xs text-gray-500 block mb-1">扶養家族</span>
+                            <span className="text-sm font-medium text-gray-800">
+                              {displayData?.hasDependents ? `${displayData.dependentCount || 0}人` : '無'}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-sm text-gray-500">社会保険:</span>
-                          <span className="ml-2 text-sm font-medium text-gray-800">
-                            {displayData?.socialInsuranceStatus === 'joined' ? '加入' :
-                             displayData?.socialInsuranceStatus === 'not_joined' ? '非加入' : '未登録'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-sm text-gray-500">扶養家族:</span>
-                          <span className="ml-2 text-sm font-medium text-gray-800">
-                            {displayData?.hasDependents ? `${displayData.dependentCount || 0}人` : '無'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </>
+                      </>
+                    )}
+                  </div>
                 );
               })()}
               
@@ -2950,14 +2909,14 @@ const StaffManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* 編集モーダル（代理登録アカウント用、管理者は全スタッフ編集可能） */}
-      {isEditModalOpen && editingStaffData && (!editingStaffData.user_id || isAdmin) && (
+      {/* 編集モーダル（事業所固有情報のみ編集可能、パーソナル情報は本人管理） */}
+      {isEditModalOpen && editingStaffData && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
                 <User size={20} className="text-[#00c4cc]" />
-                {editingStaffData.name} さんの情報を編集
+                {editingStaffData.name} さんの{editingStaffData.user_id ? '事業所情報' : '情報'}を編集
               </h3>
               <button
                 onClick={() => {
@@ -2978,7 +2937,7 @@ const StaffManagementView: React.FC = () => {
                     <span className="ml-auto text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded font-bold">本人管理</span>
                   </div>
                   <p className="text-xs text-blue-700">
-                    管理者権限により編集可能です。個人情報は本人管理のため、変更時は注意してください。
+                    個人情報は本人が管理しています。施設からは「事業所固有情報」（役職・雇用形態・給与など）のみ編集可能です。
                   </p>
                 </div>
               ) : (
@@ -2996,25 +2955,30 @@ const StaffManagementView: React.FC = () => {
               {editFormData ? (
                 <div className="space-y-6">
                   {/* パーソナル情報（パーソナルアカウントと連動） */}
+                  {editingStaffData.user_id ? (
+                    /* user_idがある場合は閲覧のみのメッセージを表示 */
+                    <div className="border-2 border-blue-200 rounded-lg p-5 bg-white">
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-blue-200">
+                        <User size={18} className="text-blue-600" />
+                        <h4 className="font-bold text-lg text-blue-800">パーソナル情報</h4>
+                        <span className="ml-auto text-xs text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full font-bold border border-blue-300">本人管理</span>
+                      </div>
+                      <div className="text-sm text-blue-700 bg-blue-50 p-4 rounded-lg">
+                        <p className="font-medium mb-2">パーソナル情報は本人が管理しています</p>
+                        <p className="text-xs text-blue-600">氏名、住所、資格などの個人情報は、スタッフ本人のパーソナルページから編集できます。施設からは下記の「事業所固有情報」のみ編集可能です。</p>
+                      </div>
+                    </div>
+                  ) : (
+                  /* 代理登録（user_idなし）の場合はパーソナル情報を編集可能 */
                   <div className="border-2 border-blue-200 rounded-lg p-5 bg-white">
                     <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-blue-200">
                       <User size={18} className="text-blue-600" />
                       <h4 className="font-bold text-lg text-blue-800">パーソナル情報</h4>
-                      {editingStaffData.user_id ? (
-                        <span className="ml-auto text-xs text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full font-bold border border-blue-300">本人管理</span>
-                      ) : (
-                        <span className="ml-auto text-xs text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full font-bold border border-blue-300">連動予定</span>
-                      )}
+                      <span className="ml-auto text-xs text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full font-bold border border-blue-300">連動予定</span>
                     </div>
                     <div className="space-y-4">
-                      <div className={`text-xs p-3 rounded border-l-4 ${
-                        editingStaffData.user_id 
-                          ? 'bg-blue-50 text-blue-800 border-blue-400'
-                          : 'bg-blue-50 text-blue-800 border-blue-400'
-                      }`}>
-                        {editingStaffData.user_id 
-                          ? '※ パーソナルアカウントに紐づいています。変更は本人の情報にも反映されます。'
-                          : '※ スタッフ本人がアカウントを作成すると、この情報はパーソナルアカウントと連動します。'}
+                      <div className="text-xs p-3 rounded border-l-4 bg-blue-50 text-blue-800 border-blue-400">
+                        ※ スタッフ本人がアカウントを作成すると、この情報はパーソナルアカウントと連動します。
                       </div>
 
                       {/* 基本情報（名前、ふりがな、生年月日、性別） */}
@@ -3024,25 +2988,86 @@ const StaffManagementView: React.FC = () => {
                           <label className="block text-sm font-bold text-gray-700 mb-2">
                             氏名 <span className="text-red-500">*</span>
                           </label>
-                          <input
-                            type="text"
-                            value={editFormData.name || ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                            required
-                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">姓</label>
+                              <input
+                                type="text"
+                                value={editFormData.lastName || ''}
+                                onChange={(e) => {
+                                  const lastName = e.target.value;
+                                  setEditFormData({
+                                    ...editFormData,
+                                    lastName,
+                                    name: `${lastName} ${editFormData.firstName || ''}`.trim()
+                                  });
+                                }}
+                                placeholder="山田"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">名</label>
+                              <input
+                                type="text"
+                                value={editFormData.firstName || ''}
+                                onChange={(e) => {
+                                  const firstName = e.target.value;
+                                  setEditFormData({
+                                    ...editFormData,
+                                    firstName,
+                                    name: `${editFormData.lastName || ''} ${firstName}`.trim()
+                                  });
+                                }}
+                                placeholder="太郎"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                required
+                              />
+                            </div>
+                          </div>
                         </div>
 
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">
                             フリガナ
                           </label>
-                          <input
-                            type="text"
-                            value={editFormData.nameKana || ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, nameKana: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">セイ</label>
+                              <input
+                                type="text"
+                                value={editFormData.lastNameKana || ''}
+                                onChange={(e) => {
+                                  const lastNameKana = e.target.value;
+                                  setEditFormData({
+                                    ...editFormData,
+                                    lastNameKana,
+                                    nameKana: `${lastNameKana} ${editFormData.firstNameKana || ''}`.trim()
+                                  });
+                                }}
+                                placeholder="ヤマダ"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">メイ</label>
+                              <input
+                                type="text"
+                                value={editFormData.firstNameKana || ''}
+                                onChange={(e) => {
+                                  const firstNameKana = e.target.value;
+                                  setEditFormData({
+                                    ...editFormData,
+                                    firstNameKana,
+                                    nameKana: `${editFormData.lastNameKana || ''} ${firstNameKana}`.trim()
+                                  });
+                                }}
+                                placeholder="タロウ"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              />
+                            </div>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -3912,6 +3937,7 @@ const StaffManagementView: React.FC = () => {
                     </div>
                     </div>
                   </div>
+                  )}
 
                   {/* 事業所固有情報（事業所管理） */}
                   <div className="border-2 border-orange-200 rounded-lg p-5 bg-white">
@@ -4042,40 +4068,14 @@ const StaffManagementView: React.FC = () => {
                           return;
                         }
 
-                        if (!editFormData.name) {
+                        // 代理登録（user_idなし）の場合のみ名前の入力をチェック
+                        if (!editingStaffData.user_id && !editFormData.name) {
                           alert('名前を入力してください');
                           return;
                         }
 
                         setInviteLoading(true);
                         try {
-                          // 資格証の写真をSupabase Storageにアップロード
-                          const uploadedCertificates: { qualification: string; url: string }[] = [];
-                          for (const cert of editFormData.qualificationCertificates || []) {
-                            if (cert.file) {
-                              const fileExt = cert.file.name.split('.').pop();
-                              const fileName = `${facility.id}/qualifications/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                              const { error: uploadError } = await supabase.storage
-                                .from('qualifications')
-                                .upload(fileName, cert.file);
-                              
-                              if (!uploadError) {
-                                const { data: urlData } = supabase.storage
-                                  .from('qualifications')
-                                  .getPublicUrl(fileName);
-                                uploadedCertificates.push({
-                                  qualification: cert.qualification,
-                                  url: urlData.publicUrl,
-                                });
-                              }
-                            } else if (cert.url) {
-                              uploadedCertificates.push({
-                                qualification: cert.qualification,
-                                url: cert.url,
-                              });
-                            }
-                          }
-
                           // memoフィールドから既存データを取得
                           let existingMemo: Record<string, unknown> = {};
                           try {
@@ -4086,49 +4086,103 @@ const StaffManagementView: React.FC = () => {
                             // 無視
                           }
 
-                          // staffテーブルを更新
-                          const { error } = await supabase
-                            .from('staff')
-                            .update({
-                              name: editFormData.name,
-                              name_kana: editFormData.nameKana || null,
-                              role: editFormData.role,
-                              type: editFormData.employmentType,
-                              birth_date: editFormData.birthDate || null,
-                              gender: editFormData.gender || null,
-                              email: editFormData.email || null,
-                              phone: editFormData.phone || null,
-                              address: editFormData.address || null,
-                              qualifications: editFormData.qualifications?.length > 0 ? editFormData.qualifications.join(',') : null,
-                              monthly_salary: editFormData.monthlySalary || null,
-                              hourly_wage: editFormData.hourlyWage || null,
-                              memo: JSON.stringify({
-                                ...existingMemo,
-                                postalCode: editFormData.postalCode || existingMemo.postalCode,
-                                myNumber: editFormData.myNumber || existingMemo.myNumber,
-                                hasSpouse: editFormData.hasSpouse !== undefined ? editFormData.hasSpouse : existingMemo.hasSpouse,
-                                spouseName: editFormData.spouseName || existingMemo.spouseName,
-                                basicPensionSymbol: editFormData.basicPensionSymbol || existingMemo.basicPensionSymbol,
-                                basicPensionNumber: editFormData.basicPensionNumber || existingMemo.basicPensionNumber,
-                                employmentInsuranceStatus: editFormData.employmentInsuranceStatus || existingMemo.employmentInsuranceStatus,
-                                employmentInsuranceNumber: editFormData.employmentInsuranceNumber || existingMemo.employmentInsuranceNumber,
-                                previousRetirementDate: editFormData.previousRetirementDate || existingMemo.previousRetirementDate,
-                                previousName: editFormData.previousName || existingMemo.previousName,
-                                socialInsuranceStatus: editFormData.socialInsuranceStatus || existingMemo.socialInsuranceStatus,
-                                hasDependents: editFormData.hasDependents !== undefined ? editFormData.hasDependents : existingMemo.hasDependents,
-                                dependentCount: editFormData.dependentCount || existingMemo.dependentCount || 0,
-                                dependents: editFormData.dependents || existingMemo.dependents || [],
-                                qualificationCertificates: uploadedCertificates.length > 0 ? uploadedCertificates : (existingMemo.qualificationCertificates || []),
-                                experienceRecords: editFormData.experienceRecords || existingMemo.experienceRecords || [],
-                                educationHistory: editFormData.educationHistory || existingMemo.educationHistory || [],
-                                facilityRole: String(editFormData.facilityRole || existingMemo.facilityRole || '').trim() || '',
-                              }),
-                              updated_at: new Date().toISOString(),
-                            })
-                            .eq('id', editingStaffData.id);
+                          // user_idがある場合は事業所固有情報のみ更新
+                          if (editingStaffData.user_id) {
+                            const { error } = await supabase
+                              .from('staff')
+                              .update({
+                                role: editFormData.role,
+                                type: editFormData.employmentType,
+                                monthly_salary: editFormData.monthlySalary || null,
+                                hourly_wage: editFormData.hourlyWage || null,
+                                memo: JSON.stringify({
+                                  ...existingMemo,
+                                  facilityRole: String(editFormData.facilityRole || existingMemo.facilityRole || '').trim() || '',
+                                }),
+                                updated_at: new Date().toISOString(),
+                              })
+                              .eq('id', editingStaffData.id);
 
-                          if (error) {
-                            throw new Error(`更新エラー: ${error.message}`);
+                            if (error) {
+                              throw new Error(`更新エラー: ${error.message}`);
+                            }
+                          } else {
+                            // 代理登録（user_idなし）の場合は全情報を更新
+                            // 資格証の写真をSupabase Storageにアップロード
+                            const uploadedCertificates: { qualification: string; url: string }[] = [];
+                            for (const cert of editFormData.qualificationCertificates || []) {
+                              if (cert.file) {
+                                const fileExt = cert.file.name.split('.').pop();
+                                const fileName = `${facility.id}/qualifications/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                                const { error: uploadError } = await supabase.storage
+                                  .from('qualifications')
+                                  .upload(fileName, cert.file);
+
+                                if (!uploadError) {
+                                  const { data: urlData } = supabase.storage
+                                    .from('qualifications')
+                                    .getPublicUrl(fileName);
+                                  uploadedCertificates.push({
+                                    qualification: cert.qualification,
+                                    url: urlData.publicUrl,
+                                  });
+                                }
+                              } else if (cert.url) {
+                                uploadedCertificates.push({
+                                  qualification: cert.qualification,
+                                  url: cert.url,
+                                });
+                              }
+                            }
+
+                            // staffテーブルを更新（全情報）
+                            const { error } = await supabase
+                              .from('staff')
+                              .update({
+                                name: editFormData.name,
+                                last_name: editFormData.lastName || null,
+                                first_name: editFormData.firstName || null,
+                                name_kana: editFormData.nameKana || null,
+                                last_name_kana: editFormData.lastNameKana || null,
+                                first_name_kana: editFormData.firstNameKana || null,
+                                role: editFormData.role,
+                                type: editFormData.employmentType,
+                                birth_date: editFormData.birthDate || null,
+                                gender: editFormData.gender || null,
+                                email: editFormData.email || null,
+                                phone: editFormData.phone || null,
+                                address: editFormData.address || null,
+                                qualifications: editFormData.qualifications?.length > 0 ? editFormData.qualifications.join(',') : null,
+                                monthly_salary: editFormData.monthlySalary || null,
+                                hourly_wage: editFormData.hourlyWage || null,
+                                memo: JSON.stringify({
+                                  ...existingMemo,
+                                  postalCode: editFormData.postalCode || existingMemo.postalCode,
+                                  myNumber: editFormData.myNumber || existingMemo.myNumber,
+                                  hasSpouse: editFormData.hasSpouse !== undefined ? editFormData.hasSpouse : existingMemo.hasSpouse,
+                                  spouseName: editFormData.spouseName || existingMemo.spouseName,
+                                  basicPensionSymbol: editFormData.basicPensionSymbol || existingMemo.basicPensionSymbol,
+                                  basicPensionNumber: editFormData.basicPensionNumber || existingMemo.basicPensionNumber,
+                                  employmentInsuranceStatus: editFormData.employmentInsuranceStatus || existingMemo.employmentInsuranceStatus,
+                                  employmentInsuranceNumber: editFormData.employmentInsuranceNumber || existingMemo.employmentInsuranceNumber,
+                                  previousRetirementDate: editFormData.previousRetirementDate || existingMemo.previousRetirementDate,
+                                  previousName: editFormData.previousName || existingMemo.previousName,
+                                  socialInsuranceStatus: editFormData.socialInsuranceStatus || existingMemo.socialInsuranceStatus,
+                                  hasDependents: editFormData.hasDependents !== undefined ? editFormData.hasDependents : existingMemo.hasDependents,
+                                  dependentCount: editFormData.dependentCount || existingMemo.dependentCount || 0,
+                                  dependents: editFormData.dependents || existingMemo.dependents || [],
+                                  qualificationCertificates: uploadedCertificates.length > 0 ? uploadedCertificates : (existingMemo.qualificationCertificates || []),
+                                  experienceRecords: editFormData.experienceRecords || existingMemo.experienceRecords || [],
+                                  educationHistory: editFormData.educationHistory || existingMemo.educationHistory || [],
+                                  facilityRole: String(editFormData.facilityRole || existingMemo.facilityRole || '').trim() || '',
+                                }),
+                                updated_at: new Date().toISOString(),
+                              })
+                              .eq('id', editingStaffData.id);
+
+                            if (error) {
+                              throw new Error(`更新エラー: ${error.message}`);
+                            }
                           }
 
                           alert('スタッフ情報を更新しました。');

@@ -522,7 +522,11 @@ export const useFacilityData = () => {
                 id: row.id,
                 facilityId: row.facility_id,
                 name: row.name,
+                lastName: row.last_name,
+                firstName: row.first_name,
                 nameKana: row.name_kana,
+                lastNameKana: row.last_name_kana,
+                firstNameKana: row.first_name_kana,
                 role: row.role as '一般スタッフ' | 'マネージャー' | '管理者',
                 type: row.type as '常勤' | '非常勤',
                 facilityRole: facilityRoleFromMemo, // memoフィールドから取得した施設での役割

@@ -520,7 +520,11 @@ export type Staff = {
   id: string;
   facilityId: string; // 施設ID（マルチテナント対応）
   name: string;
+  lastName?: string; // 姓
+  firstName?: string; // 名
   nameKana?: string; // フリガナ
+  lastNameKana?: string; // 姓（カナ）
+  firstNameKana?: string; // 名（カナ）
   role: '一般スタッフ' | 'マネージャー' | '管理者';
   type: '常勤' | '非常勤';
   facilityRole?: string; // 施設での役割（児童発達管理責任者、指導員など）
