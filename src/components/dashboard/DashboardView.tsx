@@ -1,5 +1,6 @@
 /**
  * 経営ダッシュボードビュー
+ * 売上見込み・加算最適化・詳細分析機能を統合
  */
 
 'use client';
@@ -20,8 +21,11 @@ import {
   Car,
   ChevronDown,
   ChevronUp,
+  Zap,
+  PieChart,
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   calculateWeeklyRevenue,
   calculateSlotStatistics,
@@ -41,8 +45,10 @@ import {
 import { calculateMonthlyUtilizationForecast, MonthlyUtilizationForecast } from '@/utils/utilizationForecast';
 import { calculateBusinessDays } from '@/utils/dashboardCalculations';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
+import RevenueAnalytics from './RevenueAnalytics';
 
 const DashboardView: React.FC = () => {
+  const { facility } = useAuth();
   const {
     schedules,
     usageRecords,
@@ -54,6 +60,7 @@ const DashboardView: React.FC = () => {
     getManagementTarget,
   } = useFacilityData();
 
+  const [dashboardMode, setDashboardMode] = useState<'operations' | 'revenue'>('operations');
   const [viewPeriod, setViewPeriod] = useState<'week' | 'month'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isContractTrendExpanded, setIsContractTrendExpanded] = useState(false);
@@ -207,10 +214,47 @@ const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* メインタブ切り替え */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setDashboardMode('operations')}
+            className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
+              dashboardMode === 'operations'
+                ? 'bg-[#00c4cc] text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <BarChart3 size={18} />
+            運営分析
+          </button>
+          <button
+            onClick={() => setDashboardMode('revenue')}
+            className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
+              dashboardMode === 'revenue'
+                ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Zap size={18} />
+            売上・加算分析
+            <span className="px-1.5 py-0.5 bg-white/20 rounded text-[10px]">NEW</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 売上・加算分析モード */}
+      {dashboardMode === 'revenue' && facility?.id && (
+        <RevenueAnalytics facilityId={facility.id} childrenData={children} />
+      )}
+
+      {/* 運営分析モード */}
+      {dashboardMode === 'operations' && (
+        <>
       {/* ヘッダー */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800">経営ダッシュボード</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">運営ダッシュボード</h2>
           <p className="text-gray-500 text-xs sm:text-sm mt-1">
             経営指標を週単位・月単位で確認できます。
           </p>
@@ -1058,6 +1102,8 @@ const DashboardView: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

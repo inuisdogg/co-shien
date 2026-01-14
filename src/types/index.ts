@@ -360,6 +360,12 @@ export type Child = {
   dropoffLongitude?: number; // お送り場所の経度（Google Maps用）
   // 特性・メモ
   characteristics?: string; // 特性・メモ
+  // 加算判定用フィールド
+  medical_care_score?: number; // 医療的ケア判定スコア
+  behavior_disorder_score?: number; // 強度行動障害判定スコア
+  care_needs_category?: string; // ケアニーズ判定結果
+  is_protected_child?: boolean; // 要保護・要支援児童フラグ
+  income_category?: string; // 世帯所得区分（general/low_income/welfare）
   // 契約ステータス
   contractStatus: ContractStatus; // 契約ステータス
   contractStartDate?: string; // 契約開始日
@@ -1144,5 +1150,197 @@ ${applicantName}と申します。
 ${applicantName}
 ────────────────────────`,
   };
+};
+
+// ==========================================
+// シフト管理システム
+// ==========================================
+
+// シフトパターン（施設ごとに定義）
+export type ShiftPattern = {
+  id: string;
+  facilityId: string;
+  name: string;           // '早番', '遅番', '日勤' など
+  shortName?: string;     // '早', '遅', '日' など（カレンダー表示用）
+  startTime?: string;     // 開始時刻 (HH:mm)
+  endTime?: string;       // 終了時刻 (HH:mm)
+  breakMinutes: number;   // 休憩時間（分）
+  color: string;          // 表示色
+  displayOrder: number;   // 表示順
+  isDayOff: boolean;      // 休日パターンかどうか
+  isActive: boolean;      // 有効フラグ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 月間シフトスケジュールステータス
+export type MonthlyShiftStatus = 'draft' | 'published' | 'confirmed';
+
+// 月間シフトスケジュール
+export type MonthlyShiftSchedule = {
+  id: string;
+  facilityId: string;
+  year: number;
+  month: number;
+  status: MonthlyShiftStatus;
+  publishedAt?: string;   // 公開日時
+  confirmedAt?: string;   // 確定日時
+  republishedAt?: string; // 最終再周知日時
+  republishCount?: number; // 再周知回数
+  createdAt: string;
+  updatedAt: string;
+};
+
+// シフト確認ステータス
+export type ShiftConfirmationStatus = 'pending' | 'confirmed' | 'needs_discussion';
+
+// シフト確認（スタッフの回答）
+export type ShiftConfirmation = {
+  id: string;
+  shiftId: string;
+  userId: string;
+  status: ShiftConfirmationStatus;
+  comment?: string;           // 相談内容
+  respondedAt?: string;       // 回答日時
+  resolvedAt?: string;        // 相談解決日時
+  resolutionNote?: string;    // 解決メモ
+  requiresReconfirm?: boolean; // 再確認が必要か
+  previousShiftPatternId?: string; // 変更前のシフトパターンID
+  version?: number;           // 確認バージョン
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  userName?: string;
+  shiftDate?: string;
+};
+
+// スタッフ別休暇設定
+export type StaffLeaveSettings = {
+  id: string;
+  facilityId: string;
+  userId: string;
+  // 有給休暇
+  paidLeaveEnabled: boolean;
+  paidLeaveDays: number;
+  // 代休
+  substituteLeaveEnabled: boolean;
+  substituteLeaveDays: number;
+  // メモ
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  userName?: string;
+};
+
+// 拡張シフト型（パターン情報付き）
+export type ShiftWithPattern = {
+  id: string;
+  facilityId: string;
+  staffId: string;
+  date: string;
+  hasShift: boolean;
+  shiftPatternId?: string;
+  monthlyScheduleId?: string;
+  startTime?: string;
+  endTime?: string;
+  breakMinutes?: number;
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  staffName?: string;
+  shiftPattern?: ShiftPattern;
+  confirmation?: ShiftConfirmation;
+};
+
+// シフト確認ステータスのラベル
+export const SHIFT_CONFIRMATION_STATUS_LABELS: Record<ShiftConfirmationStatus, { label: string; color: string }> = {
+  pending: { label: '未回答', color: 'bg-gray-100 text-gray-600' },
+  confirmed: { label: 'OK', color: 'bg-green-100 text-green-700' },
+  needs_discussion: { label: '相談したい', color: 'bg-orange-100 text-orange-700' },
+};
+
+// 月間シフトステータスのラベル
+export const MONTHLY_SHIFT_STATUS_LABELS: Record<MonthlyShiftStatus, { label: string; color: string }> = {
+  draft: { label: '作成中', color: 'bg-gray-100 text-gray-600' },
+  published: { label: '公開中', color: 'bg-blue-100 text-blue-700' },
+  confirmed: { label: '確定', color: 'bg-green-100 text-green-700' },
+};
+
+// 休暇申請タイプ（leave_requests用）
+export type LeaveRequestType = 'paid_leave' | 'half_day_am' | 'half_day_pm' | 'special_leave' | 'sick_leave' | 'absence';
+
+// 休暇申請タイプのラベル
+export const LEAVE_REQUEST_TYPE_LABELS: Record<LeaveRequestType, string> = {
+  paid_leave: '有給休暇',
+  half_day_am: '午前半休',
+  half_day_pm: '午後半休',
+  special_leave: '特別休暇',
+  sick_leave: '病欠',
+  absence: '欠勤',
+};
+
+// 休暇申請（簡略版 - 有給/欠勤/代休）
+export type LeaveRequest = {
+  id: string;
+  userId: string;
+  facilityId: string;
+  requestType: LeaveRequestType;
+  startDate: string;
+  endDate: string;
+  daysCount: number;
+  reason?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  userName?: string;
+  approverName?: string;
+};
+
+// ==========================================
+// 希望シフト提出
+// ==========================================
+
+// 希望シフト提出
+export type ShiftAvailabilitySubmission = {
+  id: string;
+  facilityId: string;
+  userId: string;
+  year: number;
+  month: number;
+  availableDates: string[];  // 出勤可能日の配列 ['2026-02-01', '2026-02-03', ...]
+  notes?: string;            // 備考
+  submittedAt?: string;      // 提出日時（NULLの場合は下書き）
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  userName?: string;
+};
+
+// 希望提出締切設定
+export type ShiftAvailabilityDeadline = {
+  id: string;
+  facilityId: string;
+  year: number;
+  month: number;
+  deadlineDate: string;      // 締切日 (YYYY-MM-DD)
+  isOpen: boolean;           // 提出受付中かどうか
+  createdAt: string;
+  updatedAt: string;
+};
+
+// スタッフ別希望提出状況（ダッシュボード用）
+export type StaffAvailabilityStatus = {
+  staffId: string;
+  staffName: string;
+  userId?: string;
+  submitted: boolean;
+  submittedAt?: string;
+  availableDates: string[];
+  notes?: string;
 };
 
