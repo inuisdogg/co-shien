@@ -116,8 +116,8 @@ export default function ClientSignupPage() {
 
       // Supabase Authでサインアップ（メール認証を有効化）
       const redirectUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/auth/callback?type=client`
-        : 'https://my.co-shien.inu.co.jp/auth/callback?type=client';
+        ? `${window.location.origin}/auth/callback?type=parent`
+        : 'https://co-shien.inu.co.jp/auth/callback?type=parent';
 
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,

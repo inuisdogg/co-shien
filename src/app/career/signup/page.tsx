@@ -145,9 +145,9 @@ export default function PersonalSignupPage() {
       // ここではusersテーブルのチェックで十分
 
       // Supabase Authでサインアップ（メール認証を有効化）
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/auth/callback?type=personal`
-        : 'https://my.co-shien.inu.co.jp/auth/callback?type=personal';
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback?type=career`
+        : 'https://co-shien.inu.co.jp/auth/callback?type=career';
       
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,

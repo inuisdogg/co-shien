@@ -555,7 +555,7 @@ export default function AdminSetupPage() {
               type="button"
               onClick={() => {
                 // Personal側のトップページ（ログイン画面）に遷移
-                window.location.href = 'https://my.co-shien.inu.co.jp/';
+                window.location.href = '/career';
               }}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-md transition-colors text-sm"
             >

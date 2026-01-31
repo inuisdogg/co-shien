@@ -40,7 +40,7 @@ export default function FacilitySetupPage() {
 
         <div className="space-y-3">
           <a
-            href="https://my.co-shien.inu.co.jp/?redirect=https://biz.co-shien.inu.co.jp/admin-setup"
+            href="/career/login?redirect=/admin-setup"
             className="block w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors text-center"
           >
             はい、アカウントを持っています

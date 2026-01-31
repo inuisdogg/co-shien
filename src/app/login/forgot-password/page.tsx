@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
       // Supabase Authでパスワードリセットメールを送信
       const redirectUrl = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=recovery`
-        : 'https://my.co-shien.inu.co.jp/auth/callback?type=recovery';
+        : 'https://co-shien.inu.co.jp/auth/callback?type=recovery';
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),

@@ -85,9 +85,9 @@ export default function SignupPage() {
       // Supabase Authでサインアップ（メール認証を有効化、パスワードは後で設定）
       // 一時的なパスワードを生成（メール認証後に設定画面で変更）
       const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/auth/callback?type=biz`
-        : 'https://biz.co-shien.inu.co.jp/auth/callback?type=biz';
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback?type=business`
+        : 'https://co-shien.inu.co.jp/auth/callback?type=business';
       
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -306,7 +306,7 @@ export default function SignupPage() {
           </p>
           <p className="text-center text-xs text-gray-400">
             <button
-              onClick={() => window.location.href = 'https://my.co-shien.inu.co.jp/'}
+              onClick={() => window.location.href = '/career/login'}
               className="hover:underline"
             >
               Personal側でログイン

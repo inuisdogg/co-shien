@@ -1,26 +1,45 @@
 /**
  * ドメイン設定ユーティリティ
  *
- * ドメイン構成:
- * - biz.co-shien.inu.co.jp → スタッフ用（ログイン、ダッシュボード、施設管理）
- * - my.co-shien.inu.co.jp → 利用者（クライアント）専用
+ * シングルドメイン構成:
+ * - co-shien.inu.co.jp (メインドメイン)
+ *   - /business → 施設管理（Biz）
+ *   - /career   → スタッフ向け
+ *   - /parent   → 保護者向け
+ *   - /admin    → プラットフォーム管理
+ *   - /login    → 統一ログイン
  */
+
+// メインドメイン
+const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || 'co-shien.inu.co.jp';
 
 /**
- * 現在のアプリケーションタイプを取得
- * @returns 'staff' | 'client'
+ * 現在のパスからアプリケーションタイプを取得
+ * @returns 'business' | 'career' | 'parent' | 'admin' | 'other'
  */
-export function getAppType(): 'biz' | 'personal' {
+export type AppType = 'business' | 'career' | 'parent' | 'admin' | 'other';
+
+export function getAppType(): AppType {
   if (typeof window === 'undefined') {
-    return 'biz';
+    return 'other';
   }
 
-  const hostname = window.location.hostname;
-  if (hostname.includes('my.co-shien') || hostname === 'my.co-shien.inu.co.jp') {
-    return 'personal'; // クライアント用ドメイン
+  const pathname = window.location.pathname;
+
+  if (pathname.startsWith('/business')) {
+    return 'business';
+  }
+  if (pathname.startsWith('/career')) {
+    return 'career';
+  }
+  if (pathname.startsWith('/parent')) {
+    return 'parent';
+  }
+  if (pathname.startsWith('/admin')) {
+    return 'admin';
   }
 
-  return 'biz'; // スタッフ用ドメイン（デフォルト）
+  return 'other';
 }
 
 /**
@@ -31,80 +50,115 @@ export function getBaseUrl(): string {
     return window.location.origin;
   }
 
-  return 'https://biz.co-shien.inu.co.jp';
+  return `https://${MAIN_DOMAIN}`;
 }
 
 /**
- * スタッフ用ドメインを取得
+ * メインドメインを取得
  */
-export function getBizDomain(): string {
-  return process.env.NEXT_PUBLIC_BIZ_DOMAIN || 'biz.co-shien.inu.co.jp';
+export function getMainDomain(): string {
+  return MAIN_DOMAIN;
 }
 
 /**
- * クライアント用ドメインを取得
+ * メインドメインのベースURLを取得
  */
-export function getClientDomain(): string {
-  return process.env.NEXT_PUBLIC_CLIENT_DOMAIN || 'my.co-shien.inu.co.jp';
-}
-
-/**
- * @deprecated Use getClientDomain instead
- */
-export function getPersonalDomain(): string {
-  return getClientDomain();
-}
-
-/**
- * スタッフ用ベースURLを取得（ローカルホスト対応）
- */
-export function getBizBaseUrl(): string {
+export function getMainBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return `${window.location.protocol}//${window.location.host}`;
     }
+    return window.location.origin;
   }
-  return `https://${getBizDomain()}`;
+  return `https://${MAIN_DOMAIN}`;
 }
 
 /**
- * クライアント用ベースURLを取得（ローカルホスト対応）
+ * 各アプリケーションのURLを取得
  */
-export function getClientBaseUrl(): string {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `${window.location.protocol}//${window.location.host}`;
-    }
-    if (hostname.includes('my.co-shien') || hostname === 'my.co-shien.inu.co.jp') {
-      return `${window.location.protocol}//${window.location.host}`;
-    }
-  }
-  return `https://${getClientDomain()}`;
+export function getBusinessUrl(): string {
+  return `${getMainBaseUrl()}/business`;
 }
 
-/**
- * @deprecated Use getClientBaseUrl instead
- */
-export function getPersonalBaseUrl(): string {
-  return getClientBaseUrl();
+export function getCareerUrl(): string {
+  return `${getMainBaseUrl()}/career`;
+}
+
+export function getParentUrl(): string {
+  return `${getMainBaseUrl()}/parent`;
+}
+
+export function getAdminUrl(): string {
+  return `${getMainBaseUrl()}/admin`;
+}
+
+export function getLoginUrl(): string {
+  return `${getMainBaseUrl()}/login`;
 }
 
 /**
  * 招待リンク用のベースURLを取得
- * クライアント招待はmy.ドメイン、スタッフ招待はbiz.ドメインを使用
+ * @param type 招待の種類
  */
-export function getInvitationBaseUrl(forClient: boolean = false): string {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `${window.location.protocol}//${window.location.host}`;
-    }
-  }
+export function getInvitationBaseUrl(type: 'staff' | 'parent' = 'staff'): string {
+  const baseUrl = getMainBaseUrl();
 
-  if (forClient) {
-    return `https://${getClientDomain()}`;
+  if (type === 'parent') {
+    return `${baseUrl}/parent`;
   }
-  return `https://${getBizDomain()}`;
+  return `${baseUrl}/career`;
+}
+
+/**
+ * Auth コールバックURLを取得
+ */
+export function getAuthCallbackUrl(type: 'business' | 'career' | 'parent' = 'business'): string {
+  return `${getMainBaseUrl()}/auth/callback?type=${type}`;
+}
+
+// ========================================
+// 後方互換性のための関数（非推奨）
+// ========================================
+
+/**
+ * @deprecated Use getAppType() instead
+ */
+export function getBizDomain(): string {
+  return MAIN_DOMAIN;
+}
+
+/**
+ * @deprecated Use getMainDomain() instead
+ */
+export function getClientDomain(): string {
+  return MAIN_DOMAIN;
+}
+
+/**
+ * @deprecated Use getMainDomain() instead
+ */
+export function getPersonalDomain(): string {
+  return MAIN_DOMAIN;
+}
+
+/**
+ * @deprecated Use getMainBaseUrl() instead
+ */
+export function getBizBaseUrl(): string {
+  return getMainBaseUrl();
+}
+
+/**
+ * @deprecated Use getMainBaseUrl() instead
+ */
+export function getClientBaseUrl(): string {
+  return getMainBaseUrl();
+}
+
+/**
+ * @deprecated Use getMainBaseUrl() instead
+ */
+export function getPersonalBaseUrl(): string {
+  return getMainBaseUrl();
 }

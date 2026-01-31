@@ -106,7 +106,7 @@ export default function PortalPage() {
 
     if (mode === 'biz') {
       // Bizモードへ（管理者向け）
-      window.location.href = `https://biz.co-shien.inu.co.jp/?facilityId=${facility.id}`;
+      window.location.href = `/business?facilityId=${facility.id}`;
     } else {
       // Personalモードへ（スタッフ向け）
       router.push('/career');

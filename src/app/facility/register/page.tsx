@@ -408,7 +408,7 @@ export default function FacilityRegisterPage() {
         }
 
         // Bizダッシュボードに直接リダイレクト（完了画面を表示しない）
-        window.location.href = `https://biz.co-shien.inu.co.jp/?facilityId=${facilityId}`;
+        window.location.href = `/business?facilityId=${facilityId}`;
       } else {
         // 施設情報が取得できない場合はエラー
         console.error('施設情報の取得に失敗:', facilityDataError);
