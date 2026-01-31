@@ -346,7 +346,7 @@ export default function ShiftConfirmationView({
         <div className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#818CF8]" />
             </div>
           ) : scheduleStatus !== 'published' && scheduleStatus !== 'confirmed' ? (
             <div className="text-center py-12">

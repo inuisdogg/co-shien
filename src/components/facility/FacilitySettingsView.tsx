@@ -5,18 +5,32 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck } from 'lucide-react';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase } from 'lucide-react';
 import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
 import DocumentConfigView from './DocumentConfigView';
+import WorkToolSettingsPanel from '../staff/WorkToolSettingsPanel';
+import CompanyDocumentsSettings from './CompanyDocumentsSettings';
+import StaffingComplianceSettings from './StaffingComplianceSettings';
+
+// タブの種類
+type SettingsTab = 'basic' | 'operation' | 'documents' | 'staff';
+
+const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'basic', label: '基本情報' },
+  { id: 'operation', label: '営業・休日' },
+  { id: 'documents', label: '書類設定' },
+  { id: 'staff', label: 'スタッフ設定' },
+];
 
 const FacilitySettingsView: React.FC = () => {
   const { facilitySettings, updateFacilitySettings, timeSlots, addTimeSlot, updateTimeSlot, deleteTimeSlot } = useFacilityData();
   const { facility } = useAuth();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('basic');
 
   // 最新の施設コードを取得
   useEffect(() => {
@@ -27,13 +41,13 @@ const FacilitySettingsView: React.FC = () => {
           .select('code')
           .eq('id', facility.id)
           .single();
-        
+
         if (!error && data) {
           setCurrentFacilityCode(data.code || '');
         }
       }
     };
-    
+
     fetchFacilityCode();
   }, [facility?.id]);
 
@@ -279,7 +293,8 @@ const FacilitySettingsView: React.FC = () => {
 
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4 animate-in fade-in duration-500">
+      {/* ヘッダー */}
       <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center">
@@ -292,8 +307,32 @@ const FacilitySettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 施設名設定 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      {/* タブナビゲーション */}
+      <div className="bg-white rounded-lg border border-gray-100 shadow-sm">
+        <div className="flex border-b border-gray-200">
+          {SETTINGS_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 py-3 px-4 text-sm font-bold transition-colors ${
+                activeTab === tab.id
+                  ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-cyan-50/30'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* タブコンテンツ */}
+      <div className="space-y-6">
+        {/* ========== 基本情報タブ ========== */}
+        {activeTab === 'basic' && (
+          <>
+            {/* 施設名設定 */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <Building2 size={20} className="mr-2 text-[#00c4cc]" />
           施設名設定
@@ -462,12 +501,135 @@ const FacilitySettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 定休日設定 */}
+      {/* 事業区分設定 */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg text-gray-800 flex items-center">
-            <Calendar size={20} className="mr-2 text-[#00c4cc]" />
-            定休日設定
+        <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+          <Building2 size={20} className="mr-2 text-[#00c4cc]" />
+          事業区分
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          この施設が提供するサービスの種類を選択してください。多機能型施設の場合は複数選択できます。
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.serviceCategories?.childDevelopmentSupport || false}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  serviceCategories: {
+                    ...settings.serviceCategories,
+                    childDevelopmentSupport: e.target.checked,
+                    afterSchoolDayService: settings.serviceCategories?.afterSchoolDayService || false,
+                    nurseryVisitSupport: settings.serviceCategories?.nurseryVisitSupport || false,
+                    homeBasedChildSupport: settings.serviceCategories?.homeBasedChildSupport || false,
+                  },
+                })
+              }
+              className="w-5 h-5 mt-0.5 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+            />
+            <div>
+              <span className="font-bold text-gray-800">児童発達支援</span>
+              <p className="text-xs text-gray-500 mt-1">未就学児を対象とした発達支援サービス</p>
+            </div>
+          </label>
+          <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.serviceCategories?.afterSchoolDayService || false}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  serviceCategories: {
+                    ...settings.serviceCategories,
+                    childDevelopmentSupport: settings.serviceCategories?.childDevelopmentSupport || false,
+                    afterSchoolDayService: e.target.checked,
+                    nurseryVisitSupport: settings.serviceCategories?.nurseryVisitSupport || false,
+                    homeBasedChildSupport: settings.serviceCategories?.homeBasedChildSupport || false,
+                  },
+                })
+              }
+              className="w-5 h-5 mt-0.5 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+            />
+            <div>
+              <span className="font-bold text-gray-800">放課後等デイサービス</span>
+              <p className="text-xs text-gray-500 mt-1">就学児を対象とした放課後支援サービス</p>
+            </div>
+          </label>
+          <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.serviceCategories?.nurseryVisitSupport || false}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  serviceCategories: {
+                    ...settings.serviceCategories,
+                    childDevelopmentSupport: settings.serviceCategories?.childDevelopmentSupport || false,
+                    afterSchoolDayService: settings.serviceCategories?.afterSchoolDayService || false,
+                    nurseryVisitSupport: e.target.checked,
+                    homeBasedChildSupport: settings.serviceCategories?.homeBasedChildSupport || false,
+                  },
+                })
+              }
+              className="w-5 h-5 mt-0.5 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+            />
+            <div>
+              <span className="font-bold text-gray-800">保育所等訪問支援</span>
+              <p className="text-xs text-gray-500 mt-1">保育所・学校等への訪問による支援サービス</p>
+            </div>
+          </label>
+          <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.serviceCategories?.homeBasedChildSupport || false}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  serviceCategories: {
+                    ...settings.serviceCategories,
+                    childDevelopmentSupport: settings.serviceCategories?.childDevelopmentSupport || false,
+                    afterSchoolDayService: settings.serviceCategories?.afterSchoolDayService || false,
+                    nurseryVisitSupport: settings.serviceCategories?.nurseryVisitSupport || false,
+                    homeBasedChildSupport: e.target.checked,
+                  },
+                })
+              }
+              className="w-5 h-5 mt-0.5 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+            />
+            <div>
+              <span className="font-bold text-gray-800">居宅訪問型児童発達支援</span>
+              <p className="text-xs text-gray-500 mt-1">自宅への訪問による発達支援サービス</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+            {/* 基本情報の保存ボタン */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSave}
+                  className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
+                >
+                  <Save size={16} className="mr-2" />
+                  基本情報を保存
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ========== 営業・休日タブ ========== */}
+        {activeTab === 'operation' && (
+          <>
+            {/* 定休日設定 */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg text-gray-800 flex items-center">
+                  <Calendar size={20} className="mr-2 text-[#00c4cc]" />
+                  定休日設定
           </h3>
           <button
             onClick={() => openHistoryModal('holidays')}
@@ -643,211 +805,144 @@ const FacilitySettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 営業時間設定 */}
+      {/* 営業時間・サービス提供時間設定 */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg text-gray-800 flex items-center">
             <Clock size={20} className="mr-2 text-[#00c4cc]" />
-            営業時間設定
+            営業時間・サービス提供時間
           </h3>
           <button
             onClick={() => openHistoryModal('business_hours')}
             className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"
           >
             <History size={14} />
-            変更履歴を見る
+            変更履歴
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <label className="text-sm font-bold text-gray-700 block mb-2">午前（デフォルト）</label>
-            <div className="flex items-center space-x-2">
-              <input
-                type="time"
-                value={settings.businessHours.AM.start}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    businessHours: {
-                      ...settings.businessHours,
-                      AM: { ...settings.businessHours.AM, start: e.target.value },
-                    },
-                  })
-                }
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-              />
-              <span className="text-gray-600">～</span>
-              <input
-                type="time"
-                value={settings.businessHours.AM.end}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    businessHours: {
-                      ...settings.businessHours,
-                      AM: { ...settings.businessHours.AM, end: e.target.value },
-                    },
-                  })
-                }
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-bold text-gray-700 block mb-2">午後（デフォルト）</label>
-            <div className="flex items-center space-x-2">
-              <input
-                type="time"
-                value={settings.businessHours.PM.start}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    businessHours: {
-                      ...settings.businessHours,
-                      PM: { ...settings.businessHours.PM, start: e.target.value },
-                    },
-                  })
-                }
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-              />
-              <span className="text-gray-600">～</span>
-              <input
-                type="time"
-                value={settings.businessHours.PM.end}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    businessHours: {
-                      ...settings.businessHours,
-                      PM: { ...settings.businessHours.PM, end: e.target.value },
-                    },
-                  })
-                }
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-              />
-            </div>
-          </div>
-        </div>
-        
-        {/* 期間ごとの営業時間設定 */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-bold text-gray-700">期間ごとの営業時間設定</label>
-            <button
-              onClick={addBusinessHoursPeriod}
-              className="text-xs bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors"
-            >
-              <Plus size={14} />
-              期間を追加
-            </button>
-          </div>
-          {settings.businessHoursPeriods && settings.businessHoursPeriods.length > 0 && (
-            <div className="space-y-3">
-              {settings.businessHoursPeriods.map((period) => (
-                <div key={period.id} className="border border-gray-200 rounded-md p-4 bg-gray-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <label className="text-xs text-gray-600 block mb-1">開始日</label>
-                        <input
-                          type="date"
-                          value={period.startDate}
-                          onChange={(e) =>
-                            updateBusinessHoursPeriod(period.id, { startDate: e.target.value })
-                          }
-                          className="border border-gray-300 rounded-md px-2 py-1 text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 block mb-1">終了日（空欄=無期限）</label>
-                        <input
-                          type="date"
-                          value={period.endDate}
-                          onChange={(e) =>
-                            updateBusinessHoursPeriod(period.id, { endDate: e.target.value })
-                          }
-                          className="border border-gray-300 rounded-md px-2 py-1 text-xs"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeBusinessHoursPeriod(period.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-gray-700 block mb-1">午前</label>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="time"
-                          value={period.businessHours.AM.start}
-                          onChange={(e) =>
-                            updateBusinessHoursPeriod(period.id, {
-                              businessHours: {
-                                ...period.businessHours,
-                                AM: { ...period.businessHours.AM, start: e.target.value },
-                              },
-                            })
-                          }
-                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
-                        />
-                        <span className="text-gray-600 text-xs">～</span>
-                        <input
-                          type="time"
-                          value={period.businessHours.AM.end}
-                          onChange={(e) =>
-                            updateBusinessHoursPeriod(period.id, {
-                              businessHours: {
-                                ...period.businessHours,
-                                AM: { ...period.businessHours.AM, end: e.target.value },
-                              },
-                            })
-                          }
-                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-700 block mb-1">午後</label>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="time"
-                          value={period.businessHours.PM.start}
-                          onChange={(e) =>
-                            updateBusinessHoursPeriod(period.id, {
-                              businessHours: {
-                                ...period.businessHours,
-                                PM: { ...period.businessHours.PM, start: e.target.value },
-                              },
-                            })
-                          }
-                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
-                        />
-                        <span className="text-gray-600 text-xs">～</span>
-                        <input
-                          type="time"
-                          value={period.businessHours.PM.end}
-                          onChange={(e) =>
-                            updateBusinessHoursPeriod(period.id, {
-                              businessHours: {
-                                ...period.businessHours,
-                                PM: { ...period.businessHours.PM, end: e.target.value },
-                              },
-                            })
-                          }
-                          className="border border-gray-300 rounded-md px-2 py-1 text-xs w-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
+
+        {/* コンパクトな曜日別設定 */}
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5, 6, 0].map((dayValue) => {
+            const day = weekDays.find(d => d.value === dayValue)!;
+            const dayOverride = settings.flexibleBusinessHours?.dayOverrides?.[dayValue];
+            const isClosed = dayOverride?.isClosed || false;
+            const startTime = dayOverride?.start || settings.flexibleBusinessHours?.default?.start || '09:00';
+            const endTime = dayOverride?.end || settings.flexibleBusinessHours?.default?.end || '18:00';
+
+            return (
+              <div
+                key={dayValue}
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                  isClosed ? 'bg-gray-50 border-gray-200' : 'bg-cyan-50/50 border-[#00c4cc]/20'
+                }`}
+              >
+                {/* 曜日 */}
+                <div className={`w-8 text-center font-bold ${
+                  dayValue === 0 ? 'text-red-500' : dayValue === 6 ? 'text-blue-500' : 'text-gray-700'
+                }`}>
+                  {day.label}
                 </div>
-              ))}
-            </div>
-          )}
+
+                {/* 営業/休業トグル */}
+                <button
+                  onClick={() => {
+                    const newOverrides = { ...(settings.flexibleBusinessHours?.dayOverrides || {}) };
+                    if (isClosed) {
+                      newOverrides[dayValue] = {
+                        start: settings.flexibleBusinessHours?.default?.start || '09:00',
+                        end: settings.flexibleBusinessHours?.default?.end || '18:00',
+                        isClosed: false,
+                      };
+                    } else {
+                      newOverrides[dayValue] = { isClosed: true };
+                    }
+                    setSettings({
+                      ...settings,
+                      flexibleBusinessHours: {
+                        ...settings.flexibleBusinessHours,
+                        default: settings.flexibleBusinessHours?.default || { start: '09:00', end: '18:00' },
+                        dayOverrides: newOverrides,
+                      },
+                    });
+                  }}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                    isClosed
+                      ? 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                      : 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
+                  }`}
+                >
+                  {isClosed ? '休業' : '営業'}
+                </button>
+
+                {/* 時間設定 - セレクトボックス */}
+                {!isClosed && (
+                  <div className="flex items-center gap-2 flex-1">
+                    <select
+                      value={startTime}
+                      onChange={(e) => {
+                        const newOverrides = { ...(settings.flexibleBusinessHours?.dayOverrides || {}) };
+                        newOverrides[dayValue] = {
+                          start: e.target.value,
+                          end: dayOverride?.end || settings.flexibleBusinessHours?.default?.end || '18:00',
+                          isClosed: false,
+                        };
+                        setSettings({
+                          ...settings,
+                          flexibleBusinessHours: {
+                            ...settings.flexibleBusinessHours,
+                            default: settings.flexibleBusinessHours?.default || { start: '09:00', end: '18:00' },
+                            dayOverrides: newOverrides,
+                          },
+                        });
+                      }}
+                      className="border border-gray-200 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:border-[#00c4cc] cursor-pointer"
+                    >
+                      {Array.from({ length: 34 }, (_, i) => {
+                        const h = Math.floor(i / 2) + 6;
+                        const m = (i % 2) * 30;
+                        const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                        return <option key={time} value={time}>{time}</option>;
+                      })}
+                    </select>
+                    <span className="text-gray-400">〜</span>
+                    <select
+                      value={endTime}
+                      onChange={(e) => {
+                        const newOverrides = { ...(settings.flexibleBusinessHours?.dayOverrides || {}) };
+                        newOverrides[dayValue] = {
+                          start: dayOverride?.start || settings.flexibleBusinessHours?.default?.start || '09:00',
+                          end: e.target.value,
+                          isClosed: false,
+                        };
+                        setSettings({
+                          ...settings,
+                          flexibleBusinessHours: {
+                            ...settings.flexibleBusinessHours,
+                            default: settings.flexibleBusinessHours?.default || { start: '09:00', end: '18:00' },
+                            dayOverrides: newOverrides,
+                          },
+                        });
+                      }}
+                      className="border border-gray-200 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:border-[#00c4cc] cursor-pointer"
+                    >
+                      {Array.from({ length: 34 }, (_, i) => {
+                        const h = Math.floor(i / 2) + 6;
+                        const m = (i % 2) * 30;
+                        const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                        return <option key={time} value={time}>{time}</option>;
+                      })}
+                    </select>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+
+        <p className="text-xs text-gray-500 mt-4">
+          サービス提供時間は通常、営業時間と同じです。異なる場合は別途お問い合わせください。
+        </p>
       </div>
 
       {/* 時間枠設定 */}
@@ -1045,22 +1140,60 @@ const FacilitySettingsView: React.FC = () => {
         )}
       </div>
 
-      {/* 保存ボタン */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <div className="flex justify-end">
-          <button
-            onClick={handleSave}
-            className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
-          >
-            <Save size={16} className="mr-2" />
-            保存
-          </button>
-        </div>
-      </div>
+            {/* 営業設定の保存ボタン */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSave}
+                  className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
+                >
+                  <Save size={16} className="mr-2" />
+                  営業設定を保存
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
-      {/* 書類管理設定 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <DocumentConfigView />
+        {/* ========== 書類設定タブ ========== */}
+        {activeTab === 'documents' && (
+          <>
+            {/* 書類管理設定 */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <DocumentConfigView />
+            </div>
+          </>
+        )}
+
+        {/* ========== スタッフ設定タブ ========== */}
+        {activeTab === 'staff' && (
+          <>
+            {/* 人員配置基準設定 */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              {facility?.id && (
+                <StaffingComplianceSettings facilityId={facility.id} />
+              )}
+            </div>
+
+            {/* スタッフ向け業務ツール設定 */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Briefcase size={20} className="mr-2 text-[#00c4cc]" />
+                スタッフ向け業務ツール設定
+              </h3>
+              {facility?.id && (
+                <WorkToolSettingsPanel facilityId={facility.id} />
+              )}
+            </div>
+
+            {/* 会社書類・規則管理 */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              {facility?.id && (
+                <CompanyDocumentsSettings facilityId={facility.id} />
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* 履歴モーダル */}

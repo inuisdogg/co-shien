@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Zap,
   PieChart,
+  FileText,
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +47,7 @@ import { calculateMonthlyUtilizationForecast, MonthlyUtilizationForecast } from 
 import { calculateBusinessDays } from '@/utils/dashboardCalculations';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import RevenueAnalytics from './RevenueAnalytics';
+import ComplianceManagement from './ComplianceManagement';
 
 const DashboardView: React.FC = () => {
   const { facility } = useAuth();
@@ -60,7 +62,7 @@ const DashboardView: React.FC = () => {
     getManagementTarget,
   } = useFacilityData();
 
-  const [dashboardMode, setDashboardMode] = useState<'operations' | 'revenue'>('operations');
+  const [dashboardMode, setDashboardMode] = useState<'operations' | 'revenue' | 'compliance'>('operations');
   const [viewPeriod, setViewPeriod] = useState<'week' | 'month'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isContractTrendExpanded, setIsContractTrendExpanded] = useState(false);
@@ -232,12 +234,23 @@ const DashboardView: React.FC = () => {
             onClick={() => setDashboardMode('revenue')}
             className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
               dashboardMode === 'revenue'
-                ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md'
+                ? 'bg-gradient-to-r from-[#00c4cc] to-[#00a3aa] text-white shadow-md'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             <Zap size={18} />
             売上・加算分析
+          </button>
+          <button
+            onClick={() => setDashboardMode('compliance')}
+            className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
+              dashboardMode === 'compliance'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <FileText size={18} />
+            書類・届出管理
             <span className="px-1.5 py-0.5 bg-white/20 rounded text-[10px]">NEW</span>
           </button>
         </div>
@@ -246,6 +259,11 @@ const DashboardView: React.FC = () => {
       {/* 売上・加算分析モード */}
       {dashboardMode === 'revenue' && facility?.id && (
         <RevenueAnalytics facilityId={facility.id} childrenData={children} />
+      )}
+
+      {/* コンプライアンス・書類管理モード */}
+      {dashboardMode === 'compliance' && facility?.id && (
+        <ComplianceManagement facilityId={facility.id} />
       )}
 
       {/* 運営分析モード */}

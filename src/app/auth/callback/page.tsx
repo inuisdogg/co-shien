@@ -88,11 +88,11 @@ export default function AuthCallbackPage() {
                   })
                   .eq('id', user.id);
               }
-              router.push('/client/dashboard');
+              router.push('/parent');
               return;
             } else if (type === 'personal') {
               // パーソナルアカウント認証完了
-              router.push('/personal/setup?type=confirm');
+              router.push('/career/setup?type=confirm');
               return;
             } else {
               // Bizアカウント認証完了
@@ -143,7 +143,7 @@ export default function AuthCallbackPage() {
                   })
                   .eq('id', data.user.id);
               }
-              router.push('/client/dashboard');
+              router.push('/parent');
               return;
             } else if (type === 'personal') {
               // usersテーブルを更新
@@ -169,7 +169,7 @@ export default function AuthCallbackPage() {
                   })
                   .eq('id', data.user.id);
               }
-              router.push('/staff-dashboard?verified=true');
+              router.push('/career?verified=true');
               return;
             } else {
               router.push('/setup?type=confirm');
@@ -218,9 +218,9 @@ export default function AuthCallbackPage() {
               // typeに応じて適切なログインページにリダイレクト
               const type = searchParams.get('type');
               if (type === 'client') {
-                router.push('/client/login');
+                router.push('/parent/login');
               } else {
-                router.push('/login');
+                router.push('/career/login');
               }
             }}
             className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"

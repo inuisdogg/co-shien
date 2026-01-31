@@ -333,7 +333,7 @@ ${signUrl}
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-[#8b5cf6]" />
+        <Loader2 className="w-6 h-6 animate-spin text-[#818CF8]" />
       </div>
     );
   }
@@ -346,7 +346,7 @@ ${signUrl}
           <p className="text-sm mb-4">職歴が登録されていません</p>
           <button
             onClick={handleAdd}
-            className="px-4 py-2 bg-[#8b5cf6] text-white rounded-md hover:bg-[#7c3aed] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
+            className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
           >
             <Plus className="w-4 h-4" />
             職歴を追加
@@ -371,7 +371,7 @@ ${signUrl}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Building2 className="w-5 h-5 text-[#8b5cf6]" />
+                      <Building2 className="w-5 h-5 text-[#818CF8]" />
                       <div>
                         <p className="font-bold text-gray-800">
                           {record.facilityName || '（施設名未入力）'}
@@ -426,7 +426,7 @@ ${signUrl}
                                 type="text"
                                 value={record.facilityName}
                                 onChange={(e) => updateRecord(record.id, { facilityName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：認定こども園 ○○園"
                               />
                             </div>
@@ -436,7 +436,7 @@ ${signUrl}
                                 type="text"
                                 value={record.corporateName || ''}
                                 onChange={(e) => updateRecord(record.id, { corporateName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：社会福祉法人○○会"
                               />
                             </div>
@@ -446,7 +446,7 @@ ${signUrl}
                                 type="text"
                                 value={record.corporateAddress || ''}
                                 onChange={(e) => updateRecord(record.id, { corporateAddress: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：〒000-0000 東京都○○区..."
                               />
                             </div>
@@ -456,7 +456,7 @@ ${signUrl}
                                 type="text"
                                 value={record.representativeName || ''}
                                 onChange={(e) => updateRecord(record.id, { representativeName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：理事長 山田太郎"
                               />
                             </div>
@@ -466,7 +466,7 @@ ${signUrl}
                                 type="tel"
                                 value={record.corporatePhone || ''}
                                 onChange={(e) => updateRecord(record.id, { corporatePhone: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：03-0000-0000"
                               />
                             </div>
@@ -488,7 +488,7 @@ ${signUrl}
                                 type="text"
                                 value={record.contactPersonName || ''}
                                 onChange={(e) => updateRecord(record.id, { contactPersonName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：人事部 鈴木様"
                               />
                             </div>
@@ -500,7 +500,7 @@ ${signUrl}
                                 type="email"
                                 value={record.contactEmail || ''}
                                 onChange={(e) => updateRecord(record.id, { contactEmail: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：jinji@example.com"
                               />
                             </div>
@@ -513,7 +513,7 @@ ${signUrl}
                           <select
                             value={record.businessType || ''}
                             onChange={(e) => updateRecord(record.id, { businessType: e.target.value ? parseInt(e.target.value) : undefined })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                           >
                             <option value="">選択してください</option>
                             {BUSINESS_TYPES.map((bt) => (
@@ -532,7 +532,7 @@ ${signUrl}
                               type="text"
                               value={record.businessTypeOther || ''}
                               onChange={(e) => updateRecord(record.id, { businessTypeOther: e.target.value })}
-                              className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                              className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                               placeholder="その他の内容を入力"
                             />
                           )}
@@ -553,7 +553,7 @@ ${signUrl}
                                 type="date"
                                 value={record.startDate}
                                 onChange={(e) => updateRecord(record.id, { startDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                               />
                             </div>
                             <div>
@@ -562,7 +562,7 @@ ${signUrl}
                                 type="date"
                                 value={record.endDate || ''}
                                 onChange={(e) => updateRecord(record.id, { endDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="在籍中は空欄"
                               />
                             </div>
@@ -572,7 +572,7 @@ ${signUrl}
                                 type="number"
                                 value={record.totalWorkDays || ''}
                                 onChange={(e) => updateRecord(record.id, { totalWorkDays: e.target.value ? parseInt(e.target.value) : undefined })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：470"
                               />
                             </div>
@@ -583,7 +583,7 @@ ${signUrl}
                                 step="0.5"
                                 value={record.weeklyAverageDays || ''}
                                 onChange={(e) => updateRecord(record.id, { weeklyAverageDays: e.target.value ? parseFloat(e.target.value) : undefined })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：5"
                               />
                             </div>
@@ -603,7 +603,7 @@ ${signUrl}
                                 type="text"
                                 value={record.jobTitle || ''}
                                 onChange={(e) => updateRecord(record.id, { jobTitle: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                                 placeholder="例：保育士、児童指導員"
                               />
                             </div>
@@ -616,7 +616,7 @@ ${signUrl}
                                     name={`employment-${record.id}`}
                                     checked={record.employmentType === 'fulltime'}
                                     onChange={() => updateRecord(record.id, { employmentType: 'fulltime' })}
-                                    className="text-[#8b5cf6]"
+                                    className="text-[#818CF8]"
                                   />
                                   常勤
                                 </label>
@@ -626,7 +626,7 @@ ${signUrl}
                                     name={`employment-${record.id}`}
                                     checked={record.employmentType === 'parttime'}
                                     onChange={() => updateRecord(record.id, { employmentType: 'parttime' })}
-                                    className="text-[#8b5cf6]"
+                                    className="text-[#818CF8]"
                                   />
                                   非常勤
                                 </label>
@@ -638,7 +638,7 @@ ${signUrl}
                             <textarea
                               value={record.jobDescription || ''}
                               onChange={(e) => updateRecord(record.id, { jobDescription: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                               rows={3}
                               placeholder="例：園児に対する直接支援（食事、排泄、着脱の介助、遊びの支援など）"
                             />
@@ -685,7 +685,7 @@ ${signUrl}
                                     openEmailPreview(record);
                                   }}
                                   disabled={!record.facilityName || !record.contactEmail}
-                                  className="px-4 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-md text-sm font-bold transition-colors flex items-center gap-2"
+                                  className="px-4 py-2 bg-[#818CF8] hover:bg-[#6366F1] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-md text-sm font-bold transition-colors flex items-center gap-2"
                                 >
                                   <Send className="w-4 h-4" />
                                   発行依頼
@@ -729,7 +729,7 @@ ${signUrl}
           {/* 追加ボタン */}
           <button
             onClick={handleAdd}
-            className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#8b5cf6] hover:bg-[#8b5cf6]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+            className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#818CF8] hover:bg-[#818CF8]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             職歴を追加
@@ -747,7 +747,7 @@ ${signUrl}
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
             >
-              <div className="bg-[#8b5cf6] text-white px-6 py-4 flex items-center justify-between">
+              <div className="bg-[#818CF8] text-white px-6 py-4 flex items-center justify-between">
                 <h3 className="font-bold flex items-center gap-2">
                   <Mail className="w-5 h-5" />
                   発行依頼メールのプレビュー
@@ -774,7 +774,7 @@ ${signUrl}
                     type="text"
                     value={emailSubject}
                     onChange={(e) => setEmailSubject(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
 
@@ -783,7 +783,7 @@ ${signUrl}
                   <textarea
                     value={emailBody}
                     onChange={(e) => setEmailBody(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent font-mono"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#818CF8] focus:border-transparent font-mono"
                     rows={15}
                   />
                 </div>
@@ -803,7 +803,7 @@ ${signUrl}
                 <button
                   onClick={sendCertificateRequest}
                   disabled={sendingEmail}
-                  className="px-6 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] disabled:bg-gray-400 text-white rounded-md font-bold text-sm flex items-center gap-2 transition-colors"
+                  className="px-6 py-2 bg-[#818CF8] hover:bg-[#6366F1] disabled:bg-gray-400 text-white rounded-md font-bold text-sm flex items-center gap-2 transition-colors"
                 >
                   {sendingEmail ? (
                     <>

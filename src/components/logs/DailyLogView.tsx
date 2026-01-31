@@ -1,341 +1,335 @@
 /**
- * 業務日誌管理コンポーネント
- * 日々の支援記録・活動記録を入力・管理
- * 運営指導で必要な「サービス提供に関する実施記録」の元データ
+ * 実績記録と連絡帳
+ * カレンダーから日付を選択してモーダルで児童一覧を表示
+ * 各児童の実績記録・連絡帳を入力
  */
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   BookOpen,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Plus,
-  Edit,
-  Save,
-  X,
-  Cloud,
-  Sun,
-  CloudRain,
-  Snowflake,
   Users,
-  Clock,
-  FileText,
   CheckCircle,
   AlertCircle,
-  Download,
+  CircleDot,
+  Clock,
+  X,
+  FileText,
+  MessageSquare,
+  Utensils,
+  Heart,
+  Smile,
+  Moon,
+  Droplet,
+  Save,
+  Loader2,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
-import { generateDailyLogPdf, formatDate as pdfFormatDate } from '@/utils/pdfExport';
+import { useFacilityData } from '@/hooks/useFacilityData';
+import { ScheduleItem, UsageRecord, ContactLog, ContactLogFormData } from '@/types';
+import UsageRecordForm from '@/components/schedule/UsageRecordForm';
 
-// 日誌データの型定義
-type DailyLog = {
-  id: string;
-  facilityId: string;
-  date: string;
-  logType: 'facility' | 'child';
-  childId?: string;
-  staffId?: string;
-  staffName?: string;
-  weather?: string;
-  temperature?: number;
-  attendanceSummary?: {
-    present: number;
-    absent: number;
-    total: number;
-  };
-  morningActivities?: string;
-  afternoonActivities?: string;
-  activities?: Array<{
-    time: string;
-    content: string;
-    participants?: string[];
-  }>;
-  // 児童個別記録用フィールド
-  mood?: string;
-  healthCondition?: string;
-  mealStatus?: string;
-  supportContent?: string;
-  progressNotes?: string;
-  specialNotes?: string;
-  incidents?: string;
-  communicationNotes?: string;
-  status: 'draft' | 'submitted' | 'approved';
-  createdAt: string;
-  updatedAt: string;
+// フェーズ設定
+const FEATURE_PHASE = parseInt(process.env.NEXT_PUBLIC_FEATURE_PHASE || '1', 10);
+
+// 体調・機嫌・食欲のラベル
+const HEALTH_LABELS = {
+  excellent: { label: '良好', color: 'bg-green-100 text-green-700' },
+  good: { label: '普通', color: 'bg-blue-100 text-blue-700' },
+  fair: { label: 'やや不良', color: 'bg-yellow-100 text-yellow-700' },
+  poor: { label: '不良', color: 'bg-red-100 text-red-700' },
 };
 
-// 児童の型定義
-type Child = {
-  id: string;
-  name: string;
+const MOOD_LABELS = {
+  very_happy: { label: 'とても元気', emoji: '😄', color: 'bg-green-100 text-green-700' },
+  happy: { label: '元気', emoji: '😊', color: 'bg-blue-100 text-blue-700' },
+  neutral: { label: '普通', emoji: '😐', color: 'bg-gray-100 text-gray-700' },
+  sad: { label: 'やや元気なし', emoji: '😔', color: 'bg-yellow-100 text-yellow-700' },
+  upset: { label: '元気なし', emoji: '😢', color: 'bg-red-100 text-red-700' },
 };
 
-// DBのsnake_caseからcamelCaseに変換
-const mapDbToLog = (row: any): DailyLog => ({
-  id: row.id,
-  facilityId: row.facility_id,
-  date: row.date,
-  logType: row.log_type,
-  childId: row.child_id,
-  staffId: row.staff_id,
-  staffName: row.staff_name,
-  weather: row.weather,
-  temperature: row.temperature,
-  attendanceSummary: row.attendance_summary,
-  morningActivities: row.morning_activities,
-  afternoonActivities: row.afternoon_activities,
-  activities: row.activities,
-  specialNotes: row.special_notes,
-  incidents: row.incidents,
-  communicationNotes: row.communication_notes,
-  status: row.status,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-});
-
-// 天気アイコン
-const weatherOptions = [
-  { value: 'sunny', label: '晴れ', icon: Sun },
-  { value: 'cloudy', label: '曇り', icon: Cloud },
-  { value: 'rainy', label: '雨', icon: CloudRain },
-  { value: 'snowy', label: '雪', icon: Snowflake },
-];
+const APPETITE_LABELS = {
+  excellent: { label: '完食', color: 'bg-green-100 text-green-700' },
+  good: { label: 'ほぼ完食', color: 'bg-blue-100 text-blue-700' },
+  fair: { label: '半分程度', color: 'bg-yellow-100 text-yellow-700' },
+  poor: { label: '少量', color: 'bg-orange-100 text-orange-700' },
+  none: { label: '食べず', color: 'bg-red-100 text-red-700' },
+};
 
 export default function DailyLogView() {
-  const { user, facility } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [logs, setLogs] = useState<DailyLog[]>([]);
-  const [children, setChildren] = useState<Child[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'facility' | 'child'>('facility');
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const {
+    schedules,
+    children: facilityChildren,
+    usageRecords,
+    contactLogs,
+    getUsageRecordByScheduleId,
+    getContactLogByScheduleId,
+    addUsageRecord,
+    updateUsageRecord,
+    deleteUsageRecord,
+    addContactLog,
+    updateContactLog,
+    deleteContactLog,
+  } = useFacilityData();
 
-  // 施設日誌のフォーム状態
-  const [facilityLog, setFacilityLog] = useState<Partial<DailyLog>>({
-    weather: 'sunny',
-    temperature: undefined,
-    attendanceSummary: { present: 0, absent: 0, total: 0 },
-    morningActivities: '',
-    afternoonActivities: '',
-    specialNotes: '',
-    incidents: '',
-    communicationNotes: '',
-  });
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [selectedScheduleItem, setSelectedScheduleItem] = useState<ScheduleItem | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'record' | 'contact'>('record');
+  const [isSaving, setIsSaving] = useState(false);
 
-  // 児童個別記録のフォーム状態
-  const [childLogs, setChildLogs] = useState<Record<string, Partial<DailyLog>>>({});
+  // 連絡帳フォームの状態
+  const [contactFormData, setContactFormData] = useState<Partial<ContactLogFormData>>({});
 
-  // 日付フォーマット
-  const formatDate = (date: Date): string => {
-    return date.toISOString().split('T')[0];
-  };
+  // 月の日付配列を生成
+  const calendarDays = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDayOfWeek = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
 
-  const formatDisplayDate = (date: Date): string => {
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
-  };
+    const days: Array<{ date: string; day: number; isCurrentMonth: boolean }> = [];
 
-  // 日付移動
-  const navigateDate = (direction: 'prev' | 'next') => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
-    setSelectedDate(newDate);
-  };
+    // 前月の日を追加
+    const prevMonth = new Date(year, month, 0);
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const day = prevMonth.getDate() - i;
+      const date = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      days.push({ date, day, isCurrentMonth: false });
+    }
 
-  // データ取得
-  const fetchData = useCallback(async () => {
-    if (!facility?.id) return;
+    // 当月の日を追加
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      days.push({ date, day, isCurrentMonth: true });
+    }
 
-    setLoading(true);
-    try {
-      const dateStr = formatDate(selectedDate);
+    // 次月の日を追加（6週分になるように）
+    const remainingDays = 42 - days.length;
+    for (let day = 1; day <= remainingDays; day++) {
+      const nextMonth = new Date(year, month + 1, day);
+      const date = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      days.push({ date, day, isCurrentMonth: false });
+    }
 
-      // 日誌を取得
-      const { data: logsData, error: logsError } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .eq('facility_id', facility.id)
-        .eq('date', dateStr);
+    return days;
+  }, [currentDate]);
 
-      if (logsError) throw logsError;
+  // 各日のスケジュールと実績・連絡帳状況
+  const dayStatusMap = useMemo(() => {
+    const map: Record<string, {
+      total: number;
+      recordCompleted: number;
+      contactCompleted: number;
+      schedules: Array<{
+        schedule: ScheduleItem;
+        usageRecord: UsageRecord | undefined;
+        contactLog: ContactLog | undefined;
+        hasRecord: boolean;
+        hasContact: boolean;
+      }>;
+    }> = {};
 
-      if (logsData) {
-        const mappedLogs = logsData.map(mapDbToLog);
-        setLogs(mappedLogs);
+    schedules.forEach(schedule => {
+      if (!map[schedule.date]) {
+        map[schedule.date] = { total: 0, recordCompleted: 0, contactCompleted: 0, schedules: [] };
+      }
+      const usageRecord = getUsageRecordByScheduleId(schedule.id);
+      const contactLog = getContactLogByScheduleId(schedule.id);
+      const hasRecord = !!usageRecord;
+      const hasContact = !!contactLog;
+      map[schedule.date].total++;
+      if (hasRecord) map[schedule.date].recordCompleted++;
+      if (hasContact) map[schedule.date].contactCompleted++;
+      map[schedule.date].schedules.push({ schedule, usageRecord, contactLog, hasRecord, hasContact });
+    });
 
-        // 施設日誌をフォームにセット
-        const existingFacilityLog = mappedLogs.find(l => l.logType === 'facility');
-        if (existingFacilityLog) {
-          setFacilityLog(existingFacilityLog);
-        } else {
-          setFacilityLog({
-            weather: 'sunny',
-            temperature: undefined,
-            attendanceSummary: { present: 0, absent: 0, total: 0 },
-            morningActivities: '',
-            afternoonActivities: '',
-            specialNotes: '',
-            incidents: '',
-            communicationNotes: '',
-          });
+    // 名前順でソート
+    Object.values(map).forEach(day => {
+      day.schedules.sort((a, b) => {
+        // 午前→午後
+        if (a.schedule.slot !== b.schedule.slot) {
+          return a.schedule.slot === 'AM' ? -1 : 1;
         }
+        return a.schedule.childName.localeCompare(b.schedule.childName, 'ja');
+      });
+    });
 
-        // 児童個別記録をフォームにセット
-        const childLogsMap: Record<string, Partial<DailyLog>> = {};
-        mappedLogs.filter(l => l.logType === 'child').forEach(log => {
-          if (log.childId) {
-            childLogsMap[log.childId] = log;
-          }
-        });
-        setChildLogs(childLogsMap);
-      }
+    return map;
+  }, [schedules, getUsageRecordByScheduleId, getContactLogByScheduleId]);
 
-      // 児童一覧を取得
-      const { data: childrenData } = await supabase
-        .from('children')
-        .select('id, name')
-        .eq('facility_id', facility.id)
-        .order('name');
+  // 月移動
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+      return newDate;
+    });
+  };
 
-      if (childrenData) {
-        setChildren(childrenData);
-      }
-    } catch (err) {
-      console.error('データ取得エラー:', err);
-    } finally {
-      setLoading(false);
+  // 今日に移動
+  const goToToday = () => {
+    const today = new Date();
+    setCurrentDate(today);
+    const todayStr = today.toISOString().split('T')[0];
+    setSelectedDate(todayStr);
+    setIsDateModalOpen(true);
+  };
+
+  // カレンダー日付クリック時にモーダルを開く
+  const handleDateClick = (date: string) => {
+    setSelectedDate(date);
+    setIsDateModalOpen(true);
+  };
+
+  // 日付モーダルを閉じる
+  const closeDateModal = () => {
+    setIsDateModalOpen(false);
+  };
+
+  // 児童詳細モーダルを開く
+  const openDetailModal = (schedule: ScheduleItem) => {
+    setSelectedScheduleItem(schedule);
+    setActiveTab('record');
+
+    // 連絡帳フォームの初期値を設定
+    const existingContactLog = getContactLogByScheduleId(schedule.id);
+    if (existingContactLog) {
+      setContactFormData({
+        activities: existingContactLog.activities || '',
+        healthStatus: existingContactLog.healthStatus,
+        mood: existingContactLog.mood,
+        appetite: existingContactLog.appetite,
+        mealMain: existingContactLog.mealMain,
+        mealSide: existingContactLog.mealSide,
+        mealNotes: existingContactLog.mealNotes || '',
+        toiletCount: existingContactLog.toiletCount || 0,
+        toiletNotes: existingContactLog.toiletNotes || '',
+        napStartTime: existingContactLog.napStartTime || '',
+        napEndTime: existingContactLog.napEndTime || '',
+        napNotes: existingContactLog.napNotes || '',
+        staffComment: existingContactLog.staffComment || '',
+        parentMessage: existingContactLog.parentMessage || '',
+      });
+    } else {
+      setContactFormData({
+        activities: '',
+        mealMain: false,
+        mealSide: false,
+        mealNotes: '',
+        toiletCount: 0,
+        toiletNotes: '',
+        napStartTime: '',
+        napEndTime: '',
+        napNotes: '',
+        staffComment: '',
+        parentMessage: '',
+      });
     }
-  }, [facility?.id, selectedDate]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    setIsDetailModalOpen(true);
+    setIsDateModalOpen(false); // 日付モーダルを閉じる
+  };
 
-  // 施設日誌を保存
-  const saveFacilityLog = async () => {
-    if (!facility?.id || !user?.id) return;
+  // 詳細モーダルを閉じる
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedScheduleItem(null);
+    setContactFormData({});
+    // 日付モーダルを再度開く
+    if (selectedDate) {
+      setIsDateModalOpen(true);
+    }
+  };
 
-    setSaving(true);
+  // 実績保存
+  const handleSaveUsageRecord = async (data: any) => {
+    if (!selectedScheduleItem) return;
+
     try {
-      const dateStr = formatDate(selectedDate);
-      const existingLog = logs.find(l => l.logType === 'facility');
+      const existingRecord = getUsageRecordByScheduleId(selectedScheduleItem.id);
+      if (existingRecord) {
+        await updateUsageRecord(existingRecord.id, data);
+      } else {
+        await addUsageRecord(data);
+      }
+    } catch (error) {
+      console.error('実績保存エラー:', error);
+      alert('保存に失敗しました');
+    }
+  };
 
-      const logData = {
-        facility_id: facility.id,
-        date: dateStr,
-        log_type: 'facility',
-        staff_id: user.id,
-        staff_name: user.name || '',
-        weather: facilityLog.weather,
-        temperature: facilityLog.temperature,
-        attendance_summary: facilityLog.attendanceSummary,
-        morning_activities: facilityLog.morningActivities,
-        afternoon_activities: facilityLog.afternoonActivities,
-        special_notes: facilityLog.specialNotes,
-        incidents: facilityLog.incidents,
-        communication_notes: facilityLog.communicationNotes,
-        status: 'draft',
-        updated_at: new Date().toISOString(),
+  // 実績削除
+  const handleDeleteUsageRecord = async () => {
+    if (!selectedScheduleItem) return;
+
+    const existingRecord = getUsageRecordByScheduleId(selectedScheduleItem.id);
+    if (existingRecord) {
+      if (confirm('この実績を削除しますか？')) {
+        try {
+          await deleteUsageRecord(existingRecord.id);
+        } catch (error) {
+          console.error('削除エラー:', error);
+          alert('削除に失敗しました');
+        }
+      }
+    }
+  };
+
+  // 連絡帳保存
+  const handleSaveContactLog = async () => {
+    if (!selectedScheduleItem) return;
+
+    setIsSaving(true);
+    try {
+      const existingContactLog = getContactLogByScheduleId(selectedScheduleItem.id);
+      const data: ContactLogFormData = {
+        childId: selectedScheduleItem.childId,
+        scheduleId: selectedScheduleItem.id,
+        date: selectedScheduleItem.date,
+        slot: selectedScheduleItem.slot as 'AM' | 'PM',
+        ...contactFormData,
       };
 
-      if (existingLog) {
-        const { error } = await supabase
-          .from('daily_logs')
-          .update(logData)
-          .eq('id', existingLog.id);
-        if (error) throw error;
+      if (existingContactLog) {
+        await updateContactLog(existingContactLog.id, data);
       } else {
-        const { error } = await supabase
-          .from('daily_logs')
-          .insert(logData);
-        if (error) throw error;
+        await addContactLog(data);
       }
-
-      await fetchData();
-      setIsEditing(false);
-    } catch (err) {
-      console.error('保存エラー:', err);
+      alert('連絡帳を保存しました');
+    } catch (error) {
+      console.error('連絡帳保存エラー:', error);
       alert('保存に失敗しました');
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
-  // 児童個別記録を保存
-  const saveChildLog = async (childId: string) => {
-    if (!facility?.id || !user?.id) return;
+  // 選択日の情報
+  const selectedDayInfo = selectedDate ? dayStatusMap[selectedDate] : null;
 
-    setSaving(true);
-    try {
-      const dateStr = formatDate(selectedDate);
-      const existingLog = logs.find(l => l.logType === 'child' && l.childId === childId);
-      const childLog = childLogs[childId] || {};
+  // 曜日ヘッダー
+  const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
 
-      const logData = {
-        facility_id: facility.id,
-        date: dateStr,
-        log_type: 'child',
-        child_id: childId,
-        staff_id: user.id,
-        staff_name: user.name || '',
-        mood: (childLog as any).mood,
-        health_condition: (childLog as any).healthCondition,
-        meal_status: (childLog as any).mealStatus,
-        support_content: (childLog as any).supportContent,
-        progress_notes: (childLog as any).progressNotes,
-        special_notes: childLog.specialNotes,
-        status: 'draft',
-        updated_at: new Date().toISOString(),
-      };
+  // 今日の日付文字列
+  const todayStr = new Date().toISOString().split('T')[0];
 
-      if (existingLog) {
-        const { error } = await supabase
-          .from('daily_logs')
-          .update(logData)
-          .eq('id', existingLog.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('daily_logs')
-          .insert(logData);
-        if (error) throw error;
-      }
+  // 選択中の児童の実績記録
+  const selectedUsageRecord = selectedScheduleItem
+    ? getUsageRecordByScheduleId(selectedScheduleItem.id)
+    : undefined;
 
-      await fetchData();
-    } catch (err) {
-      console.error('保存エラー:', err);
-      alert('保存に失敗しました');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // 出欠情報を更新
-  const updateAttendance = (field: 'present' | 'absent', value: number) => {
-    const current = facilityLog.attendanceSummary || { present: 0, absent: 0, total: 0 };
-    const newSummary = {
-      ...current,
-      [field]: value,
-      total: field === 'present' ? value + current.absent : current.present + value,
-    };
-    setFacilityLog({ ...facilityLog, attendanceSummary: newSummary });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]"></div>
-      </div>
-    );
-  }
-
-  const existingFacilityLog = logs.find(l => l.logType === 'facility');
+  // 選択中の児童の連絡帳
+  const selectedContactLog = selectedScheduleItem
+    ? getContactLogByScheduleId(selectedScheduleItem.id)
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -344,425 +338,590 @@ export default function DailyLogView() {
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <BookOpen className="w-7 h-7 text-[#00c4cc]" />
-            業務日誌
+            実績記録と連絡帳
           </h1>
           <p className="text-gray-500 text-sm mt-1">
-            日々の支援記録・活動記録を入力します
+            カレンダーの日付をクリックして、児童の記録を入力してください
           </p>
         </div>
         <button
-          onClick={() => {
-            const pdf = generateDailyLogPdf(
-              {
-                date: formatDate(selectedDate),
-                weather: facilityLog.weather,
-                temperature: facilityLog.temperature,
-                attendanceSummary: facilityLog.attendanceSummary ? {
-                  scheduled: facilityLog.attendanceSummary.total,
-                  actual: facilityLog.attendanceSummary.present,
-                  absent: facilityLog.attendanceSummary.absent,
-                } : undefined,
-                activities: [
-                  ...(facilityLog.morningActivities ? [{ time: '午前', activity: facilityLog.morningActivities }] : []),
-                  ...(facilityLog.afternoonActivities ? [{ time: '午後', activity: facilityLog.afternoonActivities }] : []),
-                ],
-                specialNotes: facilityLog.specialNotes,
-                safetyCheck: true,
-              },
-              { name: facility?.name || '施設名', code: facility?.code }
-            );
-            pdf.save(`業務日誌_${formatDate(selectedDate)}.pdf`);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          onClick={goToToday}
+          className="px-4 py-2 text-sm font-medium text-[#00c4cc] border border-[#00c4cc] rounded-lg hover:bg-[#00c4cc]/5 transition-colors"
         >
-          <Download className="w-4 h-4" />
-          PDF出力
+          今日
         </button>
       </div>
 
-      {/* 日付ナビゲーション */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
+      {/* カレンダー */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {/* 月ナビゲーション */}
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
           <button
-            onClick={() => navigateDate('prev')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={() => navigateMonth('prev')}
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
           >
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <div className="flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-[#00c4cc]" />
-            <span className="text-lg font-bold text-gray-800">
-              {formatDisplayDate(selectedDate)}
-            </span>
-            <input
-              type="date"
-              value={formatDate(selectedDate)}
-              onChange={(e) => setSelectedDate(new Date(e.target.value))}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-            />
-          </div>
+          <h2 className="text-lg font-bold text-gray-800">
+            {currentDate.getFullYear()}年{currentDate.getMonth() + 1}月
+          </h2>
           <button
-            onClick={() => navigateDate('next')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            disabled={formatDate(selectedDate) >= formatDate(new Date())}
+            onClick={() => navigateMonth('next')}
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
           >
             <ChevronRight className="w-5 h-5 text-gray-600" />
           </button>
         </div>
-      </div>
 
-      {/* タブ切り替え */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="flex border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('facility')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'facility'
-                ? 'bg-[#00c4cc] text-white'
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <FileText className="w-4 h-4" />
-              施設日誌
-              {existingFacilityLog && (
-                <CheckCircle className="w-4 h-4" />
-              )}
+        {/* 曜日ヘッダー */}
+        <div className="grid grid-cols-7 border-b border-gray-200">
+          {weekDays.map((day, index) => (
+            <div
+              key={day}
+              className={`py-2 text-center text-sm font-medium ${
+                index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-600'
+              }`}
+            >
+              {day}
             </div>
-          </button>
-          <button
-            onClick={() => setActiveTab('child')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'child'
-                ? 'bg-[#00c4cc] text-white'
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <Users className="w-4 h-4" />
-              児童個別記録
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                {logs.filter(l => l.logType === 'child').length}/{children.length}
-              </span>
-            </div>
-          </button>
+          ))}
         </div>
 
-        <div className="p-6">
-          {/* 施設日誌タブ */}
-          {activeTab === 'facility' && (
-            <div className="space-y-6">
-              {/* 基本情報 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* 天気 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    天気
-                  </label>
-                  <div className="flex gap-2">
-                    {weatherOptions.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <button
-                          key={option.value}
-                          onClick={() => setFacilityLog({ ...facilityLog, weather: option.value })}
-                          className={`flex-1 flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${
-                            facilityLog.weather === option.value
-                              ? 'border-[#00c4cc] bg-[#00c4cc]/10'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <Icon className={`w-5 h-5 ${
-                            facilityLog.weather === option.value ? 'text-[#00c4cc]' : 'text-gray-500'
-                          }`} />
-                          <span className="text-xs">{option.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+        {/* カレンダー本体 */}
+        <div className="grid grid-cols-7">
+          {calendarDays.map(({ date, day, isCurrentMonth }, index) => {
+            const dayStatus = dayStatusMap[date];
+            const isToday = date === todayStr;
+            const dayOfWeek = index % 7;
+            const hasSchedules = dayStatus && dayStatus.total > 0;
+            const allRecordCompleted = hasSchedules && dayStatus.recordCompleted === dayStatus.total;
+            const allContactCompleted = hasSchedules && dayStatus.contactCompleted === dayStatus.total;
 
-                {/* 気温 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    気温 (℃)
-                  </label>
-                  <input
-                    type="number"
-                    value={facilityLog.temperature || ''}
-                    onChange={(e) => setFacilityLog({ ...facilityLog, temperature: Number(e.target.value) })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
-                    placeholder="例: 25"
-                  />
-                </div>
+            return (
+              <button
+                key={date}
+                onClick={() => handleDateClick(date)}
+                className={`
+                  relative min-h-[90px] p-2 border-b border-r border-gray-100 text-left transition-all
+                  ${!isCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
+                  ${isToday ? 'bg-yellow-50' : ''}
+                  hover:bg-gray-100
+                `}
+              >
+                {/* 日付 */}
+                <span className={`
+                  inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium
+                  ${isToday ? 'bg-[#00c4cc] text-white' : ''}
+                  ${dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : ''}
+                  ${!isCurrentMonth ? 'text-gray-400' : ''}
+                `}>
+                  {day}
+                </span>
 
-                {/* 出欠 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    出欠状況
-                  </label>
-                  <div className="flex gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">出席</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={facilityLog.attendanceSummary?.present || 0}
-                        onChange={(e) => updateAttendance('present', Number(e.target.value))}
-                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-center"
-                      />
-                      <span className="text-sm text-gray-500">名</span>
+                {/* 予約人数とステータスインジケーター */}
+                {hasSchedules && isCurrentMonth && (
+                  <div className="mt-1 space-y-1">
+                    <div className="text-xs text-gray-600 font-medium">
+                      {dayStatus.total}名
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">欠席</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={facilityLog.attendanceSummary?.absent || 0}
-                        onChange={(e) => updateAttendance('absent', Number(e.target.value))}
-                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-center"
-                      />
-                      <span className="text-sm text-gray-500">名</span>
+                    {/* 実績記録ステータス */}
+                    <div className={`
+                      text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1
+                      ${allRecordCompleted ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}
+                    `}>
+                      <FileText className="w-3 h-3" />
+                      <span>実績 {dayStatus.recordCompleted}/{dayStatus.total}</span>
+                    </div>
+                    {/* 連絡帳ステータス */}
+                    <div className={`
+                      text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1
+                      ${allContactCompleted ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}
+                    `}>
+                      <MessageSquare className="w-3 h-3" />
+                      <span>連絡 {dayStatus.contactCompleted}/{dayStatus.total}</span>
                     </div>
                   </div>
-                </div>
-              </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* 活動内容 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    午前の活動
-                  </label>
-                  <textarea
-                    value={facilityLog.morningActivities || ''}
-                    onChange={(e) => setFacilityLog({ ...facilityLog, morningActivities: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 min-h-[120px]"
-                    placeholder="午前中に行った活動を記入..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    午後の活動
-                  </label>
-                  <textarea
-                    value={facilityLog.afternoonActivities || ''}
-                    onChange={(e) => setFacilityLog({ ...facilityLog, afternoonActivities: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 min-h-[120px]"
-                    placeholder="午後に行った活動を記入..."
-                  />
-                </div>
-              </div>
-
-              {/* 特記事項 */}
+      {/* 日付選択モーダル（児童一覧） */}
+      {isDateModalOpen && selectedDate && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden">
+            {/* モーダルヘッダー */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  特記事項
-                </label>
-                <textarea
-                  value={facilityLog.specialNotes || ''}
-                  onChange={(e) => setFacilityLog({ ...facilityLog, specialNotes: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 min-h-[100px]"
-                  placeholder="特記事項があれば記入..."
-                />
+                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#00c4cc]" />
+                  {(() => {
+                    const [y, m, d] = selectedDate.split('-').map(Number);
+                    const date = new Date(y, m - 1, d);
+                    const days = ['日', '月', '火', '水', '木', '金', '土'];
+                    return `${m}月${d}日(${days[date.getDay()]})`;
+                  })()}
+                </h2>
+                {selectedDayInfo && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    予約 {selectedDayInfo.total}名 /
+                    実績 {selectedDayInfo.recordCompleted}名完了 /
+                    連絡帳 {selectedDayInfo.contactCompleted}名完了
+                  </p>
+                )}
               </div>
-
-              {/* ヒヤリハット */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <span className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-yellow-500" />
-                    ヒヤリハット・事故等
-                  </span>
-                </label>
-                <textarea
-                  value={facilityLog.incidents || ''}
-                  onChange={(e) => setFacilityLog({ ...facilityLog, incidents: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 min-h-[80px]"
-                  placeholder="ヒヤリハットや事故があれば記入..."
-                />
-              </div>
-
-              {/* 保護者連絡事項 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  保護者連絡事項
-                </label>
-                <textarea
-                  value={facilityLog.communicationNotes || ''}
-                  onChange={(e) => setFacilityLog({ ...facilityLog, communicationNotes: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 min-h-[80px]"
-                  placeholder="保護者への連絡事項を記入..."
-                />
-              </div>
-
-              {/* 保存ボタン */}
-              <div className="flex justify-end pt-4 border-t border-gray-200">
-                <button
-                  onClick={saveFacilityLog}
-                  disabled={saving}
-                  className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2.5 px-6 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" />
-                  {saving ? '保存中...' : '保存する'}
-                </button>
-              </div>
-
-              {/* 最終更新情報 */}
-              {existingFacilityLog && (
-                <div className="text-sm text-gray-500 text-right">
-                  最終更新: {new Date(existingFacilityLog.updatedAt).toLocaleString('ja-JP')}
-                  {existingFacilityLog.staffName && ` by ${existingFacilityLog.staffName}`}
-                </div>
-              )}
+              <button
+                onClick={closeDateModal}
+                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
             </div>
-          )}
 
-          {/* 児童個別記録タブ */}
-          {activeTab === 'child' && (
-            <div className="space-y-4">
-              {children.length === 0 ? (
+            {/* 児童一覧 */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {!selectedDayInfo || selectedDayInfo.total === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p>登録されている児童がいません</p>
+                  <p>この日の利用予約はありません</p>
                 </div>
               ) : (
-                <>
-                  {/* 児童選択 */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                    {children.map((child) => {
-                      const hasLog = logs.some(l => l.logType === 'child' && l.childId === child.id);
-                      return (
-                        <button
-                          key={child.id}
-                          onClick={() => setSelectedChildId(child.id)}
-                          className={`p-3 rounded-lg border-2 text-sm font-medium transition-colors ${
-                            selectedChildId === child.id
-                              ? 'border-[#00c4cc] bg-[#00c4cc]/10 text-[#00c4cc]'
-                              : hasLog
-                                ? 'border-green-300 bg-green-50 text-green-700'
-                                : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center gap-1">
-                            {hasLog && <CheckCircle className="w-3 h-3" />}
-                            {child.name}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* 選択した児童の記録フォーム */}
-                  {selectedChildId && (
-                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                      <h3 className="font-bold text-gray-800 mb-4">
-                        {children.find(c => c.id === selectedChildId)?.name} さんの記録
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            機嫌・様子
-                          </label>
-                          <select
-                            value={(childLogs[selectedChildId] as any)?.mood || ''}
-                            onChange={(e) => setChildLogs({
-                              ...childLogs,
-                              [selectedChildId]: { ...childLogs[selectedChildId], mood: e.target.value }
-                            })}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
-                          >
-                            <option value="">選択してください</option>
-                            <option value="good">良い</option>
-                            <option value="normal">普通</option>
-                            <option value="bad">あまり良くない</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            体調
-                          </label>
-                          <select
-                            value={(childLogs[selectedChildId] as any)?.healthCondition || ''}
-                            onChange={(e) => setChildLogs({
-                              ...childLogs,
-                              [selectedChildId]: { ...childLogs[selectedChildId], healthCondition: e.target.value }
-                            })}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
-                          >
-                            <option value="">選択してください</option>
-                            <option value="good">良好</option>
-                            <option value="normal">普通</option>
-                            <option value="poor">不調気味</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            食事の様子
-                          </label>
-                          <select
-                            value={(childLogs[selectedChildId] as any)?.mealStatus || ''}
-                            onChange={(e) => setChildLogs({
-                              ...childLogs,
-                              [selectedChildId]: { ...childLogs[selectedChildId], mealStatus: e.target.value }
-                            })}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
-                          >
-                            <option value="">選択してください</option>
-                            <option value="complete">完食</option>
-                            <option value="mostly">ほぼ完食</option>
-                            <option value="half">半分程度</option>
-                            <option value="little">少量</option>
-                            <option value="none">食べられなかった</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          支援内容・活動の様子
-                        </label>
-                        <textarea
-                          value={(childLogs[selectedChildId] as any)?.supportContent || ''}
-                          onChange={(e) => setChildLogs({
-                            ...childLogs,
-                            [selectedChildId]: { ...childLogs[selectedChildId], supportContent: e.target.value }
-                          })}
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 min-h-[100px]"
-                          placeholder="本日の支援内容や活動の様子を記入..."
-                        />
-                      </div>
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          特記事項
-                        </label>
-                        <textarea
-                          value={childLogs[selectedChildId]?.specialNotes || ''}
-                          onChange={(e) => setChildLogs({
-                            ...childLogs,
-                            [selectedChildId]: { ...childLogs[selectedChildId], specialNotes: e.target.value }
-                          })}
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 min-h-[80px]"
-                          placeholder="特記事項があれば記入..."
-                        />
-                      </div>
-                      <div className="flex justify-end mt-4">
-                        <button
-                          onClick={() => saveChildLog(selectedChildId)}
-                          disabled={saving}
-                          className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          <Save className="w-4 h-4" />
-                          {saving ? '保存中...' : '保存'}
-                        </button>
+                <div className="space-y-4">
+                  {/* 午前の予約 */}
+                  {selectedDayInfo.schedules.filter(s => s.schedule.slot === 'AM').length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">午前</span>
+                        <span className="text-gray-500 font-normal">
+                          ({selectedDayInfo.schedules.filter(s => s.schedule.slot === 'AM').length}名)
+                        </span>
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedDayInfo.schedules
+                          .filter(s => s.schedule.slot === 'AM')
+                          .map(({ schedule, hasRecord, hasContact }) => (
+                            <button
+                              key={schedule.id}
+                              onClick={() => openDetailModal(schedule)}
+                              className="w-full flex items-center justify-between p-3 rounded-lg border bg-white hover:bg-gray-50 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-base font-medium text-gray-800">
+                                  {schedule.childName}
+                                </span>
+                                <div className="flex items-center gap-1 text-xs text-gray-400">
+                                  {schedule.hasPickup && <span className="px-1 bg-gray-100 rounded">迎</span>}
+                                  {schedule.hasDropoff && <span className="px-1 bg-gray-100 rounded">送</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* 実績記録ステータス */}
+                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  hasRecord ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  <FileText className="w-3.5 h-3.5" />
+                                  <span>実績記録</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                    hasRecord ? 'bg-green-200' : 'bg-gray-200'
+                                  }`}>
+                                    {hasRecord ? '済' : '未'}
+                                  </span>
+                                </div>
+                                {/* 連絡帳ステータス */}
+                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  hasContact ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>連絡帳</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                    hasContact ? 'bg-green-200' : 'bg-gray-200'
+                                  }`}>
+                                    {hasContact ? '済' : '未'}
+                                  </span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              </div>
+                            </button>
+                          ))}
                       </div>
                     </div>
                   )}
-                </>
+
+                  {/* 午後の予約 */}
+                  {selectedDayInfo.schedules.filter(s => s.schedule.slot === 'PM').length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">午後</span>
+                        <span className="text-gray-500 font-normal">
+                          ({selectedDayInfo.schedules.filter(s => s.schedule.slot === 'PM').length}名)
+                        </span>
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedDayInfo.schedules
+                          .filter(s => s.schedule.slot === 'PM')
+                          .map(({ schedule, hasRecord, hasContact }) => (
+                            <button
+                              key={schedule.id}
+                              onClick={() => openDetailModal(schedule)}
+                              className="w-full flex items-center justify-between p-3 rounded-lg border bg-white hover:bg-gray-50 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-base font-medium text-gray-800">
+                                  {schedule.childName}
+                                </span>
+                                <div className="flex items-center gap-1 text-xs text-gray-400">
+                                  {schedule.hasPickup && <span className="px-1 bg-gray-100 rounded">迎</span>}
+                                  {schedule.hasDropoff && <span className="px-1 bg-gray-100 rounded">送</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* 実績記録ステータス */}
+                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  hasRecord ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  <FileText className="w-3.5 h-3.5" />
+                                  <span>実績記録</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                    hasRecord ? 'bg-green-200' : 'bg-gray-200'
+                                  }`}>
+                                    {hasRecord ? '済' : '未'}
+                                  </span>
+                                </div>
+                                {/* 連絡帳ステータス */}
+                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  hasContact ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>連絡帳</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                    hasContact ? 'bg-green-200' : 'bg-gray-200'
+                                  }`}>
+                                    {hasContact ? '済' : '未'}
+                                  </span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* 児童詳細モーダル（タブ付き） */}
+      {isDetailModalOpen && selectedScheduleItem && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+            {/* モーダルヘッダー */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">
+                  {selectedScheduleItem.childName}
+                </h2>
+                <p className="text-sm text-gray-500">
+                  {(() => {
+                    const [y, m, d] = selectedScheduleItem.date.split('-').map(Number);
+                    const date = new Date(y, m - 1, d);
+                    const days = ['日', '月', '火', '水', '木', '金', '土'];
+                    return `${m}月${d}日(${days[date.getDay()]}) ${selectedScheduleItem.slot === 'AM' ? '午前' : '午後'}`;
+                  })()}
+                </p>
+              </div>
+              <button
+                onClick={closeDetailModal}
+                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* タブ切り替え */}
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('record')}
+                className={`flex-1 px-6 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                  activeTab === 'record'
+                    ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                実績記録
+                {selectedUsageRecord && (
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('contact')}
+                className={`flex-1 px-6 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                  activeTab === 'contact'
+                    ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                連絡帳
+                {selectedContactLog && (
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                )}
+              </button>
+            </div>
+
+            {/* タブコンテンツ */}
+            <div className="flex-1 overflow-y-auto">
+              {activeTab === 'record' ? (
+                /* 実績記録タブ */
+                <UsageRecordForm
+                  scheduleItem={selectedScheduleItem}
+                  initialData={selectedUsageRecord}
+                  onSave={handleSaveUsageRecord}
+                  onDelete={handleDeleteUsageRecord}
+                />
+              ) : (
+                /* 連絡帳タブ */
+                <div className="p-6 space-y-6">
+                  {/* 今日の活動 */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-[#00c4cc]" />
+                      今日の活動内容
+                    </label>
+                    <textarea
+                      value={contactFormData.activities || ''}
+                      onChange={(e) => setContactFormData({ ...contactFormData, activities: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="今日行った活動を記入してください"
+                    />
+                  </div>
+
+                  {/* 体調・機嫌・食欲 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 体調 */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <Heart className="w-4 h-4 text-red-400" />
+                        体調
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(HEALTH_LABELS).map(([key, { label, color }]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setContactFormData({ ...contactFormData, healthStatus: key as any })}
+                            className={`px-3 py-2 text-xs rounded-lg border transition-all ${
+                              contactFormData.healthStatus === key
+                                ? `${color} border-current`
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 機嫌 */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <Smile className="w-4 h-4 text-yellow-500" />
+                        機嫌
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(MOOD_LABELS).map(([key, { label, emoji, color }]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setContactFormData({ ...contactFormData, mood: key as any })}
+                            className={`px-3 py-2 text-xs rounded-lg border transition-all ${
+                              contactFormData.mood === key
+                                ? `${color} border-current`
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {emoji} {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 食欲 */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <Utensils className="w-4 h-4 text-orange-400" />
+                        食欲
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(APPETITE_LABELS).map(([key, { label, color }]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setContactFormData({ ...contactFormData, appetite: key as any })}
+                            className={`px-3 py-2 text-xs rounded-lg border transition-all ${
+                              contactFormData.appetite === key
+                                ? `${color} border-current`
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 食事 */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                      <Utensils className="w-4 h-4 text-orange-400" />
+                      食事
+                    </label>
+                    <div className="flex items-center gap-4 mb-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={contactFormData.mealMain || false}
+                          onChange={(e) => setContactFormData({ ...contactFormData, mealMain: e.target.checked })}
+                          className="w-4 h-4 text-[#00c4cc] rounded"
+                        />
+                        <span className="text-sm text-gray-700">主食</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={contactFormData.mealSide || false}
+                          onChange={(e) => setContactFormData({ ...contactFormData, mealSide: e.target.checked })}
+                          className="w-4 h-4 text-[#00c4cc] rounded"
+                        />
+                        <span className="text-sm text-gray-700">副食</span>
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      value={contactFormData.mealNotes || ''}
+                      onChange={(e) => setContactFormData({ ...contactFormData, mealNotes: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="食事に関するメモ"
+                    />
+                  </div>
+
+                  {/* 排泄・睡眠 */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 排泄 */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <Droplet className="w-4 h-4 text-blue-400" />
+                        排泄
+                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm text-gray-600">トイレ回数:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={contactFormData.toiletCount || 0}
+                          onChange={(e) => setContactFormData({ ...contactFormData, toiletCount: parseInt(e.target.value) || 0 })}
+                          className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                        />
+                        <span className="text-sm text-gray-600">回</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={contactFormData.toiletNotes || ''}
+                        onChange={(e) => setContactFormData({ ...contactFormData, toiletNotes: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                        placeholder="排泄に関するメモ"
+                      />
+                    </div>
+
+                    {/* 睡眠 */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <Moon className="w-4 h-4 text-indigo-400" />
+                        お昼寝
+                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="time"
+                          value={contactFormData.napStartTime || ''}
+                          onChange={(e) => setContactFormData({ ...contactFormData, napStartTime: e.target.value })}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                        />
+                        <span className="text-gray-500">〜</span>
+                        <input
+                          type="time"
+                          value={contactFormData.napEndTime || ''}
+                          onChange={(e) => setContactFormData({ ...contactFormData, napEndTime: e.target.value })}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={contactFormData.napNotes || ''}
+                        onChange={(e) => setContactFormData({ ...contactFormData, napNotes: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                        placeholder="睡眠に関するメモ"
+                      />
+                    </div>
+                  </div>
+
+                  {/* スタッフからのコメント */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-[#00c4cc]" />
+                      スタッフからのコメント
+                    </label>
+                    <textarea
+                      value={contactFormData.staffComment || ''}
+                      onChange={(e) => setContactFormData({ ...contactFormData, staffComment: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="今日の様子やエピソードなど"
+                    />
+                  </div>
+
+                  {/* 保護者への連絡事項 */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-purple-400" />
+                      保護者への連絡事項
+                    </label>
+                    <textarea
+                      value={contactFormData.parentMessage || ''}
+                      onChange={(e) => setContactFormData({ ...contactFormData, parentMessage: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="持ち物のお願いなど"
+                    />
+                  </div>
+
+                  {/* 保存ボタン */}
+                  <div className="flex justify-end pt-4 border-t border-gray-200">
+                    <button
+                      onClick={handleSaveContactLog}
+                      disabled={isSaving}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      保存する
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

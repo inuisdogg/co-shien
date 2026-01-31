@@ -1,29 +1,245 @@
 /**
  * 利用実績登録フォーム
+ * DailyLogViewのモーダル内で使用するフォームコンポーネント
+ * 実施加算の詳細記録に対応
  */
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, HelpCircle } from 'lucide-react';
+import {
+  Clock,
+  Car,
+  FileText,
+  Plus,
+  Trash2,
+  Save,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  ClipboardCheck,
+  AlertTriangle,
+  Users,
+  Target,
+  Heart,
+  Truck,
+  MessageSquare,
+} from 'lucide-react';
 import { UsageRecordFormData, UsageRecord, ScheduleItem } from '@/types';
 
 interface UsageRecordFormProps {
   scheduleItem: ScheduleItem;
   initialData?: UsageRecord | Partial<UsageRecordFormData>;
-  onClose: () => void;
   onSave: (data: UsageRecordFormData) => void;
   onDelete?: () => void;
+}
+
+// 実施加算の定義（詳細記録が必要なもの）
+interface ImplementationAddition {
+  id: string;
+  name: string;
+  units: string;
+  icon: React.ElementType;
+  color: string;
+  requiredFields: {
+    id: string;
+    label: string;
+    type: 'text' | 'textarea' | 'select' | 'time' | 'date';
+    placeholder?: string;
+    options?: string[];
+    required?: boolean;
+  }[];
+  notes: string;
+}
+
+const IMPLEMENTATION_ADDITIONS: ImplementationAddition[] = [
+  {
+    id: 'specialist_support',
+    name: '専門的支援実施加算',
+    units: '150単位/回',
+    icon: Target,
+    color: 'text-purple-600 bg-purple-50 border-purple-200',
+    requiredFields: [
+      { id: 'plan_name', label: '専門的支援実施計画', type: 'text', placeholder: '計画名を入力', required: true },
+      { id: 'support_content', label: '支援内容', type: 'textarea', placeholder: '実施した専門的支援の内容を記載', required: true },
+      { id: 'duration', label: '実施時間', type: 'select', options: ['30分以上1時間未満', '1時間以上'], required: true },
+      { id: 'staff_name', label: '実施職員', type: 'text', placeholder: '担当職員名（PT/OT/ST等）', required: true },
+    ],
+    notes: '理学療法士等が計画的に個別・集中的な支援を30分以上実施した場合に算定',
+  },
+  {
+    id: 'cooperation_1',
+    name: '関係機関連携加算(I)',
+    units: '250単位/回',
+    icon: Users,
+    color: 'text-blue-600 bg-blue-50 border-blue-200',
+    requiredFields: [
+      { id: 'institution', label: '連携機関', type: 'text', placeholder: '保育所、学校名など', required: true },
+      { id: 'meeting_date', label: '連携日', type: 'date', required: true },
+      { id: 'content', label: '連携内容', type: 'textarea', placeholder: '情報共有・協議した内容', required: true },
+      { id: 'plan_updated', label: '個別支援計画への反映', type: 'select', options: ['反映済み', '反映予定', '該当なし'] },
+    ],
+    notes: '保育所や学校等と連携し、個別支援計画作成等を行った場合',
+  },
+  {
+    id: 'cooperation_2',
+    name: '関係機関連携加算(II)',
+    units: '200単位/回',
+    icon: Users,
+    color: 'text-blue-600 bg-blue-50 border-blue-200',
+    requiredFields: [
+      { id: 'institution', label: '連携機関', type: 'text', placeholder: '保育所、学校名など', required: true },
+      { id: 'meeting_date', label: '連携日', type: 'date', required: true },
+      { id: 'content', label: '連携内容', type: 'textarea', placeholder: '情報連携の内容（オンライン可）', required: true },
+    ],
+    notes: '保育所や学校等と個別支援計画作成時「以外」で情報連携を行った場合',
+  },
+  {
+    id: 'behavior_support',
+    name: '強度行動障害児支援加算',
+    units: '200単位/日（開始90日は+500）',
+    icon: AlertTriangle,
+    color: 'text-orange-600 bg-orange-50 border-orange-200',
+    requiredFields: [
+      { id: 'support_plan', label: '支援計画', type: 'text', placeholder: '計画名を入力', required: true },
+      { id: 'support_content', label: '支援内容', type: 'textarea', placeholder: '実施した支援の具体的内容', required: true },
+      { id: 'staff_name', label: '担当職員', type: 'text', placeholder: '研修修了者名', required: true },
+      { id: 'start_date', label: '支援開始日', type: 'date' },
+    ],
+    notes: '強度行動障害支援者養成研修修了者が支援計画を作成して支援を実施',
+  },
+  {
+    id: 'individual_support_1',
+    name: '個別サポート加算(I)',
+    units: '120単位/日',
+    icon: Heart,
+    color: 'text-pink-600 bg-pink-50 border-pink-200',
+    requiredFields: [
+      { id: 'category', label: '該当区分', type: 'select', options: ['重症心身障害児', '身体障害1・2級', '療育手帳最重度・重度', '精神障害1級'], required: true },
+      { id: 'support_content', label: '支援内容', type: 'textarea', placeholder: '実施した支援の内容' },
+    ],
+    notes: '重症心身障害児、身体障害1・2級等の児童への支援。受給者証への記載が必要。',
+  },
+  {
+    id: 'individual_support_2',
+    name: '個別サポート加算(II)',
+    units: '150単位/日',
+    icon: Heart,
+    color: 'text-pink-600 bg-pink-50 border-pink-200',
+    requiredFields: [
+      { id: 'cooperation_org', label: '連携機関', type: 'text', placeholder: '児童相談所等', required: true },
+      { id: 'last_share_date', label: '直近の情報共有日', type: 'date', required: true },
+      { id: 'support_content', label: '支援内容', type: 'textarea', placeholder: '要保護・要支援児童への支援内容', required: true },
+    ],
+    notes: '要保護・要支援児童に対し、児童相談所等と6ヶ月に1回以上連携して支援',
+  },
+  {
+    id: 'family_support_1',
+    name: '家族支援加算(I)',
+    units: '200-300単位',
+    icon: MessageSquare,
+    color: 'text-teal-600 bg-teal-50 border-teal-200',
+    requiredFields: [
+      { id: 'support_type', label: '支援形態', type: 'select', options: ['居宅訪問(1h以上)', '居宅訪問(1h未満)', 'オンライン'], required: true },
+      { id: 'content', label: '相談援助内容', type: 'textarea', placeholder: '実施した相談援助の内容', required: true },
+      { id: 'duration', label: '実施時間', type: 'text', placeholder: '例: 45分' },
+    ],
+    notes: '入所児童の家族に対し、個別に相談援助等を行った場合',
+  },
+  {
+    id: 'family_support_2',
+    name: '家族支援加算(II)',
+    units: '60-80単位',
+    icon: MessageSquare,
+    color: 'text-teal-600 bg-teal-50 border-teal-200',
+    requiredFields: [
+      { id: 'support_type', label: '実施形態', type: 'select', options: ['対面', 'オンライン'], required: true },
+      { id: 'participant_count', label: '参加家族数', type: 'text', placeholder: '例: 5家族' },
+      { id: 'content', label: 'グループ支援内容', type: 'textarea', placeholder: '実施したグループ支援の内容', required: true },
+    ],
+    notes: '入所児童の家族に対し、グループでの相談援助等を行った場合',
+  },
+  {
+    id: 'childcare_support',
+    name: '子育てサポート加算',
+    units: '80単位/回（月4回）',
+    icon: Users,
+    color: 'text-green-600 bg-green-50 border-green-200',
+    requiredFields: [
+      { id: 'observation_scene', label: '観察・参加場面', type: 'text', placeholder: '例: 集団療育場面', required: true },
+      { id: 'content', label: '支援内容', type: 'textarea', placeholder: '保護者への説明・支援内容', required: true },
+    ],
+    notes: '保護者が支援場面を観察・参加する機会を提供。ただのフィードバックのみでは算定不可。',
+  },
+  {
+    id: 'extension_support',
+    name: '延長支援加算',
+    units: '61-123単位',
+    icon: Clock,
+    color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+    requiredFields: [
+      { id: 'extension_time', label: '延長区分', type: 'select', options: ['30分以上1時間未満（61単位）', '1時間以上2時間未満（92単位）', '2時間以上（123単位）'], required: true },
+      { id: 'reason', label: '延長理由', type: 'textarea', placeholder: '預かりニーズの内容' },
+    ],
+    notes: '基本の支援時間5時間を超えて預かりニーズに対応した場合。職員2名以上配置必要。',
+  },
+  {
+    id: 'transport',
+    name: '送迎加算',
+    units: '54単位/片道',
+    icon: Truck,
+    color: 'text-gray-600 bg-gray-50 border-gray-200',
+    requiredFields: [
+      { id: 'type', label: '送迎種別', type: 'select', options: ['迎えのみ', '送りのみ', '往復'], required: true },
+      { id: 'special', label: '加算区分', type: 'select', options: ['通常', '重症心身障害児(+40)', '医療的ケア児(+40)', '医療的ケア児(+80)'] },
+    ],
+    notes: '居宅等と事業所間の送迎を行った場合',
+  },
+  {
+    id: 'transition_support',
+    name: '保育・教育等移行支援加算',
+    units: '500単位/回',
+    icon: Target,
+    color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
+    requiredFields: [
+      { id: 'type', label: '支援種別', type: 'select', options: ['退所前調整（2回まで）', '退所後訪問相談（1回）'], required: true },
+      { id: 'destination', label: '移行先', type: 'text', placeholder: '保育所、学校名など', required: true },
+      { id: 'content', label: '支援内容', type: 'textarea', placeholder: '調整・相談の内容', required: true },
+    ],
+    notes: '保育所等への円滑な移行を支援するための加算',
+  },
+  {
+    id: 'absence_response',
+    name: '欠席時対応加算(I)',
+    units: '94単位/回（月4回）',
+    icon: MessageSquare,
+    color: 'text-amber-600 bg-amber-50 border-amber-200',
+    requiredFields: [
+      { id: 'contact_date', label: '連絡日', type: 'date', required: true },
+      { id: 'reason', label: '欠席理由', type: 'text', placeholder: '急病等', required: true },
+      { id: 'consultation', label: '相談援助内容', type: 'textarea', placeholder: '電話等で行った相談援助の内容', required: true },
+    ],
+    notes: '利用予定日の2日前までにキャンセル連絡があり、相談援助を行って記録した場合',
+  },
+];
+
+// 実施加算の詳細データ型
+interface AdditionDetail {
+  additionId: string;
+  fields: Record<string, string>;
+}
+
+interface ExtendedFormData extends UsageRecordFormData {
+  additionDetails?: AdditionDetail[];
 }
 
 const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
   scheduleItem,
   initialData,
-  onClose,
   onSave,
   onDelete,
 }) => {
-  const [formData, setFormData] = useState<UsageRecordFormData>(() => ({
+  const [formData, setFormData] = useState<ExtendedFormData>(() => ({
     scheduleId: scheduleItem.id,
     childId: scheduleItem.childId,
     childName: scheduleItem.childName,
@@ -50,13 +266,17 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
     memo: '',
     recordSheetRemarks: '',
     addonItems: [],
+    additionDetails: [],
     ...initialData,
   }));
+
+  const [showAddonSection, setShowAddonSection] = useState(false);
+  const [expandedAdditions, setExpandedAdditions] = useState<Set<string>>(new Set());
+  const [isSaving, setIsSaving] = useState(false);
 
   // initialDataが変更されたときにフォームデータを更新
   useEffect(() => {
     if (initialData) {
-      // UsageRecord型の場合はid, facilityId, createdAt, updatedAtを除外
       const { id, facilityId, createdAt, updatedAt, ...recordData } = initialData as UsageRecord;
       setFormData((prev) => ({
         ...prev,
@@ -69,37 +289,12 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
     }
   }, [initialData, scheduleItem]);
 
-  // 加算項目のリスト
-  const addonOptions = [
-    '家族支援加算(I)(個別)',
-    '家族支援加算(II)(グループ)',
-    '強度行動障害児支援加算',
-    '延長支援加算',
-    '医療連携体制加算((VI)以外)',
-    '医療連携体制加算(VI)単位数',
-    '関係機関連携加算(I)',
-    '関係機関連携加算(II)',
-    '関係機関連携加算(III)',
-    '関係機関連携加算(IV)',
-    '個別サポート加算(I)',
-    '個別サポート加算(II)',
-    '集中的支援加算',
-    '人工内耳装用児支援加算',
-    '視覚・聴覚・言語機能障害児支援加算',
-    '入浴支援加算',
-    '専門的支援実施加算',
-    '事業所間連携加算(I)',
-    '事業所間連携加算(II)',
-    '子育てサポート加算',
-    '保育・教育等移行支援加算(退所前)',
-  ];
-
   // 時間区分のオプション
   const timeCategoryOptions = [
-    '区分1 (1時間30分以下)',
-    '区分2 (1時間30分超3時間以下)',
-    '区分3 (3時間超4時間以下)',
-    '区分4 (4時間超)',
+    { value: '区分1', label: '区分1 (1時間30分以下)' },
+    { value: '区分2', label: '区分2 (1時間30分超〜3時間以下)' },
+    { value: '区分3', label: '区分3 (3時間超〜4時間以下)' },
+    { value: '区分4', label: '区分4 (4時間超)' },
   ];
 
   // 計画時間から算定時間数を計算
@@ -135,463 +330,477 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
     }
   };
 
-  // 計画時間をクリア
-  const clearPlannedTime = () => {
+  // 加算項目のトグル
+  const toggleAddition = (additionId: string) => {
+    setFormData((prev) => {
+      const isSelected = prev.addonItems.includes(additionId);
+      const newAddonItems = isSelected
+        ? prev.addonItems.filter((i) => i !== additionId)
+        : [...prev.addonItems, additionId];
+
+      // 詳細データも更新
+      const newDetails = isSelected
+        ? prev.additionDetails?.filter((d) => d.additionId !== additionId) || []
+        : [...(prev.additionDetails || []), { additionId, fields: {} }];
+
+      // 選択時は展開
+      if (!isSelected) {
+        setExpandedAdditions((prev) => new Set([...prev, additionId]));
+      }
+
+      return {
+        ...prev,
+        addonItems: newAddonItems,
+        additionDetails: newDetails,
+      };
+    });
+  };
+
+  // 加算詳細フィールドの更新
+  const updateAdditionField = (additionId: string, fieldId: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      plannedStartTime: '',
-      plannedEndTime: '',
+      additionDetails: prev.additionDetails?.map((d) =>
+        d.additionId === additionId ? { ...d, fields: { ...d.fields, [fieldId]: value } } : d
+      ) || [],
     }));
   };
 
-  // 加算項目のトグル
-  const toggleAddonItem = (item: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      addonItems: prev.addonItems.includes(item)
-        ? prev.addonItems.filter((i) => i !== item)
-        : [...prev.addonItems, item],
-    }));
+  // 加算の展開トグル
+  const toggleExpand = (additionId: string) => {
+    setExpandedAdditions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(additionId)) {
+        newSet.delete(additionId);
+      } else {
+        newSet.add(additionId);
+      }
+      return newSet;
+    });
+  };
+
+  // 加算詳細データを取得
+  const getAdditionDetail = (additionId: string): Record<string, string> => {
+    return formData.additionDetails?.find((d) => d.additionId === additionId)?.fields || {};
   };
 
   // フォーム送信
-  const handleSubmit = () => {
-    onSave(formData);
+  const handleSubmit = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+    } finally {
+      setIsSaving(false);
+    }
   };
-
-  // 日付をYYYY/MM/DD形式に変換
-  const formatDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-');
-    return `${year}/${month}/${day}`;
-  };
-
-  const memoCharCount = (formData.memo || '').length;
-  const remarksCharCount = (formData.recordSheetRemarks || '').length;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg w-full max-w-6xl my-8 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
-        {/* ヘッダー */}
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white sticky top-0 z-10">
-          <div className="flex items-center space-x-2">
-            <h3 className="font-bold text-lg text-gray-800 flex items-center">
-              利用実績編集
-            </h3>
-            <HelpCircle size={16} className="text-gray-400" />
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-xs text-gray-600">
-              [事業所] pocopoco(児発)
-            </div>
-            <div className="text-xs text-gray-600">
-              [職員] 畠昂哉 (オーナー)
-            </div>
+    <div className="p-6 space-y-6">
+      {/* サービス提供の状況 */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-3">
+          サービス提供の状況
+        </label>
+        <div className="flex gap-2">
+          {['利用', '欠席(加算なし)', '加算のみ'].map((status) => (
             <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              key={status}
+              type="button"
+              onClick={() => setFormData((prev) => ({ ...prev, serviceStatus: status as any }))}
+              className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                formData.serviceStatus === status
+                  ? 'bg-[#00c4cc] text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <X size={24} />
+              {status}
             </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 時間設定セクション */}
+      <div className="bg-gray-50 rounded-xl p-5 space-y-5">
+        <div className="flex items-center gap-2 text-gray-700">
+          <Clock className="w-5 h-5 text-[#00c4cc]" />
+          <span className="font-bold">時間設定</span>
+        </div>
+
+        {/* 計画時間 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-2">計画時間</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="time"
+              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
+              value={formData.plannedStartTime || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, plannedStartTime: e.target.value }))}
+            />
+            <span className="text-gray-400">〜</span>
+            <input
+              type="time"
+              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
+              value={formData.plannedEndTime || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, plannedEndTime: e.target.value }))}
+            />
           </div>
         </div>
 
-        <div className="p-6 grid grid-cols-2 gap-6">
-          {/* 左カラム */}
-          <div className="space-y-4">
-            {/* 日付 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">日付</label>
-              <input
-                type="date"
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.date}
-                onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-              />
-            </div>
+        {/* 実績時間 */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-600">実績時間</label>
+            <button
+              type="button"
+              onClick={reflectPlannedTime}
+              className="text-xs text-[#00c4cc] hover:underline"
+            >
+              計画時間を反映
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="time"
+              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
+              value={formData.actualStartTime || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, actualStartTime: e.target.value }))}
+            />
+            <span className="text-gray-400">〜</span>
+            <input
+              type="time"
+              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
+              value={formData.actualEndTime || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, actualEndTime: e.target.value }))}
+            />
+          </div>
+        </div>
 
-            {/* サービス提供の状況 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">サービス提供の状況</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.serviceStatus}
-                onChange={(e) => setFormData((prev) => ({ ...prev, serviceStatus: e.target.value as any }))}
+        {/* 時間区分 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-2">時間区分</label>
+          <div className="grid grid-cols-2 gap-2">
+            {timeCategoryOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, timeCategory: option.value }))}
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all text-left ${
+                  formData.timeCategory === option.value
+                    ? 'bg-[#00c4cc]/10 text-[#00c4cc] border border-[#00c4cc]'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
               >
-                <option value="利用">利用</option>
-                <option value="欠席(加算なし)">欠席(加算なし)</option>
-                <option value="加算のみ">加算のみ</option>
-              </select>
-            </div>
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-            {/* 提供形態 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">提供形態</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.provisionForm || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, provisionForm: e.target.value }))}
-              >
-                <option value="">選択してください</option>
-                <option value="個別">個別</option>
-                <option value="小集団">小集団</option>
-                <option value="集団">集団</option>
-              </select>
-            </div>
+      {/* 送迎セクション */}
+      <div className="bg-gray-50 rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2 text-gray-700">
+          <Car className="w-5 h-5 text-[#00c4cc]" />
+          <span className="font-bold">送迎</span>
+        </div>
 
-            {/* 計画時間 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center">
-                計画時間
-                <HelpCircle size={14} className="ml-1 text-gray-400" />
-              </label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="time"
-                  className="flex-1 bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={formData.plannedStartTime || ''}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, plannedStartTime: e.target.value }))}
-                  step={formData.plannedTimeOneMinuteInterval ? 60 : undefined}
-                />
-                <span className="text-gray-500">~</span>
-                <input
-                  type="time"
-                  className="flex-1 bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={formData.plannedEndTime || ''}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, plannedEndTime: e.target.value }))}
-                  step={formData.plannedTimeOneMinuteInterval ? 60 : undefined}
-                />
-              </div>
-              <div className="flex items-center justify-between mt-2">
+        <div className="grid grid-cols-2 gap-4">
+          {/* 迎え */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">迎え</label>
+            <div className="flex gap-2">
+              {['あり', 'なし'].map((value) => (
                 <button
-                  onClick={clearPlannedTime}
-                  className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border border-gray-300 rounded"
+                  key={value}
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, pickup: value as any }))}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    formData.pickup === value
+                      ? 'bg-[#00c4cc] text-white'
+                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  }`}
                 >
-                  クリア
+                  {value}
                 </button>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.plannedTimeOneMinuteInterval}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, plannedTimeOneMinuteInterval: e.target.checked }))}
-                    className="accent-[#00c4cc]"
-                  />
-                  <span className="text-xs text-gray-700">1分間隔で入力する</span>
-                </label>
-              </div>
+              ))}
             </div>
-
-            {/* 開始終了時間 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">開始終了時間</label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="time"
-                  className="flex-1 bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={formData.actualStartTime || ''}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, actualStartTime: e.target.value }))}
-                  step={formData.actualTimeOneMinuteInterval ? 60 : undefined}
-                />
-                <span className="text-gray-500">~</span>
-                <input
-                  type="time"
-                  className="flex-1 bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={formData.actualEndTime || ''}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, actualEndTime: e.target.value }))}
-                  step={formData.actualTimeOneMinuteInterval ? 60 : undefined}
-                />
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <button
-                  onClick={reflectPlannedTime}
-                  className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border border-gray-300 rounded"
-                >
-                  計画時間を反映
-                </button>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.actualTimeOneMinuteInterval}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, actualTimeOneMinuteInterval: e.target.checked }))}
-                    className="accent-[#00c4cc]"
-                  />
-                  <span className="text-xs text-gray-700">1分間隔で入力する</span>
-                </label>
-              </div>
-              <p className="text-[10px] text-gray-500 mt-1">
-                ※実績記録票に記載する実利用時間です。
-              </p>
-            </div>
-
-            {/* 算定時間数 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center">
-                算定時間数
-                <HelpCircle size={14} className="ml-1 text-gray-400" />
-              </label>
-              <div className="flex items-center space-x-2">
-                <select
-                  className="flex-1 bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={formData.calculatedTimeMethod}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, calculatedTimeMethod: e.target.value as any }))}
-                >
-                  <option value="計画時間から算出">計画時間から算出</option>
-                  <option value="開始終了時間から算出">開始終了時間から算出</option>
-                  <option value="手動入力">手動入力</option>
-                </select>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  className="w-20 bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={formData.calculatedTime}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, calculatedTime: parseFloat(e.target.value) || 0 }))}
-                  disabled={formData.calculatedTimeMethod !== '手動入力'}
-                />
-              </div>
-            </div>
-
-            {/* 時間区分 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">時間区分</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.timeCategory || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, timeCategory: e.target.value }))}
-              >
-                <option value="">選択してください</option>
-                {timeCategoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 送迎迎え */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">送迎迎え</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.pickup}
-                onChange={(e) => setFormData((prev) => ({ ...prev, pickup: e.target.value as any }))}
-              >
-                <option value="なし">なし</option>
-                <option value="あり">あり</option>
-              </select>
-              <label className="flex items-center space-x-2 mt-2 cursor-pointer">
+            {formData.pickup === 'あり' && (
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.pickupSamePremises}
                   onChange={(e) => setFormData((prev) => ({ ...prev, pickupSamePremises: e.target.checked }))}
-                  className="accent-[#00c4cc]"
+                  className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
                 />
-                <span className="text-xs text-gray-700">同一敷地内</span>
+                <span className="text-xs text-gray-600">同一敷地内</span>
               </label>
-            </div>
+            )}
+          </div>
 
-            {/* 送迎送り */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">送迎送り</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.dropoff}
-                onChange={(e) => setFormData((prev) => ({ ...prev, dropoff: e.target.value as any }))}
-              >
-                <option value="なし">なし</option>
-                <option value="あり">あり</option>
-              </select>
-              <label className="flex items-center space-x-2 mt-2 cursor-pointer">
+          {/* 送り */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">送り</label>
+            <div className="flex gap-2">
+              {['あり', 'なし'].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, dropoff: value as any }))}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    formData.dropoff === value
+                      ? 'bg-[#00c4cc] text-white'
+                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+            {formData.dropoff === 'あり' && (
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.dropoffSamePremises}
                   onChange={(e) => setFormData((prev) => ({ ...prev, dropoffSamePremises: e.target.checked }))}
-                  className="accent-[#00c4cc]"
+                  className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
                 />
-                <span className="text-xs text-gray-700">同一敷地内</span>
+                <span className="text-xs text-gray-600">同一敷地内</span>
               </label>
-            </div>
-
-            {/* 部屋 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">部屋</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.room || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, room: e.target.value }))}
-              >
-                <option value="">未選択</option>
-                <option value="部屋1">部屋1</option>
-                <option value="部屋2">部屋2</option>
-                <option value="部屋3">部屋3</option>
-              </select>
-            </div>
-
-            {/* 指導形態 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">指導形態</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.instructionForm || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, instructionForm: e.target.value }))}
-              >
-                <option value="小集団">小集団</option>
-                <option value="個別">個別</option>
-                <option value="集団">集団</option>
-              </select>
-            </div>
-
-            {/* 請求対象 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">請求対象</label>
-              <select
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                value={formData.billingTarget}
-                onChange={(e) => setFormData((prev) => ({ ...prev, billingTarget: e.target.value as any }))}
-              >
-                <option value="請求する">請求する</option>
-                <option value="請求しない">請求しない</option>
-              </select>
-              <p className="text-[10px] text-gray-500 mt-1">
-                実績を残したまま国保連・市町村への請求の対象から外したい場合は「請求しない」を選択してください。
-              </p>
-            </div>
-
-            {/* 自費項目 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">自費項目</label>
-              {formData.serviceStatus === '加算のみ' ? (
-                <p className="text-xs text-gray-500">
-                  サービス提供の状況が「加算のみ」時、設定できません。
-                </p>
-              ) : (
-                <select
-                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
-                  value={formData.selfPayItem || ''}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, selfPayItem: e.target.value }))}
-                >
-                  <option value="">選択してください</option>
-                  <option value="自費項目1">自費項目1</option>
-                  <option value="自費項目2">自費項目2</option>
-                </select>
-              )}
-            </div>
-          </div>
-
-          {/* 右カラム */}
-          <div className="space-y-4">
-            {/* メモ */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">メモ</label>
-              <div className="text-xs text-gray-500 mb-1 text-right">
-                {memoCharCount}/2000
-              </div>
-              <textarea
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] h-32 resize-none"
-                placeholder="自由に記録する事ができます"
-                value={formData.memo || ''}
-                onChange={(e) => {
-                  if (e.target.value.length <= 2000) {
-                    setFormData((prev) => ({ ...prev, memo: e.target.value }));
-                  }
-                }}
-                maxLength={2000}
-              />
-              <div className="text-xs text-gray-500 mt-1 text-right">
-                0/2000
-              </div>
-            </div>
-
-            {/* 実績記録票備考 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">実績記録票備考</label>
-              <label className="text-xs text-gray-700 block mb-1">備考</label>
-              <textarea
-                className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] h-20 resize-none"
-                value={formData.recordSheetRemarks || ''}
-                onChange={(e) => {
-                  if (e.target.value.length <= 50) {
-                    setFormData((prev) => ({ ...prev, recordSheetRemarks: e.target.value }));
-                  }
-                }}
-                maxLength={50}
-              />
-              <div className="text-xs text-gray-500 mt-1 text-right">
-                {remarksCharCount}/50
-              </div>
-            </div>
-
-            {/* 加算情報 */}
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">加算情報</label>
-              {formData.serviceStatus === '欠席(加算なし)' ? (
-                <p className="text-xs text-gray-500">
-                  サービス提供の状況が「欠席(加算なし)」時、無効になります。
-                </p>
-              ) : (
-                <div className="border border-gray-300 rounded-md p-3 max-h-64 overflow-y-auto">
-                  <label className="flex items-center space-x-2 mb-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={addonOptions.every((item) => formData.addonItems.includes(item))}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormData((prev) => ({ ...prev, addonItems: [...addonOptions] }));
-                        } else {
-                          setFormData((prev) => ({ ...prev, addonItems: [] }));
-                        }
-                      }}
-                      className="accent-[#00c4cc]"
-                    />
-                    <span className="text-xs text-gray-700">選択してください</span>
-                  </label>
-                  <div className="space-y-1">
-                    {addonOptions.map((item) => (
-                      <label key={item} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.addonItems.includes(item)}
-                          onChange={() => toggleAddonItem(item)}
-                          className="accent-[#00c4cc]"
-                        />
-                        <span className="text-xs text-gray-700">{item}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* フッター */}
-        <div className="p-4 border-t border-gray-200 flex justify-between items-center bg-white sticky bottom-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md text-sm transition-colors"
-          >
-            閉じる
-          </button>
-          <div className="flex space-x-3">
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-md text-sm transition-colors"
-              >
-                削除する
-              </button>
             )}
-            <button
-              onClick={handleSubmit}
-              className="px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors"
-            >
-              保存する
-            </button>
           </div>
         </div>
+      </div>
+
+      {/* 提供形態・指導形態 */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">提供形態</label>
+          <select
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
+            value={formData.provisionForm || ''}
+            onChange={(e) => setFormData((prev) => ({ ...prev, provisionForm: e.target.value }))}
+          >
+            <option value="">選択してください</option>
+            <option value="個別">個別</option>
+            <option value="小集団">小集団</option>
+            <option value="集団">集団</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">指導形態</label>
+          <select
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
+            value={formData.instructionForm || ''}
+            onChange={(e) => setFormData((prev) => ({ ...prev, instructionForm: e.target.value }))}
+          >
+            <option value="小集団">小集団</option>
+            <option value="個別">個別</option>
+            <option value="集団">集団</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 実施加算セクション */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowAddonSection(!showAddonSection)}
+          className="w-full px-5 py-4 flex items-center justify-between bg-white hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-[#00c4cc]" />
+            <span className="font-bold text-gray-700">実施加算</span>
+            {formData.addonItems.length > 0 && (
+              <span className="px-2 py-0.5 bg-[#00c4cc]/10 text-[#00c4cc] text-xs rounded-full">
+                {formData.addonItems.length}件選択中
+              </span>
+            )}
+          </div>
+          {showAddonSection ? (
+            <ChevronUp className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
+
+        {showAddonSection && (
+          <div className="border-t border-gray-200">
+            {formData.serviceStatus === '欠席(加算なし)' ? (
+              <p className="text-sm text-gray-500 text-center py-8">
+                サービス提供の状況が「欠席(加算なし)」のため、加算を選択できません
+              </p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {IMPLEMENTATION_ADDITIONS.map((addition) => {
+                  const Icon = addition.icon;
+                  const isSelected = formData.addonItems.includes(addition.id);
+                  const isExpanded = expandedAdditions.has(addition.id);
+                  const detail = getAdditionDetail(addition.id);
+
+                  return (
+                    <div key={addition.id} className={isSelected ? 'bg-gray-50' : ''}>
+                      {/* 加算ヘッダー */}
+                      <div className="px-4 py-3 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleAddition(addition.id)}
+                          className={`w-5 h-5 rounded flex items-center justify-center transition-all ${
+                            isSelected ? 'bg-[#00c4cc] text-white' : 'border border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => isSelected && toggleExpand(addition.id)}
+                          className="flex-1 flex items-center gap-3 text-left"
+                          disabled={!isSelected}
+                        >
+                          <div className={`p-1.5 rounded ${addition.color}`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1">
+                            <div className={`font-medium text-sm ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>
+                              {addition.name}
+                            </div>
+                            <div className="text-xs text-gray-400">{addition.units}</div>
+                          </div>
+                          {isSelected && (
+                            isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* 詳細入力フォーム */}
+                      {isSelected && isExpanded && (
+                        <div className="px-4 pb-4 space-y-3">
+                          <div className="ml-8 p-4 bg-white rounded-lg border border-gray-200 space-y-3">
+                            <div className="text-xs text-amber-600 flex items-start gap-1.5 pb-3 border-b border-gray-100">
+                              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                              <span>{addition.notes}</span>
+                            </div>
+
+                            {addition.requiredFields.map((field) => (
+                              <div key={field.id}>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  {field.label}
+                                  {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                                </label>
+                                {field.type === 'textarea' ? (
+                                  <textarea
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] resize-none"
+                                    rows={2}
+                                    placeholder={field.placeholder}
+                                    value={detail[field.id] || ''}
+                                    onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                  />
+                                ) : field.type === 'select' ? (
+                                  <select
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                                    value={detail[field.id] || ''}
+                                    onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                  >
+                                    <option value="">選択してください</option>
+                                    {field.options?.map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type={field.type}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                                    placeholder={field.placeholder}
+                                    value={detail[field.id] || ''}
+                                    onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* メモ */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-2">メモ</label>
+        <textarea
+          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+          rows={3}
+          placeholder="自由にメモを記録できます"
+          value={formData.memo || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, memo: e.target.value }))}
+          maxLength={2000}
+        />
+        <div className="text-xs text-gray-400 text-right mt-1">
+          {(formData.memo || '').length}/2000
+        </div>
+      </div>
+
+      {/* 請求対象 */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-2">請求対象</label>
+        <div className="flex gap-2">
+          {['請求する', '請求しない'].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFormData((prev) => ({ ...prev, billingTarget: value as any }))}
+              className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                formData.billingTarget === value
+                  ? value === '請求する' ? 'bg-[#00c4cc] text-white' : 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+        {formData.billingTarget === '請求しない' && (
+          <p className="text-xs text-orange-600 mt-2">
+            ※実績を残したまま国保連・市町村への請求の対象から外します
+          </p>
+        )}
+      </div>
+
+      {/* アクションボタン */}
+      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+        {onDelete && initialData && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span className="text-sm font-medium">削除</span>
+          </button>
+        )}
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSaving}
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-lg transition-colors disabled:opacity-50"
+        >
+          {isSaving ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          <span className="text-sm font-bold">保存する</span>
+        </button>
       </div>
     </div>
   );
 };
 
 export default UsageRecordForm;
-

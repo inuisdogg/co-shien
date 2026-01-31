@@ -10,16 +10,16 @@ import {
   Settings,
   Save,
   Loader2,
-  GripVertical,
   Clock,
   FileText,
   Receipt,
-  FileOutput,
   Calendar,
   CalendarDays,
-  GraduationCap,
   Bell,
-  CheckSquare,
+  Briefcase,
+  Wallet,
+  Scale,
+  FolderOpen,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
@@ -33,12 +33,13 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Clock,
   FileText,
   Receipt,
-  FileOutput,
   Calendar,
   CalendarDays,
-  GraduationCap,
   Bell,
-  CheckSquare,
+  Briefcase,
+  Wallet,
+  Scale,
+  FolderOpen,
 };
 
 interface WorkToolSettingsPanelProps {
@@ -47,28 +48,16 @@ interface WorkToolSettingsPanelProps {
 
 export default function WorkToolSettingsPanel({ facilityId }: WorkToolSettingsPanelProps) {
   const [settings, setSettings] = useState<FacilityWorkToolSettings | null>(null);
-  const [enabledTools, setEnabledTools] = useState<Record<WorkToolId, boolean>>({
-    time_tracking: true,
-    daily_report: true,
-    expense: true,
-    document_output: true,
-    attendance_calendar: true,
-    shift_view: false,
-    training_record: true,
-    announcements: true,
-    task_management: false,
-  });
-  const [toolOrder, setToolOrder] = useState<WorkToolId[]>([
-    'time_tracking',
-    'daily_report',
-    'expense',
-    'document_output',
-    'attendance_calendar',
-    'shift_view',
-    'training_record',
-    'announcements',
-    'task_management',
-  ]);
+  // WORK_TOOLSからデフォルト値を動的に生成
+  const defaultEnabledTools = WORK_TOOLS.reduce((acc, tool) => {
+    acc[tool.id] = tool.defaultEnabled;
+    return acc;
+  }, {} as Record<WorkToolId, boolean>);
+
+  const defaultToolOrder = WORK_TOOLS.map(tool => tool.id);
+
+  const [enabledTools, setEnabledTools] = useState<Record<WorkToolId, boolean>>(defaultEnabledTools);
+  const [toolOrder, setToolOrder] = useState<WorkToolId[]>(defaultToolOrder);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -171,7 +160,7 @@ export default function WorkToolSettingsPanel({ facilityId }: WorkToolSettingsPa
             業務ツール表示設定
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            スタッフの個人画面に表示するツールを選択してください
+            スタッフのキャリア画面（自分のページ）に表示するツールを選択してください
           </p>
         </div>
         <button

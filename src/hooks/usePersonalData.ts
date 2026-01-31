@@ -125,14 +125,7 @@ export function usePersonalData(): UsePersonalDataReturn {
         // 所属施設がない場合はstaffテーブルから取得（後方互換性）
         const { data: staffData, error: staffError } = await supabase
           .from('staff')
-          .select(`
-            *,
-            facilities:facility_id (
-              id,
-              name,
-              code
-            )
-          `)
+          .select('*')
           .eq('user_id', user.id);
 
         if (staffError) throw staffError;
@@ -143,10 +136,19 @@ export function usePersonalData(): UsePersonalDataReturn {
           return;
         }
 
+        // 施設IDを集めて施設データを取得
+        const facilityIds = staffData.map((s: any) => s.facility_id).filter(Boolean);
+        const { data: facilitiesData } = await supabase
+          .from('facilities')
+          .select('id, name, code')
+          .in('id', facilityIds);
+
+        const facilitiesMap = new Map((facilitiesData || []).map((f: any) => [f.id, f]));
+
         // staffデータからFacilityWorkDataを作成
         const facilityWorkData: FacilityWorkData[] = await Promise.all(
-          staffData.map(async (staff: any) => {
-            const facility = staff.facilities;
+          staffData.filter((staff: any) => facilitiesMap.has(staff.facility_id)).map(async (staff: any) => {
+            const facility = facilitiesMap.get(staff.facility_id);
 
             // 業務ツール設定を取得
             const { data: toolSettings } = await supabase

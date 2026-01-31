@@ -21,7 +21,20 @@ export type HolidayPeriod = {
   regularHolidays: number[]; // 定休日（0=日, 1=月, ..., 6=土）
 };
 
-// 期間ごとの営業時間設定
+// 曜日別の時間設定
+export type DayOfWeekHours = {
+  start?: string;     // HH:mm（isClosed時は未設定可）
+  end?: string;       // HH:mm（isClosed時は未設定可）
+  isClosed?: boolean; // 閉所の場合true
+};
+
+// 柔軟な営業時間設定（曜日別対応）
+export type FlexibleHours = {
+  default: { start: string; end: string };  // デフォルトの営業時間
+  dayOverrides?: Partial<Record<number, DayOfWeekHours>>;  // 曜日別の例外設定（0=日, 1=月, ..., 6=土）
+};
+
+// 期間ごとの営業時間設定（後方互換性のため保持）
 export type BusinessHoursPeriod = {
   id: string; // 期間ID
   startDate: string; // 開始日（YYYY-MM-DD形式）
@@ -59,12 +72,28 @@ export type FacilitySettings = {
   holidayPeriods?: HolidayPeriod[]; // 期間ごとの定休日設定
   customHolidays: string[]; // カスタム休業日（YYYY-MM-DD形式の配列）
   includeHolidays?: boolean; // 祝日を休業日に含めるかどうか
-  // 営業時間
+  // 営業時間（運営規定用）- 旧形式（後方互換性のため保持）
   businessHours: {
     AM: { start: string; end: string }; // 例: { start: '09:00', end: '12:00' }
     PM: { start: string; end: string }; // 例: { start: '13:00', end: '18:00' }
   };
-  businessHoursPeriods?: BusinessHoursPeriod[]; // 期間ごとの営業時間設定
+  businessHoursPeriods?: BusinessHoursPeriod[]; // 期間ごとの営業時間設定（後方互換性のため保持）
+  // 営業時間（新形式：曜日別対応）
+  flexibleBusinessHours?: FlexibleHours;
+  // サービス提供時間（運営規定用：職員が配置されサービス提供可能な時間）- 旧形式
+  serviceHours?: {
+    AM: { start: string; end: string };
+    PM: { start: string; end: string };
+  };
+  // サービス提供時間（新形式：曜日別対応）
+  flexibleServiceHours?: FlexibleHours;
+  // 事業区分（多機能型施設対応）
+  serviceCategories?: {
+    childDevelopmentSupport: boolean;      // 児童発達支援
+    afterSchoolDayService: boolean;        // 放課後等デイサービス
+    nurseryVisitSupport: boolean;          // 保育所等訪問支援
+    homeBasedChildSupport: boolean;        // 居宅訪問型児童発達支援
+  };
   // 受け入れ人数
   capacity: {
     AM: number; // 午前の定員
@@ -443,15 +472,16 @@ export type FacilityChildrenSettings = {
 
 // 書類タイプ
 export type DocumentType =
-  | 'contract'           // 契約書
-  | 'assessment'         // アセスメントシート
-  | 'support_plan'       // 個別支援計画書
-  | 'beneficiary_cert'   // 受給者証
-  | 'medical_cert'       // 診断書・医療証明
-  | 'insurance_card'     // 保険証
-  | 'emergency_contact'  // 緊急連絡先
-  | 'photo_consent'      // 写真掲載同意書
-  | 'other';             // その他
+  | 'contract'             // 契約書
+  | 'assessment'           // アセスメントシート
+  | 'support_plan'         // 個別支援計画書
+  | 'special_support_plan' // 専門的支援計画書
+  | 'beneficiary_cert'     // 受給者証
+  | 'medical_cert'         // 診断書・医療証明
+  | 'insurance_card'       // 保険証
+  | 'emergency_contact'    // 緊急連絡先
+  | 'photo_consent'        // 写真掲載同意書
+  | 'other';               // その他
 
 // 書類ステータス
 export type DocumentStatus =
@@ -504,6 +534,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   contract: '契約書',
   assessment: 'アセスメントシート',
   support_plan: '個別支援計画書',
+  special_support_plan: '専門的支援計画書',
   beneficiary_cert: '受給者証',
   medical_cert: '診断書・医療証明',
   insurance_card: '保険証',
@@ -511,6 +542,46 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   photo_consent: '写真掲載同意書',
   other: 'その他',
 };
+
+// 書類カテゴリ（グループ化用）
+export const DOCUMENT_CATEGORIES = [
+  {
+    id: 'support_plan',
+    label: '個別支援計画',
+    types: ['support_plan'] as DocumentType[],
+    icon: 'ClipboardList',
+  },
+  {
+    id: 'special_support_plan',
+    label: '専門的支援計画',
+    types: ['special_support_plan'] as DocumentType[],
+    icon: 'ClipboardList',
+  },
+  {
+    id: 'beneficiary_cert',
+    label: '受給者証',
+    types: ['beneficiary_cert'] as DocumentType[],
+    icon: 'FileCheck',
+  },
+  {
+    id: 'assessment',
+    label: 'アセスメントシート',
+    types: ['assessment'] as DocumentType[],
+    icon: 'FileSearch',
+  },
+  {
+    id: 'contracts',
+    label: '契約・同意書',
+    types: ['contract', 'photo_consent', 'emergency_contact', 'medical_cert', 'insurance_card'] as DocumentType[],
+    icon: 'FileSignature',
+  },
+  {
+    id: 'other',
+    label: 'その他',
+    types: ['other'] as DocumentType[],
+    icon: 'File',
+  },
+] as const;
 
 // 書類ステータスのラベル
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, { label: string; color: string }> = {
@@ -672,6 +743,63 @@ export type UsageRecord = {
 
 // 利用実績フォームデータ
 export type UsageRecordFormData = Omit<UsageRecord, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
+
+// 連絡帳
+export type ContactLog = {
+  id: string;
+  facilityId: string;
+  childId: string;
+  scheduleId?: string;
+  date: string; // YYYY-MM-DD
+  slot?: 'AM' | 'PM';
+
+  // 活動内容
+  activities?: string;
+
+  // 体調・様子
+  healthStatus?: 'excellent' | 'good' | 'fair' | 'poor';
+  mood?: 'very_happy' | 'happy' | 'neutral' | 'sad' | 'upset';
+  appetite?: 'excellent' | 'good' | 'fair' | 'poor' | 'none';
+
+  // 食事
+  mealMain?: boolean;
+  mealSide?: boolean;
+  mealNotes?: string;
+
+  // 排泄
+  toiletCount?: number;
+  toiletNotes?: string;
+
+  // 睡眠（お昼寝）
+  napStartTime?: string;
+  napEndTime?: string;
+  napNotes?: string;
+
+  // スタッフからのコメント
+  staffComment?: string;
+  staffUserId?: string;
+
+  // 保護者への連絡事項
+  parentMessage?: string;
+
+  // 保護者からの返信
+  parentReply?: string;
+  parentReplyAt?: string;
+
+  // サイン関連
+  isSigned?: boolean;
+  signedAt?: string;
+  signedByUserId?: string;
+  signatureData?: string;
+
+  // メタデータ
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+};
+
+// 連絡帳フォームデータ
+export type ContactLogFormData = Omit<ContactLog, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
 
 // リードステータス
 export type LeadStatus = 'new-inquiry' | 'visit-scheduled' | 'considering' | 'waiting-benefit' | 'contract-progress' | 'contracted' | 'lost';
@@ -916,17 +1044,15 @@ export type FacilityTimeSlot = {
 // 業務ツール設定
 // ==========================================
 
-// 業務ツールID
+// 業務ツールID（キャリア画面で表示するツール）
 export type WorkToolId =
-  | 'time_tracking'      // 打刻（勤怠）
-  | 'daily_report'       // 日報作成
-  | 'expense'            // 経費精算
-  | 'document_output'    // 書類出力
-  | 'attendance_calendar'// 勤怠カレンダー
-  | 'shift_view'         // シフト確認
-  | 'training_record'    // 研修記録
-  | 'announcements'      // お知らせ
-  | 'task_management';   // タスク管理
+  | 'time_tracking'       // 打刻（勤怠）
+  | 'attendance_calendar' // 勤怠カレンダー（休暇申請も含む）
+  | 'shift_view'          // シフト確認
+  | 'expense'             // 経費精算
+  | 'payslip'             // 給与明細
+  | 'knowledge_base'      // ナレッジベース（社内Wiki）
+  | 'biz_dashboard';      // Bizダッシュボード
 
 // 業務ツール定義
 export type WorkToolDefinition = {
@@ -934,19 +1060,19 @@ export type WorkToolDefinition = {
   name: string;
   icon: string; // Lucide icon name
   description: string;
+  defaultEnabled: boolean; // デフォルトで有効か
 };
 
-// 業務ツール一覧
+// 業務ツール一覧（キャリア画面に表示する機能）
+// ※日報、書類出力、研修記録等はビジネス管理画面から利用可能
 export const WORK_TOOLS: WorkToolDefinition[] = [
-  { id: 'time_tracking', name: '打刻（勤怠）', icon: 'Clock', description: '始業・終業・休憩の打刻' },
-  { id: 'daily_report', name: '日報作成', icon: 'FileText', description: '日報の作成・提出' },
-  { id: 'expense', name: '経費精算', icon: 'Receipt', description: '経費の申請・管理' },
-  { id: 'document_output', name: '書類出力', icon: 'FileOutput', description: '各種書類の出力' },
-  { id: 'attendance_calendar', name: '勤怠カレンダー', icon: 'Calendar', description: '勤怠状況の確認' },
-  { id: 'shift_view', name: 'シフト確認', icon: 'CalendarDays', description: 'シフト表の確認' },
-  { id: 'training_record', name: '研修記録', icon: 'GraduationCap', description: '研修履歴の管理' },
-  { id: 'announcements', name: 'お知らせ', icon: 'Bell', description: '施設からのお知らせ' },
-  { id: 'task_management', name: 'タスク管理', icon: 'CheckSquare', description: 'タスクの管理' },
+  { id: 'time_tracking', name: '打刻', icon: 'Clock', description: '始業・終業・休憩の打刻', defaultEnabled: true },
+  { id: 'attendance_calendar', name: '勤怠カレンダー', icon: 'Calendar', description: '勤怠実績・休暇申請', defaultEnabled: true },
+  { id: 'shift_view', name: 'シフト確認', icon: 'CalendarDays', description: 'シフト表の確認', defaultEnabled: true },
+  { id: 'expense', name: '経費精算', icon: 'Receipt', description: '経費の申請・管理', defaultEnabled: true },
+  { id: 'payslip', name: '給与明細', icon: 'Wallet', description: '給与明細・書類の確認', defaultEnabled: true },
+  { id: 'knowledge_base', name: 'ナレッジ', icon: 'Library', description: '就業規則・マニュアル・ノウハウ', defaultEnabled: true },
+  { id: 'biz_dashboard', name: 'ビジネス管理画面', icon: 'Briefcase', description: '施設管理画面を開く', defaultEnabled: true },
 ];
 
 // 施設業務ツール設定
@@ -1342,5 +1468,580 @@ export type StaffAvailabilityStatus = {
   submittedAt?: string;
   availableDates: string[];
   notes?: string;
+};
+
+// ============================================
+// 送迎担当者・完了チェック関連の型定義
+// ============================================
+
+// 日別送迎担当者割り当て
+export type DailyTransportAssignment = {
+  id: string;
+  facilityId: string;
+  date: string;               // YYYY-MM-DD
+  driverStaffId: string;      // 運転手
+  attendantStaffId: string;   // 添乗員
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  driverName?: string;
+  attendantName?: string;
+};
+
+// 送迎完了チェック記録
+export type TransportCompletionRecord = {
+  id: string;
+  facilityId: string;
+  date: string;               // YYYY-MM-DD
+  scheduleId: string;
+  childId: string;
+  // お迎え完了
+  pickupCompleted: boolean;
+  pickupCompletedAt?: string;
+  pickupCompletedBy?: string;
+  pickupNotes?: string;
+  // お送り完了
+  dropoffCompleted: boolean;
+  dropoffCompletedAt?: string;
+  dropoffCompletedBy?: string;
+  dropoffNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 拡張情報（JOINで取得）
+  childName?: string;
+};
+
+// ============================================
+// 行政連携関連の型定義
+// ============================================
+
+// 行政機関
+export type GovernmentOrganization = {
+  id: string;
+  name: string;
+  department?: string;
+  prefecture?: string;
+  municipalityCode?: string;
+  address?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 行政アカウント
+export type GovernmentAccount = {
+  id: string;
+  organizationId: string;
+  email: string;
+  name?: string;
+  role: 'staff' | 'admin';
+  accessToken?: string;
+  tokenExpiresAt?: string;
+  lastAccessedAt?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // 参照データ
+  organization?: GovernmentOrganization;
+};
+
+// 事業所と行政の紐付け
+export type FacilityGovernmentLink = {
+  id: string;
+  facilityId: string;
+  organizationId: string;
+  linkType: 'jurisdiction' | 'other';
+  primaryContactEmail?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 参照データ
+  organization?: GovernmentOrganization;
+};
+
+// 書類カテゴリ
+export type GovernmentDocumentCategory = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  submissionFrequency?: 'monthly' | 'quarterly' | 'annually' | 'as_needed';
+  requiredFields?: Record<string, any>;
+  templateUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+// 書類提出ステータス
+export type DocumentSubmissionStatus = 'draft' | 'submitted' | 'received' | 'returned' | 'completed';
+
+// 書類提出
+export type GovernmentDocumentSubmission = {
+  id: string;
+  facilityId: string;
+  organizationId: string;
+  categoryId: string;
+  title: string;
+  targetPeriod?: string;
+  targetYear?: number;
+  targetMonth?: number;
+  content?: Record<string, any>;
+  fileUrl?: string;
+  fileName?: string;
+  status: DocumentSubmissionStatus;
+  submittedAt?: string;
+  submittedBy?: string;
+  receivedAt?: string;
+  receivedBy?: string;
+  returnReason?: string;
+  completionNote?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 参照データ
+  organization?: GovernmentOrganization;
+  category?: GovernmentDocumentCategory;
+};
+
+// 契約内容報告書の明細
+export type ContractReportItem = {
+  id: string;
+  submissionId: string;
+  childId: string;
+  contractId?: string;
+  reportType: 'new' | 'change' | 'termination';
+  childName: string;
+  childBirthday?: string;
+  recipientNumber?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  serviceType?: string;
+  daysPerMonth?: number;
+  changeContent?: string;
+  terminationReason?: string;
+  createdAt: string;
+};
+
+// 行政⇔事業所メッセージ
+export type GovernmentMessage = {
+  id: string;
+  facilityId: string;
+  organizationId: string;
+  relatedSubmissionId?: string;
+  relatedMeetingId?: string;
+  direction: 'to_facility' | 'to_government';
+  subject: string;
+  body: string;
+  attachments?: { name: string; url: string; type?: string }[];
+  sentByUserId?: string;
+  sentByGovAccountId?: string;
+  sentAt: string;
+  readAt?: string;
+  readBy?: string;
+  createdAt: string;
+  // 参照データ
+  organization?: GovernmentOrganization;
+};
+
+// ============================================
+// 個別支援計画PDF管理
+// ============================================
+
+export type SupportPlanFileStatus = 'draft' | 'active' | 'completed' | 'archived';
+export type SupportPlanType = 'initial' | 'renewal' | 'modification';
+
+export type SupportPlanFile = {
+  id: string;
+  facilityId: string;
+  childId: string;
+  planType: SupportPlanType;
+  periodStart: string;
+  periodEnd: string;
+  planCreatedDate: string;
+  planCreatorName?: string;
+  filePath?: string;
+  fileName: string;
+  fileSize?: number;
+  parentAgreed: boolean;
+  parentAgreedAt?: string;
+  parentSignerName?: string;
+  midEvaluationDate?: string;
+  midEvaluationNote?: string;
+  finalEvaluationDate?: string;
+  finalEvaluationNote?: string;
+  status: SupportPlanFileStatus;
+  nextRenewalDate?: string;
+  renewalReminderSent: boolean;
+  notes?: string;
+  uploadedBy?: string;
+  uploadedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  // 参照データ
+  child?: { id: string; name: string };
+};
+
+// ============================================
+// 人員配置コンプライアンス管理
+// Personnel Staffing Compliance
+// ============================================
+
+// 人員区分 (Personnel Classification)
+export type PersonnelType = 'standard' | 'addition';
+
+// 人員区分ラベル
+export const PERSONNEL_TYPE_LABELS: Record<PersonnelType, string> = {
+  standard: '基準人員',
+  addition: '加算人員',
+};
+
+// 勤務形態 (Work Style)
+export type WorkStyle = 'fulltime_dedicated' | 'fulltime_concurrent' | 'parttime';
+
+// 勤務形態ラベル
+export const WORK_STYLE_LABELS: Record<WorkStyle, string> = {
+  fulltime_dedicated: '常勤専従',
+  fulltime_concurrent: '常勤兼務',
+  parttime: '非常勤',
+};
+
+// コンプライアンス状態 (Compliance Status)
+export type ComplianceStatus = 'compliant' | 'warning' | 'non_compliant';
+
+// コンプライアンス状態表示設定
+export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, { label: string; color: string; bgColor: string; icon: string }> = {
+  compliant: { label: '充足', color: 'text-green-600', bgColor: 'bg-green-50', icon: '○' },
+  warning: { label: '注意', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: '△' },
+  non_compliant: { label: '不足', color: 'text-red-600', bgColor: 'bg-red-50', icon: '×' },
+};
+
+// スタッフ人員設定 (Staff Personnel Settings)
+export type StaffPersonnelSettings = {
+  id: string;
+  facilityId: string;
+  staffId: string;
+  personnelType: PersonnelType;
+  workStyle: WorkStyle;
+  isManager: boolean;           // 管理者フラグ
+  isServiceManager: boolean;    // 児発管フラグ
+  managerConcurrentRole?: string; // 管理者の兼務役割
+  contractedWeeklyHours?: number; // 週所定労働時間
+  assignedAdditionCodes?: string[]; // 配置先加算コード
+  effectiveFrom: string;
+  effectiveTo?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 結合データ (JOIN)
+  staffName?: string;
+  qualifications?: string[];
+  yearsOfExperience?: number;
+};
+
+// コンプライアンス警告タイプ
+export type ComplianceWarningType =
+  | 'staffing_shortage'      // 基準人員不足
+  | 'fte_insufficient'       // 常勤換算不足
+  | 'manager_absent'         // 管理者不在
+  | 'service_manager_absent' // 児発管不在
+  | 'fulltime_dedicated_absent' // 常勤専従不在
+  | 'addition_requirement';  // 加算要件不足
+
+// コンプライアンス警告
+export type ComplianceWarning = {
+  type: ComplianceWarningType;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+  relatedAdditionCode?: string;
+};
+
+// スタッフコンプライアンス内訳
+export type StaffComplianceBreakdown = {
+  staffId: string;
+  name: string;
+  personnelType: PersonnelType;
+  workStyle: WorkStyle;
+  scheduledHours: number;    // その日のシフト時間
+  fte: number;               // 常勤換算値
+  qualifications?: string[];
+  assignedAdditions?: string[];
+  isManager?: boolean;
+  isServiceManager?: boolean;
+};
+
+// 日次人員配置コンプライアンス
+export type DailyStaffingCompliance = {
+  id: string;
+  facilityId: string;
+  date: string;
+  overallStatus: ComplianceStatus;
+  // 基準人員チェック
+  hasTwoStaff: boolean;              // 2名配置済み
+  hasFulltimeDedicated: boolean;     // 常勤専従1名配置済み
+  hasSecondStaff: boolean;           // 2人目充足
+  fteTotal: number;                  // 常勤換算合計
+  // 管理者・児発管チェック
+  hasManager: boolean;
+  hasServiceManager: boolean;
+  // 人数内訳
+  scheduledStaffCount: number;       // シフト登録スタッフ総数
+  standardStaffCount: number;        // 基準人員数
+  additionStaffCount: number;        // 加算人員数
+  // 詳細
+  additionCompliance: Record<string, { met: boolean; reason: string }>;
+  staffBreakdown: StaffComplianceBreakdown[];
+  warnings: ComplianceWarning[];
+  // メタデータ
+  calculatedAt: string;
+  calculatedBy?: string;
+};
+
+// 加算スタッフ要件
+export type AdditionStaffRequirement = {
+  id: string;
+  additionCode: string;
+  requiredQualifications?: string[];
+  anyQualification: boolean;         // いずれかの資格でOK
+  minYearsExperience?: number;       // 最低経験年数
+  requiredWorkStyle?: WorkStyle;     // 必要な勤務形態
+  minFte?: number;                   // 最低FTE
+  minStaffCount: number;             // 最低人数
+  additionalConditions?: Record<string, unknown>;
+  description?: string;
+};
+
+// 勤務体制一覧表ステータス
+export type WorkScheduleReportStatus = 'draft' | 'submitted' | 'approved';
+
+// 勤務体制一覧表のスタッフ配置エントリ
+export type WorkScheduleStaffAssignment = {
+  staffId: string;
+  name: string;
+  personnelType: PersonnelType;
+  workStyle: WorkStyle;
+  qualifications: string[];
+  yearsOfExperience?: number;
+  weeklyHours: number;
+  fte: number;
+  assignedAdditions: string[];
+  role?: string;  // 児発管, 管理者 等
+};
+
+// 勤務体制一覧表
+export type WorkScheduleReport = {
+  id: string;
+  facilityId: string;
+  year: number;
+  month: number;
+  staffAssignments: WorkScheduleStaffAssignment[];
+  totalStandardStaff: number;
+  totalAdditionStaff: number;
+  fteTotal: number;
+  status: WorkScheduleReportStatus;
+  generatedAt?: string;
+  submittedAt?: string;
+  submittedTo?: string;            // 提出先
+  approvedAt?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 施設設定の人員関連拡張 (FacilitySettingsの拡張)
+export type FacilityStaffingSettings = {
+  standardWeeklyHours: number;      // 週あたり所定労働時間（常勤の基準）
+  managerStaffId?: string;          // 管理者のスタッフID
+  serviceManagerStaffId?: string;   // 児発管のスタッフID
+};
+
+// 資格コード定義
+export const QUALIFICATION_CODES = {
+  PT: '理学療法士',
+  OT: '作業療法士',
+  ST: '言語聴覚士',
+  PSYCHOLOGIST: '公認心理師',
+  VISION_TRAINER: '視能訓練士',
+  NURSE: '看護師',
+  PUBLIC_HEALTH_NURSE: '保健師',
+  NURSERY_TEACHER: '保育士',
+  CHILD_INSTRUCTOR: '児童指導員',
+  SOCIAL_WORKER: '社会福祉士',
+  CARE_WORKER: '介護福祉士',
+  PSYCH_WELFARE_WORKER: '精神保健福祉士',
+} as const;
+
+export type QualificationCode = keyof typeof QUALIFICATION_CODES;
+
+// ==========================================
+// ナレッジベース（社内Wiki）
+// ==========================================
+
+// ナレッジカテゴリコード
+export type KnowledgeCategoryCode = 'labor' | 'manual' | 'facility' | 'knowhow' | 'qa' | 'other';
+
+// デフォルトカテゴリ定義
+export const DEFAULT_KNOWLEDGE_CATEGORIES: {
+  code: KnowledgeCategoryCode;
+  name: string;
+  icon: string;
+  color: string;
+}[] = [
+  { code: 'labor', name: '労務・制度', icon: 'Scale', color: '#3B82F6' },
+  { code: 'manual', name: '業務マニュアル', icon: 'BookOpen', color: '#10B981' },
+  { code: 'facility', name: '施設情報', icon: 'Building2', color: '#8B5CF6' },
+  { code: 'knowhow', name: '療育ノウハウ', icon: 'Lightbulb', color: '#F59E0B' },
+  { code: 'qa', name: 'Q&A', icon: 'HelpCircle', color: '#EC4899' },
+  { code: 'other', name: 'その他', icon: 'FileText', color: '#6B7280' },
+];
+
+// ナレッジカテゴリ
+export type KnowledgeCategory = {
+  id: string;
+  facilityId: string;
+  code: string;
+  name: string;
+  icon: string;
+  color: string;
+  displayOrder: number;
+  isDefault: boolean;
+  createdAt: string;
+};
+
+// 添付ファイル
+export type KnowledgeAttachment = {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+};
+
+// ナレッジ記事
+export type KnowledgeArticle = {
+  id: string;
+  facilityId: string;
+
+  // コンテンツ
+  title: string;
+  content: string;           // Markdown形式
+  summary?: string;
+
+  // 分類
+  category: string;
+  tags: string[];
+
+  // 権限・公開設定
+  isAdminLocked: boolean;    // true: 管理者のみ編集可能
+  isPublished: boolean;
+  isPinned: boolean;
+
+  // 添付ファイル
+  attachments: KnowledgeAttachment[];
+
+  // 作成者情報
+  authorId?: string;
+  authorName?: string;
+  lastEditorId?: string;
+  lastEditorName?: string;
+
+  // 統計
+  viewCount: number;
+
+  // タイムスタンプ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 記事作成/更新用
+export type KnowledgeArticleInput = {
+  title: string;
+  content: string;
+  summary?: string;
+  category: string;
+  tags?: string[];
+  isAdminLocked?: boolean;
+  isPublished?: boolean;
+  isPinned?: boolean;
+  attachments?: KnowledgeAttachment[];
+};
+
+// =============================================
+// 公式規定・制度（Company Regulations）
+// =============================================
+
+// 規定カテゴリ
+export type RegulationCategory = {
+  id: string;
+  facilityId: string;
+  code: string;           // 'employment_rules', 'salary', 'benefits', 'safety', 'other'
+  name: string;           // '就業規則', '賃金・報酬', '福利厚生', '安全衛生', 'その他'
+  icon?: string;          // Lucide icon name
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// デフォルト規定カテゴリ
+export const DEFAULT_REGULATION_CATEGORIES: Omit<RegulationCategory, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>[] = [
+  { code: 'employment_rules', name: '就業規則', icon: 'FileText', displayOrder: 1 },
+  { code: 'salary', name: '賃金・報酬', icon: 'Wallet', displayOrder: 2 },
+  { code: 'benefits', name: '福利厚生', icon: 'Heart', displayOrder: 3 },
+  { code: 'safety', name: '安全衛生', icon: 'Shield', displayOrder: 4 },
+  { code: 'other', name: 'その他規定', icon: 'FolderOpen', displayOrder: 5 },
+];
+
+// 公式規定文書
+export type CompanyRegulation = {
+  id: string;
+  facilityId: string;
+
+  // 基本情報
+  title: string;
+  description?: string;
+  categoryCode: string;
+
+  // ファイル情報
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+
+  // PDF検索用テキスト
+  extractedText?: string;
+
+  // メタデータ
+  version?: string;
+  effectiveDate?: string;
+  revisionDate?: string;
+
+  // 表示設定
+  isPublished: boolean;
+  displayOrder: number;
+
+  // 監査情報
+  uploadedBy?: string;
+  uploadedByName?: string;
+  viewCount: number;
+
+  // タイムスタンプ
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 規定文書作成/更新用
+export type CompanyRegulationInput = {
+  title: string;
+  description?: string;
+  categoryCode: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize?: number;
+  fileType?: string;
+  version?: string;
+  effectiveDate?: string;
+  revisionDate?: string;
+  isPublished?: boolean;
+  displayOrder?: number;
 };
 

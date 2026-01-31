@@ -1,6 +1,7 @@
 /**
- * 運営用管理画面
- * 企業登録→施設登録→招待リンク発行
+ * SaaS運営管理画面
+ * マスター管理者のみがアクセス可能
+ * 主な機能：施設招待リンクの発行
  */
 
 'use client';
@@ -9,158 +10,151 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
-import { Building2, Plus, Copy, X, CheckCircle, XCircle, Briefcase, Users, Link as LinkIcon, Shield } from 'lucide-react';
+import {
+  Building2,
+  Plus,
+  Copy,
+  CheckCircle,
+  Users,
+  Briefcase,
+  Baby,
+  Link as LinkIcon,
+  ArrowLeft,
+  Clock,
+  Mail,
+  ExternalLink
+} from 'lucide-react';
 
-// 静的生成をスキップ
 export const dynamic = 'force-dynamic';
-
-interface Company {
-  id: string;
-  name: string;
-  contactPersonName?: string;
-  contactPersonEmail?: string;
-  contractStartDate?: string;
-  contractEndDate?: string;
-  contractAmount?: number;
-  createdAt: string;
-  facilities: Facility[];
-}
 
 interface Facility {
   id: string;
   name: string;
-  companyId: string;
-  franchiseOrIndependent: 'franchise' | 'independent' | null;
-  registrationToken?: string;
+  companyName: string;
+  status: 'pending' | 'active';
+  invitationToken?: string;
   tokenExpiresAt?: string;
-  isCompleted: boolean;
   createdAt: string;
+}
+
+interface DashboardStats {
+  totalCompanies: number;
+  totalFacilities: number;
+  pendingInvitations: number;
+  totalStaff: number;
+  totalChildren: number;
 }
 
 export default function AdminPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [hasPermission, setHasPermission] = useState(false);
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'companies' | 'facilities'>('companies');
-  const [showCompanyForm, setShowCompanyForm] = useState(false);
-  const [showFacilityForm, setShowFacilityForm] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
-  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
-  
-  // 企業フォーム状態
-  const [companyName, setCompanyName] = useState('');
-  const [contactPersonName, setContactPersonName] = useState('');
-  const [contactPersonEmail, setContactPersonEmail] = useState('');
-  const [contractStartDate, setContractStartDate] = useState('');
-  const [contractEndDate, setContractEndDate] = useState('');
-  const [contractAmount, setContractAmount] = useState('');
-  
-  // 施設フォーム状態
-  const [facilityName, setFacilityName] = useState('');
-  const [franchiseOrIndependent, setFranchiseOrIndependent] = useState<'franchise' | 'independent' | ''>('');
-  
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFacilityName, setInviteFacilityName] = useState('');
+  const [inviteCompanyName, setInviteCompanyName] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
-  // 権限チェックとユーザー情報取得
+  // 権限チェック
   useEffect(() => {
     const checkPermission = async () => {
       try {
         const userStr = localStorage.getItem('user');
         if (!userStr) {
-          router.push('/login');
+          router.push('/career/login');
           return;
         }
 
         const userData = JSON.parse(userStr);
         setUser(userData);
 
-        // 施設発行権限をチェック
-        const { data, error } = await supabase
+        // admin_permissionsをチェック
+        const { data: permData, error: permError } = await supabase
           .from('admin_permissions')
           .select('id')
           .eq('user_id', userData.id)
           .eq('permission_type', 'facility_creation')
           .single();
 
-        if (error || !data) {
-          setError('施設発行権限がありません');
-          setLoading(false);
+        if (permError || !permData) {
+          router.push('/career');
           return;
         }
 
         setHasPermission(true);
-        loadCompanies();
-      } catch (err: any) {
-        setError(err.message || '権限確認に失敗しました');
-        setLoading(false);
+        loadData();
+      } catch (err) {
+        console.error('権限確認エラー:', err);
+        router.push('/career/login');
       }
     };
 
     checkPermission();
   }, [router]);
 
-  // 企業一覧を取得
-  const loadCompanies = async () => {
+  // データ読み込み
+  const loadData = async () => {
     try {
-      const { data: companiesData, error: companiesError } = await supabase
-        .from('companies')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // 統計データ
+      const [
+        { count: companiesCount },
+        { count: facilitiesCount },
+        { count: staffCount },
+        { count: childrenCount },
+      ] = await Promise.all([
+        supabase.from('companies').select('*', { count: 'exact', head: true }),
+        supabase.from('facilities').select('*', { count: 'exact', head: true }),
+        supabase.from('staff').select('*', { count: 'exact', head: true }),
+        supabase.from('children').select('*', { count: 'exact', head: true }),
+      ]);
 
-      if (companiesError) {
-        console.error('企業取得エラー:', companiesError);
-        return;
-      }
+      // 招待待ち施設数
+      const { count: pendingCount } = await supabase
+        .from('facilities')
+        .select('*', { count: 'exact', head: true })
+        .eq('pre_registered', true);
 
-      // 各企業に紐づく施設を取得
-      const companyIds = companiesData?.map(c => c.id) || [];
-      let facilitiesData: any[] = [];
-      if (companyIds.length > 0) {
-        const { data: facilities, error: facilitiesError } = await supabase
-          .from('facilities')
-          .select('id, name, company_id, franchise_or_independent, pre_registered, verification_status, code, created_at, facility_registration_tokens(token, expires_at)')
-          .in('company_id', companyIds)
-          .eq('pre_registered', true);
-        
-        if (facilitiesError) {
-          console.error('施設取得エラー:', facilitiesError);
-        } else {
-          facilitiesData = facilities || [];
-        }
-      }
-
-      // データを結合
-      const companiesWithFacilities = (companiesData || []).map(company => {
-        const facilities = facilitiesData
-          .filter(f => f.company_id === company.id)
-          .map(f => ({
-            id: f.id,
-            name: f.name,
-            companyId: f.company_id,
-            franchiseOrIndependent: f.franchise_or_independent,
-            registrationToken: f.facility_registration_tokens?.[0]?.token,
-            tokenExpiresAt: f.facility_registration_tokens?.[0]?.expires_at,
-            isCompleted: (f.verification_status === 'verified' || !!f.code) && !f.pre_registered,
-            createdAt: f.created_at,
-          }));
-        
-        return {
-          id: company.id,
-          name: company.name,
-          contactPersonName: company.contact_person_name,
-          contactPersonEmail: company.contact_person_email,
-          contractStartDate: company.contract_start_date,
-          contractEndDate: company.contract_end_date,
-          contractAmount: company.contract_amount,
-          createdAt: company.created_at,
-          facilities,
-        };
+      setStats({
+        totalCompanies: companiesCount || 0,
+        totalFacilities: facilitiesCount || 0,
+        pendingInvitations: pendingCount || 0,
+        totalStaff: staffCount || 0,
+        totalChildren: childrenCount || 0,
       });
 
-      setCompanies(companiesWithFacilities);
+      // 施設一覧（最新10件）
+      const { data: facilitiesData } = await supabase
+        .from('facilities')
+        .select(`
+          id,
+          name,
+          pre_registered,
+          verification_status,
+          code,
+          created_at,
+          companies(name),
+          facility_registration_tokens(token, expires_at)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const formattedFacilities: Facility[] = (facilitiesData || []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        companyName: f.companies?.name || '未設定',
+        status: f.pre_registered ? 'pending' : 'active',
+        invitationToken: f.facility_registration_tokens?.[0]?.token,
+        tokenExpiresAt: f.facility_registration_tokens?.[0]?.expires_at,
+        createdAt: f.created_at,
+      }));
+
+      setFacilities(formattedFacilities);
     } catch (err) {
       console.error('データ読み込みエラー:', err);
     } finally {
@@ -168,673 +162,423 @@ export default function AdminPage() {
     }
   };
 
-  // 企業登録
-  const handleCompanySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 招待リンク生成
+  const generateInvitation = async () => {
+    if (!inviteFacilityName.trim()) {
+      setError('施設名を入力してください');
+      return;
+    }
+
+    setSubmitting(true);
     setError('');
-    setSuccess('');
 
     try {
-      if (!companyName.trim()) {
-        throw new Error('企業名を入力してください');
-      }
+      // 企業を作成（または既存を使用）
+      let companyId: string;
 
-      const now = new Date().toISOString();
-
-      if (editingCompanyId) {
-        // 更新
-        const { error } = await supabase
-          .from('companies')
-          .update({
-            name: companyName.trim(),
-            contact_person_name: contactPersonName.trim() || null,
-            contact_person_email: contactPersonEmail.trim() || null,
-            contract_start_date: contractStartDate || null,
-            contract_end_date: contractEndDate || null,
-            contract_amount: contractAmount ? parseFloat(contractAmount) : null,
-            updated_at: now,
-          })
-          .eq('id', editingCompanyId);
-
-        if (error) throw error;
-        setSuccess('企業情報を更新しました');
-      } else {
-        // 新規作成
-        const { error } = await supabase
+      if (inviteCompanyName.trim()) {
+        const { data: newCompany, error: companyError } = await supabase
           .from('companies')
           .insert({
-            name: companyName.trim(),
-            contact_person_name: contactPersonName.trim() || null,
-            contact_person_email: contactPersonEmail.trim() || null,
-            contract_start_date: contractStartDate || null,
-            contract_end_date: contractEndDate || null,
-            contract_amount: contractAmount ? parseFloat(contractAmount) : null,
-          });
+            name: inviteCompanyName.trim(),
+            contact_person_email: inviteEmail.trim() || null,
+          })
+          .select()
+          .single();
 
-        if (error) throw error;
-        setSuccess('企業を登録しました');
+        if (companyError) throw companyError;
+        companyId = newCompany.id;
+      } else {
+        // 企業名がない場合は施設名と同じ会社を作成
+        const { data: newCompany, error: companyError } = await supabase
+          .from('companies')
+          .insert({
+            name: inviteFacilityName.trim(),
+            contact_person_email: inviteEmail.trim() || null,
+          })
+          .select()
+          .single();
+
+        if (companyError) throw companyError;
+        companyId = newCompany.id;
       }
 
-      resetCompanyForm();
-      loadCompanies();
-    } catch (err: any) {
-      setError(err.message || '登録に失敗しました');
-    }
-  };
-
-  // 施設登録
-  const handleFacilitySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    try {
-      if (!selectedCompanyId) {
-        throw new Error('企業を選択してください');
-      }
-      if (!facilityName.trim()) {
-        throw new Error('施設名を入力してください');
-      }
-      if (!franchiseOrIndependent) {
-        throw new Error('フランチャイズか独立店舗かを選択してください');
-      }
-
-      const facilityId = `facility-pre-${Date.now()}`;
-      const now = new Date().toISOString();
-
-      // 施設を作成（事前登録状態）
-      const { error } = await supabase
+      // 施設を作成（仮登録状態）
+      const { data: newFacility, error: facilityError } = await supabase
         .from('facilities')
         .insert({
-          id: facilityId,
-          name: facilityName.trim(),
-          company_id: selectedCompanyId,
-          franchise_or_independent: franchiseOrIndependent,
+          name: inviteFacilityName.trim(),
+          company_id: companyId,
           pre_registered: true,
-          verification_status: 'unverified',
-        });
+          verification_status: 'pending',
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
-      setSuccess('施設を登録しました');
-      resetFacilityForm();
-      loadCompanies();
-    } catch (err: any) {
-      setError(err.message || '登録に失敗しました');
-    }
-  };
+      if (facilityError) throw facilityError;
 
-  // トークンを生成
-  const generateToken = async (facilityId: string) => {
-    try {
-      const token = `reg-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      // トークンを生成
+      const token = crypto.randomUUID();
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7日間有効
 
-      // 既存のトークンを削除
-      await supabase
-        .from('facility_registration_tokens')
-        .delete()
-        .eq('facility_id', facilityId);
-
-      // 新しいトークンを保存
-      const { error } = await supabase
+      const { error: tokenError } = await supabase
         .from('facility_registration_tokens')
         .insert({
-          facility_id: facilityId,
-          token,
+          facility_id: newFacility.id,
+          token: token,
           expires_at: expiresAt.toISOString(),
         });
 
-      if (error) throw error;
-      setSuccess('トークンを生成しました');
-      loadCompanies();
+      if (tokenError) throw tokenError;
+
+      // 招待リンクを生成
+      const baseUrl = window.location.origin;
+      const inviteLink = `${baseUrl}/facility/join?token=${token}`;
+      setGeneratedLink(inviteLink);
+
+      // データを再読み込み
+      loadData();
     } catch (err: any) {
-      setError(err.message || 'トークンの生成に失敗しました');
+      console.error('招待生成エラー:', err);
+      setError(err.message || '招待リンクの生成に失敗しました');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // リンクをコピー
+  const copyLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('コピーエラー:', err);
     }
   };
 
   // フォームをリセット
-  const resetCompanyForm = () => {
-    setCompanyName('');
-    setContactPersonName('');
-    setContactPersonEmail('');
-    setContractStartDate('');
-    setContractEndDate('');
-    setContractAmount('');
-    setShowCompanyForm(false);
-    setEditingCompanyId(null);
-  };
-
-  const resetFacilityForm = () => {
-    setFacilityName('');
-    setFranchiseOrIndependent('');
-    setShowFacilityForm(false);
-    setSelectedCompanyId(null);
-  };
-
-  // 編集開始
-  const startEditCompany = (company: Company) => {
-    setCompanyName(company.name);
-    setContactPersonName(company.contactPersonName || '');
-    setContactPersonEmail(company.contactPersonEmail || '');
-    setContractStartDate(company.contractStartDate || '');
-    setContractEndDate(company.contractEndDate || '');
-    setContractAmount(company.contractAmount?.toString() || '');
-    setEditingCompanyId(company.id);
-    setShowCompanyForm(true);
-  };
-
-  // 特設ページのURLを取得
-  const getRegistrationUrl = (token: string) => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/facility/register?token=${token}`;
-  };
-
-  // URLをコピー
-  const copyUrl = (url: string) => {
-    navigator.clipboard.writeText(url);
-    setSuccess('URLをクリップボードにコピーしました');
-    setTimeout(() => setSuccess(''), 3000);
+  const resetForm = () => {
+    setShowInviteForm(false);
+    setInviteEmail('');
+    setInviteFacilityName('');
+    setInviteCompanyName('');
+    setGeneratedLink('');
+    setError('');
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">読み込み中...</div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#818CF8]"></div>
       </div>
     );
   }
 
   if (!hasPermission) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-md">
-          <div className="text-center">
-            <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-800 mb-2">アクセス権限がありません</h2>
-            <p className="text-gray-600 mb-4">施設発行権限が必要です</p>
-            <button
-              onClick={() => router.push('/staff-dashboard')}
-              className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors"
-            >
-              ダッシュボードに戻る
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/career')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex items-center gap-3">
+                <Image
+                  src="/logo-cropped-center.png"
+                  alt="co-shien"
+                  width={120}
+                  height={40}
+                  className="h-8 w-auto"
+                />
+                <span className="text-sm font-bold text-[#818CF8] bg-[#818CF8]/10 px-2 py-1 rounded">
+                  運営管理
+                </span>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600">
+              {user?.name}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* 統計カード */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
             <div className="flex items-center gap-3">
-              <Image
-                src="/logo-cropped-center.png"
-                alt="co-shien"
-                width={120}
-                height={32}
-                className="h-8 w-auto"
-                priority
-              />
-              <h1 className="text-xl font-bold text-gray-800">運営管理画面</h1>
-            </div>
-            <button
-              onClick={() => router.push('/staff-dashboard')}
-              className="text-gray-600 hover:text-gray-800 text-sm"
-            >
-              ダッシュボードに戻る
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* メッセージ */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-6">
-            {success}
-          </div>
-        )}
-
-        {/* タブ */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab('companies')}
-            className={`px-4 py-2 rounded-md font-bold transition-colors ${
-              activeTab === 'companies'
-                ? 'bg-[#00c4cc] text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            <Users className="w-4 h-4 inline mr-2" />
-            企業管理
-          </button>
-          <button
-            onClick={() => setActiveTab('facilities')}
-            className={`px-4 py-2 rounded-md font-bold transition-colors ${
-              activeTab === 'facilities'
-                ? 'bg-[#00c4cc] text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            <Building2 className="w-4 h-4 inline mr-2" />
-            施設管理
-          </button>
-        </div>
-
-        {/* 企業管理タブ */}
-        {activeTab === 'companies' && (
-          <>
-            {!showCompanyForm && (
-              <div className="mb-6">
-                <button
-                  onClick={() => {
-                    resetCompanyForm();
-                    setShowCompanyForm(true);
-                  }}
-                  className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  企業を登録
-                </button>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-blue-600" />
               </div>
-            )}
-
-            {showCompanyForm && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-4">
-                  {editingCompanyId ? '企業情報を編集' : '企業を登録'}
-                </h2>
-                <form onSubmit={handleCompanySubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      企業名 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      placeholder="例: ○○株式会社"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        担当者名
-                      </label>
-                      <input
-                        type="text"
-                        value={contactPersonName}
-                        onChange={(e) => setContactPersonName(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        担当者メールアドレス
-                      </label>
-                      <input
-                        type="email"
-                        value={contactPersonEmail}
-                        onChange={(e) => setContactPersonEmail(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        契約開始日
-                      </label>
-                      <input
-                        type="date"
-                        value={contractStartDate}
-                        onChange={(e) => setContractStartDate(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        契約終了日
-                      </label>
-                      <input
-                        type="date"
-                        value={contractEndDate}
-                        onChange={(e) => setContractEndDate(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        契約金額（円）
-                      </label>
-                      <input
-                        type="number"
-                        value={contractAmount}
-                        onChange={(e) => setContractAmount(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                        placeholder="例: 50000"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors"
-                    >
-                      {editingCompanyId ? '更新' : '登録'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetCompanyForm}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors"
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* 企業一覧 */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-800">企業一覧</h2>
-              </div>
-              <div className="divide-y divide-gray-200">
-                {companies.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    登録された企業がありません
-                  </div>
-                ) : (
-                  companies.map((company) => (
-                    <div key={company.id} className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <Briefcase className="w-5 h-5 text-[#00c4cc]" />
-                            <h3 className="text-lg font-bold text-gray-800">{company.name}</h3>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                            {company.contactPersonName && (
-                              <div>
-                                <span className="font-bold">担当者:</span> {company.contactPersonName}
-                              </div>
-                            )}
-                            {company.contactPersonEmail && (
-                              <div>
-                                <span className="font-bold">メール:</span> {company.contactPersonEmail}
-                              </div>
-                            )}
-                            {company.contractStartDate && (
-                              <div>
-                                <span className="font-bold">契約開始:</span> {new Date(company.contractStartDate).toLocaleDateString('ja-JP')}
-                              </div>
-                            )}
-                            {company.contractEndDate && (
-                              <div>
-                                <span className="font-bold">契約終了:</span> {new Date(company.contractEndDate).toLocaleDateString('ja-JP')}
-                              </div>
-                            )}
-                            {company.contractAmount && (
-                              <div>
-                                <span className="font-bold">契約金額:</span> ¥{company.contractAmount.toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => startEditCompany(company)}
-                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold py-2 px-4 rounded-md transition-colors"
-                        >
-                          編集
-                        </button>
-                      </div>
-
-                      {/* 施設一覧 */}
-                      {company.facilities.length > 0 && (
-                        <div className="mt-4 pl-8 border-l-2 border-gray-200">
-                          <h4 className="text-sm font-bold text-gray-700 mb-2">登録施設 ({company.facilities.length})</h4>
-                          <div className="space-y-3">
-                            {company.facilities.map((facility) => (
-                              <div key={facility.id} className="bg-gray-50 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 text-gray-600" />
-                                    <span className="font-bold text-gray-800">{facility.name}</span>
-                                    <span className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-700">
-                                      {facility.franchiseOrIndependent === 'franchise' ? 'フランチャイズ' : '独立店舗'}
-                                    </span>
-                                    {facility.isCompleted ? (
-                                      <CheckCircle className="w-4 h-4 text-green-500" />
-                                    ) : (
-                                      <XCircle className="w-4 h-4 text-yellow-500" />
-                                    )}
-                                  </div>
-                                </div>
-                                {facility.registrationToken ? (
-                                  <div className="mt-2">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className="text-xs font-bold text-gray-700">招待リンク:</span>
-                                      <button
-                                        onClick={() => copyUrl(getRegistrationUrl(facility.registrationToken!))}
-                                        className="text-[#00c4cc] hover:text-[#00b0b8] text-xs flex items-center gap-1"
-                                      >
-                                        <Copy className="w-3 h-3" />
-                                        コピー
-                                      </button>
-                                    </div>
-                                    <div className="bg-white border border-gray-300 rounded-md p-2 text-xs font-mono text-gray-700 break-all">
-                                      {getRegistrationUrl(facility.registrationToken)}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => generateToken(facility.id)}
-                                    className="mt-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-xs font-bold py-1 px-3 rounded-md transition-colors"
-                                  >
-                                    招待リンクを発行
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
+              <div>
+                <p className="text-2xl font-bold text-gray-800">{stats?.totalCompanies || 0}</p>
+                <p className="text-xs text-gray-500">企業</p>
               </div>
             </div>
-          </>
-        )}
+          </div>
 
-        {/* 施設管理タブ */}
-        {activeTab === 'facilities' && (
-          <>
-            {!showFacilityForm && (
-              <div className="mb-6">
-                <button
-                  onClick={() => {
-                    if (companies.length === 0) {
-                      setError('まず企業を登録してください');
-                      return;
-                    }
-                    resetFacilityForm();
-                    setShowFacilityForm(true);
-                  }}
-                  className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  施設を登録
-                </button>
+          <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-green-600" />
               </div>
-            )}
+              <div>
+                <p className="text-2xl font-bold text-gray-800">{stats?.totalFacilities || 0}</p>
+                <p className="text-xs text-gray-500">施設</p>
+              </div>
+            </div>
+          </div>
 
-            {showFacilityForm && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-4">施設を登録</h2>
-                <form onSubmit={handleFacilitySubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      企業 <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={selectedCompanyId || ''}
-                      onChange={(e) => setSelectedCompanyId(e.target.value)}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
-                    >
-                      <option value="">企業を選択</option>
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">{stats?.totalStaff || 0}</p>
+                <p className="text-xs text-gray-500">スタッフ</p>
+              </div>
+            </div>
+          </div>
 
+          <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Baby className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">{stats?.totalChildren || 0}</p>
+                <p className="text-xs text-gray-500">利用者</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 施設招待セクション */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-[#818CF8]" />
+                施設招待
+              </h2>
+              {!showInviteForm && (
+                <button
+                  onClick={() => setShowInviteForm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold rounded-lg transition-colors text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  新規施設を招待
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 招待フォーム */}
+          {showInviteForm && (
+            <div className="p-6 bg-gray-50 border-b border-gray-100">
+              {!generatedLink ? (
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">
                       施設名 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={facilityName}
-                      onChange={(e) => setFacilityName(e.target.value)}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      value={inviteFacilityName}
+                      onChange={(e) => setInviteFacilityName(e.target.value)}
                       placeholder="例: ○○放課後等デイサービス"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      タイプ <span className="text-red-500">*</span>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">
+                      企業名（任意）
                     </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          value="franchise"
-                          checked={franchiseOrIndependent === 'franchise'}
-                          onChange={(e) => setFranchiseOrIndependent(e.target.value as 'franchise' | 'independent')}
-                          className="mr-2"
-                        />
-                        <span>フランチャイズ</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          value="independent"
-                          checked={franchiseOrIndependent === 'independent'}
-                          onChange={(e) => setFranchiseOrIndependent(e.target.value as 'independent')}
-                          className="mr-2"
-                        />
-                        <span>独立店舗</span>
-                      </label>
-                    </div>
+                    <input
+                      type="text"
+                      value={inviteCompanyName}
+                      onChange={(e) => setInviteCompanyName(e.target.value)}
+                      placeholder="例: 株式会社○○"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">空欄の場合、施設名と同じ企業として登録されます</p>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">
+                      担当者メールアドレス（任意）
+                    </label>
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="例: tanaka@example.com"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 text-red-600 text-sm px-4 py-2 rounded-lg">
+                      {error}
+                    </div>
+                  )}
 
                   <div className="flex gap-3">
                     <button
-                      type="submit"
-                      className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                      onClick={generateInvitation}
+                      disabled={submitting}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold rounded-lg transition-colors disabled:opacity-50"
                     >
-                      登録
+                      {submitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          生成中...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="w-4 h-4" />
+                          招待リンクを生成
+                        </>
+                      )}
                     </button>
                     <button
-                      type="button"
-                      onClick={resetFacilityForm}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-md transition-colors"
+                      onClick={resetForm}
+                      className="px-4 py-3 border border-gray-300 text-gray-600 font-bold rounded-lg hover:bg-gray-100 transition-colors"
                     >
                       キャンセル
                     </button>
                   </div>
-                </form>
-              </div>
-            )}
-
-            {/* 全施設一覧 */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-800">全施設一覧</h2>
-              </div>
-              <div className="divide-y divide-gray-200">
-                {companies.flatMap(c => c.facilities).length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    登録された施設がありません
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="font-bold">招待リンクを生成しました</span>
                   </div>
-                ) : (
-                  companies.flatMap(company =>
-                    company.facilities.map(facility => (
-                      <div key={facility.id} className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Building2 className="w-5 h-5 text-[#00c4cc]" />
-                              <span className="font-bold text-gray-800">{facility.name}</span>
-                              <span className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-700">
-                                {facility.franchiseOrIndependent === 'franchise' ? 'フランチャイズ' : '独立店舗'}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                ({companies.find(c => c.id === facility.companyId)?.name})
-                              </span>
-                              {facility.isCompleted ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <XCircle className="w-4 h-4 text-yellow-500" />
-                              )}
-                            </div>
-                            {facility.registrationToken ? (
-                              <div className="mt-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-bold text-gray-700">招待リンク:</span>
-                                  <button
-                                    onClick={() => copyUrl(getRegistrationUrl(facility.registrationToken!))}
-                                    className="text-[#00c4cc] hover:text-[#00b0b8] text-xs flex items-center gap-1"
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                    コピー
-                                  </button>
-                                </div>
-                                <div className="bg-gray-50 border border-gray-300 rounded-md p-2 text-xs font-mono text-gray-700 break-all">
-                                  {getRegistrationUrl(facility.registrationToken)}
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => generateToken(facility.id)}
-                                className="mt-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-xs font-bold py-1 px-3 rounded-md transition-colors"
-                              >
-                                招待リンクを発行
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )
-                )}
-              </div>
+
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-2">以下のリンクを施設担当者に共有してください：</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={generatedLink}
+                        readOnly
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-mono"
+                      />
+                      <button
+                        onClick={() => copyLink(generatedLink)}
+                        className={`flex items-center gap-1 px-4 py-2 rounded-lg font-bold transition-colors ${
+                          copied
+                            ? 'bg-green-100 text-green-600'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {copied ? (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            コピー済み
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            コピー
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      ※ このリンクは7日間有効です
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 font-bold mb-2">招待フロー</p>
+                    <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                      <li>施設担当者がリンクを開く</li>
+                      <li>キャリアアカウントがない場合は先に作成</li>
+                      <li>施設情報を入力して登録完了</li>
+                      <li>施設オーナーとして管理開始</li>
+                    </ol>
+                  </div>
+
+                  <button
+                    onClick={resetForm}
+                    className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              )}
             </div>
-          </>
-        )}
-      </div>
+          )}
+
+          {/* 施設一覧 */}
+          <div className="p-6">
+            <h3 className="text-sm font-bold text-gray-600 mb-4">最近の施設</h3>
+            {facilities.length > 0 ? (
+              <div className="space-y-3">
+                {facilities.map((facility) => (
+                  <div
+                    key={facility.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        facility.status === 'active'
+                          ? 'bg-green-100'
+                          : 'bg-yellow-100'
+                      }`}>
+                        <Building2 className={`w-5 h-5 ${
+                          facility.status === 'active'
+                            ? 'text-green-600'
+                            : 'text-yellow-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-800">{facility.name}</p>
+                        <p className="text-xs text-gray-500">{facility.companyName}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {facility.status === 'pending' ? (
+                        <span className="flex items-center gap-1 text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                          <Clock className="w-3 h-3" />
+                          招待中
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          <CheckCircle className="w-3 h-3" />
+                          登録済み
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400">
+                        {new Date(facility.createdAt).toLocaleDateString('ja-JP')}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-gray-500 py-8">
+                まだ施設がありません
+              </p>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

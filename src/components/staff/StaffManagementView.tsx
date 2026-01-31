@@ -149,7 +149,17 @@ const StaffManagementView: React.FC = () => {
   const [publicInviteLink, setPublicInviteLink] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDashboardInviteModalOpen, setIsDashboardInviteModalOpen] = useState(false);
-  const [detailTab, setDetailTab] = useState<'profile' | 'facility'>('profile');
+  const [detailTab, setDetailTab] = useState<'profile' | 'facility' | 'documents' | 'tasks'>('profile');
+
+  // 書類・タスク用の状態
+  const [staffDocuments, setStaffDocuments] = useState<any[]>([]);
+  const [staffTasks, setStaffTasks] = useState<any[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showDocumentForm, setShowDocumentForm] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<any>(null);
+  const [editingTask, setEditingTask] = useState<any>(null);
   const [dashboardPermissions, setDashboardPermissions] = useState<UserPermissions>({
     // 利用者管理
     schedule: false,
@@ -376,6 +386,160 @@ const StaffManagementView: React.FC = () => {
       } catch (error) {
         console.error('ユーザー情報取得エラー:', error);
       }
+    }
+  };
+
+  // スタッフの書類を読み込む
+  const loadStaffDocuments = async (userId: string) => {
+    if (!facility?.id) return;
+    setLoadingDocuments(true);
+    try {
+      const { data, error } = await supabase
+        .from('staff_documents')
+        .select('*')
+        .eq('facility_id', facility.id)
+        .eq('user_id', userId)
+        .order('target_year', { ascending: false })
+        .order('target_month', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (!error) {
+        setStaffDocuments(data || []);
+      }
+    } catch (err) {
+      console.error('書類取得エラー:', err);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  // スタッフのタスクを読み込む
+  const loadStaffTasks = async (userId: string) => {
+    if (!facility?.id) return;
+    setLoadingTasks(true);
+    try {
+      const { data, error } = await supabase
+        .from('staff_tasks')
+        .select('*')
+        .eq('facility_id', facility.id)
+        .eq('assigned_to', userId)
+        .order('created_at', { ascending: false });
+
+      if (!error) {
+        setStaffTasks(data || []);
+      }
+    } catch (err) {
+      console.error('タスク取得エラー:', err);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  // 書類を保存
+  const saveDocument = async (docData: any) => {
+    if (!facility?.id || !selectedStaff?.user_id) return;
+
+    try {
+      const data = {
+        facility_id: facility.id,
+        user_id: selectedStaff.user_id,
+        document_type: docData.documentType,
+        title: docData.title,
+        description: docData.description || null,
+        file_url: docData.fileUrl,
+        file_name: docData.fileName,
+        file_type: docData.fileType || 'pdf',
+        target_year: docData.targetYear ? parseInt(docData.targetYear) : null,
+        target_month: docData.targetMonth ? parseInt(docData.targetMonth) : null,
+        issued_at: new Date().toISOString(),
+      };
+
+      if (editingDocument?.id) {
+        const { error } = await supabase
+          .from('staff_documents')
+          .update(data)
+          .eq('id', editingDocument.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('staff_documents')
+          .insert(data);
+        if (error) throw error;
+      }
+
+      await loadStaffDocuments(selectedStaff.user_id);
+      setShowDocumentForm(false);
+      setEditingDocument(null);
+    } catch (err: any) {
+      console.error('書類保存エラー:', err);
+      alert('保存に失敗しました: ' + (err.message || ''));
+    }
+  };
+
+  // タスクを保存
+  const saveTask = async (taskData: any) => {
+    if (!facility?.id || !selectedStaff?.user_id) return;
+
+    try {
+      const data = {
+        facility_id: facility.id,
+        assigned_to: selectedStaff.user_id,
+        title: taskData.title,
+        description: taskData.description || '',
+        priority: taskData.priority || 'medium',
+        status: taskData.status || 'pending',
+        due_date: taskData.dueDate || null,
+      };
+
+      if (editingTask?.id) {
+        const { error } = await supabase
+          .from('staff_tasks')
+          .update(data)
+          .eq('id', editingTask.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('staff_tasks')
+          .insert(data);
+        if (error) throw error;
+      }
+
+      await loadStaffTasks(selectedStaff.user_id);
+      setShowTaskForm(false);
+      setEditingTask(null);
+    } catch (err: any) {
+      console.error('タスク保存エラー:', err);
+      alert('保存に失敗しました: ' + (err.message || ''));
+    }
+  };
+
+  // 書類を削除
+  const deleteDocument = async (id: string) => {
+    if (!confirm('この書類を削除しますか？')) return;
+    try {
+      const { error } = await supabase.from('staff_documents').delete().eq('id', id);
+      if (error) throw error;
+      if (selectedStaff?.user_id) {
+        await loadStaffDocuments(selectedStaff.user_id);
+      }
+    } catch (err) {
+      console.error('削除エラー:', err);
+      alert('削除に失敗しました');
+    }
+  };
+
+  // タスクを削除
+  const deleteTask = async (id: string) => {
+    if (!confirm('このタスクを削除しますか？')) return;
+    try {
+      const { error } = await supabase.from('staff_tasks').delete().eq('id', id);
+      if (error) throw error;
+      if (selectedStaff?.user_id) {
+        await loadStaffTasks(selectedStaff.user_id);
+      }
+    } catch (err) {
+      console.error('削除エラー:', err);
+      alert('削除に失敗しました');
     }
   };
 
@@ -2094,6 +2258,36 @@ const StaffManagementView: React.FC = () => {
                 >
                   事業所固有情報
                 </button>
+                {selectedStaff.user_id && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setDetailTab('documents');
+                        loadStaffDocuments(selectedStaff.user_id!);
+                      }}
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        detailTab === 'documents'
+                          ? 'border-[#00c4cc] text-[#00c4cc]'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      書類配信
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDetailTab('tasks');
+                        loadStaffTasks(selectedStaff.user_id!);
+                      }}
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        detailTab === 'tasks'
+                          ? 'border-[#00c4cc] text-[#00c4cc]'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      タスク
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
@@ -2269,10 +2463,226 @@ const StaffManagementView: React.FC = () => {
                         </div>
                       </>
                     )}
+
+                    {/* 書類タブ */}
+                    {detailTab === 'documents' && (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <p className="text-xs text-gray-500">このスタッフに配信する書類を管理します（給与明細、源泉徴収票、雇用契約書など）</p>
+                          <button
+                            onClick={() => {
+                              setEditingDocument(null);
+                              setShowDocumentForm(true);
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                            書類を追加
+                          </button>
+                        </div>
+
+                        {loadingDocuments ? (
+                          <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+                          </div>
+                        ) : staffDocuments.length > 0 ? (
+                          <div className="space-y-2">
+                            {staffDocuments.map((doc) => {
+                              const typeLabels: Record<string, string> = {
+                                payslip: '給与明細',
+                                withholding_tax: '源泉徴収票',
+                                employment_contract: '雇用契約書',
+                                wage_notice: '賃金通知書',
+                                social_insurance: '社会保険関連',
+                                year_end_adjustment: '年末調整',
+                                other: 'その他',
+                              };
+                              const typeColors: Record<string, string> = {
+                                payslip: 'bg-blue-100 text-blue-700',
+                                withholding_tax: 'bg-green-100 text-green-700',
+                                employment_contract: 'bg-purple-100 text-purple-700',
+                                wage_notice: 'bg-yellow-100 text-yellow-700',
+                                social_insurance: 'bg-pink-100 text-pink-700',
+                                year_end_adjustment: 'bg-orange-100 text-orange-700',
+                                other: 'bg-gray-100 text-gray-700',
+                              };
+                              return (
+                                <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                  <div className="flex items-center gap-3">
+                                    <FileText className="w-8 h-8 text-gray-400" />
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${typeColors[doc.document_type] || typeColors.other}`}>
+                                          {typeLabels[doc.document_type] || doc.document_type}
+                                        </span>
+                                        {doc.target_year && (
+                                          <span className="text-xs text-gray-500">
+                                            {doc.target_year}年{doc.target_month ? `${doc.target_month}月` : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="font-bold text-gray-800 text-sm">{doc.title}</p>
+                                      {doc.file_name && (
+                                        <p className="text-xs text-gray-500">{doc.file_name}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={doc.file_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-2 text-gray-500 hover:text-[#00c4cc]"
+                                    >
+                                      <Download className="w-4 h-4" />
+                                    </a>
+                                    <button
+                                      onClick={() => {
+                                        setEditingDocument(doc);
+                                        setShowDocumentForm(true);
+                                      }}
+                                      className="p-2 text-gray-500 hover:text-[#00c4cc]"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteDocument(doc.id)}
+                                      className="p-2 text-gray-500 hover:text-red-500"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            書類はまだ登録されていません
+                          </div>
+                        )}
+
+                        {/* 書類登録フォームモーダル */}
+                        {showDocumentForm && (
+                          <StaffDocumentFormModal
+                            facilityId={facility?.id || ''}
+                            initialData={editingDocument}
+                            onSave={saveDocument}
+                            onClose={() => {
+                              setShowDocumentForm(false);
+                              setEditingDocument(null);
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* タスクタブ */}
+                    {detailTab === 'tasks' && (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <p className="text-xs text-gray-500">このスタッフに割り当てたタスクを管理します</p>
+                          <button
+                            onClick={() => {
+                              setEditingTask(null);
+                              setShowTaskForm(true);
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                            タスクを追加
+                          </button>
+                        </div>
+
+                        {loadingTasks ? (
+                          <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+                          </div>
+                        ) : staffTasks.length > 0 ? (
+                          <div className="space-y-2">
+                            {staffTasks.map((task) => {
+                              const priorityColors = {
+                                high: 'bg-red-100 text-red-700',
+                                medium: 'bg-yellow-100 text-yellow-700',
+                                low: 'bg-green-100 text-green-700',
+                              };
+                              const statusColors = {
+                                pending: 'bg-gray-100 text-gray-600',
+                                in_progress: 'bg-blue-100 text-blue-700',
+                                completed: 'bg-green-100 text-green-700',
+                              };
+                              const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed';
+
+                              return (
+                                <div key={task.id} className={`flex items-center justify-between p-4 rounded-lg ${task.status === 'completed' ? 'bg-gray-50 opacity-60' : isOverdue ? 'bg-red-50' : 'bg-gray-50'}`}>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${priorityColors[task.priority as keyof typeof priorityColors] || priorityColors.medium}`}>
+                                        {task.priority === 'high' ? '高' : task.priority === 'low' ? '低' : '中'}
+                                      </span>
+                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${statusColors[task.status as keyof typeof statusColors] || statusColors.pending}`}>
+                                        {task.status === 'completed' ? '完了' : task.status === 'in_progress' ? '進行中' : '未着手'}
+                                      </span>
+                                      {isOverdue && (
+                                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500 text-white">期限超過</span>
+                                      )}
+                                    </div>
+                                    <p className={`font-bold ${task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                                      {task.title}
+                                    </p>
+                                    {task.description && (
+                                      <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+                                    )}
+                                    {task.due_date && (
+                                      <p className={`text-xs mt-1 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
+                                        期限: {new Date(task.due_date).toLocaleDateString('ja-JP')}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 ml-4">
+                                    <button
+                                      onClick={() => {
+                                        setEditingTask(task);
+                                        setShowTaskForm(true);
+                                      }}
+                                      className="p-2 text-gray-500 hover:text-[#00c4cc]"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteTask(task.id)}
+                                      className="p-2 text-gray-500 hover:text-red-500"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            タスクはまだ割り当てられていません
+                          </div>
+                        )}
+
+                        {/* タスク登録フォームモーダル */}
+                        {showTaskForm && (
+                          <TaskFormModal
+                            initialData={editingTask}
+                            onSave={saveTask}
+                            onClose={() => {
+                              setShowTaskForm(false);
+                              setEditingTask(null);
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
-              
+
               {/* アクションボタン */}
               {selectedStaff.user_id && (
                 <div className="border-t border-gray-200 pt-4 mt-6">
@@ -4215,6 +4625,370 @@ const StaffManagementView: React.FC = () => {
     </div>
   );
 };
+
+// スタッフ書類登録フォームモーダル
+function StaffDocumentFormModal({
+  facilityId,
+  initialData,
+  onSave,
+  onClose,
+}: {
+  facilityId: string;
+  initialData: any;
+  onSave: (data: any) => void;
+  onClose: () => void;
+}) {
+  const currentDate = new Date();
+  const [formData, setFormData] = useState({
+    documentType: initialData?.document_type || 'payslip',
+    title: initialData?.title || '',
+    description: initialData?.description || '',
+    targetYear: initialData?.target_year || currentDate.getFullYear(),
+    targetMonth: initialData?.target_month || '',
+  });
+  const [uploadedFile, setUploadedFile] = useState<{ url: string; name: string } | null>(
+    initialData?.file_url ? { url: initialData.file_url, name: initialData.file_name || 'アップロード済み' } : null
+  );
+  const [saving, setSaving] = useState(false);
+
+  // FileUploaderをインポートしてないので、直接ファイル選択を実装
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const timestamp = Date.now();
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filePath = `staff-documents/${facilityId}/${timestamp}_${sanitizedName}`;
+
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      if (urlData?.publicUrl) {
+        setUploadedFile({ url: urlData.publicUrl, name: file.name });
+      }
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      alert('アップロードに失敗しました: ' + (err.message || ''));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadedFile) {
+      alert('ファイルをアップロードしてください');
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        ...formData,
+        fileUrl: uploadedFile.url,
+        fileName: uploadedFile.name,
+        fileType: uploadedFile.name.split('.').pop()?.toLowerCase() || 'pdf',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const documentTypes = [
+    { value: 'payslip', label: '給与明細' },
+    { value: 'withholding_tax', label: '源泉徴収票' },
+    { value: 'employment_contract', label: '雇用契約書' },
+    { value: 'wage_notice', label: '賃金通知書' },
+    { value: 'social_insurance', label: '社会保険関連書類' },
+    { value: 'year_end_adjustment', label: '年末調整書類' },
+    { value: 'other', label: 'その他' },
+  ];
+
+  // 月選択が必要なタイプ
+  const needsMonth = ['payslip'].includes(formData.documentType);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="font-bold text-lg text-gray-800">
+            {initialData ? '書類を編集' : '書類を追加'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">書類種別 *</label>
+            <select
+              value={formData.documentType}
+              onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              {documentTypes.map((type) => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">タイトル *</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              placeholder="例: 2026年1月分 給与明細"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">対象年</label>
+              <select
+                value={formData.targetYear}
+                onChange={(e) => setFormData({ ...formData, targetYear: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {[...Array(5)].map((_, i) => {
+                  const year = currentDate.getFullYear() - i + 1;
+                  return <option key={year} value={year}>{year}年</option>;
+                })}
+              </select>
+            </div>
+            {needsMonth && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">対象月</label>
+                <select
+                  value={formData.targetMonth}
+                  onChange={(e) => setFormData({ ...formData, targetMonth: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="">選択してください</option>
+                  {[...Array(12)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>{i + 1}月</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">ファイル *</label>
+            {uploadedFile ? (
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-6 h-6 text-gray-400" />
+                  <span className="text-sm text-gray-700">{uploadedFile.name}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUploadedFile(null)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-[#00c4cc] hover:bg-gray-50 transition-colors"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                {uploading ? (
+                  <div className="flex flex-col items-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc] mb-2" />
+                    <p className="text-sm text-gray-600">アップロード中...</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">クリックしてファイルを選択</p>
+                    <p className="text-xs text-gray-400 mt-1">PDF, Word, Excel (最大20MB)</p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">メモ</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+              placeholder="任意のメモ"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-sm"
+            >
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              disabled={saving || uploading || !uploadedFile}
+              className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg text-sm disabled:opacity-50"
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// タスク登録フォームモーダル
+function TaskFormModal({
+  initialData,
+  onSave,
+  onClose,
+}: {
+  initialData: any;
+  onSave: (data: any) => void;
+  onClose: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    title: initialData?.title || '',
+    description: initialData?.description || '',
+    priority: initialData?.priority || 'medium',
+    status: initialData?.status || 'pending',
+    dueDate: initialData?.due_date?.split('T')[0] || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title.trim()) {
+      alert('タイトルを入力してください');
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(formData);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="font-bold text-lg text-gray-800">
+            {initialData ? 'タスクを編集' : 'タスクを追加'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">タイトル *</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              placeholder="タスクのタイトル"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">詳細</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+              placeholder="タスクの詳細説明"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">優先度</label>
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="high">高</option>
+                <option value="medium">中</option>
+                <option value="low">低</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">期限</label>
+              <input
+                type="date"
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+          </div>
+
+          {initialData && (
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">ステータス</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="pending">未着手</option>
+                <option value="in_progress">進行中</option>
+                <option value="completed">完了</option>
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-sm"
+            >
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg text-sm disabled:opacity-50"
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default StaffManagementView;
 

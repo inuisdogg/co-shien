@@ -109,7 +109,7 @@ export default function FacilityRegisterPage() {
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (!userStr) {
-      router.push('/login');
+      router.push('/career/login');
       return;
     }
     setUser(JSON.parse(userStr));

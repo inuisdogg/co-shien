@@ -42,7 +42,7 @@ export default function PortalPage() {
         // localStorageからユーザー情報を取得
         const userStr = localStorage.getItem('user');
         if (!userStr) {
-          router.push('/login');
+          router.push('/career/login');
           return;
         }
 
@@ -109,7 +109,7 @@ export default function PortalPage() {
       window.location.href = `https://biz.co-shien.inu.co.jp/?facilityId=${facility.id}`;
     } else {
       // Personalモードへ（スタッフ向け）
-      router.push('/personal/dashboard');
+      router.push('/career');
     }
   };
 
@@ -117,7 +117,7 @@ export default function PortalPage() {
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('selectedFacility');
-    router.push('/login');
+    router.push('/career/login');
   };
 
   if (loading) {

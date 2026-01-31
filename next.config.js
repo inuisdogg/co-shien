@@ -5,15 +5,11 @@ const nextConfig = {
   images: {
     unoptimized: true, // Netlifyで画像最適化を無効化（publicフォルダの画像を直接使用）
   },
-  // ドメイン設定
-  // Biz側: biz.co-shien.inu.co.jp
-  // Personal側: my.co-shien.inu.co.jp
-  // 環境変数 NEXT_PUBLIC_APP_TYPE で 'biz' または 'personal' を指定
-  // NEXT_PUBLIC_BIZ_DOMAIN=biz.co-shien.inu.co.jp
-  // NEXT_PUBLIC_PERSONAL_DOMAIN=my.co-shien.inu.co.jp
-  
-  // 注意: middleware.tsでサブドメインルーティングを処理しているため、
-  // ここでのrewrite設定はフォールバックとしてのみ機能します
+  // URL構成（パスベース）
+  // ドメイン: co-shien.inu.co.jp
+  // - /client   : 利用者向け
+  // - /personal : スタッフ向け
+  // - /biz      : 施設管理向け
   async rewrites() {
     return [];
   },

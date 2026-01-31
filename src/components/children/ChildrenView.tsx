@@ -20,11 +20,11 @@ import {
   ChevronUp,
   Mail,
   BookOpen,
-  MessageSquare,
   CalendarDays,
-  ClipboardList,
   UserCheck,
   FileWarning,
+  Truck,
+  MapPin,
 } from 'lucide-react';
 import { Child, ChildFormData, ContractStatus, Lead, FacilityIntakeData } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -307,6 +307,50 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     } catch (error: any) {
       console.error('時間帯更新エラー:', error);
       alert('時間帯の更新に失敗しました: ' + error.message);
+    }
+  };
+
+  // 送迎設定を更新する関数
+  const handleUpdateTransport = async (
+    childId: string,
+    updates: {
+      needsPickup?: boolean;
+      needsDropoff?: boolean;
+      pickupLocation?: string;
+      pickupAddress?: string;
+      dropoffLocation?: string;
+      dropoffAddress?: string;
+    }
+  ) => {
+    if (!selectedChild) return;
+
+    try {
+      const dbUpdates: Record<string, unknown> = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (updates.needsPickup !== undefined) dbUpdates.needs_pickup = updates.needsPickup;
+      if (updates.needsDropoff !== undefined) dbUpdates.needs_dropoff = updates.needsDropoff;
+      if (updates.pickupLocation !== undefined) dbUpdates.pickup_location = updates.pickupLocation;
+      if (updates.pickupAddress !== undefined) dbUpdates.pickup_address = updates.pickupAddress;
+      if (updates.dropoffLocation !== undefined) dbUpdates.dropoff_location = updates.dropoffLocation;
+      if (updates.dropoffAddress !== undefined) dbUpdates.dropoff_address = updates.dropoffAddress;
+
+      const { error } = await supabase
+        .from('children')
+        .update(dbUpdates)
+        .eq('id', childId);
+
+      if (error) throw error;
+
+      // ローカルの状態も更新
+      setSelectedChild({
+        ...selectedChild,
+        ...updates,
+      });
+    } catch (error: any) {
+      console.error('送迎設定更新エラー:', error);
+      alert('送迎設定の更新に失敗しました: ' + error.message);
     }
   };
 
@@ -1748,16 +1792,6 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </button>
                       <button
                         onClick={() => {
-                          setActiveTab('chat');
-                          setIsDetailModalOpen(false);
-                        }}
-                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
-                      >
-                        <MessageSquare size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
-                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">チャット</span>
-                      </button>
-                      <button
-                        onClick={() => {
                           setActiveTab('schedule');
                           setIsDetailModalOpen(false);
                         }}
@@ -1765,16 +1799,6 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       >
                         <CalendarDays size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
                         <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">予約</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setActiveTab('support-plan');
-                          setIsDetailModalOpen(false);
-                        }}
-                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
-                      >
-                        <ClipboardList size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
-                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">支援計画</span>
                       </button>
                       <button
                         onClick={() => {
@@ -2095,35 +2119,100 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             })}
                           </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-bold text-gray-500">送迎</label>
-                          <div className="mt-2 space-y-2">
+                        {/* 送迎設定（編集可能） */}
+                        <div className="bg-gray-50 rounded-lg p-4 mt-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Truck size={16} className="text-[#00c4cc]" />
+                            <label className="text-xs font-bold text-gray-700">送迎設定</label>
+                          </div>
+
+                          {/* お迎え設定 */}
+                          <div className="mb-4">
+                            <div className="flex items-center gap-3 mb-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedChild.needsPickup || false}
+                                  onChange={(e) => handleUpdateTransport(selectedChild.id, { needsPickup: e.target.checked })}
+                                  className="accent-[#00c4cc] w-4 h-4"
+                                />
+                                <span className="text-sm font-bold text-gray-700">お迎えあり</span>
+                              </label>
+                            </div>
                             {selectedChild.needsPickup && (
-                              <div>
-                                <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
-                                  お迎え
-                                </span>
-                                <span className="text-sm text-gray-600">
-                                  {selectedChild.pickupLocation === 'その他'
-                                    ? selectedChild.pickupLocationCustom || '（未入力）'
-                                    : selectedChild.pickupLocation || '（未入力）'}
-                                </span>
+                              <div className="ml-6 space-y-2">
+                                <div>
+                                  <label className="text-xs text-gray-500 block mb-1">乗車地</label>
+                                  <select
+                                    value={selectedChild.pickupLocation || '自宅'}
+                                    onChange={(e) => handleUpdateTransport(selectedChild.id, { pickupLocation: e.target.value })}
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                  >
+                                    <option value="自宅">自宅</option>
+                                    <option value="事業所">事業所</option>
+                                    <option value="学校">学校</option>
+                                    <option value="その他">その他</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500 block mb-1">
+                                    <MapPin size={12} className="inline mr-1" />
+                                    住所（ルート計算用）
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={selectedChild.pickupAddress || ''}
+                                    onChange={(e) => handleUpdateTransport(selectedChild.id, { pickupAddress: e.target.value })}
+                                    placeholder="例: 東京都府中市○○町1-2-3"
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                  />
+                                </div>
                               </div>
                             )}
+                          </div>
+
+                          {/* お送り設定 */}
+                          <div>
+                            <div className="flex items-center gap-3 mb-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedChild.needsDropoff || false}
+                                  onChange={(e) => handleUpdateTransport(selectedChild.id, { needsDropoff: e.target.checked })}
+                                  className="accent-[#00c4cc] w-4 h-4"
+                                />
+                                <span className="text-sm font-bold text-gray-700">お送りあり</span>
+                              </label>
+                            </div>
                             {selectedChild.needsDropoff && (
-                              <div>
-                                <span className="text-xs bg-[#e0f7fa] text-[#006064] px-2 py-1 rounded font-bold mr-2">
-                                  お送り
-                                </span>
-                                <span className="text-sm text-gray-600">
-                                  {selectedChild.dropoffLocation === 'その他'
-                                    ? selectedChild.dropoffLocationCustom || '（未入力）'
-                                    : selectedChild.dropoffLocation || '（未入力）'}
-                                </span>
+                              <div className="ml-6 space-y-2">
+                                <div>
+                                  <label className="text-xs text-gray-500 block mb-1">降車地</label>
+                                  <select
+                                    value={selectedChild.dropoffLocation || '自宅'}
+                                    onChange={(e) => handleUpdateTransport(selectedChild.id, { dropoffLocation: e.target.value })}
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                  >
+                                    <option value="自宅">自宅</option>
+                                    <option value="事業所">事業所</option>
+                                    <option value="学校">学校</option>
+                                    <option value="その他">その他</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500 block mb-1">
+                                    <MapPin size={12} className="inline mr-1" />
+                                    住所（ルート計算用）
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={selectedChild.dropoffAddress || ''}
+                                    onChange={(e) => handleUpdateTransport(selectedChild.id, { dropoffAddress: e.target.value })}
+                                    placeholder="例: 東京都府中市○○町1-2-3"
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                  />
+                                </div>
                               </div>
-                            )}
-                            {!selectedChild.needsPickup && !selectedChild.needsDropoff && (
-                              <span className="text-sm text-gray-500">送迎なし</span>
                             )}
                           </div>
                         </div>

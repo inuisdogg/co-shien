@@ -1,0 +1,26 @@
+{
+  "name": "co-shien ベビーシッター",
+  "short_name": "ベビーシッター",
+  "description": "専門職と過ごす、安心のシッティング。PT・OT・STなどの発達支援の専門家がお子様をお預かりします。",
+  "start_url": "/babysitter",
+  "scope": "/babysitter",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#EC4899",
+  "icons": [
+    {
+      "src": "/babysitter/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/babysitter/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "lifestyle", "medical"],
+  "lang": "ja"
+}

@@ -186,7 +186,7 @@ export default function ClientInvitationView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ED8936]"></div>
       </div>
     );
   }
@@ -198,7 +198,7 @@ export default function ClientInvitationView() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <UserPlus className="w-6 h-6 text-orange-500" />
+              <UserPlus className="w-6 h-6 text-[#F6AD55]" />
               利用者招待
             </h2>
             <p className="text-sm text-gray-600 mt-1">
@@ -207,7 +207,7 @@ export default function ClientInvitationView() {
           </div>
           <button
             onClick={() => setIsInvitationModalOpen(true)}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-md transition-colors flex items-center gap-2"
+            className="bg-[#ED8936] hover:bg-[#D97706] text-white font-bold py-2 px-4 rounded-md transition-colors flex items-center gap-2"
           >
             <Mail className="w-5 h-5" />
             招待を作成
@@ -244,7 +244,7 @@ export default function ClientInvitationView() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#F6AD55]"
             >
               <option value="all">すべて</option>
               <option value="pending">承認待ち</option>
@@ -268,7 +268,7 @@ export default function ClientInvitationView() {
               return (
                 <div
                   key={invitation.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:border-orange-300 transition-colors"
+                  className="border border-gray-200 rounded-lg p-4 hover:border-[#F6AD55]/50 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -298,7 +298,7 @@ export default function ClientInvitationView() {
                       {canResend && (
                         <button
                           onClick={() => handleResendInvitation(invitation)}
-                          className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200 transition-colors flex items-center gap-1"
+                          className="text-xs px-2 py-1 bg-[#FDEBD0] text-[#D97706] rounded-full hover:bg-[#FBD38D] transition-colors flex items-center gap-1"
                         >
                           <RefreshCw className="w-3 h-3" />
                           再送信

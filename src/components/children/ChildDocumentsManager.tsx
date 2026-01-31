@@ -1,33 +1,34 @@
 /**
  * 児童書類管理コンポーネント
- * 契約書、アセスメントシートなどの必要書類を管理
+ * カテゴリ別にPDFをドラッグ&ドロップで登録・管理
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   FileText,
   Upload,
   CheckCircle,
-  Clock,
   AlertCircle,
-  AlertTriangle,
-  Eye,
+  Download,
   Trash2,
-  Plus,
   Calendar,
+  ClipboardList,
+  FileCheck,
+  FileSearch,
+  FileSignature,
+  File,
+  Save,
 } from 'lucide-react';
 import {
-  ChildDocument,
-  DocumentTemplate,
   DocumentType,
-  DocumentStatus,
   DOCUMENT_TYPE_LABELS,
-  DOCUMENT_STATUS_LABELS,
+  DOCUMENT_CATEGORIES,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Props = {
   childId: string;
@@ -36,12 +37,26 @@ type Props = {
   onClose: () => void;
 };
 
-const STATUS_ICONS: Record<DocumentStatus, typeof CheckCircle> = {
-  required: AlertCircle,
-  submitted: Clock,
-  approved: CheckCircle,
-  expired: AlertTriangle,
-  rejected: AlertTriangle,
+type ChildDocument = {
+  id: string;
+  documentType: DocumentType;
+  documentName: string;
+  fileName?: string;
+  filePath?: string;
+  fileSize?: number;
+  expiryDate?: string;
+  status: 'active' | 'expired';
+  uploadedAt: string;
+  notes?: string;
+};
+
+// カテゴリアイコンマッピング
+const CATEGORY_ICONS = {
+  ClipboardList,
+  FileCheck,
+  FileSearch,
+  FileSignature,
+  File,
 };
 
 export const ChildDocumentsManager: React.FC<Props> = ({
@@ -50,82 +65,48 @@ export const ChildDocumentsManager: React.FC<Props> = ({
   facilityId,
   onClose,
 }) => {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState<ChildDocument[]>([]);
-  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newDocument, setNewDocument] = useState<{
-    documentType: DocumentType;
-    documentName: string;
-    dueDate: string;
-  }>({
-    documentType: 'contract',
+  const [selectedCategory, setSelectedCategory] = useState(DOCUMENT_CATEGORIES[0].id);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // アップロードモーダル
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadForm, setUploadForm] = useState({
+    documentType: '' as DocumentType,
     documentName: '',
-    dueDate: '',
+    expiryDate: '',
+    notes: '',
   });
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, [childId, facilityId]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchData = async () => {
+  // データ取得
+  const fetchData = useCallback(async () => {
     try {
-      // 既存の書類を取得
       const { data: docs } = await supabase
         .from('child_documents')
         .select('*')
         .eq('facility_id', facilityId)
         .eq('child_id', childId)
-        .order('document_type', { ascending: true })
         .order('created_at', { ascending: false });
 
       if (docs) {
         setDocuments(
           docs.map((d) => ({
             id: d.id,
-            facilityId: d.facility_id,
-            childId: d.child_id,
             documentType: d.document_type as DocumentType,
             documentName: d.document_name,
-            description: d.description,
-            status: d.status as DocumentStatus,
-            filePath: d.file_path,
             fileName: d.file_name,
+            filePath: d.file_path,
             fileSize: d.file_size,
-            mimeType: d.mime_type,
-            dueDate: d.due_date,
             expiryDate: d.expiry_date,
-            submittedAt: d.submitted_at,
-            submittedBy: d.submitted_by,
-            reviewedAt: d.reviewed_at,
-            reviewedBy: d.reviewed_by,
-            rejectionReason: d.rejection_reason,
-            createdAt: d.created_at,
-            updatedAt: d.updated_at,
-            version: d.version,
-          }))
-        );
-      }
-
-      // テンプレートを取得
-      const { data: tpls } = await supabase
-        .from('document_templates')
-        .select('*')
-        .eq('facility_id', facilityId)
-        .order('document_type', { ascending: true });
-
-      if (tpls) {
-        setTemplates(
-          tpls.map((t) => ({
-            id: t.id,
-            facilityId: t.facility_id,
-            documentType: t.document_type as DocumentType,
-            documentName: t.document_name,
-            description: t.description,
-            isRequired: t.is_required,
-            defaultDueDays: t.default_due_days,
-            createdAt: t.created_at,
-            updatedAt: t.updated_at,
+            status: d.expiry_date && new Date(d.expiry_date) < new Date() ? 'expired' : 'active',
+            uploadedAt: d.created_at,
+            notes: d.description,
           }))
         );
       }
@@ -134,110 +115,167 @@ export const ChildDocumentsManager: React.FC<Props> = ({
     } finally {
       setLoading(false);
     }
+  }, [childId, facilityId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // 現在のカテゴリ情報
+  const currentCategory = DOCUMENT_CATEGORIES.find(c => c.id === selectedCategory)!;
+  const CategoryIcon = CATEGORY_ICONS[currentCategory.icon as keyof typeof CATEGORY_ICONS];
+
+  // カテゴリ内の書類
+  const categoryDocuments = documents.filter(d =>
+    currentCategory.types.includes(d.documentType)
+  );
+
+  // カテゴリごとの書類数
+  const getCategoryCount = (categoryId: string) => {
+    const cat = DOCUMENT_CATEGORIES.find(c => c.id === categoryId);
+    if (!cat) return 0;
+    return documents.filter(d => cat.types.includes(d.documentType)).length;
   };
 
-  // テンプレートから必要書類を自動生成
-  const initializeFromTemplates = async () => {
+  // ドラッグ&ドロップ
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    const pdfFile = droppedFiles.find(f => f.type === 'application/pdf');
+
+    if (pdfFile) {
+      openUploadModal(pdfFile);
+    } else {
+      alert('PDFファイルを選択してください');
+    }
+  };
+
+  // アップロードモーダル
+  const openUploadModal = (file: File) => {
+    setUploadFile(file);
+    setUploadForm({
+      documentType: currentCategory.types[0],
+      documentName: file.name.replace('.pdf', ''),
+      expiryDate: '',
+      notes: '',
+    });
+    setShowUploadModal(true);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      openUploadModal(file);
+    } else if (file) {
+      alert('PDFファイルを選択してください');
+    }
+    e.target.value = '';
+  };
+
+  // アップロード処理
+  const handleUpload = async () => {
+    if (!uploadFile || !uploadForm.documentType || !user?.id) return;
+
+    setSaving(true);
     try {
-      const today = new Date();
-      const newDocs = templates
-        .filter((t) => !documents.some((d) => d.documentType === t.documentType))
-        .map((t) => {
-          const dueDate = t.defaultDueDays
-            ? new Date(today.getTime() + t.defaultDueDays * 24 * 60 * 60 * 1000)
-                .toISOString()
-                .split('T')[0]
-            : null;
-          return {
-            id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            facility_id: facilityId,
-            child_id: childId,
-            document_type: t.documentType,
-            document_name: t.documentName,
-            description: t.description,
-            status: 'required' as const,
-            due_date: dueDate,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            version: 1,
-          };
+      // Supabase Storageにアップロード
+      const fileName = `${facilityId}/${childId}/${Date.now()}_${uploadFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('child-documents')
+        .upload(fileName, uploadFile);
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+      }
+
+      // メタデータをDBに保存
+      const { error: dbError } = await supabase
+        .from('child_documents')
+        .insert({
+          id: `doc-${Date.now()}`,
+          facility_id: facilityId,
+          child_id: childId,
+          document_type: uploadForm.documentType,
+          document_name: uploadForm.documentName || uploadFile.name,
+          file_name: uploadFile.name,
+          file_path: uploadError ? null : fileName,
+          file_size: uploadFile.size,
+          expiry_date: uploadForm.expiryDate || null,
+          description: uploadForm.notes || null,
+          status: 'approved',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          version: 1,
         });
 
-      if (newDocs.length > 0) {
-        await supabase.from('child_documents').insert(newDocs);
-        fetchData();
-      }
-    } catch (error) {
-      console.error('Error initializing documents:', error);
+      if (dbError) throw dbError;
+
+      await fetchData();
+      setShowUploadModal(false);
+      setUploadFile(null);
+    } catch (err) {
+      console.error('アップロードエラー:', err);
+      alert('アップロードに失敗しました');
+    } finally {
+      setSaving(false);
     }
   };
 
-  // 書類ステータスを更新
-  const updateStatus = async (docId: string, newStatus: DocumentStatus) => {
-    try {
-      const updateData: Record<string, unknown> = {
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (newStatus === 'submitted') {
-        updateData.submitted_at = new Date().toISOString();
-      } else if (newStatus === 'approved') {
-        updateData.reviewed_at = new Date().toISOString();
-      }
-
-      await supabase.from('child_documents').update(updateData).eq('id', docId);
-      fetchData();
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  };
-
-  // 書類を削除
-  const deleteDocument = async (docId: string) => {
-    if (!confirm('この書類を削除しますか？')) return;
-    try {
-      await supabase.from('child_documents').delete().eq('id', docId);
-      fetchData();
-    } catch (error) {
-      console.error('Error deleting document:', error);
-    }
-  };
-
-  // 新規書類を追加
-  const addDocument = async () => {
-    if (!newDocument.documentName) {
-      alert('書類名を入力してください');
+  // ダウンロード
+  const handleDownload = async (doc: ChildDocument) => {
+    if (!doc.filePath) {
+      alert('ファイルが見つかりません');
       return;
     }
+
     try {
-      await supabase.from('child_documents').insert({
-        id: `doc-${Date.now()}`,
-        facility_id: facilityId,
-        child_id: childId,
-        document_type: newDocument.documentType,
-        document_name: newDocument.documentName,
-        status: 'required',
-        due_date: newDocument.dueDate || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        version: 1,
-      });
-      setShowAddForm(false);
-      setNewDocument({ documentType: 'contract', documentName: '', dueDate: '' });
-      fetchData();
-    } catch (error) {
-      console.error('Error adding document:', error);
+      const { data, error } = await supabase.storage
+        .from('child-documents')
+        .download(doc.filePath);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName || 'document.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('ダウンロードエラー:', err);
+      alert('ダウンロードに失敗しました');
     }
   };
 
-  // 統計を計算
-  const stats = {
-    total: documents.length,
-    required: documents.filter((d) => d.status === 'required').length,
-    submitted: documents.filter((d) => d.status === 'submitted').length,
-    approved: documents.filter((d) => d.status === 'approved').length,
-    expired: documents.filter((d) => d.status === 'expired').length,
+  // 削除
+  const handleDelete = async (doc: ChildDocument) => {
+    if (!confirm(`「${doc.documentName}」を削除しますか？`)) return;
+
+    try {
+      if (doc.filePath) {
+        await supabase.storage.from('child-documents').remove([doc.filePath]);
+      }
+      await supabase.from('child_documents').delete().eq('id', doc.id);
+      await fetchData();
+    } catch (err) {
+      console.error('削除エラー:', err);
+      alert('削除に失敗しました');
+    }
   };
 
   if (loading) {
@@ -245,7 +283,6 @@ export const ChildDocumentsManager: React.FC<Props> = ({
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc] mx-auto"></div>
-          <p className="text-gray-600 mt-4">読み込み中...</p>
         </div>
       </div>
     );
@@ -253,260 +290,178 @@ export const ChildDocumentsManager: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* ヘッダー */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">必要書類管理</h2>
+            <h2 className="text-lg font-bold text-gray-800">書類管理</h2>
             <p className="text-sm text-gray-500">{childName}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600"
           >
             <X size={24} />
           </button>
         </div>
 
-        {/* 統計バー */}
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-gray-600">
-              全{stats.total}件
-            </span>
-            {stats.required > 0 && (
-              <span className="text-orange-600 font-medium">
-                未提出: {stats.required}
+        {/* コンテンツ */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* 左: カテゴリ */}
+          <div className="w-48 border-r border-gray-200 bg-gray-50 overflow-y-auto">
+            {DOCUMENT_CATEGORIES.map((cat) => {
+              const Icon = CATEGORY_ICONS[cat.icon as keyof typeof CATEGORY_ICONS];
+              const count = getCategoryCount(cat.id);
+              const isSelected = selectedCategory === cat.id;
+
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`w-full px-4 py-3 text-left flex items-center gap-2 transition-colors ${
+                    isSelected
+                      ? 'bg-white border-l-4 border-[#00c4cc] text-[#00c4cc]'
+                      : 'hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span className="text-sm font-medium flex-1">{cat.label}</span>
+                  {count > 0 && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      isSelected ? 'bg-[#00c4cc]/10' : 'bg-gray-200'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 右: ファイル一覧 */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {/* ドロップゾーン */}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors mb-4 ${
+                isDragging
+                  ? 'border-[#00c4cc] bg-[#00c4cc]/5'
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <Upload className={`w-8 h-8 mx-auto mb-2 ${
+                isDragging ? 'text-[#00c4cc]' : 'text-gray-400'
+              }`} />
+              <p className="text-gray-600 text-sm mb-2">
+                PDFをドラッグ&ドロップ
+              </p>
+              <input
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="text-sm bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-medium py-1.5 px-4 rounded-lg transition-colors"
+              >
+                ファイルを選択
+              </button>
+            </div>
+
+            {/* カテゴリタイトル */}
+            <div className="flex items-center gap-2 mb-3">
+              <CategoryIcon size={18} className="text-gray-500" />
+              <h3 className="text-sm font-bold text-gray-700">
+                {currentCategory.label}
+              </h3>
+              <span className="text-xs text-gray-400">
+                ({categoryDocuments.length}件)
               </span>
-            )}
-            {stats.submitted > 0 && (
-              <span className="text-blue-600 font-medium">
-                確認中: {stats.submitted}
-              </span>
-            )}
-            {stats.approved > 0 && (
-              <span className="text-green-600 font-medium">
-                承認済: {stats.approved}
-              </span>
-            )}
-            {stats.expired > 0 && (
-              <span className="text-red-600 font-medium">
-                期限切: {stats.expired}
-              </span>
+            </div>
+
+            {/* 書類タイプ別表示 */}
+            {currentCategory.types.map(docType => {
+              const typeDocs = categoryDocuments.filter(d => d.documentType === docType);
+              if (typeDocs.length === 0) return null;
+
+              return (
+                <div key={docType} className="mb-4">
+                  <div className="text-xs font-medium text-gray-500 mb-2 px-1">
+                    {DOCUMENT_TYPE_LABELS[docType]}
+                  </div>
+                  <div className="space-y-2">
+                    {typeDocs.map(doc => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <FileText className="w-5 h-5 text-red-500 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-800 truncate">
+                                {doc.documentName}
+                              </span>
+                              {doc.status === 'expired' && (
+                                <span className="flex items-center gap-1 text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
+                                  <AlertCircle className="w-3 h-3" />
+                                  期限切れ
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {doc.expiryDate && (
+                                <span className="inline-flex items-center gap-1 mr-3">
+                                  <Calendar className="w-3 h-3" />
+                                  有効期限: {doc.expiryDate}
+                                </span>
+                              )}
+                              {doc.fileName && (
+                                <span className="text-gray-400">{doc.fileName}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {doc.filePath && (
+                            <button
+                              onClick={() => handleDownload(doc)}
+                              className="p-2 text-gray-500 hover:text-[#00c4cc] hover:bg-white rounded-lg transition-colors"
+                              title="ダウンロード"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(doc)}
+                            className="p-2 text-gray-500 hover:text-red-500 hover:bg-white rounded-lg transition-colors"
+                            title="削除"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {categoryDocuments.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">このカテゴリには書類がありません</p>
+              </div>
             )}
           </div>
-        </div>
-
-        {/* コンテンツ */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {documents.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 mb-4">登録された書類がありません</p>
-              {templates.length > 0 && (
-                <button
-                  onClick={initializeFromTemplates}
-                  className="px-4 py-2 bg-[#00c4cc] text-white rounded-md hover:bg-[#00b0b8] transition-colors"
-                >
-                  テンプレートから必要書類を登録
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {documents.map((doc) => {
-                const StatusIcon = STATUS_ICONS[doc.status];
-                const statusInfo = DOCUMENT_STATUS_LABELS[doc.status];
-                const isOverdue =
-                  doc.status === 'required' &&
-                  doc.dueDate &&
-                  new Date(doc.dueDate) < new Date();
-
-                return (
-                  <div
-                    key={doc.id}
-                    className={`p-4 rounded-lg border ${
-                      isOverdue
-                        ? 'border-red-300 bg-red-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`p-2 rounded-lg ${
-                            doc.status === 'approved'
-                              ? 'bg-green-100'
-                              : doc.status === 'required'
-                              ? 'bg-orange-100'
-                              : 'bg-gray-100'
-                          }`}
-                        >
-                          <FileText
-                            size={20}
-                            className={
-                              doc.status === 'approved'
-                                ? 'text-green-600'
-                                : doc.status === 'required'
-                                ? 'text-orange-600'
-                                : 'text-gray-600'
-                            }
-                          />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-gray-800">
-                              {doc.documentName}
-                            </h4>
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${statusInfo.color}`}
-                            >
-                              <StatusIcon size={12} />
-                              {statusInfo.label}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {DOCUMENT_TYPE_LABELS[doc.documentType]}
-                            {doc.description && ` - ${doc.description}`}
-                          </p>
-                          {doc.dueDate && (
-                            <p
-                              className={`text-xs mt-1 flex items-center gap-1 ${
-                                isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'
-                              }`}
-                            >
-                              <Calendar size={12} />
-                              提出期限: {doc.dueDate}
-                              {isOverdue && ' （期限超過）'}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {doc.status === 'required' && (
-                          <button
-                            onClick={() => updateStatus(doc.id, 'submitted')}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="提出済みにする"
-                          >
-                            <Upload size={16} />
-                          </button>
-                        )}
-                        {doc.status === 'submitted' && (
-                          <button
-                            onClick={() => updateStatus(doc.id, 'approved')}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="承認する"
-                          >
-                            <CheckCircle size={16} />
-                          </button>
-                        )}
-                        {doc.filePath && (
-                          <button
-                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="ファイルを表示"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => deleteDocument(doc.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="削除"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 新規追加フォーム */}
-          {showAddForm && (
-            <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-              <h4 className="font-bold text-sm text-gray-700 mb-3">新規書類追加</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select
-                  value={newDocument.documentType}
-                  onChange={(e) =>
-                    setNewDocument({
-                      ...newDocument,
-                      documentType: e.target.value as DocumentType,
-                    })
-                  }
-                  className="border border-gray-300 rounded-md p-2 text-sm"
-                >
-                  {Object.entries(DOCUMENT_TYPE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={newDocument.documentName}
-                  onChange={(e) =>
-                    setNewDocument({ ...newDocument, documentName: e.target.value })
-                  }
-                  placeholder="書類名"
-                  className="border border-gray-300 rounded-md p-2 text-sm"
-                />
-                <input
-                  type="date"
-                  value={newDocument.dueDate}
-                  onChange={(e) =>
-                    setNewDocument({ ...newDocument, dueDate: e.target.value })
-                  }
-                  className="border border-gray-300 rounded-md p-2 text-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-2 mt-3">
-                <button
-                  onClick={() => setShowAddForm(false)}
-                  className="px-3 py-1.5 text-gray-600 hover:text-gray-800 text-sm"
-                >
-                  キャンセル
-                </button>
-                <button
-                  onClick={addDocument}
-                  className="px-3 py-1.5 bg-[#00c4cc] text-white rounded-md hover:bg-[#00b0b8] text-sm"
-                >
-                  追加
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* フッター */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex gap-2">
-            {!showAddForm && (
-              <>
-                <button
-                  onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-1 px-3 py-2 text-gray-700 hover:bg-gray-200 rounded-md transition-colors text-sm"
-                >
-                  <Plus size={16} />
-                  書類を追加
-                </button>
-                {templates.length > 0 &&
-                  documents.length > 0 &&
-                  documents.length < templates.length && (
-                    <button
-                      onClick={initializeFromTemplates}
-                      className="flex items-center gap-1 px-3 py-2 text-gray-700 hover:bg-gray-200 rounded-md transition-colors text-sm"
-                    >
-                      <FileText size={16} />
-                      不足書類を追加
-                    </button>
-                  )}
-              </>
-            )}
-          </div>
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
@@ -515,6 +470,112 @@ export const ChildDocumentsManager: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {/* アップロードモーダル */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-800">書類の登録</h2>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* ファイル情報 */}
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <FileText className="w-8 h-8 text-red-500" />
+                <div>
+                  <p className="font-medium text-gray-800">{uploadFile?.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {uploadFile && (uploadFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+              </div>
+
+              {/* 書類タイプ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  書類タイプ <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={uploadForm.documentType}
+                  onChange={(e) => setUploadForm({ ...uploadForm, documentType: e.target.value as DocumentType })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  {currentCategory.types.map(type => (
+                    <option key={type} value={type}>
+                      {DOCUMENT_TYPE_LABELS[type]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 書類名 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  書類名
+                </label>
+                <input
+                  type="text"
+                  value={uploadForm.documentName}
+                  onChange={(e) => setUploadForm({ ...uploadForm, documentName: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  placeholder="例: 2024年度 受給者証"
+                />
+              </div>
+
+              {/* 有効期限 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  有効期限
+                </label>
+                <input
+                  type="date"
+                  value={uploadForm.expiryDate}
+                  onChange={(e) => setUploadForm({ ...uploadForm, expiryDate: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+                <p className="text-xs text-gray-400 mt-1">受給者証など期限がある書類の場合に設定</p>
+              </div>
+
+              {/* 備考 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  備考
+                </label>
+                <textarea
+                  value={uploadForm.notes}
+                  onChange={(e) => setUploadForm({ ...uploadForm, notes: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 min-h-[60px]"
+                  placeholder="メモがあれば入力"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleUpload}
+                disabled={saving || !uploadForm.documentType}
+                className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {saving ? '登録中...' : '登録する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

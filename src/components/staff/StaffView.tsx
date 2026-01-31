@@ -4,10 +4,10 @@
 
 'use client';
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
-import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw, Mail, Send } from 'lucide-react';
-import { Staff, ScheduleItem, UserPermissions, StaffInvitation } from '@/types';
+import { CalendarCheck, Users, AlertCircle, Plus, Trash2, X, Upload, XCircle, Settings, RotateCw, Mail, Send, ChevronLeft, ChevronRight, ArrowLeft, Calendar, Save, Printer, Unlock, Truck } from 'lucide-react';
+import { Staff, ScheduleItem, UserPermissions, StaffInvitation, DailyTransportAssignment } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import { hashPassword } from '@/utils/password';
@@ -15,11 +15,23 @@ import { supabase } from '@/lib/supabase';
 import { inviteStaff } from '@/utils/staffInvitationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getInvitationBaseUrl } from '@/utils/domain';
+import { useAdditionComplianceCheck } from '@/hooks/useAdditionComplianceCheck';
+import AdditionComplianceBanner from '@/components/staff/AdditionComplianceBanner';
 
 const StaffView: React.FC = () => {
   const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings, saveShifts, fetchShifts } = useFacilityData();
   const { facility } = useAuth();
-  const [subTab] = useState<'shift' | 'list'>('shift');
+  const [subTab, setSubTab] = useState<'shift' | 'list'>('shift');
+
+  // 加算コンプライアンスチェックフック
+  const {
+    complianceResults,
+    categoryGroups,
+    summary: complianceSummary,
+    loading: complianceLoading,
+    checkComplianceForMonth,
+    refreshSettings: refreshAdditionSettings,
+  } = useAdditionComplianceCheck();
   
   // スタッフを並び順でソート（マネージャー→常勤→非常勤）
   const sortedStaff = useMemo(() => {
@@ -70,8 +82,15 @@ const StaffView: React.FC = () => {
   const [inviteToken, setInviteToken] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [shifts, setShifts] = useState<Record<string, Record<string, boolean>>>({}); // {staffId: {date: boolean}}
+  const [viewMode, setViewMode] = useState<'monthly' | 'weekly'>('monthly'); // 月間 or 週間ビュー
+  const [monthlyScheduleStatus, setMonthlyScheduleStatus] = useState<'draft' | 'published' | 'confirmed'>('draft');
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isShiftPatternModalOpen, setIsShiftPatternModalOpen] = useState(false);
+  const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [shiftPatterns, setShiftPatterns] = useState<Record<string, boolean[]>>({}); // {staffId: [月, 火, 水, 木, 金, 土]}
+
+  // 送迎担当者割り当て {date: {driverId, attendantId}}
+  const [transportAssignments, setTransportAssignments] = useState<Record<string, { driverId: string; attendantId: string }>>({});
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -120,11 +139,219 @@ const StaffView: React.FC = () => {
     return dates;
   }, [currentDate]);
 
+  // 月間カレンダー用：現在表示中の年月
+  const [displayYear, setDisplayYear] = useState(new Date().getFullYear());
+  const [displayMonth, setDisplayMonth] = useState(new Date().getMonth() + 1);
+
+  // 月間カレンダーのデータを生成（日曜始まり、利用調整と同じ形式）
+  const monthCalendarData = useMemo(() => {
+    const formatDate = (date: Date): string => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    const firstDay = new Date(displayYear, displayMonth - 1, 1);
+    const lastDay = new Date(displayYear, displayMonth, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay(); // 日曜=0
+
+    const dates: Array<{ date: string; day: number; isCurrentMonth: boolean }> = [];
+
+    // 前月の末尾日を追加（日曜始まり）
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const date = new Date(displayYear, displayMonth - 1, -i);
+      dates.push({
+        date: formatDate(date),
+        day: date.getDate(),
+        isCurrentMonth: false,
+      });
+    }
+
+    // 当月の日を追加
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(displayYear, displayMonth - 1, day);
+      dates.push({
+        date: formatDate(date),
+        day,
+        isCurrentMonth: true,
+      });
+    }
+
+    // 次月の初めの日を追加（6週間分 = 42日）
+    const remainingDays = 42 - dates.length;
+    for (let day = 1; day <= remainingDays; day++) {
+      const date = new Date(displayYear, displayMonth, day);
+      dates.push({
+        date: formatDate(date),
+        day,
+        isCurrentMonth: false,
+      });
+    }
+
+    return dates;
+  }, [displayYear, displayMonth]);
+
+  // 月を変更
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(displayYear, displayMonth - 1 + offset, 1);
+    setDisplayYear(newDate.getFullYear());
+    setDisplayMonth(newDate.getMonth() + 1);
+  };
+
+  // 日付をクリックして週間ビューに切り替え
+  const selectDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    setCurrentDate(date);
+    setViewMode('weekly');
+  };
+
   // 週を変更
   const changeWeek = (offset: number) => {
     const newDate = new Date(weekDates[0].date);
     newDate.setDate(newDate.getDate() + offset * 7);
     setCurrentDate(newDate);
+  };
+
+  // 確定済み月のリスト（アーカイブ用）
+  const [confirmedMonths, setConfirmedMonths] = useState<Array<{ year: number; month: number }>>([]);
+
+  // ローカルストレージのキーを生成
+  const getStatusKey = (facilityId: string, year: number, month: number) =>
+    `shift_status_${facilityId}_${year}_${month}`;
+
+  // 月間スケジュールのステータスを取得（ローカルストレージから）
+  React.useEffect(() => {
+    if (!facility?.id) return;
+
+    // 現在の月のステータスを取得
+    const statusKey = getStatusKey(facility.id, displayYear, displayMonth);
+    const savedStatus = localStorage.getItem(statusKey);
+    setMonthlyScheduleStatus((savedStatus as 'draft' | 'confirmed') || 'draft');
+
+    // 確定済み月のリストを取得
+    const archiveKey = `shift_archive_${facility.id}`;
+    const savedArchive = localStorage.getItem(archiveKey);
+    if (savedArchive) {
+      try {
+        setConfirmedMonths(JSON.parse(savedArchive));
+      } catch {
+        setConfirmedMonths([]);
+      }
+    }
+  }, [facility?.id, displayYear, displayMonth]);
+
+  // シフトを下書き保存
+  const handleSaveDraft = async () => {
+    if (!facility?.id) return;
+
+    setIsPublishing(true);
+    try {
+      await saveShifts(shifts);
+      alert('シフトを下書き保存しました');
+    } catch (error) {
+      console.error('シフト保存エラー:', error);
+      alert('シフトの保存に失敗しました');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  // シフトを決定する（確定状態で保存）
+  const handleConfirmShifts = async () => {
+    if (!facility?.id) return;
+
+    setIsPublishing(true);
+    try {
+      // シフトを保存
+      await saveShifts(shifts);
+
+      // ステータスをローカルストレージに保存
+      const statusKey = getStatusKey(facility.id, displayYear, displayMonth);
+      localStorage.setItem(statusKey, 'confirmed');
+
+      // アーカイブリストに追加
+      const archiveKey = `shift_archive_${facility.id}`;
+      const currentArchive = [...confirmedMonths];
+      const exists = currentArchive.some(m => m.year === displayYear && m.month === displayMonth);
+      if (!exists) {
+        currentArchive.push({ year: displayYear, month: displayMonth });
+        currentArchive.sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return b.month - a.month;
+        });
+        localStorage.setItem(archiveKey, JSON.stringify(currentArchive));
+        setConfirmedMonths(currentArchive);
+      }
+
+      setMonthlyScheduleStatus('confirmed');
+      alert(`${displayYear}年${displayMonth}月のシフトを確定しました`);
+    } catch (error) {
+      console.error('シフト確定エラー:', error);
+      alert('シフトの確定に失敗しました');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  // シフトの確定を解除する
+  const handleUnlockShifts = () => {
+    if (!facility?.id) return;
+
+    if (!confirm(`${displayYear}年${displayMonth}月のシフト確定を解除しますか？\n解除すると編集可能な状態に戻ります。`)) {
+      return;
+    }
+
+    // ステータスをローカルストレージから削除（draftに戻す）
+    const statusKey = getStatusKey(facility.id, displayYear, displayMonth);
+    localStorage.removeItem(statusKey);
+
+    setMonthlyScheduleStatus('draft');
+    alert(`${displayYear}年${displayMonth}月のシフト確定を解除しました`);
+  };
+
+  // シフト表印刷プレビューを開く
+  const handlePrintShifts = () => {
+    setIsPrintPreviewOpen(true);
+  };
+
+  // 実際に印刷を実行
+  const executePrint = () => {
+    const printArea = document.getElementById('shift-print-area');
+    if (!printArea) return;
+
+    const printContent = printArea.innerHTML;
+    const printWindow = window.open('', '', 'width=1200,height=800');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${displayYear}年${displayMonth}月 シフト表</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+            body {
+              font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+              margin: 0; padding: 15px;
+            }
+          </style>
+        </head>
+        <body>${printContent}</body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    }
   };
 
   // 各日の利用児童数を計算
@@ -720,29 +947,95 @@ const StaffView: React.FC = () => {
     }
   };
 
-  // シフトデータを取得（初回のみ、または週が変更されたときのみ）
-  const currentWeekRangeRef = useRef<string>('');
-  
+  // シフトデータを取得（月が変更されたとき）
+  const currentMonthRangeRef = useRef<string>('');
+
   React.useEffect(() => {
     const loadShifts = async () => {
-      if (weekDates.length > 0) {
-        const startDate = weekDates[0].date;
-        const endDate = weekDates[weekDates.length - 1].date;
-        const weekRange = `${startDate}_${endDate}`;
-        
-        // 週が変更された場合のみ取得（refで比較して無限ループを防ぐ）
-        if (weekRange !== currentWeekRangeRef.current) {
-          console.log('🕐 シフトデータを取得中...', startDate, '～', endDate);
-          const fetchedShifts = await fetchShifts(startDate, endDate);
-          console.log('✅ シフトデータ取得成功:', Object.keys(fetchedShifts).length, '名分');
-          setShifts(fetchedShifts);
-          currentWeekRangeRef.current = weekRange;
+      // 月間表示用の日付範囲を計算
+      const firstDay = new Date(displayYear, displayMonth - 1, 1);
+      const lastDay = new Date(displayYear, displayMonth, 0);
+
+      // 前月の末日も含めるため、少し広めの範囲を取得
+      const startDate = new Date(firstDay);
+      startDate.setDate(startDate.getDate() - 7); // 前週分も取得
+      const endDate = new Date(lastDay);
+      endDate.setDate(endDate.getDate() + 7); // 翌週分も取得
+
+      const formatDate = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      const startStr = formatDate(startDate);
+      const endStr = formatDate(endDate);
+      const monthRange = `${displayYear}-${displayMonth}`;
+
+      // 月が変更された場合のみ取得
+      if (monthRange !== currentMonthRangeRef.current) {
+        console.log('🕐 シフトデータを取得中...', startStr, '～', endStr);
+        const fetchedShifts = await fetchShifts(startStr, endStr);
+        console.log('✅ シフトデータ取得成功:', Object.keys(fetchedShifts).length, '名分');
+        setShifts(fetchedShifts);
+        currentMonthRangeRef.current = monthRange;
+
+        // 送迎担当者データも取得
+        if (facility?.id) {
+          const { data: transportData } = await supabase
+            .from('daily_transport_assignments')
+            .select('*')
+            .eq('facility_id', facility.id)
+            .gte('date', startStr)
+            .lte('date', endStr);
+
+          if (transportData) {
+            const assignments: Record<string, { driverId: string; attendantId: string }> = {};
+            transportData.forEach((row: any) => {
+              assignments[row.date] = {
+                driverId: row.driver_staff_id,
+                attendantId: row.attendant_staff_id,
+              };
+            });
+            setTransportAssignments(assignments);
+          }
         }
       }
     };
     loadShifts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekDates.length > 0 ? `${weekDates[0].date}_${weekDates[weekDates.length - 1].date}` : '']);
+  }, [displayYear, displayMonth, fetchShifts, facility?.id]);
+
+  // シフトが変更されたら加算コンプライアンスをチェック
+  useEffect(() => {
+    if (Object.keys(shifts).length > 0 && staff.length > 0) {
+      checkComplianceForMonth(shifts, staff, displayYear, displayMonth);
+    }
+  }, [shifts, staff, displayYear, displayMonth, checkComplianceForMonth]);
+
+  // 送迎担当者を保存
+  const saveTransportAssignment = async (date: string, driverId: string, attendantId: string) => {
+    if (!facility?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from('daily_transport_assignments')
+        .upsert({
+          facility_id: facility.id,
+          date,
+          driver_staff_id: driverId,
+          attendant_staff_id: attendantId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'facility_id,date' });
+
+      if (error) throw error;
+
+      setTransportAssignments(prev => ({
+        ...prev,
+        [date]: { driverId, attendantId },
+      }));
+    } catch (error) {
+      console.error('送迎担当者の保存に失敗:', error);
+      alert('送迎担当者の保存に失敗しました');
+    }
+  };
 
 
   return (
@@ -756,66 +1049,307 @@ const StaffView: React.FC = () => {
         </div>
       </div>
 
-      {subTab === 'shift' ? (
+      {subTab === 'shift' && (
         /* Shift Management Tab */
         <div className="space-y-6">
-          {/* シフト設定カレンダー */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            {/* Info Bar: Child Count Check */}
-            <div className="bg-[#e0f7fa] p-2 sm:p-3 border-b border-[#b2ebf2] flex items-center space-x-2 text-xs sm:text-sm text-[#006064]">
-              <AlertCircle size={14} className="sm:w-[18px] sm:h-[18px] shrink-0" />
-              <span className="leading-tight">
-                各日の「利用児童数」を確認しながらシフトを配置してください。児童10名につき2名の配置が必要です。
-              </span>
-            </div>
+          {/* 加算コンプライアンスバナー */}
+          <AdditionComplianceBanner
+            complianceResults={complianceResults}
+            categoryGroups={categoryGroups}
+            summary={complianceSummary}
+            loading={complianceLoading}
+            onSettingsClick={() => {
+              // 加算設定画面への導線（設定タブへ移動など）
+              refreshAdditionSettings();
+            }}
+          />
 
-            {/* 週選択コントロール */}
-            <div className="p-3 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-50">
-              <div className="flex items-center space-x-2 sm:space-x-4">
-                <button
-                  onClick={() => changeWeek(-1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-200 rounded transition-colors text-sm"
-                >
-                  ←
-                </button>
-                <h3 className="font-bold text-sm sm:text-base text-gray-800">
-                  {weekDates[0].date.split('-')[1]}月 {weekDates[0].date.split('-')[2]}日 ～{' '}
-                  {weekDates[5].date.split('-')[1]}月 {weekDates[5].date.split('-')[2]}日
-                </h3>
-                <button
-                  onClick={() => changeWeek(1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-200 rounded transition-colors text-sm"
-                >
-                  →
-                </button>
+          {viewMode === 'monthly' ? (
+            // 月間カレンダービュー（利用調整カレンダーと同じデザイン）
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+              {/* 月選択ヘッダー */}
+              <div className="p-3 border-b border-gray-200 bg-gray-50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    <button
+                      onClick={() => changeMonth(-1)}
+                      className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+                    >
+                      ←
+                    </button>
+                    <h3 className="font-bold text-sm sm:text-lg text-gray-800">
+                      {displayYear}年{displayMonth}月
+                    </h3>
+                    <button
+                      onClick={() => changeMonth(1)}
+                      className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+                    >
+                      →
+                    </button>
+                    {/* アーカイブドロップダウン */}
+                    {confirmedMonths.length > 0 && (
+                      <select
+                        onChange={(e) => {
+                          const [year, month] = e.target.value.split('-').map(Number);
+                          if (year && month) {
+                            setCurrentDate(new Date(year, month - 1, 1));
+                          }
+                        }}
+                        value=""
+                        className="ml-2 px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded bg-white text-gray-700"
+                      >
+                        <option value="">過去のシフト表</option>
+                        {confirmedMonths.map((m) => (
+                          <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`}>
+                            {m.year}年{m.month}月（確定版）
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* ステータス表示 */}
+                    <span className={`px-2 py-1 text-xs font-bold rounded ${
+                      monthlyScheduleStatus === 'confirmed'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {monthlyScheduleStatus === 'confirmed' ? '確定済み' : '作成中'}
+                    </span>
+                    <button
+                      onClick={handleOpenShiftPatternModal}
+                      className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center gap-1"
+                    >
+                      <Settings size={14} />
+                      <span>基本パターン</span>
+                    </button>
+                    {/* シフト印刷 */}
+                    <button
+                      onClick={handlePrintShifts}
+                      className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center gap-1"
+                    >
+                      <Printer size={14} />
+                      <span>印刷</span>
+                    </button>
+                    {monthlyScheduleStatus === 'confirmed' ? (
+                      /* 確定済みの場合：確定解除ボタンを表示 */
+                      <button
+                        onClick={handleUnlockShifts}
+                        className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center gap-1"
+                      >
+                        <Unlock size={14} />
+                        <span>確定解除</span>
+                      </button>
+                    ) : (
+                      /* 作成中の場合：下書き保存と月次確定ボタンを表示 */
+                      <>
+                        <button
+                          onClick={handleSaveDraft}
+                          disabled={isPublishing}
+                          className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Save size={14} />
+                          <span>{isPublishing ? '保存中...' : '下書き保存'}</span>
+                        </button>
+                        <button
+                          onClick={handleConfirmShifts}
+                          disabled={isPublishing}
+                          className="px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <CalendarCheck size={14} />
+                          <span>{isPublishing ? '保存中...' : '月次確定'}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center space-x-2 w-full sm:w-auto">
-                <button
-                  onClick={handleOpenShiftPatternModal}
-                  className="flex-1 sm:flex-none px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
-                >
-                  <Settings size={14} className="mr-1 sm:mr-2 shrink-0" />
-                  <span className="hidden sm:inline">基本シフトパターン設定</span>
-                  <span className="sm:hidden">パターン設定</span>
-                </button>
-                <button
-                  onClick={handleApplyShiftPatterns}
-                  className="flex-1 sm:flex-none px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
-                >
-                  <RotateCw size={14} className="mr-1 sm:mr-2 shrink-0" />
-                  <span className="hidden sm:inline">パターン一括反映</span>
-                  <span className="sm:hidden">一括反映</span>
-                </button>
-                <button
-                  onClick={handleSaveShifts}
-                  className="flex-1 sm:flex-none px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
-                >
-                  <CalendarCheck size={14} className="mr-1 sm:mr-2 shrink-0" />
-                  <span className="hidden sm:inline">シフトを保存</span>
-                  <span className="sm:hidden">保存</span>
-                </button>
+
+              {/* 説明文 */}
+              <div className={`p-2 sm:p-3 border-b flex items-center gap-2 text-xs sm:text-sm ${
+                monthlyScheduleStatus === 'confirmed'
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-[#e0f7fa] border-[#b2ebf2] text-[#006064]'
+              }`}>
+                <AlertCircle size={14} className="shrink-0" />
+                <span>
+                  {monthlyScheduleStatus === 'confirmed'
+                    ? '確定済みです。編集するには「確定解除」をクリックしてください'
+                    : '日付をクリックしてシフトを編集し、完了したら「月次確定」で確定してください'}
+                </span>
+              </div>
+
+              {/* カレンダー本体 */}
+              <div className="p-4">
+                {/* 曜日ヘッダー（日曜始まり） */}
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {['日', '月', '火', '水', '木', '金', '土'].map((day, i) => (
+                    <div
+                      key={i}
+                      className={`p-1 text-center text-xs font-bold ${
+                        i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-600'
+                      }`}
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* カレンダーグリッド */}
+                <div className="grid grid-cols-7 gap-1">
+                  {monthCalendarData.map((dateInfo, index) => {
+                    const holidayDay = isHoliday(dateInfo.date);
+                    const staffForDay = sortedStaff.filter(s => shifts[s.id]?.[dateInfo.date]);
+                    const childCount = getChildCountByDate(dateInfo.date);
+                    const today = new Date();
+                    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    const isToday = dateInfo.date === todayStr;
+
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => !holidayDay && selectDate(dateInfo.date)}
+                        className={`min-h-[85px] sm:min-h-[100px] border rounded-lg p-1.5 transition-colors ${
+                          holidayDay
+                            ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
+                            : !dateInfo.isCurrentMonth
+                            ? 'bg-gray-50 opacity-50 border-gray-200 cursor-pointer hover:bg-gray-100'
+                            : monthlyScheduleStatus === 'confirmed'
+                            ? 'bg-green-50/50 border-green-200 cursor-pointer hover:bg-green-50'
+                            : 'bg-white border-gray-200 cursor-pointer hover:bg-gray-50'
+                        } ${isToday ? 'ring-2 ring-[#00c4cc]' : ''}`}
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <div
+                            className={`text-sm font-bold leading-tight ${
+                              !dateInfo.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'
+                            }`}
+                          >
+                            {dateInfo.day}
+                          </div>
+                          {holidayDay && dateInfo.isCurrentMonth && (
+                            <span className="text-[10px] bg-red-200 text-red-700 px-1.5 py-0.5 rounded font-bold leading-tight">
+                              休業
+                            </span>
+                          )}
+                        </div>
+                        {!holidayDay && dateInfo.isCurrentMonth && (
+                          <div className="flex flex-col gap-0.5">
+                            {/* 勤務スタッフ表示 */}
+                            {staffForDay.length > 0 ? (
+                              <div className="bg-[#e0f7fa] rounded px-1.5 py-1">
+                                <div className="space-y-0.5">
+                                  {staffForDay.slice(0, 4).map(s => (
+                                    <div key={s.id} className="text-[9px] text-[#006064] truncate leading-tight">
+                                      {s.name}
+                                    </div>
+                                  ))}
+                                  {staffForDay.length > 4 && (
+                                    <div className="text-[9px] text-[#006064]/60 leading-tight">
+                                      他{staffForDay.length - 4}名
+                                    </div>
+                                  )}
+                                </div>
+                                {/* 人数表示（控えめ） */}
+                                <div className="text-[8px] text-[#006064]/50 text-right mt-0.5">
+                                  {staffForDay.length}名配置
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-100 rounded px-1.5 py-1">
+                                <span className="text-[10px] text-gray-400">未設定</span>
+                              </div>
+                            )}
+                            {/* 利用児童数 */}
+                            {childCount > 0 && (
+                              <div className="text-[9px] text-gray-500 mt-0.5">
+                                児童: {childCount}名
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
+          ) : (
+            // 週間シフト編集ビュー
+            <>
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+              {/* 戻るボタン + 週選択コントロール */}
+              <div className="p-3 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-50">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setViewMode('monthly')}
+                    className="flex items-center gap-1 px-3 py-1.5 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors text-sm font-bold"
+                  >
+                    <ArrowLeft size={16} />
+                    月カレンダー
+                  </button>
+                  <div className="flex items-center space-x-2 sm:space-x-4">
+                    <button
+                      onClick={() => changeWeek(-1)}
+                      className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <h3 className="font-bold text-sm sm:text-base text-gray-800">
+                      {weekDates[0].date.split('-')[1]}月 {weekDates[0].date.split('-')[2]}日 ～{' '}
+                      {weekDates[5].date.split('-')[1]}月 {weekDates[5].date.split('-')[2]}日
+                    </h3>
+                    <button
+                      onClick={() => changeWeek(1)}
+                      className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 w-full sm:w-auto">
+                  {/* ステータス表示 */}
+                  <span className={`px-2 py-1 text-xs font-bold rounded ${
+                    monthlyScheduleStatus === 'confirmed'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {monthlyScheduleStatus === 'confirmed' ? '確定済み' : '作成中'}
+                  </span>
+                  <button
+                    onClick={handleOpenShiftPatternModal}
+                    className="flex-1 sm:flex-none px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
+                  >
+                    <Settings size={14} className="mr-1 sm:mr-2 shrink-0" />
+                    <span className="hidden sm:inline">基本シフトパターン設定</span>
+                    <span className="sm:hidden">パターン設定</span>
+                  </button>
+                  <button
+                    onClick={handleApplyShiftPatterns}
+                    className="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
+                  >
+                    <RotateCw size={14} className="mr-1 sm:mr-2 shrink-0" />
+                    <span className="hidden sm:inline">パターン一括反映</span>
+                    <span className="sm:hidden">一括反映</span>
+                  </button>
+                  <button
+                    onClick={handleSaveShifts}
+                    className="flex-1 sm:flex-none px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-xs sm:text-sm font-bold transition-colors flex items-center justify-center"
+                  >
+                    <Save size={14} className="mr-1 sm:mr-2 shrink-0" />
+                    <span className="hidden sm:inline">この週を保存</span>
+                    <span className="sm:hidden">週次保存</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Info Bar: Child Count Check */}
+              <div className="bg-[#e0f7fa] p-2 sm:p-3 border-b border-[#b2ebf2] flex items-center space-x-2 text-xs sm:text-sm text-[#006064]">
+                <AlertCircle size={14} className="sm:w-[18px] sm:h-[18px] shrink-0" />
+                <span className="leading-tight">
+                  各日の「利用児童数」を確認しながらシフトを配置してください。児童10名につき2名の配置が必要です。
+                </span>
+              </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left border-collapse">
@@ -873,7 +1407,7 @@ const StaffView: React.FC = () => {
                         return (
                           <td
                             key={`${s.id}-${d.date}`}
-                            className={`p-0.5 border-b border-r border-gray-100 text-center ${
+                            className={`p-0.5 border-b border-r border-gray-100 text-center relative ${
                               isHolidayDay ? 'bg-red-50' : 'bg-white'
                             }`}
                           >
@@ -887,7 +1421,9 @@ const StaffView: React.FC = () => {
                                 onClick={() => toggleShift(s.id, d.date)}
                                 className={`w-full py-1 px-0.5 rounded transition-all ${
                                   hasShift
-                                    ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
+                                    ? monthlyScheduleStatus === 'confirmed'
+                                      ? 'bg-green-500 text-white hover:bg-green-600'
+                                      : 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
                                     : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                 }`}
                               >
@@ -915,6 +1451,104 @@ const StaffView: React.FC = () => {
                           className="p-1 border-r border-gray-100 text-center text-[9px] text-gray-400"
                         >
                           {count} 名
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {/* 送迎担当者（運転手） */}
+                  <tr className="bg-blue-50">
+                    <td className="p-2 border-r border-gray-100 sticky left-0 z-10 bg-blue-50">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-blue-700">
+                        <Truck size={12} />
+                        運転手
+                        <span className="text-red-500">*</span>
+                      </div>
+                    </td>
+                    {weekDates.map((d) => {
+                      const isHolidayDay = isHoliday(d.date);
+                      const assignment = transportAssignments[d.date];
+                      const activeStaffForDay = sortedStaff.filter(s => shifts[s.id]?.[d.date]);
+                      return (
+                        <td
+                          key={`driver-${d.date}`}
+                          className={`p-0.5 border-r border-gray-100 ${isHolidayDay ? 'bg-red-50' : 'bg-blue-50'}`}
+                        >
+                          {isHolidayDay ? (
+                            <div className="text-[9px] text-center text-red-400">-</div>
+                          ) : (
+                            <select
+                              value={assignment?.driverId || ''}
+                              onChange={(e) => {
+                                const driverId = e.target.value;
+                                const attendantId = assignment?.attendantId || '';
+                                if (driverId && attendantId) {
+                                  saveTransportAssignment(d.date, driverId, attendantId);
+                                } else {
+                                  setTransportAssignments(prev => ({
+                                    ...prev,
+                                    [d.date]: { driverId, attendantId },
+                                  }));
+                                }
+                              }}
+                              className={`w-full text-[9px] p-0.5 rounded border ${
+                                !assignment?.driverId ? 'border-red-300 bg-red-50' : 'border-blue-200 bg-white'
+                              }`}
+                            >
+                              <option value="">選択</option>
+                              {activeStaffForDay.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {/* 送迎担当者（添乗員） */}
+                  <tr className="bg-green-50">
+                    <td className="p-2 border-r border-gray-100 sticky left-0 z-10 bg-green-50">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-green-700">
+                        <Truck size={12} />
+                        添乗員
+                        <span className="text-red-500">*</span>
+                      </div>
+                    </td>
+                    {weekDates.map((d) => {
+                      const isHolidayDay = isHoliday(d.date);
+                      const assignment = transportAssignments[d.date];
+                      const activeStaffForDay = sortedStaff.filter(s => shifts[s.id]?.[d.date]);
+                      return (
+                        <td
+                          key={`attendant-${d.date}`}
+                          className={`p-0.5 border-r border-gray-100 ${isHolidayDay ? 'bg-red-50' : 'bg-green-50'}`}
+                        >
+                          {isHolidayDay ? (
+                            <div className="text-[9px] text-center text-red-400">-</div>
+                          ) : (
+                            <select
+                              value={assignment?.attendantId || ''}
+                              onChange={(e) => {
+                                const attendantId = e.target.value;
+                                const driverId = assignment?.driverId || '';
+                                if (driverId && attendantId) {
+                                  saveTransportAssignment(d.date, driverId, attendantId);
+                                } else {
+                                  setTransportAssignments(prev => ({
+                                    ...prev,
+                                    [d.date]: { driverId, attendantId },
+                                  }));
+                                }
+                              }}
+                              className={`w-full text-[9px] p-0.5 rounded border ${
+                                !assignment?.attendantId ? 'border-red-300 bg-red-50' : 'border-green-200 bg-white'
+                              }`}
+                            >
+                              <option value="">選択</option>
+                              {activeStaffForDay.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          )}
                         </td>
                       );
                     })}
@@ -1059,58 +1693,8 @@ const StaffView: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      ) : (
-        /* Staff Master List Tab */
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-          <div className="flex justify-between mb-4">
-            <h3 className="font-bold text-lg text-gray-800">登録スタッフ一覧</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setIsInviteModalOpen(true)}
-                className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors flex items-center"
-              >
-                <Send size={16} className="mr-2" /> 招待
-              </button>
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors flex items-center"
-              >
-                <Plus size={16} className="mr-2" /> 追加
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedStaff.map((s: Staff) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow bg-white"
-              >
-                <div className="flex items-center space-x-3 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 border border-gray-200">
-                    {s.name[0]}
-                  </div>
-                  <div className="flex-1">
-                    <button
-                      onClick={() => handleEditStaff(s)}
-                      className="font-bold text-sm text-gray-800 hover:text-[#00c4cc] transition-colors text-left w-full"
-                    >
-                      {s.name}
-                    </button>
-                    <div className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded inline-block mt-0.5">
-                      {s.role} / {s.type}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleDeleteStaff(s.id, s.name)}
-                  className="text-gray-300 hover:text-red-500 transition-colors ml-2"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
+          </>
+          )}
         </div>
       )}
 
@@ -2598,6 +3182,112 @@ const StaffView: React.FC = () => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* シフト印刷プレビューモーダル */}
+      {isPrintPreviewOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg w-full max-w-6xl shadow-2xl border border-gray-100 my-8">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center">
+                <Printer size={20} className="mr-2 text-[#00c4cc]" />
+                シフト表 印刷プレビュー
+              </h3>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={executePrint}
+                  className="px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors flex items-center gap-2"
+                >
+                  <Printer size={16} />
+                  印刷する
+                </button>
+                <button
+                  onClick={() => setIsPrintPreviewOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 overflow-auto bg-gray-100">
+              {/* 印刷エリア */}
+              <div id="shift-print-area" className="bg-white p-6 shadow-lg mx-auto" style={{ maxWidth: '1100px' }}>
+                <h1 className="text-center text-xl font-bold mb-2">
+                  {displayYear}年{displayMonth}月 シフト表
+                </h1>
+                <div className="text-center text-gray-600 mb-4">
+                  {facility?.name || ''}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-400 p-1 bg-gray-100 font-bold text-left" style={{ width: '90px' }}>
+                          スタッフ名
+                        </th>
+                        {Array.from({ length: new Date(displayYear, displayMonth, 0).getDate() }, (_, i) => {
+                          const date = new Date(displayYear, displayMonth - 1, i + 1);
+                          const dayOfWeek = date.getDay();
+                          const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+                          return (
+                            <th
+                              key={i}
+                              className={`border border-gray-400 p-0.5 text-center font-bold ${
+                                dayOfWeek === 0 ? 'bg-red-50 text-red-600' : dayOfWeek === 6 ? 'bg-blue-50 text-blue-600' : 'bg-gray-100'
+                              }`}
+                              style={{ width: '28px' }}
+                            >
+                              <div className="text-[11px]">{i + 1}</div>
+                              <div className="text-[9px] text-gray-500">{dayNames[dayOfWeek]}</div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedStaff.map(s => (
+                        <tr key={s.id}>
+                          <td className="border border-gray-400 p-1 font-bold text-left bg-gray-50 truncate">
+                            {s.name}
+                          </td>
+                          {Array.from({ length: new Date(displayYear, displayMonth, 0).getDate() }, (_, i) => {
+                            const dateStr = `${displayYear}-${String(displayMonth).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+                            const hasShift = shifts[s.id]?.[dateStr] || false;
+                            const holidayDay = isHoliday(dateStr);
+                            const date = new Date(displayYear, displayMonth - 1, i + 1);
+                            const dayOfWeek = date.getDay();
+
+                            if (holidayDay) {
+                              return (
+                                <td key={i} className="border border-gray-400 p-0.5 text-center bg-red-100 text-red-700 text-[10px]">
+                                  休
+                                </td>
+                              );
+                            }
+                            return (
+                              <td
+                                key={i}
+                                className={`border border-gray-400 p-0.5 text-center ${
+                                  dayOfWeek === 0 ? 'bg-red-50' : dayOfWeek === 6 ? 'bg-blue-50' : ''
+                                }`}
+                              >
+                                {hasShift && <span className="text-teal-700 font-bold text-sm">◯</span>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="text-right text-xs text-gray-500 mt-4">
+                  印刷日: {new Date().toLocaleDateString('ja-JP')}
+                  {monthlyScheduleStatus === 'confirmed' ? ' / 確定済み' : ' / 作成中'}
+                </div>
+              </div>
             </div>
           </div>
         </div>

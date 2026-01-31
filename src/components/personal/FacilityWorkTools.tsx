@@ -13,17 +13,18 @@ import {
   Clock,
   FileText,
   Receipt,
-  FileOutput,
   Calendar,
   CalendarDays,
-  GraduationCap,
   Bell,
-  CheckSquare,
   PlayCircle,
   PauseCircle,
   Coffee,
   LogOut,
   Briefcase,
+  Wallet,
+  Scale,
+  FolderOpen,
+  Library,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -41,12 +42,14 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Clock,
   FileText,
   Receipt,
-  FileOutput,
   Calendar,
   CalendarDays,
-  GraduationCap,
   Bell,
-  CheckSquare,
+  Briefcase,
+  Wallet,
+  Scale,
+  FolderOpen,
+  Library,
 };
 
 interface FacilityWorkToolsProps {
@@ -56,7 +59,6 @@ interface FacilityWorkToolsProps {
   onStartBreak: (facilityId: string) => Promise<void>;
   onEndBreak: (facilityId: string) => Promise<void>;
   onToolClick: (facilityId: string, toolId: WorkToolId) => void;
-  onBizDashboardClick?: (facilityId: string) => void;
   isLoading?: boolean;
 }
 
@@ -117,15 +119,15 @@ function TimeTrackingButtons({
       {/* 打刻時間表示 */}
       {attendance?.startTime && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 bg-white/50 rounded-lg px-3 py-2">
-          <div>始業: <span className="font-bold text-[#00c4cc]">{attendance.startTime}</span></div>
+          <div>始業: <span className="font-bold text-[#00c4cc]">{attendance.startTime.slice(0, 5)}</span></div>
           {attendance.breakStartTime && (
-            <div>休憩: <span className="font-bold text-[#00a3aa]">{attendance.breakStartTime}</span></div>
+            <div>休憩: <span className="font-bold text-[#00a3aa]">{attendance.breakStartTime.slice(0, 5)}</span></div>
           )}
           {attendance.breakEndTime && (
-            <div>戻り: <span className="font-bold text-[#00c4cc]">{attendance.breakEndTime}</span></div>
+            <div>戻り: <span className="font-bold text-[#00c4cc]">{attendance.breakEndTime.slice(0, 5)}</span></div>
           )}
           {attendance.endTime && (
-            <div>退勤: <span className="font-bold text-[#008b92]">{attendance.endTime}</span></div>
+            <div>退勤: <span className="font-bold text-[#008b92]">{attendance.endTime.slice(0, 5)}</span></div>
           )}
         </div>
       )}
@@ -189,16 +191,27 @@ function WorkToolGrid({
   facilityId,
   settings,
   onToolClick,
+  hasBizAccess,
 }: {
   facilityId: string;
   settings: FacilityWorkToolSettings | null;
   onToolClick: (facilityId: string, toolId: WorkToolId) => void;
+  hasBizAccess: boolean;
 }) {
-  // 有効なツールを取得
+  // 有効なツールを取得（打刻は別セクションなので除外）
   const enabledTools = WORK_TOOLS.filter(tool => {
+    // 打刻は別セクションで表示するので除外
+    if (tool.id === 'time_tracking') return false;
+    // Bizダッシュボードは常に表示（権限チェックはクリック時に行う）
+    if (tool.id === 'biz_dashboard') return true;
+
     if (!settings) {
-      // 設定がない場合はデフォルトで全て表示
-      return true;
+      // 設定がない場合はデフォルト設定を使用
+      return tool.defaultEnabled;
+    }
+    // 設定にキーがない場合（新しく追加されたツール）はデフォルト設定を使用
+    if (settings.enabledTools[tool.id] === undefined) {
+      return tool.defaultEnabled;
     }
     return settings.enabledTools[tool.id];
   });
@@ -218,15 +231,21 @@ function WorkToolGrid({
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
       {sortedTools.map(tool => {
         const IconComponent = ICON_MAP[tool.icon] || FileText;
+        // Bizダッシュボードは特別なスタイル
+        const isBizDashboard = tool.id === 'biz_dashboard';
         return (
           <button
             key={tool.id}
             onClick={() => onToolClick(facilityId, tool.id)}
-            className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-200"
+            className={`flex flex-col items-center gap-1.5 p-3 rounded-lg transition-colors border ${
+              isBizDashboard
+                ? 'bg-[#00c4cc]/10 hover:bg-[#00c4cc]/20 border-[#00c4cc]/30'
+                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+            }`}
           >
-            <IconComponent className="w-6 h-6 text-[#8b5cf6]" />
+            <IconComponent className={`w-6 h-6 ${isBizDashboard ? 'text-[#00c4cc]' : 'text-[#818CF8]'}`} />
             <span className="text-xs font-medium text-gray-700 text-center leading-tight">
-              {tool.name.replace('（', '\n（')}
+              {tool.name}
             </span>
           </button>
         );
@@ -242,7 +261,6 @@ export default function FacilityWorkTools({
   onStartBreak,
   onEndBreak,
   onToolClick,
-  onBizDashboardClick,
   isLoading,
 }: FacilityWorkToolsProps) {
   // 最初の施設をデフォルトで開く
@@ -253,7 +271,7 @@ export default function FacilityWorkTools({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8b5cf6]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#818CF8]" />
       </div>
     );
   }
@@ -287,7 +305,7 @@ export default function FacilityWorkTools({
               className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <Building2 className="w-5 h-5 text-[#8b5cf6]" />
+                <Building2 className="w-5 h-5 text-[#818CF8]" />
                 <div className="text-left">
                   <p className="font-bold text-gray-800">{facility.facilityName}</p>
                   <p className="text-xs text-gray-500">{facility.employmentRecord.role}</p>
@@ -317,28 +335,6 @@ export default function FacilityWorkTools({
                   className="overflow-hidden"
                 >
                   <div className="px-4 pb-4 space-y-4">
-                    {/* Bizダッシュボードへの遷移ボタン */}
-                    {onBizDashboardClick && (
-                      (() => {
-                        const permissions = facility.employmentRecord.permissions;
-                        const hasAccess =
-                          facility.employmentRecord.role === '管理者' ||
-                          (permissions && Object.values(permissions).some(v => v === true));
-
-                        if (!hasAccess) return null;
-
-                        return (
-                          <button
-                            onClick={() => onBizDashboardClick(facility.facilityId)}
-                            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors"
-                          >
-                            <Briefcase className="w-5 h-5" />
-                            Bizダッシュボードを開く
-                          </button>
-                        );
-                      })()
-                    )}
-
                     {/* 打刻セクション */}
                     <div className="bg-gray-50 rounded-lg p-4">
                       <TimeTrackingButtons
@@ -359,6 +355,11 @@ export default function FacilityWorkTools({
                       facilityId={facility.facilityId}
                       settings={facility.workToolSettings}
                       onToolClick={onToolClick}
+                      hasBizAccess={
+                        facility.employmentRecord.role === '管理者' ||
+                        Boolean(facility.employmentRecord.permissions &&
+                         Object.values(facility.employmentRecord.permissions).some(v => v === true))
+                      }
                     />
                   </div>
                 </motion.div>

@@ -17,10 +17,10 @@ import { Notification } from '@/types';
 interface HeaderProps {
   onMenuClick?: () => void;
   onLogoClick?: () => void;
-  mode?: 'biz' | 'personal';
+  mode?: 'business' | 'career';
 }
 
-const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'business' }) => {
   const { requests } = useFacilityData();
   const { user, logout, facility } = useAuth();
   const router = useRouter();
@@ -125,9 +125,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' 
     }
   };
   
-  const isPersonal = mode === 'personal';
-  const primaryColor = isPersonal ? '#8b5cf6' : '#00c4cc';
-  const primaryColorDark = isPersonal ? '#7c3aed' : '#00b0b8';
+  const isCareer = mode === 'career';
+  const primaryColor = isCareer ? '#818CF8' : '#00c4cc';
+  const primaryColorDark = isCareer ? '#6366F1' : '#00b0b8';
 
   const handleLogout = () => {
     logout();
@@ -145,22 +145,22 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' 
           className="cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2"
         >
           <Image src="/logo-cropped-center.png" alt="co-shien" width={150} height={40} className="h-10 w-auto object-contain" priority />
-          <span 
+          <span
             className={`text-xs font-bold px-2 py-1 rounded ${
-              isPersonal 
-                ? 'bg-[#8b5cf6] text-white' 
+              isCareer
+                ? 'bg-[#818CF8] text-white'
                 : 'bg-[#00c4cc] text-white'
             }`}
           >
-            {isPersonal ? 'Personal' : 'Biz'}
+            {isCareer ? 'キャリア' : 'ビジネス'}
           </span>
         </button>
       </div>
       <div className="hidden md:flex items-center gap-4">
-        <div 
+        <div
           className={`flex items-center text-gray-400 bg-gray-100 rounded-md px-3 py-2 w-72 transition-colors focus-within:bg-white focus-within:ring-2 ${
-            isPersonal 
-              ? 'focus-within:ring-[#8b5cf6]/20 focus-within:border-[#8b5cf6]' 
+            isCareer
+              ? 'focus-within:ring-[#818CF8]/20 focus-within:border-[#818CF8]'
               : 'focus-within:ring-[#00c4cc]/20 focus-within:border-[#00c4cc]'
           }`}
         >
@@ -173,53 +173,53 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'biz' 
         </div>
         <div className="flex items-center gap-2">
           <Image src="/logo-cropped-center.png" alt="co-shien" width={120} height={32} className="h-8 w-auto object-contain" priority />
-          <span 
+          <span
             className={`text-xs font-bold px-2 py-1 rounded ${
-              isPersonal 
-                ? 'bg-[#8b5cf6] text-white' 
+              isCareer
+                ? 'bg-[#818CF8] text-white'
                 : 'bg-[#00c4cc] text-white'
             }`}
           >
-            {isPersonal ? 'Personal' : 'Biz'}
+            {isCareer ? 'キャリア' : 'ビジネス'}
           </span>
         </div>
       </div>
       <div className="flex items-center space-x-5">
         {user && (
           <div className="text-sm font-medium text-gray-700 hidden md:block">
-            {isPersonal ? (
-              // パーソナルモード：個人名を表示
+            {isCareer ? (
+              // キャリアモード：個人名を表示
               <span>
-                {user.lastName && user.firstName 
-                  ? `${user.lastName} ${user.firstName}` 
+                {user.lastName && user.firstName
+                  ? `${user.lastName} ${user.firstName}`
                   : user.name || user.email}
               </span>
             ) : (
-              // Bizモード：施設のスタッフ名を表示
+              // ビジネスモード：施設のスタッフ名を表示
               <span>
-                {user.lastName && user.firstName 
-                  ? `${user.lastName} ${user.firstName}` 
+                {user.lastName && user.firstName
+                  ? `${user.lastName} ${user.firstName}`
                   : user.name || user.email}さん
               </span>
             )}
           </div>
         )}
-        {!isPersonal && user && (
+        {!isCareer && user && (
           <button
             onClick={() => {
-              // パーソナルダッシュボードに遷移（localStorageの情報は保持される）
+              // キャリア画面に遷移（localStorageの情報は保持される）
               const personalUrl = getPersonalBaseUrl();
-              // パーソナルダッシュボードのパスを追加
+              // キャリア画面のパスを追加
               const targetUrl = personalUrl.endsWith('/')
-                ? `${personalUrl}personal-dashboard`
-                : `${personalUrl}/personal-dashboard`;
+                ? `${personalUrl}career`
+                : `${personalUrl}/career`;
               window.location.href = targetUrl;
             }}
-            className="text-sm text-gray-600 hover:text-[#8b5cf6] transition-colors flex items-center space-x-1 px-2 py-1 rounded hover:bg-[#8b5cf6]/10"
-            title="パーソナルダッシュボードへ"
+            className="text-sm text-gray-600 hover:text-[#818CF8] transition-colors flex items-center space-x-1 px-2 py-1 rounded hover:bg-[#818CF8]/10"
+            title="キャリアダッシュボードへ"
           >
             <User size={18} />
-            <span className="hidden md:inline">パーソナル</span>
+            <span className="hidden md:inline">キャリア</span>
           </button>
         )}
         <div className="relative" ref={notificationRef}>

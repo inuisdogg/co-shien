@@ -399,7 +399,7 @@ export default function StaffDashboardPage() {
         // セッションからユーザー情報を取得
         const storedUser = localStorage.getItem('user');
         if (!storedUser) {
-          router.push('/login');
+          router.push('/career/login');
           return;
         }
 
@@ -407,7 +407,7 @@ export default function StaffDashboardPage() {
 
         // 利用者（クライアント）の場合は利用者ダッシュボードへリダイレクト
         if (userData.userType === 'client') {
-          router.push('/client/dashboard');
+          router.push('/parent');
           return;
         }
 
@@ -608,7 +608,7 @@ export default function StaffDashboardPage() {
         }
       } catch (err) {
         console.error('データ読み込みエラー:', err);
-        router.push('/login');
+        router.push('/career/login');
       } finally {
         setLoading(false);
       }
@@ -703,7 +703,7 @@ export default function StaffDashboardPage() {
   // ログアウト処理
   const handleLogout = () => {
     localStorage.removeItem('user');
-    router.push('/login');
+    router.push('/career/login');
   };
 
   // 打刻処理
@@ -816,7 +816,7 @@ export default function StaffDashboardPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Image src="/logo-cropped-center.png" alt="co-shien" width={120} height={32} className="h-8 w-auto object-contain" priority />
-              <span className="text-xs font-bold px-2 py-1 rounded bg-[#8b5cf6] text-white">
+              <span className="text-xs font-bold px-2 py-1 rounded bg-[#818CF8] text-white">
                 Personal
               </span>
             </div>
@@ -840,12 +840,12 @@ export default function StaffDashboardPage() {
               <button
                 onClick={() => photoInputRef.current?.click()}
                 disabled={uploadingPhoto}
-                className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-[#8b5cf6] hover:border-[#7c3aed] transition-colors group"
+                className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-[#818CF8] hover:border-[#6366F1] transition-colors group"
               >
                 {profilePhotoUrl ? (
                   <img src={profilePhotoUrl} alt="プロフィール写真" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-[#8b5cf6] flex items-center justify-center">
+                  <div className="w-full h-full bg-[#818CF8] flex items-center justify-center">
                     <User className="w-8 h-8 text-white" />
                   </div>
                 )}
@@ -877,10 +877,10 @@ export default function StaffDashboardPage() {
 
           {/* 所属情報 */}
           {currentFacility && (
-            <div className="bg-[#8b5cf6]/10 rounded-lg p-4 border border-[#8b5cf6]/20">
+            <div className="bg-[#818CF8]/10 rounded-lg p-4 border border-[#818CF8]/20">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-[#8b5cf6]" />
+                  <Building2 className="w-5 h-5 text-[#818CF8]" />
                   <div>
                     <span className="font-bold text-gray-800 block">
                       {currentFacility.facilityName || '事業所'}
@@ -899,7 +899,7 @@ export default function StaffDashboardPage() {
                         setCurrentFacility(otherFacilities[0]);
                       }
                     }}
-                    className="text-sm text-[#8b5cf6] hover:underline"
+                    className="text-sm text-[#818CF8] hover:underline"
                   >
                     切り替え
                   </button>
@@ -997,13 +997,13 @@ export default function StaffDashboardPage() {
           className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
         >
           <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#8b5cf6]" />
+            <Clock className="w-5 h-5 text-[#818CF8]" />
             業務管理ツール
           </h2>
           
           <div className="space-y-4">
             {/* 本日の勤務ステータス表示 */}
-            <div className="bg-[#8b5cf6]/5 rounded-lg p-4 border border-[#8b5cf6]/20">
+            <div className="bg-[#818CF8]/5 rounded-lg p-4 border border-[#818CF8]/20">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold text-gray-700">本日の勤務状況</span>
                 <span className={`text-xs font-bold px-2 py-1 rounded ${
@@ -1044,7 +1044,7 @@ export default function StaffDashboardPage() {
                 {todayAttendance.startTime && (
                   <div className="flex items-center justify-between pt-2 border-t border-gray-200 mt-2">
                     <span className="font-bold text-gray-800">本日の勤務時間</span>
-                    <span className="font-bold text-[#8b5cf6]">
+                    <span className="font-bold text-[#818CF8]">
                       {Math.floor(todayAttendance.totalWorkMinutes / 60)}時間{todayAttendance.totalWorkMinutes % 60}分
                     </span>
                   </div>
@@ -1059,33 +1059,33 @@ export default function StaffDashboardPage() {
                 <button
                   onClick={() => handleTimeTracking('start')}
                   disabled={timeTrackingStatus === 'working' || timeTrackingStatus === 'break' || !!todayAttendance.startTime}
-                  className="flex flex-col items-center justify-center p-3 bg-[#8b5cf6]/10 rounded-lg border border-[#8b5cf6]/20 hover:bg-[#8b5cf6]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center justify-center p-3 bg-[#818CF8]/10 rounded-lg border border-[#818CF8]/20 hover:bg-[#818CF8]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <PlayCircle className="w-6 h-6 text-[#8b5cf6] mb-1" />
+                  <PlayCircle className="w-6 h-6 text-[#818CF8] mb-1" />
                   <span className="text-xs font-bold text-gray-800">始業</span>
                 </button>
                 <button
                   onClick={() => handleTimeTracking('break_start')}
                   disabled={timeTrackingStatus !== 'working' || !!todayAttendance.breakStartTime}
-                  className="flex flex-col items-center justify-center p-3 bg-[#8b5cf6]/10 rounded-lg border border-[#8b5cf6]/20 hover:bg-[#8b5cf6]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center justify-center p-3 bg-[#818CF8]/10 rounded-lg border border-[#818CF8]/20 hover:bg-[#818CF8]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Coffee className="w-6 h-6 text-[#8b5cf6] mb-1" />
+                  <Coffee className="w-6 h-6 text-[#818CF8] mb-1" />
                   <span className="text-xs font-bold text-gray-800">休憩開始</span>
                 </button>
                 <button
                   onClick={() => handleTimeTracking('break_end')}
                   disabled={timeTrackingStatus !== 'break' || !todayAttendance.breakStartTime || !!todayAttendance.breakEndTime}
-                  className="flex flex-col items-center justify-center p-3 bg-[#8b5cf6]/10 rounded-lg border border-[#8b5cf6]/20 hover:bg-[#8b5cf6]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center justify-center p-3 bg-[#818CF8]/10 rounded-lg border border-[#818CF8]/20 hover:bg-[#818CF8]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <PlayCircle className="w-6 h-6 text-[#8b5cf6] mb-1" />
+                  <PlayCircle className="w-6 h-6 text-[#818CF8] mb-1" />
                   <span className="text-xs font-bold text-gray-800">休憩終了</span>
                 </button>
                 <button
                   onClick={() => handleTimeTracking('end')}
                   disabled={timeTrackingStatus === 'idle' || !todayAttendance.startTime || !!todayAttendance.endTime}
-                  className="flex flex-col items-center justify-center p-3 bg-[#8b5cf6]/10 rounded-lg border border-[#8b5cf6]/20 hover:bg-[#8b5cf6]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center justify-center p-3 bg-[#818CF8]/10 rounded-lg border border-[#818CF8]/20 hover:bg-[#818CF8]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <PauseCircle className="w-6 h-6 text-[#8b5cf6] mb-1" />
+                  <PauseCircle className="w-6 h-6 text-[#818CF8] mb-1" />
                   <span className="text-xs font-bold text-gray-800">退勤</span>
                 </button>
               </div>
@@ -1123,7 +1123,7 @@ export default function StaffDashboardPage() {
           className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
         >
           <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-[#8b5cf6]" />
+            <Bell className="w-5 h-5 text-[#818CF8]" />
             通知・アクション
           </h2>
           
@@ -1138,7 +1138,7 @@ export default function StaffDashboardPage() {
                   <p className="text-xs text-gray-600">
                     保育士証の有効期限が2024年3月31日に切れます。再アップロードしてください。
                   </p>
-                  <button className="mt-2 text-xs text-[#8b5cf6] hover:underline">
+                  <button className="mt-2 text-xs text-[#818CF8] hover:underline">
                     確認する →
                   </button>
                 </div>
@@ -1155,7 +1155,7 @@ export default function StaffDashboardPage() {
                   <p className="text-xs text-gray-600">
                     過去の職場（〇〇事業所）から実務経験証明の承認依頼が届いています。
                   </p>
-                  <button className="mt-2 text-xs text-[#8b5cf6] hover:underline">
+                  <button className="mt-2 text-xs text-[#818CF8] hover:underline">
                     確認する →
                   </button>
                 </div>
@@ -1174,7 +1174,7 @@ export default function StaffDashboardPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto"
           >
-            <div className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] p-4 text-white">
+            <div className="bg-gradient-to-r from-[#818CF8] to-[#6366F1] p-4 text-white">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Calendar className="w-5 h-5" />
@@ -1377,7 +1377,7 @@ export default function StaffDashboardPage() {
                         </div>
                         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 border border-purple-200">
                           <div className="text-[10px] text-purple-600 font-bold mb-1 uppercase tracking-wide">残有給日数</div>
-                          <div className="text-lg font-bold text-[#8b5cf6]">{remainingPaidLeave}<span className="text-sm">日</span></div>
+                          <div className="text-lg font-bold text-[#818CF8]">{remainingPaidLeave}<span className="text-sm">日</span></div>
                         </div>
                       </>
                     );
@@ -1473,8 +1473,8 @@ export default function StaffDashboardPage() {
                           key={dateStr}
                           className={`aspect-square border rounded-lg p-1 cursor-pointer transition-all hover:shadow-sm hover:scale-105 ${
                             isToday 
-                              ? 'bg-gradient-to-br from-[#8b5cf6]/20 to-[#7c3aed]/20 border-[#8b5cf6] shadow-md' 
-                              : 'border-gray-200 hover:border-[#8b5cf6]/50 bg-white'
+                              ? 'bg-gradient-to-br from-[#818CF8]/20 to-[#6366F1]/20 border-[#818CF8] shadow-md' 
+                              : 'border-gray-200 hover:border-[#818CF8]/50 bg-white'
                           } ${isHoliday ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-60' : ''}`}
                           onContextMenu={(e) => {
                             e.preventDefault();
@@ -1532,7 +1532,7 @@ export default function StaffDashboardPage() {
                           }}
                         >
                           <div className={`text-xs font-bold mb-0.5 ${
-                            isToday ? 'text-[#8b5cf6]' : 'text-gray-800'
+                            isToday ? 'text-[#818CF8]' : 'text-gray-800'
                           }`}>
                             {date.getDate()}
                           </div>
@@ -1654,7 +1654,7 @@ export default function StaffDashboardPage() {
                       });
                       setShowPaidLeaveModal(true);
                     }}
-                    className="px-3 py-1.5 bg-[#8b5cf6] text-white rounded-md hover:bg-[#7c3aed] transition-colors font-bold text-xs flex items-center gap-1.5"
+                    className="px-3 py-1.5 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold text-xs flex items-center gap-1.5"
                   >
                     <Plus className="w-3 h-3" />
                     有給申請
@@ -1747,7 +1747,7 @@ export default function StaffDashboardPage() {
                     type="time"
                     value={manualAttendanceData.startTime}
                     onChange={(e) => setManualAttendanceData({ ...manualAttendanceData, startTime: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -1756,7 +1756,7 @@ export default function StaffDashboardPage() {
                     type="time"
                     value={manualAttendanceData.endTime}
                     onChange={(e) => setManualAttendanceData({ ...manualAttendanceData, endTime: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
               </div>
@@ -1768,7 +1768,7 @@ export default function StaffDashboardPage() {
                     type="time"
                     value={manualAttendanceData.breakStartTime}
                     onChange={(e) => setManualAttendanceData({ ...manualAttendanceData, breakStartTime: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -1777,7 +1777,7 @@ export default function StaffDashboardPage() {
                     type="time"
                     value={manualAttendanceData.breakEndTime}
                     onChange={(e) => setManualAttendanceData({ ...manualAttendanceData, breakEndTime: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
               </div>
@@ -1792,7 +1792,7 @@ export default function StaffDashboardPage() {
                   placeholder="例：打刻を忘れたため、出張のためなど"
                   required
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                 />
               </div>
 
@@ -1838,7 +1838,7 @@ export default function StaffDashboardPage() {
                       reason: '',
                     });
                   }}
-                  className="flex-1 px-4 py-3 bg-[#8b5cf6] text-white rounded-lg hover:bg-[#7c3aed] transition-colors font-bold"
+                  className="flex-1 px-4 py-3 bg-[#818CF8] text-white rounded-lg hover:bg-[#6366F1] transition-colors font-bold"
                 >
                   保存
                 </button>
@@ -1899,7 +1899,7 @@ export default function StaffDashboardPage() {
                     setPaidLeaveFormData({ ...paidLeaveFormData, date: e.target.value });
                     setSelectedDateForPaidLeave(e.target.value);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                 />
               </div>
 
@@ -1913,7 +1913,7 @@ export default function StaffDashboardPage() {
                       value="paid_leave"
                       checked={paidLeaveFormData.type === 'paid_leave'}
                       onChange={(e) => setPaidLeaveFormData({ ...paidLeaveFormData, type: e.target.value as any })}
-                      className="w-4 h-4 text-[#8b5cf6]"
+                      className="w-4 h-4 text-[#818CF8]"
                     />
                     <span className="text-sm font-bold">有給休暇（全日）</span>
                   </label>
@@ -1924,7 +1924,7 @@ export default function StaffDashboardPage() {
                       value="half_paid_leave"
                       checked={paidLeaveFormData.type === 'half_paid_leave'}
                       onChange={(e) => setPaidLeaveFormData({ ...paidLeaveFormData, type: e.target.value as any })}
-                      className="w-4 h-4 text-[#8b5cf6]"
+                      className="w-4 h-4 text-[#818CF8]"
                     />
                     <span className="text-sm font-bold">有給休暇（半日）</span>
                   </label>
@@ -1938,7 +1938,7 @@ export default function StaffDashboardPage() {
                   onChange={(e) => setPaidLeaveFormData({ ...paidLeaveFormData, reason: e.target.value })}
                   placeholder="申請理由を入力してください"
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                 />
               </div>
 
@@ -1977,7 +1977,7 @@ export default function StaffDashboardPage() {
                       reason: '',
                     });
                   }}
-                  className="flex-1 px-4 py-3 bg-[#8b5cf6] text-white rounded-lg hover:bg-[#7c3aed] transition-colors font-bold"
+                  className="flex-1 px-4 py-3 bg-[#818CF8] text-white rounded-lg hover:bg-[#6366F1] transition-colors font-bold"
                 >
                   申請する
                 </button>
@@ -2007,7 +2007,7 @@ export default function StaffDashboardPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] rounded-lg shadow-sm p-4"
+            className="bg-gradient-to-r from-[#818CF8] to-[#6366F1] rounded-lg shadow-sm p-4"
           >
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="text-white">
@@ -2022,7 +2022,7 @@ export default function StaffDashboardPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowResumePreview(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#8b5cf6] font-bold rounded-lg hover:bg-white/90 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#818CF8] font-bold rounded-lg hover:bg-white/90 transition-colors"
                 >
                   <FileText className="w-5 h-5" />
                   履歴書を作成
@@ -2051,13 +2051,13 @@ export default function StaffDashboardPage() {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <User className="w-5 h-5 text-[#8b5cf6]" />
+                <User className="w-5 h-5 text-[#818CF8]" />
                 基本プロフィール
               </h2>
               {!isEditingProfile && (
                 <button
                   onClick={() => setIsEditingProfile(true)}
-                  className="flex items-center gap-1 text-sm text-[#8b5cf6] hover:text-[#7c3aed] font-bold"
+                  className="flex items-center gap-1 text-sm text-[#818CF8] hover:text-[#6366F1] font-bold"
                 >
                   <Edit className="w-4 h-4" />
                   編集
@@ -2073,7 +2073,7 @@ export default function StaffDashboardPage() {
                     type="text"
                     value={profileData.name}
                     onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -2082,7 +2082,7 @@ export default function StaffDashboardPage() {
                     type="email"
                     value={profileData.email}
                     onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                     placeholder="ログインIDとして使用されます"
                   />
                 </div>
@@ -2092,7 +2092,7 @@ export default function StaffDashboardPage() {
                     type="date"
                     value={profileData.birthDate}
                     onChange={(e) => setProfileData({ ...profileData, birthDate: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -2101,7 +2101,7 @@ export default function StaffDashboardPage() {
                     type="text"
                     value={profileData.address}
                     onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -2110,7 +2110,7 @@ export default function StaffDashboardPage() {
                     type="tel"
                     value={profileData.phone}
                     onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -2118,7 +2118,7 @@ export default function StaffDashboardPage() {
                   <select
                     value={profileData.gender}
                     onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   >
                     <option value="">選択してください</option>
                     <option value="男性">男性</option>
@@ -2134,7 +2134,7 @@ export default function StaffDashboardPage() {
                     onChange={(e) => setProfileData({ ...profileData, myNumber: e.target.value })}
                     placeholder="12桁のマイナンバー"
                     maxLength={12}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -2153,7 +2153,7 @@ export default function StaffDashboardPage() {
                               spouseName: profileData.spouseName || '' // 既存の値があれば保持
                             });
                           }}
-                          className="w-4 h-4 text-[#8b5cf6]"
+                          className="w-4 h-4 text-[#818CF8]"
                         />
                         <span className="text-sm">有</span>
                       </label>
@@ -2169,7 +2169,7 @@ export default function StaffDashboardPage() {
                               spouseName: '' // 無を選択した場合は空にする
                             });
                           }}
-                          className="w-4 h-4 text-[#8b5cf6]"
+                          className="w-4 h-4 text-[#818CF8]"
                         />
                         <span className="text-sm">無</span>
                       </label>
@@ -2181,7 +2181,7 @@ export default function StaffDashboardPage() {
                           type="text"
                           value={profileData.spouseName}
                           onChange={(e) => setProfileData({ ...profileData, spouseName: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                         />
                       </div>
                     )}
@@ -2197,7 +2197,7 @@ export default function StaffDashboardPage() {
                         value={profileData.basicPensionSymbol}
                         onChange={(e) => setProfileData({ ...profileData, basicPensionSymbol: e.target.value })}
                         maxLength={4}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                       />
                     </div>
                     <div>
@@ -2207,7 +2207,7 @@ export default function StaffDashboardPage() {
                         value={profileData.basicPensionNumber}
                         onChange={(e) => setProfileData({ ...profileData, basicPensionNumber: e.target.value })}
                         maxLength={6}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -2215,7 +2215,7 @@ export default function StaffDashboardPage() {
                 {/* 現在の所属事業所での契約内容 */}
                 <div className="mt-6 pt-6 border-t border-gray-300">
                   <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-[#8b5cf6]" />
+                    <Building2 className="w-5 h-5 text-[#818CF8]" />
                     現在の所属事業所での契約内容
                   </h3>
                 </div>
@@ -2230,7 +2230,7 @@ export default function StaffDashboardPage() {
                           value="joined"
                           checked={profileData.employmentInsuranceStatus === 'joined'}
                           onChange={(e) => setProfileData({ ...profileData, employmentInsuranceStatus: e.target.value as any })}
-                          className="w-4 h-4 text-[#8b5cf6]"
+                          className="w-4 h-4 text-[#818CF8]"
                         />
                         <span className="text-sm">加入</span>
                       </label>
@@ -2241,7 +2241,7 @@ export default function StaffDashboardPage() {
                           value="not_joined"
                           checked={profileData.employmentInsuranceStatus === 'not_joined'}
                           onChange={(e) => setProfileData({ ...profileData, employmentInsuranceStatus: e.target.value as any })}
-                          className="w-4 h-4 text-[#8b5cf6]"
+                          className="w-4 h-4 text-[#818CF8]"
                         />
                         <span className="text-sm">非加入</span>
                       </label>
@@ -2252,7 +2252,7 @@ export default function StaffDashboardPage() {
                           value="first_time"
                           checked={profileData.employmentInsuranceStatus === 'first_time'}
                           onChange={(e) => setProfileData({ ...profileData, employmentInsuranceStatus: e.target.value as any })}
-                          className="w-4 h-4 text-[#8b5cf6]"
+                          className="w-4 h-4 text-[#818CF8]"
                         />
                         <span className="text-sm">初めて加入</span>
                       </label>
@@ -2270,7 +2270,7 @@ export default function StaffDashboardPage() {
                           }}
                           placeholder="例: 1234-567890-1"
                           maxLength={13}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                         />
                         <p className="text-xs text-gray-500 mt-1">4桁-6桁-1桁の形式で入力してください</p>
                       </div>
@@ -2283,7 +2283,7 @@ export default function StaffDashboardPage() {
                             type="text"
                             value={profileData.previousName}
                             onChange={(e) => setProfileData({ ...profileData, previousName: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                           />
                         </div>
                         <div>
@@ -2292,7 +2292,7 @@ export default function StaffDashboardPage() {
                             type="date"
                             value={profileData.previousRetirementDate}
                             onChange={(e) => setProfileData({ ...profileData, previousRetirementDate: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                           />
                         </div>
                       </div>
@@ -2309,7 +2309,7 @@ export default function StaffDashboardPage() {
                         value="joined"
                         checked={profileData.socialInsuranceStatus === 'joined'}
                         onChange={(e) => setProfileData({ ...profileData, socialInsuranceStatus: e.target.value as any })}
-                        className="w-4 h-4 text-[#8b5cf6]"
+                        className="w-4 h-4 text-[#818CF8]"
                       />
                       <span className="text-sm">加入</span>
                     </label>
@@ -2320,7 +2320,7 @@ export default function StaffDashboardPage() {
                         value="not_joined"
                         checked={profileData.socialInsuranceStatus === 'not_joined'}
                         onChange={(e) => setProfileData({ ...profileData, socialInsuranceStatus: e.target.value as any })}
-                        className="w-4 h-4 text-[#8b5cf6]"
+                        className="w-4 h-4 text-[#818CF8]"
                       />
                       <span className="text-sm">非加入</span>
                     </label>
@@ -2336,7 +2336,7 @@ export default function StaffDashboardPage() {
                           name="hasDependents"
                           checked={profileData.hasDependents}
                           onChange={(e) => setProfileData({ ...profileData, hasDependents: true })}
-                          className="w-4 h-4 text-[#8b5cf6]"
+                          className="w-4 h-4 text-[#818CF8]"
                         />
                         <span className="text-sm">有</span>
                       </label>
@@ -2346,7 +2346,7 @@ export default function StaffDashboardPage() {
                           name="hasDependents"
                           checked={!profileData.hasDependents}
                           onChange={(e) => setProfileData({ ...profileData, hasDependents: false, dependents: [] })}
-                          className="w-4 h-4 text-[#8b5cf6]"
+                          className="w-4 h-4 text-[#818CF8]"
                         />
                         <span className="text-sm">無</span>
                       </label>
@@ -2379,7 +2379,7 @@ export default function StaffDashboardPage() {
                               );
                               setProfileData({ ...profileData, dependentCount: count, dependents: newDependents });
                             }}
-                            className="w-24 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
+                            className="w-24 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
                           />
                           <span className="ml-2 text-sm text-gray-600">人</span>
                         </div>
@@ -2398,7 +2398,7 @@ export default function StaffDashboardPage() {
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
                                   placeholder="例：妻、子"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 />
                               </div>
                               <div>
@@ -2411,7 +2411,7 @@ export default function StaffDashboardPage() {
                                     updated[index].birthDate = e.target.value;
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 />
                               </div>
                             </div>
@@ -2426,7 +2426,7 @@ export default function StaffDashboardPage() {
                                     updated[index].furigana = e.target.value;
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 />
                               </div>
                               <div>
@@ -2439,7 +2439,7 @@ export default function StaffDashboardPage() {
                                     updated[index].name = e.target.value;
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 />
                               </div>
                             </div>
@@ -2456,7 +2456,7 @@ export default function StaffDashboardPage() {
                                       updated[index].gender = 'male';
                                       setProfileData({ ...profileData, dependents: updated });
                                     }}
-                                    className="w-4 h-4 text-[#8b5cf6]"
+                                    className="w-4 h-4 text-[#818CF8]"
                                   />
                                   <span className="text-sm">男</span>
                                 </label>
@@ -2470,7 +2470,7 @@ export default function StaffDashboardPage() {
                                       updated[index].gender = 'female';
                                       setProfileData({ ...profileData, dependents: updated });
                                     }}
-                                    className="w-4 h-4 text-[#8b5cf6]"
+                                    className="w-4 h-4 text-[#818CF8]"
                                   />
                                   <span className="text-sm">女</span>
                                 </label>
@@ -2487,7 +2487,7 @@ export default function StaffDashboardPage() {
                                     updated[index].occupation = e.target.value;
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 />
                               </div>
                               <div>
@@ -2501,7 +2501,7 @@ export default function StaffDashboardPage() {
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
                                   placeholder="円"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 />
                               </div>
                             </div>
@@ -2515,7 +2515,7 @@ export default function StaffDashboardPage() {
                                     updated[index].notWorking = e.target.checked;
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
-                                  className="w-4 h-4 text-[#8b5cf6]"
+                                  className="w-4 h-4 text-[#818CF8]"
                                 />
                                 <span className="text-xs text-gray-600">働いていない場合</span>
                               </label>
@@ -2527,7 +2527,7 @@ export default function StaffDashboardPage() {
                                     updated[index].notWorkingReason = e.target.value;
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 >
                                   <option value="">選択してください</option>
                                   <option value="preschooler">未就学児</option>
@@ -2551,7 +2551,7 @@ export default function StaffDashboardPage() {
                                 }}
                                 maxLength={12}
                                 placeholder="12桁"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                               />
                             </div>
                             {index > 0 && (
@@ -2565,7 +2565,7 @@ export default function StaffDashboardPage() {
                                     updated[index].separateAddress = e.target.value;
                                     setProfileData({ ...profileData, dependents: updated });
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                                 />
                               </div>
                             )}
@@ -2643,7 +2643,7 @@ export default function StaffDashboardPage() {
                         alert('プロフィールの保存に失敗しました');
                       }
                     }}
-                    className="px-4 py-2 bg-[#8b5cf6] text-white rounded-md hover:bg-[#7c3aed] transition-colors font-bold"
+                    className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold"
                   >
                     保存
                   </button>
@@ -2739,7 +2739,7 @@ export default function StaffDashboardPage() {
                 {/* 現在の所属事業所での契約内容 */}
                 <div className="mt-6 pt-6 border-t border-gray-300">
                   <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-[#8b5cf6]" />
+                    <Building2 className="w-5 h-5 text-[#818CF8]" />
                     現在の所属事業所での契約内容
                   </h3>
                 </div>
@@ -2776,7 +2776,7 @@ export default function StaffDashboardPage() {
             {/* 実務経験のサマリー */}
             <div className="mt-6 pt-6 border-t border-gray-200">
               <h3 className="text-sm font-bold text-gray-700 mb-3">実務経験のサマリー</h3>
-              <div className="bg-[#8b5cf6]/5 rounded-lg p-4 border border-[#8b5cf6]/20">
+              <div className="bg-[#818CF8]/5 rounded-lg p-4 border border-[#818CF8]/20">
                 <div className="text-sm text-gray-600">
                   <div className="flex items-center justify-between mb-2">
                     <span>所属企業別</span>
@@ -2784,7 +2784,7 @@ export default function StaffDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span>累計経験</span>
-                    <span className="font-bold text-[#8b5cf6]">計算中...</span>
+                    <span className="font-bold text-[#818CF8]">計算中...</span>
                   </div>
                 </div>
               </div>
@@ -2799,7 +2799,7 @@ export default function StaffDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Award className="w-5 h-5 text-[#8b5cf6]" />
+              <Award className="w-5 h-5 text-[#818CF8]" />
               保有資格
             </h2>
 
@@ -2816,7 +2816,7 @@ export default function StaffDashboardPage() {
                         status: 'not_registered',
                       }]);
                     }}
-                    className="px-4 py-2 bg-[#8b5cf6] text-white rounded-md hover:bg-[#7c3aed] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
+                    className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
                   >
                     <Plus className="w-4 h-4" />
                     資格を追加
@@ -2836,7 +2836,7 @@ export default function StaffDashboardPage() {
                             ));
                           }}
                           placeholder="資格名を入力（例：保育士、社会福祉士）"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                         />
                       </div>
                       <button
@@ -2899,7 +2899,7 @@ export default function StaffDashboardPage() {
                       status: 'not_registered',
                     }]);
                   }}
-                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#8b5cf6] hover:bg-[#8b5cf6]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#818CF8] hover:bg-[#818CF8]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   資格を追加
@@ -2916,7 +2916,7 @@ export default function StaffDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-[#8b5cf6]" />
+              <Briefcase className="w-5 h-5 text-[#818CF8]" />
               職歴
             </h2>
 
@@ -2935,7 +2935,7 @@ export default function StaffDashboardPage() {
                         certificateStatus: 'not_requested',
                       }]);
                     }}
-                    className="px-4 py-2 bg-[#8b5cf6] text-white rounded-md hover:bg-[#7c3aed] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
+                    className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
                   >
                     <Plus className="w-4 h-4" />
                     職歴を追加
@@ -2958,7 +2958,7 @@ export default function StaffDashboardPage() {
                                 ));
                               }}
                               placeholder="事業所名を入力"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
@@ -2972,7 +2972,7 @@ export default function StaffDashboardPage() {
                                     r.id === record.id ? { ...r, startDate: e.target.value } : r
                                   ));
                                 }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                               />
                             </div>
                             <div>
@@ -2986,7 +2986,7 @@ export default function StaffDashboardPage() {
                                   ));
                                 }}
                                 placeholder="在籍中は空欄"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                               />
                             </div>
                           </div>
@@ -3023,14 +3023,14 @@ export default function StaffDashboardPage() {
                                 r.id === record.id ? { ...r, certificateStatus: 'pending' } : r
                               ));
                             }}
-                            className="w-full mt-2 px-3 py-2 bg-[#8b5cf6] text-white rounded-md hover:bg-[#7c3aed] transition-colors text-xs font-bold flex items-center justify-center gap-2"
+                            className="w-full mt-2 px-3 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors text-xs font-bold flex items-center justify-center gap-2"
                           >
                             <FileCheck className="w-3 h-3" />
                             実務経験証明を依頼する
                           </button>
                         )}
                         {record.pdfUrl && (
-                          <div className="mt-2 text-xs text-[#8b5cf6] font-bold">
+                          <div className="mt-2 text-xs text-[#818CF8] font-bold">
                             ✓ PDFがアップロードされています
                           </div>
                         )}
@@ -3050,7 +3050,7 @@ export default function StaffDashboardPage() {
                       certificateStatus: 'not_requested',
                     }]);
                   }}
-                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#8b5cf6] hover:bg-[#8b5cf6]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#818CF8] hover:bg-[#818CF8]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   職歴を追加
@@ -3067,7 +3067,7 @@ export default function StaffDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#8b5cf6]" />
+              <FileText className="w-5 h-5 text-[#818CF8]" />
               学歴
             </h2>
 
@@ -3085,7 +3085,7 @@ export default function StaffDashboardPage() {
                         degree: '',
                       }]);
                     }}
-                    className="px-4 py-2 bg-[#8b5cf6] text-white rounded-md hover:bg-[#7c3aed] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
+                    className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
                   >
                     <Plus className="w-4 h-4" />
                     学歴を追加
@@ -3105,7 +3105,7 @@ export default function StaffDashboardPage() {
                               item.id === edu.id ? { ...item, schoolName: e.target.value } : item
                             ));
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                         />
                       </div>
                       <div>
@@ -3118,7 +3118,7 @@ export default function StaffDashboardPage() {
                               item.id === edu.id ? { ...item, graduationDate: e.target.value } : item
                             ));
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                         />
                       </div>
                       <div>
@@ -3132,7 +3132,7 @@ export default function StaffDashboardPage() {
                             ));
                           }}
                           placeholder="例：高等学校卒業"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
                         />
                       </div>
                     </div>
@@ -3157,7 +3157,7 @@ export default function StaffDashboardPage() {
                       degree: '',
                     }]);
                   }}
-                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#8b5cf6] hover:bg-[#8b5cf6]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#818CF8] hover:bg-[#818CF8]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   学歴を追加
@@ -3193,7 +3193,7 @@ export default function StaffDashboardPage() {
           {/* 所属施設 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
             <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-[#8b5cf6]" />
+              <Building2 className="w-5 h-5 text-[#818CF8]" />
               所属施設
             </h3>
             {activeEmployments.length > 0 ? (
@@ -3203,7 +3203,7 @@ export default function StaffDashboardPage() {
                     key={emp.id}
                     className={`p-3 rounded-lg border ${
                       currentFacility?.id === emp.id
-                        ? 'border-[#8b5cf6] bg-purple-50'
+                        ? 'border-[#818CF8] bg-purple-50'
                         : 'border-gray-200 bg-gray-50'
                     }`}
                     onClick={() => setCurrentFacility(emp)}
@@ -3214,7 +3214,7 @@ export default function StaffDashboardPage() {
                         <p className="text-sm text-gray-500">{emp.role || 'スタッフ'}</p>
                       </div>
                       {currentFacility?.id === emp.id && (
-                        <span className="text-xs bg-[#8b5cf6] text-white px-2 py-1 rounded-full">選択中</span>
+                        <span className="text-xs bg-[#818CF8] text-white px-2 py-1 rounded-full">選択中</span>
                       )}
                     </div>
                   </div>
@@ -3235,7 +3235,7 @@ export default function StaffDashboardPage() {
           {/* アカウント設定 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
             <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <User className="w-5 h-5 text-[#8b5cf6]" />
+              <User className="w-5 h-5 text-[#818CF8]" />
               アカウント
             </h3>
             <div className="space-y-2 text-sm">
@@ -3260,7 +3260,7 @@ export default function StaffDashboardPage() {
               保護者とのチャット
             </h3>
             <button
-              onClick={() => router.push('/staff-dashboard/chat')}
+              onClick={() => router.push('/career-dashboard/chat')}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors"
             >
               <MessageSquare className="w-5 h-5" />
@@ -3273,7 +3273,7 @@ export default function StaffDashboardPage() {
             onClick={() => {
               localStorage.removeItem('user');
               localStorage.removeItem('selectedFacility');
-              router.push('/login');
+              router.push('/career/login');
             }}
             className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors"
           >
@@ -3290,7 +3290,7 @@ export default function StaffDashboardPage() {
             <button 
               onClick={() => setActiveTab('home')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'home' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
+                activeTab === 'home' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
               }`}
             >
               <Briefcase className="w-6 h-6" />
@@ -3299,7 +3299,7 @@ export default function StaffDashboardPage() {
             <button 
               onClick={() => setActiveTab('career')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'career' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
+                activeTab === 'career' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
               }`}
             >
               <Award className="w-6 h-6" />
@@ -3308,7 +3308,7 @@ export default function StaffDashboardPage() {
             <button
               onClick={() => setActiveTab('work')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'work' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
+                activeTab === 'work' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
               }`}
             >
               <FileText className="w-6 h-6" />
@@ -3317,7 +3317,7 @@ export default function StaffDashboardPage() {
             <button
               onClick={() => setActiveTab('expense')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'expense' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
+                activeTab === 'expense' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
               }`}
             >
               <Receipt className="w-6 h-6" />
@@ -3326,7 +3326,7 @@ export default function StaffDashboardPage() {
             <button
               onClick={() => setActiveTab('settings')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'settings' ? 'text-[#8b5cf6]' : 'text-gray-600 hover:text-[#8b5cf6]'
+                activeTab === 'settings' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
               }`}
             >
               <Settings className="w-6 h-6" />
@@ -3345,7 +3345,7 @@ export default function StaffDashboardPage() {
             className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
           >
             {/* ヘッダー */}
-            <div className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white px-6 py-4 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-[#818CF8] to-[#6366F1] text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6" />
                 <h2 className="text-xl font-bold">履歴書プレビュー</h2>
@@ -3354,7 +3354,7 @@ export default function StaffDashboardPage() {
                 <button
                   onClick={generateFromPreview}
                   disabled={generatingPDF === 'resume'}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#8b5cf6] font-bold rounded-md hover:bg-white/90 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#818CF8] font-bold rounded-md hover:bg-white/90 transition-colors disabled:opacity-50"
                 >
                   {generatingPDF === 'resume' ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -3393,7 +3393,7 @@ export default function StaffDashboardPage() {
                     type="checkbox"
                     checked={usePhotoInResume}
                     onChange={(e) => setUsePhotoInResume(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#8b5cf6] focus:ring-[#8b5cf6]"
+                    className="w-4 h-4 rounded text-[#818CF8] focus:ring-[#818CF8]"
                   />
                   <span className="text-sm text-gray-700">履歴書に掲載する</span>
                 </label>
@@ -3449,7 +3449,7 @@ export default function StaffDashboardPage() {
                             onBlur={() => setEditingField(null)}
                             onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                             autoFocus
-                            className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none"
+                            className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none"
                             placeholder="例: 渋谷駅"
                           />
                         ) : (
@@ -3471,7 +3471,7 @@ export default function StaffDashboardPage() {
                             onBlur={() => setEditingField(null)}
                             onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                             autoFocus
-                            className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none"
+                            className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none"
                             placeholder="例: 約30分"
                           />
                         ) : (
@@ -3539,7 +3539,7 @@ export default function StaffDashboardPage() {
                         onBlur={() => setEditingField(null)}
                         autoFocus
                         rows={3}
-                        className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none resize-none"
+                        className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none resize-none"
                         placeholder="志望動機を入力してください"
                       />
                     ) : (
@@ -3564,7 +3564,7 @@ export default function StaffDashboardPage() {
                         onBlur={() => setEditingField(null)}
                         autoFocus
                         rows={2}
-                        className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none resize-none"
+                        className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none resize-none"
                       />
                     ) : (
                       <span className="whitespace-pre-wrap">{resumeEditData.personalRequests}</span>
@@ -3587,7 +3587,7 @@ export default function StaffDashboardPage() {
                         onBlur={() => setEditingField(null)}
                         onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                         autoFocus
-                        className="w-full px-2 py-1 border border-[#8b5cf6] rounded focus:outline-none"
+                        className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none"
                       />
                     ) : (
                       <span>{resumeEditData.healthStatus}</span>
@@ -3775,7 +3775,7 @@ export default function StaffDashboardPage() {
             <p style={{ fontSize: '12px', color: '#666' }}>職歴なし</p>
           ) : (
             experienceRecords.map((exp) => (
-              <div key={exp.id} style={{ marginBottom: '20px', paddingLeft: '10px', borderLeft: '3px solid #8b5cf6' }}>
+              <div key={exp.id} style={{ marginBottom: '20px', paddingLeft: '10px', borderLeft: '3px solid #818CF8' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
                   <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{exp.facilityName}</span>
                   <span style={{ fontSize: '12px', color: '#666' }}>

@@ -17,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isMaster: boolean; // マスター管理者（施設オーナー）かどうか
+  isLoading: boolean; // 認証状態の読み込み中かどうか
   login: (facilityCode: string, loginId: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: keyof UserPermissions) => boolean;
@@ -416,6 +417,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAuthenticated,
     isAdmin,
     isMaster,
+    isLoading: loading,
     login,
     logout,
     hasPermission,

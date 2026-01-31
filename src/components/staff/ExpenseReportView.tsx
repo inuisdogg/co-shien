@@ -299,7 +299,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#8b5cf6]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#818CF8]" />
       </div>
     );
   }
@@ -307,7 +307,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
   return (
     <div className="space-y-6 pb-20">
       {/* ヘッダー */}
-      <div className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] rounded-xl p-4 text-white">
+      <div className="bg-gradient-to-r from-[#818CF8] to-[#6366F1] rounded-xl p-4 text-white">
         <h2 className="text-lg font-bold flex items-center gap-2">
           <Receipt className="w-5 h-5" />
           経費精算
@@ -320,7 +320,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
       {/* 新規申請ボタン */}
       <button
         onClick={() => setShowNewExpenseModal(true)}
-        className="w-full flex items-center justify-center gap-2 py-4 bg-white border-2 border-dashed border-[#8b5cf6] rounded-xl text-[#8b5cf6] font-bold hover:bg-[#8b5cf6]/5 transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-4 bg-white border-2 border-dashed border-[#818CF8] rounded-xl text-[#818CF8] font-bold hover:bg-[#818CF8]/5 transition-colors"
       >
         <Plus className="w-5 h-5" />
         新規経費申請
@@ -368,7 +368,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
                     {expense.receiptUrl && (
                       <button
                         onClick={() => window.open(expense.receiptUrl, '_blank')}
-                        className="text-xs text-[#8b5cf6] hover:underline mt-1"
+                        className="text-xs text-[#818CF8] hover:underline mt-1"
                       >
                         領収書を見る
                       </button>
@@ -448,7 +448,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[#8b5cf6] hover:bg-[#8b5cf6]/5 transition-colors"
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[#818CF8] hover:bg-[#818CF8]/5 transition-colors"
                   >
                     <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-600">
@@ -471,7 +471,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="例: 電車代、教材購入"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
                   required
                 />
               </div>
@@ -488,7 +488,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
                     value={formData.amount || ''}
                     onChange={(e) => setFormData({ ...formData, amount: parseInt(e.target.value) || 0 })}
                     placeholder="0"
-                    className="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]"
+                    className="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
                     required
                     min="1"
                   />
@@ -504,7 +504,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
                   type="date"
                   value={formData.expenseDate}
                   onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
                   required
                 />
               </div>
@@ -519,10 +519,10 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="何のための経費か詳しく記入してください"
                   rows={3}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
                 />
                 {suggestedCategory && suggestedCategory.confidence > 0.3 && (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-[#8b5cf6]">
+                  <div className="mt-2 flex items-center gap-2 text-sm text-[#818CF8]">
                     <Sparkles className="w-4 h-4" />
                     <span>
                       「{suggestedCategory.categoryName}」カテゴリが推定されました
@@ -545,7 +545,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
                       onClick={() => setFormData({ ...formData, category: cat.id })}
                       className={`p-3 rounded-lg border-2 text-left transition-colors ${
                         formData.category === cat.id
-                          ? 'border-[#8b5cf6] bg-[#8b5cf6]/10'
+                          ? 'border-[#818CF8] bg-[#818CF8]/10'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -559,7 +559,7 @@ export default function ExpenseReportView({ userId, facilityId, staffId, staffNa
               <button
                 type="submit"
                 disabled={submitting || !formData.title || !formData.amount || !formData.category}
-                className="w-full py-4 bg-[#8b5cf6] hover:bg-[#7c3aed] disabled:bg-gray-300 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="w-full py-4 bg-[#818CF8] hover:bg-[#6366F1] disabled:bg-gray-300 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>

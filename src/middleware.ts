@@ -2,15 +2,20 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * ドメイン構成:
- * - biz.co-shien.inu.co.jp → スタッフ用（ログイン、ダッシュボード、施設管理）
- * - my.co-shien.inu.co.jp → 利用者（クライアント）専用
- * - localhost → 開発環境（すべてのパスにアクセス可能）
+ * シングルドメイン構成: co-shien.inu.co.jp
+ *
+ * 現在有効な機能:
+ * - /business → ビジネス（施設管理）
+ * - /career → キャリア（スタッフ向け）
+ * - /parent → 保護者
+ *
+ * 一時的に無効化（将来リリース予定）:
+ * - /babysitter → ベビーシッター
+ * - /consultation → 発達相談
  */
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
 
   // HTMLファイルに対してキャッシュ無効化
   const isHtmlRequest =
@@ -39,7 +44,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 招待リンク（どちらのドメインからでもアクセス可能）
+  // 招待リンク
   if (pathname === '/activate' || pathname.startsWith('/activate/')) {
     return NextResponse.next();
   }
@@ -58,25 +63,18 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 無限ループ防止
-  if (pathname.startsWith('/biz') || pathname.startsWith('/personal-dashboard')) {
-    return NextResponse.next();
+  // ========================================
+  // 一時的に無効化された機能へのリダイレクト
+  // ========================================
+  if (pathname.startsWith('/consultation') || pathname.startsWith('/babysitter')) {
+    // 発達相談・ベビーシッターは一時的に無効化 → /business へリダイレクト
+    return NextResponse.redirect(new URL('/business', req.url), 302);
   }
 
-  // ドメイン解析
-  const hostWithoutPort = host.split(':')[0].toLowerCase();
-
-  // ========================================
-  // ローカル開発環境 → すべてのパスにアクセス可能
-  // ========================================
-  if (hostWithoutPort === 'localhost' || hostWithoutPort === '127.0.0.1') {
-    // /staff-dashboard → /personal-dashboard リダイレクト（ローカルでも有効）
-    if (pathname === '/staff-dashboard' || pathname.startsWith('/staff-dashboard/')) {
-      const newPath = pathname.replace('/staff-dashboard', '/personal-dashboard');
-      const redirectUrl = new URL(newPath, req.url);
-      return NextResponse.redirect(redirectUrl, 302);
-    }
-
+  // 各領域パス（そのまま通す）
+  if (pathname.startsWith('/business') ||
+      pathname.startsWith('/career') ||
+      pathname.startsWith('/parent')) {
     const response = NextResponse.next();
     if (isHtmlRequest) {
       response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -84,75 +82,32 @@ export function middleware(req: NextRequest) {
     return response;
   }
 
-  const hostParts = hostWithoutPort.split('.');
-  const firstPart = hostParts[0]?.toLowerCase() || '';
-
-  // co-shien.inu.co.jp → biz.co-shien.inu.co.jp にリダイレクト
-  if (hostWithoutPort === 'co-shien.inu.co.jp' || hostWithoutPort === 'www.co-shien.inu.co.jp') {
-    const protocol = req.nextUrl.protocol || 'https:';
-    const redirectUrl = new URL(`${protocol}//biz.co-shien.inu.co.jp${pathname}${req.nextUrl.search}`);
-    return NextResponse.redirect(redirectUrl, 301);
+  // ========================================
+  // 旧パスからのリダイレクト（後方互換性）
+  // ========================================
+  if (pathname.startsWith('/biz')) {
+    const newPath = pathname.replace('/biz', '/business');
+    return NextResponse.redirect(new URL(newPath, req.url), 301);
   }
-
-  // ========================================
-  // my.co-shien.inu.co.jp → 利用者専用
-  // ========================================
-  if (firstPart === 'my' || hostWithoutPort.startsWith('my.')) {
-    // /client パスはそのまま通す
-    if (pathname.startsWith('/client')) {
-      const response = NextResponse.next();
-      if (isHtmlRequest) {
-        response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-      }
-      return response;
-    }
-
-    // ルート（/）へのアクセスは /client/login にリダイレクト
-    if (pathname === '/') {
-      const redirectUrl = new URL('/client/login', req.url);
-      return NextResponse.redirect(redirectUrl, 302);
-    }
-
-    // その他のパス（/personal-dashboard, /staff-dashboard など）へのアクセスは biz 側にリダイレクト
-    if (pathname.startsWith('/personal-dashboard') ||
-        pathname.startsWith('/staff-dashboard') ||
-        pathname.startsWith('/portal') ||
-        pathname.startsWith('/facility') ||
-        pathname.startsWith('/signup') ||
-        pathname.startsWith('/login') ||
-        pathname.startsWith('/setup')) {
-      const protocol = req.nextUrl.protocol || 'https:';
-      const redirectUrl = new URL(`${protocol}//biz.co-shien.inu.co.jp${pathname}${req.nextUrl.search}`);
-      return NextResponse.redirect(redirectUrl, 302);
-    }
-
-    // その他は /client/login にリダイレクト
-    const redirectUrl = new URL('/client/login', req.url);
-    return NextResponse.redirect(redirectUrl, 302);
+  if (pathname.startsWith('/personal')) {
+    const newPath = pathname.replace('/personal', '/career');
+    return NextResponse.redirect(new URL(newPath, req.url), 301);
   }
-
-  // ========================================
-  // biz.co-shien.inu.co.jp → スタッフ用（メイン）
-  // ========================================
-
-  // /client へのアクセスは my 側にリダイレクト
   if (pathname.startsWith('/client')) {
-    const protocol = req.nextUrl.protocol || 'https:';
-    const redirectUrl = new URL(`${protocol}//my.co-shien.inu.co.jp${pathname}${req.nextUrl.search}`);
-    return NextResponse.redirect(redirectUrl, 302);
+    const newPath = pathname.replace('/client', '/parent');
+    return NextResponse.redirect(new URL(newPath, req.url), 301);
   }
-
-  // /staff-dashboard へのアクセスは /personal-dashboard にリダイレクト（後方互換性）
+  // 旧パス /sitter, /expert も一時的に /business へリダイレクト
+  if (pathname.startsWith('/sitter') || pathname.startsWith('/expert')) {
+    return NextResponse.redirect(new URL('/business', req.url), 302);
+  }
   if (pathname === '/staff-dashboard' || pathname.startsWith('/staff-dashboard/')) {
-    const newPath = pathname.replace('/staff-dashboard', '/personal-dashboard');
-    const redirectUrl = new URL(newPath, req.url);
-    return NextResponse.redirect(redirectUrl, 302);
+    const newPath = pathname.replace('/staff-dashboard', '/career');
+    return NextResponse.redirect(new URL(newPath, req.url), 301);
   }
 
-  // biz側はそのまま処理を続行
+  // ルート（/）はそのまま通す（トップページ用）
   const response = NextResponse.next();
-  response.headers.set('x-debug-subdomain', firstPart || 'none');
-
   if (isHtmlRequest) {
     response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     response.headers.set('Pragma', 'no-cache');

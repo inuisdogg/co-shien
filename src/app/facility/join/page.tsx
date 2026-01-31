@@ -43,7 +43,7 @@ export default function FacilityJoinPage() {
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (!userStr) {
-      router.push('/login');
+      router.push('/career/login');
       return;
     }
     setUser(JSON.parse(userStr));

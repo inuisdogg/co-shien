@@ -24,6 +24,7 @@ interface ChildCardProps {
   onDragEnd?: (e: React.DragEvent) => void;
   compact?: boolean;         // コンパクト表示（ポップアップ用）
   hasUsageRecord?: boolean;  // 実績登録済みフラグ
+  showBothTransport?: boolean; // 送迎両方ありの場合に表示
 }
 
 export default function ChildCard({
@@ -40,6 +41,7 @@ export default function ChildCard({
   onDragEnd,
   compact = false,
   hasUsageRecord = false,
+  showBothTransport = false,
 }: ChildCardProps) {
   // スロットに応じた背景色
   const getBackgroundClass = () => {
@@ -55,30 +57,47 @@ export default function ChildCard({
     return 'text-gray-800';
   };
 
-  // コンパクト表示（ポップアップ用）
+  // コンパクト表示（ドロップエリア内用）
   if (compact) {
     return (
-      <button
+      <div
+        draggable={draggable && !hasUsageRecord}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         onClick={onClick}
         className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg border transition-all
+          relative group flex items-center gap-1.5 px-2 py-1.5 rounded-md border transition-all text-xs
           ${getBackgroundClass()}
+          ${draggable && !hasUsageRecord ? 'cursor-grab active:cursor-grabbing' : ''}
           ${onClick ? 'cursor-pointer' : 'cursor-default'}
         `}
       >
-        <span className={`text-sm font-medium truncate ${getTextClass()}`}>
+        <span className={`font-medium truncate ${getTextClass()}`}>
           {child.name}
-          {(() => {
-            const ageDisplay = child.birthDate ? calculateAgeWithMonths(child.birthDate).display : child.age ? `${child.age}歳` : null;
-            return ageDisplay ? (
-              <span className="text-xs font-normal text-gray-500 ml-1.5">({ageDisplay})</span>
-            ) : null;
-          })()}
         </span>
-        {(child.needsPickup || child.needsDropoff) && (
-          <Car className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+        {/* 送迎両方ありの場合 */}
+        {showBothTransport && (
+          <span className="text-[9px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-bold flex-shrink-0">
+            迎送
+          </span>
         )}
-      </button>
+        {/* 実績登録済みマーク */}
+        {hasUsageRecord && (
+          <span className="text-[9px] text-green-600 flex-shrink-0">済</span>
+        )}
+        {/* 削除ボタン */}
+        {onRemove && !hasUsageRecord && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        )}
+      </div>
     );
   }
 

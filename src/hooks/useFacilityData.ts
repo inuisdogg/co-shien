@@ -14,6 +14,8 @@ import {
   FacilitySettings,
   UsageRecord,
   UsageRecordFormData,
+  ContactLog,
+  ContactLogFormData,
   Lead,
   LeadFormData,
   LeadStatus,
@@ -55,6 +57,24 @@ export const useFacilityData = () => {
       PM: { start: '13:00', end: '18:00' },
     },
     businessHoursPeriods: [],
+    flexibleBusinessHours: {
+      default: { start: '09:00', end: '18:00' },
+      dayOverrides: {},
+    },
+    serviceHours: {
+      AM: { start: '09:00', end: '12:00' },
+      PM: { start: '13:00', end: '18:00' },
+    },
+    flexibleServiceHours: {
+      default: { start: '09:00', end: '18:00' },
+      dayOverrides: {},
+    },
+    serviceCategories: {
+      childDevelopmentSupport: false,
+      afterSchoolDayService: true, // デフォルトで放デイを選択
+      nurseryVisitSupport: false,
+      homeBasedChildSupport: false,
+    },
     capacity: {
       AM: 10,
       PM: 10,
@@ -67,6 +87,7 @@ export const useFacilityData = () => {
   const [loadingStaff, setLoadingStaff] = useState(true);
 
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
+  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [managementTargets, setManagementTargets] = useState<ManagementTarget[]>([]);
   const [timeSlots, setTimeSlots] = useState<FacilityTimeSlot[]>([]);
@@ -119,6 +140,24 @@ export const useFacilityData = () => {
               PM: { start: '13:00', end: '18:00' },
             },
             businessHoursPeriods: data.business_hours_periods || [],
+            flexibleBusinessHours: data.flexible_business_hours || {
+              default: { start: '09:00', end: '18:00' },
+              dayOverrides: {},
+            },
+            serviceHours: data.service_hours || {
+              AM: { start: '09:00', end: '12:00' },
+              PM: { start: '13:00', end: '18:00' },
+            },
+            flexibleServiceHours: data.flexible_service_hours || {
+              default: { start: '09:00', end: '18:00' },
+              dayOverrides: {},
+            },
+            serviceCategories: data.service_categories || {
+              childDevelopmentSupport: false,
+              afterSchoolDayService: true,
+              nurseryVisitSupport: false,
+              homeBasedChildSupport: false,
+            },
             capacity: data.capacity || {
               AM: 10,
               PM: 10,
@@ -614,6 +653,70 @@ export const useFacilityData = () => {
     fetchSchedules();
   }, [facilityId]);
 
+  // Supabaseから連絡帳データを取得
+  useEffect(() => {
+    if (!facilityId) {
+      return;
+    }
+
+    const fetchContactLogs = async () => {
+      try {
+        console.log('📋 fetchContactLogs: 連絡帳データを取得中... facilityId:', facilityId);
+        const { data, error } = await supabase
+          .from('contact_logs')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .order('date', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching contact logs:', error);
+          return;
+        }
+
+        console.log('✅ fetchContactLogs: 連絡帳データ取得成功:', data?.length || 0, '件');
+        if (data) {
+          const contactLogsData: ContactLog[] = data.map((row) => ({
+            id: row.id,
+            facilityId: row.facility_id,
+            childId: row.child_id,
+            scheduleId: row.schedule_id || undefined,
+            date: row.date,
+            slot: row.slot || undefined,
+            activities: row.activities || undefined,
+            healthStatus: row.health_status || undefined,
+            mood: row.mood || undefined,
+            appetite: row.appetite || undefined,
+            mealMain: row.meal_main || false,
+            mealSide: row.meal_side || false,
+            mealNotes: row.meal_notes || undefined,
+            toiletCount: row.toilet_count || 0,
+            toiletNotes: row.toilet_notes || undefined,
+            napStartTime: row.nap_start_time || undefined,
+            napEndTime: row.nap_end_time || undefined,
+            napNotes: row.nap_notes || undefined,
+            staffComment: row.staff_comment || undefined,
+            staffUserId: row.staff_user_id || undefined,
+            parentMessage: row.parent_message || undefined,
+            parentReply: row.parent_reply || undefined,
+            parentReplyAt: row.parent_reply_at || undefined,
+            isSigned: row.is_signed || false,
+            signedAt: row.signed_at || undefined,
+            signedByUserId: row.signed_by_user_id || undefined,
+            signatureData: row.signature_data || undefined,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+            createdBy: row.created_by || undefined,
+          }));
+          setContactLogs(contactLogsData);
+        }
+      } catch (error) {
+        console.error('❌ Error in fetchContactLogs:', error);
+      }
+    };
+
+    fetchContactLogs();
+  }, [facilityId]);
+
   // Supabaseからリードデータを取得
   useEffect(() => {
     if (!facilityId) {
@@ -1007,6 +1110,10 @@ export const useFacilityData = () => {
           include_holidays: updatedSettings.includeHolidays ?? false,
           business_hours: updatedSettings.businessHours,
           business_hours_periods: updatedSettings.businessHoursPeriods || [],
+          flexible_business_hours: updatedSettings.flexibleBusinessHours || null,
+          service_hours: updatedSettings.serviceHours || null,
+          flexible_service_hours: updatedSettings.flexibleServiceHours || null,
+          service_categories: updatedSettings.serviceCategories || null,
           capacity: updatedSettings.capacity,
           // 送迎可能人数
           transport_capacity: updatedSettings.transportCapacity || { pickup: 4, dropoff: 4 },
@@ -1144,6 +1251,41 @@ export const useFacilityData = () => {
       ));
     } catch (error) {
       console.error('Error in moveSchedule:', error);
+      throw error;
+    }
+  };
+
+  // スケジュールの送迎設定を更新
+  const updateScheduleTransport = async (scheduleId: string, hasPickup: boolean, hasDropoff: boolean) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    if (!schedule) {
+      throw new Error('スケジュールが見つかりません');
+    }
+
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('schedules')
+        .update({
+          has_pickup: hasPickup,
+          has_dropoff: hasDropoff,
+          updated_at: now,
+        })
+        .eq('id', scheduleId);
+
+      if (error) {
+        console.error('Error updating schedule transport:', error);
+        throw error;
+      }
+
+      // ローカル状態を更新
+      setSchedules(schedules.map(s =>
+        s.id === scheduleId
+          ? { ...s, hasPickup, hasDropoff, updatedAt: now }
+          : s
+      ));
+    } catch (error) {
+      console.error('Error in updateScheduleTransport:', error);
       throw error;
     }
   };
@@ -1325,6 +1467,146 @@ export const useFacilityData = () => {
     () => usageRecords.filter((r) => r.facilityId === facilityId),
     [usageRecords, facilityId]
   );
+
+  // 連絡帳機能
+  const filteredContactLogs = useMemo(
+    () => contactLogs.filter((c) => c.facilityId === facilityId),
+    [contactLogs, facilityId]
+  );
+
+  const getContactLogByScheduleId = (scheduleId: string): ContactLog | undefined => {
+    return contactLogs.find((c) => c.scheduleId === scheduleId);
+  };
+
+  const getContactLogByChildAndDate = (childId: string, date: string, slot?: string): ContactLog | undefined => {
+    return contactLogs.find((c) =>
+      c.childId === childId &&
+      c.date === date &&
+      (slot ? c.slot === slot : true)
+    );
+  };
+
+  const addContactLog = async (data: ContactLogFormData) => {
+    if (!facilityId) {
+      throw new Error('施設IDが設定されていません');
+    }
+
+    const contactLogId = `contact-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    try {
+      const { error } = await supabase
+        .from('contact_logs')
+        .insert({
+          id: contactLogId,
+          facility_id: facilityId,
+          child_id: data.childId,
+          schedule_id: data.scheduleId || null,
+          date: data.date,
+          slot: data.slot || null,
+          activities: data.activities || null,
+          health_status: data.healthStatus || null,
+          mood: data.mood || null,
+          appetite: data.appetite || null,
+          meal_main: data.mealMain || false,
+          meal_side: data.mealSide || false,
+          meal_notes: data.mealNotes || null,
+          toilet_count: data.toiletCount || 0,
+          toilet_notes: data.toiletNotes || null,
+          nap_start_time: data.napStartTime || null,
+          nap_end_time: data.napEndTime || null,
+          nap_notes: data.napNotes || null,
+          staff_comment: data.staffComment || null,
+          staff_user_id: data.staffUserId || null,
+          parent_message: data.parentMessage || null,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding contact log:', error);
+        throw error;
+      }
+
+      const newContactLog: ContactLog = {
+        ...data,
+        id: contactLogId,
+        facilityId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setContactLogs([...contactLogs, newContactLog]);
+      return newContactLog;
+    } catch (error) {
+      console.error('Error in addContactLog:', error);
+      throw error;
+    }
+  };
+
+  const updateContactLog = async (contactLogId: string, data: Partial<ContactLogFormData>) => {
+    try {
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (data.activities !== undefined) updateData.activities = data.activities;
+      if (data.healthStatus !== undefined) updateData.health_status = data.healthStatus;
+      if (data.mood !== undefined) updateData.mood = data.mood;
+      if (data.appetite !== undefined) updateData.appetite = data.appetite;
+      if (data.mealMain !== undefined) updateData.meal_main = data.mealMain;
+      if (data.mealSide !== undefined) updateData.meal_side = data.mealSide;
+      if (data.mealNotes !== undefined) updateData.meal_notes = data.mealNotes;
+      if (data.toiletCount !== undefined) updateData.toilet_count = data.toiletCount;
+      if (data.toiletNotes !== undefined) updateData.toilet_notes = data.toiletNotes;
+      if (data.napStartTime !== undefined) updateData.nap_start_time = data.napStartTime;
+      if (data.napEndTime !== undefined) updateData.nap_end_time = data.napEndTime;
+      if (data.napNotes !== undefined) updateData.nap_notes = data.napNotes;
+      if (data.staffComment !== undefined) updateData.staff_comment = data.staffComment;
+      if (data.parentMessage !== undefined) updateData.parent_message = data.parentMessage;
+
+      const { error } = await supabase
+        .from('contact_logs')
+        .update(updateData)
+        .eq('id', contactLogId);
+
+      if (error) {
+        console.error('Error updating contact log:', error);
+        throw error;
+      }
+
+      setContactLogs(
+        contactLogs.map((c) =>
+          c.id === contactLogId
+            ? { ...c, ...data, updatedAt: updateData.updated_at }
+            : c
+        )
+      );
+    } catch (error) {
+      console.error('Error in updateContactLog:', error);
+      throw error;
+    }
+  };
+
+  const deleteContactLog = async (contactLogId: string) => {
+    try {
+      const { error } = await supabase
+        .from('contact_logs')
+        .delete()
+        .eq('id', contactLogId);
+
+      if (error) {
+        console.error('Error deleting contact log:', error);
+        throw error;
+      }
+
+      setContactLogs(contactLogs.filter((c) => c.id !== contactLogId));
+    } catch (error) {
+      console.error('Error in deleteContactLog:', error);
+      throw error;
+    }
+  };
 
   const filteredLeads = useMemo(
     () => leads.filter((l) => l.facilityId === facilityId),
@@ -1734,14 +2016,89 @@ export const useFacilityData = () => {
 
   // シフト管理機能
   const saveShifts = async (shifts: Record<string, Record<string, boolean>>) => {
+    console.log('💾 saveShifts 開始:', { facilityId, shiftsCount: Object.keys(shifts).length });
+
     if (!facilityId) {
       console.warn('⚠️  saveShifts: facilityIdが設定されていません');
-      return;
+      throw new Error('施設IDが設定されていません');
     }
 
     try {
       console.log('💾 saveShifts: シフトデータを保存中...', Object.keys(shifts).length, '名分');
-      
+
+      // emp-プレフィックス付きIDをstaffテーブルのIDにマッピングする
+      const staffIdMapping: Record<string, string> = {};
+      const empPrefixedIds = Object.keys(shifts).filter(id => id.startsWith('emp-'));
+
+      if (empPrefixedIds.length > 0) {
+        // employment_recordsのIDからuser_idを取得
+        const empIds = empPrefixedIds.map(id => id.replace('emp-', ''));
+        const { data: empRecords } = await supabase
+          .from('employment_records')
+          .select('id, user_id')
+          .in('id', empIds);
+
+        if (empRecords) {
+          const userIds = empRecords.map(e => e.user_id).filter(Boolean);
+
+          // user_idからstaffテーブルのIDを取得
+          if (userIds.length > 0) {
+            const { data: staffRecords } = await supabase
+              .from('staff')
+              .select('id, user_id')
+              .eq('facility_id', facilityId)
+              .in('user_id', userIds);
+
+            // マッピングを作成し、staffテーブルにエントリがないユーザーを特定
+            const usersWithoutStaff: string[] = [];
+            for (const emp of empRecords) {
+              const matchingStaff = staffRecords?.find(s => s.user_id === emp.user_id);
+              if (matchingStaff) {
+                staffIdMapping[`emp-${emp.id}`] = matchingStaff.id;
+              } else if (emp.user_id) {
+                usersWithoutStaff.push(emp.user_id);
+              }
+            }
+
+            // staffテーブルにエントリがないユーザー用にエントリを作成
+            if (usersWithoutStaff.length > 0) {
+              console.log('📝 staffテーブルにエントリを作成:', usersWithoutStaff.length, '件');
+
+              // ユーザー情報を取得
+              const { data: usersData } = await supabase
+                .from('users')
+                .select('id, name')
+                .in('id', usersWithoutStaff);
+
+              if (usersData) {
+                for (const user of usersData) {
+                  const newStaffId = `staff-${user.id}`;
+                  const { error: insertError } = await supabase
+                    .from('staff')
+                    .upsert({
+                      id: newStaffId,
+                      facility_id: facilityId,
+                      user_id: user.id,
+                      name: user.name || '名称未設定',
+                      role: '一般スタッフ',
+                      type: '常勤',
+                    }, { onConflict: 'id' });
+
+                  if (!insertError) {
+                    // マッピングを追加
+                    const emp = empRecords.find(e => e.user_id === user.id);
+                    if (emp) {
+                      staffIdMapping[`emp-${emp.id}`] = newStaffId;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        console.log('📋 staff ID マッピング:', staffIdMapping);
+      }
+
       // すべてのシフトデータを準備（has_shiftがfalseのものも含む）
       const shiftData: Array<{
         facility_id: string;
@@ -1751,10 +2108,19 @@ export const useFacilityData = () => {
       }> = [];
 
       for (const [staffId, dates] of Object.entries(shifts)) {
+        // emp-プレフィックスがある場合はマッピングから実際のstaff_idを取得
+        const actualStaffId = staffIdMapping[staffId] || staffId;
+
+        // マッピングできなかった emp- ID はスキップ
+        if (staffId.startsWith('emp-') && !staffIdMapping[staffId]) {
+          console.warn('⚠️  スキップ: マッピングできないstaff ID:', staffId);
+          continue;
+        }
+
         for (const [date, hasShift] of Object.entries(dates)) {
           shiftData.push({
             facility_id: facilityId,
-            staff_id: staffId,
+            staff_id: actualStaffId,
             date: date,
             has_shift: hasShift,
           });
@@ -1773,12 +2139,15 @@ export const useFacilityData = () => {
         updated_at: now,
       }));
 
+      console.log('📤 saveShifts: upsertするデータ:', upsertData.length, '件', upsertData.slice(0, 3));
+
       const { error: upsertError } = await supabase
         .from('shifts')
         .upsert(upsertData, { onConflict: 'facility_id,staff_id,date' });
 
       if (upsertError) {
         console.error('❌ Error upserting shifts:', upsertError);
+        console.error('❌ Error details:', JSON.stringify(upsertError, null, 2));
         throw upsertError;
       }
 
@@ -1797,6 +2166,8 @@ export const useFacilityData = () => {
 
     try {
       console.log('🕐 fetchShifts: シフトデータを取得中...', startDate, '～', endDate);
+
+      // シフトデータを取得
       const { data, error } = await supabase
         .from('shifts')
         .select('staff_id, date, has_shift')
@@ -1809,13 +2180,49 @@ export const useFacilityData = () => {
         return {};
       }
 
+      // staff_id → emp-{employment_record_id} の逆マッピングを作成
+      const reverseMapping: Record<string, string> = {};
+
+      // staffテーブルからuser_idを取得
+      const { data: staffRecords } = await supabase
+        .from('staff')
+        .select('id, user_id')
+        .eq('facility_id', facilityId);
+
+      if (staffRecords && staffRecords.length > 0) {
+        const userIdsFromStaff = staffRecords.map(s => s.user_id).filter(Boolean);
+
+        if (userIdsFromStaff.length > 0) {
+          // employment_recordsからuser_idとidのマッピングを取得
+          const { data: empRecords } = await supabase
+            .from('employment_records')
+            .select('id, user_id')
+            .eq('facility_id', facilityId)
+            .in('user_id', userIdsFromStaff);
+
+          if (empRecords) {
+            for (const staff of staffRecords) {
+              const emp = empRecords.find(e => e.user_id === staff.user_id);
+              if (emp) {
+                // staff.id → emp-{emp.id} のマッピング
+                reverseMapping[staff.id] = `emp-${emp.id}`;
+              }
+            }
+          }
+        }
+      }
+
+      console.log('📋 逆マッピング:', Object.keys(reverseMapping).length, '件');
+
       const shifts: Record<string, Record<string, boolean>> = {};
       if (data) {
         for (const row of data) {
-          if (!shifts[row.staff_id]) {
-            shifts[row.staff_id] = {};
+          // staff_idを元のID（emp-付き または そのまま）に変換
+          const originalId = reverseMapping[row.staff_id] || row.staff_id;
+          if (!shifts[originalId]) {
+            shifts[originalId] = {};
           }
-          shifts[row.staff_id][row.date] = row.has_shift;
+          shifts[originalId][row.date] = row.has_shift;
         }
         console.log('✅ fetchShifts: シフトデータ取得成功:', data.length, '件');
       } else {
@@ -1971,6 +2378,7 @@ export const useFacilityData = () => {
     loadingChildren,
     loadingStaff,
     usageRecords: filteredUsageRecords,
+    contactLogs: filteredContactLogs,
     leads: filteredLeads,
     managementTargets: filteredManagementTargets,
     timeSlots,
@@ -1987,6 +2395,7 @@ export const useFacilityData = () => {
     updateFacilitySettings,
     deleteSchedule,
     moveSchedule,
+    updateScheduleTransport,
     bulkRegisterFromPatterns,
     resetDaySchedules,
     resetMonthSchedules,
@@ -1994,6 +2403,11 @@ export const useFacilityData = () => {
     updateUsageRecord,
     deleteUsageRecord,
     getUsageRecordByScheduleId,
+    addContactLog,
+    updateContactLog,
+    deleteContactLog,
+    getContactLogByScheduleId,
+    getContactLogByChildAndDate,
     addLead,
     updateLead,
     deleteLead,

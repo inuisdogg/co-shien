@@ -2046,7 +2046,7 @@ function ActivatePageContent() {
                 {facilityName}との連携を開始しました
               </p>
               <button
-                onClick={() => router.push('/staff-dashboard')}
+                onClick={() => router.push('/career')}
                 className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
               >
                 ダッシュボードへ

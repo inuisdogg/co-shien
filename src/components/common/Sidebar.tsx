@@ -1,11 +1,12 @@
 /**
  * サイドバーコンポーネント
  * アコーディオン形式のメニューでUXを改善
+ * フェーズ管理対応: NEXT_PUBLIC_FEATURE_PHASE 環境変数で表示メニューを制御
  */
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import {
   CalendarDays,
@@ -32,28 +33,79 @@ import {
   Truck,
   ChevronDown,
   ChevronRight,
+  Zap,
+  Library,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { supabase } from '@/lib/supabase';
+
+// フェーズ定義
+// Phase 1 (P0-P1): 実務必須機能 - 施設情報、スタッフ管理、シフト管理、児童管理、利用予約、業務日誌、ダッシュボード、個別支援計画、書類管理
+// Phase 2 (P2): 請求・監査・経営 - 運営指導準備、経営設定、研修記録、委員会管理、損益計算書、キャッシュフロー、経費管理、苦情・事故報告
+// Phase 3 (P3): 外部連携・SaaS化 - 送迎ルート、チャット、コネクト、利用者招待、リード管理
+type FeaturePhase = 1 | 2 | 3;
+
+// 各メニュー項目のフェーズ設定
+const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
+  // Phase 1: 実務必須
+  'schedule': 1,      // 利用予約
+  'children': 1,      // 児童管理
+  'daily-log': 1,     // 業務日誌
+  'support-plan': 1,  // 個別支援計画
+  'staff': 1,         // スタッフ管理
+  'shift': 1,         // シフト管理
+  'dashboard': 1,     // ダッシュボード
+  'facility': 1,      // 施設情報
+  'documents': 1,     // 書類管理
+  'addition-settings': 1, // 加算体制設定
+  'knowledge': 1,     // ナレッジベース
+
+  // Phase 2: 請求・監査・経営
+  'audit-preparation': 2, // 運営指導準備
+  'management': 2,        // 経営設定
+  'addition-catalog': 1,  // 加算一覧（Phase 1で表示）
+  'training': 2,          // 研修記録
+  'committee': 2,         // 委員会管理
+  'profit-loss': 2,       // 損益計算書
+  'cash-flow': 2,         // キャッシュフロー
+  'expense-management': 2, // 経費管理
+  'incident': 2,          // 苦情・事故報告
+
+  // Phase 3: 外部連携・SaaS化
+  'transport': 1,         // 送迎ルート（Phase 1で表示）
+  'chat': 3,              // チャット
+  'connect': 3,           // コネクト
+  'client-invitation': 3, // 利用者招待
+  'lead': 3,              // リード管理
+  'government': 2,        // 行政連携
+};
+
+// 現在のフェーズを取得
+const getCurrentPhase = (): FeaturePhase => {
+  const phase = parseInt(process.env.NEXT_PUBLIC_FEATURE_PHASE || '1', 10);
+  if (phase >= 1 && phase <= 3) return phase as FeaturePhase;
+  return 1;
+};
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   isOpen?: boolean;
   onClose?: () => void;
-  mode?: 'biz' | 'personal';
+  mode?: 'business' | 'career';
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = false, onClose, mode = 'biz' }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = false, onClose, mode = 'business' }) => {
   const { facility } = useAuth();
   const { facilitySettings } = useFacilityData();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const { isAdmin, isMaster, hasPermission } = useAuth();
-  const isPersonal = mode === 'personal';
-  const primaryColor = isPersonal ? '#8b5cf6' : '#00c4cc';
+  const isCareer = mode === 'career';
+  const primaryColor = isCareer ? '#818CF8' : '#00c4cc';
+  const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // 最新の施設コードを取得
   useEffect(() => {
@@ -80,15 +132,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
   // メニューを用途ごとに定義（整理・統合済み）
   const menuCategories = [
     {
-      category: '利用者',
+      category: '保護者',
       icon: Users,
       items: [
         { id: 'schedule', label: '利用予約', icon: CalendarDays, permission: 'schedule' as const },
         { id: 'children', label: '児童管理', icon: Users, permission: 'children' as const },
-        { id: 'transport', label: '送迎ルート', icon: Truck, permission: 'transport' as const },
         { id: 'chat', label: 'チャット', icon: MessageSquare, permission: 'chat' as const },
         { id: 'connect', label: 'コネクト', icon: Link2, permission: 'connect' as const },
-        { id: 'client-invitation', label: '利用者招待', icon: UserPlus, permission: 'clientInvitation' as const },
+        { id: 'client-invitation', label: '保護者招待', icon: UserPlus, permission: 'clientInvitation' as const },
         { id: 'lead', label: 'リード管理', icon: Target, permission: 'lead' as const },
       ],
     },
@@ -96,7 +147,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       category: '記録',
       icon: BookOpen,
       items: [
-        { id: 'daily-log', label: '業務日誌', icon: BookOpen, permission: 'dailyLog' as const },
+        { id: 'daily-log', label: '実績と連絡帳', icon: BookOpen, permission: 'dailyLog' as const },
         { id: 'support-plan', label: '個別支援計画', icon: ClipboardList, permission: 'supportPlan' as const },
         { id: 'incident', label: '苦情・事故報告', icon: AlertTriangle, permission: 'incident' as const },
       ],
@@ -108,15 +159,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'staff', label: 'スタッフ管理', icon: Users, permission: 'staff' as const },
         { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'shift' as const },
         { id: 'training', label: '研修記録', icon: GraduationCap, permission: 'training' as const },
+        { id: 'knowledge', label: 'ナレッジ', icon: Library, permission: 'staff' as const },
       ],
     },
     {
       category: '運営',
       icon: ClipboardCheck,
       items: [
+        { id: 'transport', label: '送迎ルート', icon: Truck, permission: 'transport' as const },
         { id: 'audit-preparation', label: '運営指導準備', icon: ClipboardCheck, permission: 'auditPreparation' as const },
         { id: 'committee', label: '委員会管理', icon: UsersRound, permission: 'committee' as const },
         { id: 'documents', label: '書類管理', icon: FileText, permission: 'documents' as const },
+        { id: 'government', label: '行政連携', icon: Building2, permission: 'dashboard' as const },
       ],
     },
     {
@@ -124,6 +178,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       icon: BarChart3,
       items: [
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
+        { id: 'addition-catalog', label: '加算一覧', icon: Zap, permission: 'dashboard' as const },
         { id: 'profit-loss', label: '損益計算書', icon: TrendingUp, permission: 'profitLoss' as const },
         { id: 'cash-flow', label: 'キャッシュフロー', icon: Wallet, permission: 'cashFlow' as const },
         { id: 'expense-management', label: '経費管理', icon: Receipt, permission: 'expenseManagement' as const },
@@ -135,19 +190,28 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       icon: Settings,
       items: [
         { id: 'facility', label: '施設情報', icon: Settings, permission: 'facility' as const },
+        { id: 'addition-settings', label: '加算体制設定', icon: Zap, permission: 'facility' as const },
       ],
     },
   ];
 
-  // 権限に基づいてメニューをフィルタリング
+  // 現在のフェーズを取得
+  const currentPhase = getCurrentPhase();
+
+  // 権限とフェーズに基づいてメニューをフィルタリング
   const filteredCategories = useMemo(() => menuCategories.map((category) => ({
     ...category,
     items: category.items.filter((item) => {
+      // フェーズによるフィルタリング
+      const menuPhase = MENU_PHASE_CONFIG[item.id] || 1;
+      if (menuPhase > currentPhase) return false;
+
+      // 権限によるフィルタリング
       if (isAdmin) return true; // 管理者は全メニューにアクセス可能
       return hasPermission(item.permission);
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  })).filter((category) => category.items.length > 0), [isAdmin]);
+  })).filter((category) => category.items.length > 0), [isAdmin, currentPhase]);
 
   // アクティブなタブが含まれるカテゴリを自動展開
   useEffect(() => {
@@ -167,6 +231,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         newSet.delete(category);
       } else {
         newSet.add(category);
+        // 展開時に少し遅延してスクロール（アニメーション後に実行）
+        setTimeout(() => {
+          const element = categoryRefs.current[category];
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }, 50);
       }
       return newSet;
     });
@@ -208,13 +279,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
           const CategoryIcon = category.icon;
 
           return (
-            <div key={category.category} className={categoryIndex > 0 ? 'mt-1' : ''}>
+            <div
+              key={category.category}
+              ref={(el) => { categoryRefs.current[category.category] = el; }}
+              className={categoryIndex > 0 ? 'mt-1' : ''}
+            >
               {/* カテゴリヘッダー（クリックで展開/折りたたみ） */}
               <button
                 onClick={() => toggleCategory(category.category)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
                   hasActiveItem
-                    ? `${isPersonal ? 'bg-purple-50 text-purple-700' : 'bg-teal-50 text-teal-700'}`
+                    ? `${isCareer ? 'bg-purple-50 text-purple-700' : 'bg-teal-50 text-teal-700'}`
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -245,7 +320,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                       }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-[13px] ${
                         activeTab === item.id
-                          ? `${isPersonal ? 'bg-[#8b5cf6]' : 'bg-[#00c4cc]'} text-white font-bold shadow-sm`
+                          ? `${isCareer ? 'bg-[#818CF8]' : 'bg-[#00c4cc]'} text-white font-bold shadow-sm`
                           : 'text-gray-600 hover:bg-gray-100 font-medium'
                       }`}
                     >

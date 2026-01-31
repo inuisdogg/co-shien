@@ -1,14 +1,21 @@
 /**
  * 児童選択ポップアップ
  * [+]ボタンクリック時に表示される児童選択UI
+ * 送迎オプションの個別設定に対応
  */
 
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, Car, Check } from 'lucide-react';
+import { Search, X, Car, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Child, TimeSlot } from '@/types';
-import ChildCard from './ChildCard';
+
+// 選択された児童の情報（送迎オプション付き）
+export interface SelectedChildWithTransport {
+  childId: string;
+  hasPickup: boolean;
+  hasDropoff: boolean;
+}
 
 interface ChildPickerPopupProps {
   isOpen: boolean;
@@ -18,6 +25,7 @@ interface ChildPickerPopupProps {
   date: string;
   alreadyRegisteredIds: string[];  // 既に登録済みの児童ID
   onSelect: (childIds: string[]) => void;
+  onSelectWithTransport?: (children: SelectedChildWithTransport[]) => void; // 送迎オプション付き
   multiSelect?: boolean;
 }
 
@@ -29,10 +37,13 @@ export default function ChildPickerPopup({
   date,
   alreadyRegisteredIds,
   onSelect,
+  onSelectWithTransport,
   multiSelect = true,
 }: ChildPickerPopupProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // 送迎オプション: childId -> { hasPickup, hasDropoff }
+  const [transportOptions, setTransportOptions] = useState<Record<string, { hasPickup: boolean; hasDropoff: boolean }>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 曜日を取得
@@ -49,6 +60,7 @@ export default function ChildPickerPopup({
     // 開いたときに選択をリセット
     if (isOpen) {
       setSelectedIds([]);
+      setTransportOptions({});
       setSearchQuery('');
     }
   }, [isOpen]);
@@ -99,23 +111,70 @@ export default function ChildPickerPopup({
 
   // 児童選択トグル
   const toggleChild = (childId: string) => {
+    const child = childList.find(c => c.id === childId);
+
     if (multiSelect) {
-      setSelectedIds(prev =>
-        prev.includes(childId)
-          ? prev.filter(id => id !== childId)
-          : [...prev, childId]
-      );
+      setSelectedIds(prev => {
+        if (prev.includes(childId)) {
+          // 選択解除時は送迎オプションも削除
+          setTransportOptions(opts => {
+            const newOpts = { ...opts };
+            delete newOpts[childId];
+            return newOpts;
+          });
+          return prev.filter(id => id !== childId);
+        } else {
+          // 選択時は児童のデフォルト送迎設定を使用
+          setTransportOptions(opts => ({
+            ...opts,
+            [childId]: {
+              hasPickup: child?.needsPickup || false,
+              hasDropoff: child?.needsDropoff || false,
+            }
+          }));
+          return [...prev, childId];
+        }
+      });
     } else {
       // 単一選択の場合は即座に確定
-      onSelect([childId]);
+      if (onSelectWithTransport) {
+        onSelectWithTransport([{
+          childId,
+          hasPickup: child?.needsPickup || false,
+          hasDropoff: child?.needsDropoff || false,
+        }]);
+      } else {
+        onSelect([childId]);
+      }
       onClose();
     }
+  };
+
+  // 送迎オプションのトグル
+  const toggleTransportOption = (childId: string, option: 'pickup' | 'dropoff') => {
+    setTransportOptions(opts => ({
+      ...opts,
+      [childId]: {
+        ...opts[childId],
+        [option === 'pickup' ? 'hasPickup' : 'hasDropoff']: !opts[childId]?.[option === 'pickup' ? 'hasPickup' : 'hasDropoff']
+      }
+    }));
   };
 
   // 確定
   const handleConfirm = () => {
     if (selectedIds.length > 0) {
-      onSelect(selectedIds);
+      if (onSelectWithTransport) {
+        // 送迎オプション付きで返す
+        const childrenWithTransport: SelectedChildWithTransport[] = selectedIds.map(childId => ({
+          childId,
+          hasPickup: transportOptions[childId]?.hasPickup || false,
+          hasDropoff: transportOptions[childId]?.hasDropoff || false,
+        }));
+        onSelectWithTransport(childrenWithTransport);
+      } else {
+        onSelect(selectedIds);
+      }
       onClose();
     }
   };
@@ -179,44 +238,90 @@ export default function ChildPickerPopup({
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="space-y-2">
               {availableChildren.map(child => {
                 const isSelected = selectedIds.includes(child.id);
                 const patternMatch = isPatternMatch(child);
+                const transport = transportOptions[child.id];
 
                 return (
-                  <button
+                  <div
                     key={child.id}
-                    onClick={() => toggleChild(child.id)}
                     className={`
-                      relative flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all text-left
+                      rounded-lg border transition-all
                       ${isSelected
-                        ? 'bg-[#00c4cc] border-[#00c4cc] text-white'
+                        ? 'bg-[#00c4cc]/5 border-[#00c4cc]'
                         : patternMatch
                           ? 'bg-yellow-50 border-yellow-200 hover:border-yellow-300'
                           : 'bg-white border-gray-200 hover:border-gray-300'
                       }
                     `}
                   >
-                    {/* 選択チェック */}
-                    {multiSelect && isSelected && (
-                      <Check className="w-4 h-4 flex-shrink-0" />
-                    )}
+                    {/* 児童名と選択 */}
+                    <button
+                      onClick={() => toggleChild(child.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+                    >
+                      {/* 選択チェック */}
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        isSelected
+                          ? 'bg-[#00c4cc] border-[#00c4cc]'
+                          : 'border-gray-300'
+                      }`}>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                      </div>
 
-                    {/* 名前 */}
-                    <span className={`text-sm font-medium truncate ${
-                      isSelected ? 'text-white' : 'text-gray-800'
-                    }`}>
-                      {child.name}
-                    </span>
+                      {/* 名前 */}
+                      <span className="text-sm font-medium text-gray-800 flex-1">
+                        {child.name}
+                      </span>
 
-                    {/* 送迎マーク */}
-                    {(child.needsPickup || child.needsDropoff) && (
-                      <Car className={`w-3.5 h-3.5 flex-shrink-0 ${
-                        isSelected ? 'text-white/80' : 'text-gray-400'
-                      }`} />
+                      {/* デフォルト送迎設定の表示（未選択時） */}
+                      {!isSelected && (child.needsPickup || child.needsDropoff) && (
+                        <span className="text-xs text-gray-400 flex items-center gap-1">
+                          <Car className="w-3.5 h-3.5" />
+                          {child.needsPickup && child.needsDropoff ? '送迎あり' : child.needsPickup ? '迎えあり' : '送りあり'}
+                        </span>
+                      )}
+
+                      {/* パターン一致マーク */}
+                      {patternMatch && (
+                        <span className="text-[10px] bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded font-bold">
+                          パターン
+                        </span>
+                      )}
+                    </button>
+
+                    {/* 送迎オプション（選択時のみ表示） */}
+                    {isSelected && (
+                      <div className="px-3 pb-2.5 flex items-center gap-4 ml-8">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={transport?.hasPickup || false}
+                            onChange={() => toggleTransportOption(child.id, 'pickup')}
+                            className="w-4 h-4 rounded border-gray-300 text-[#00c4cc] focus:ring-[#00c4cc]"
+                          />
+                          <span className="text-xs text-gray-600 flex items-center gap-1">
+                            <ArrowRight className="w-3 h-3" />
+                            お迎え
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={transport?.hasDropoff || false}
+                            onChange={() => toggleTransportOption(child.id, 'dropoff')}
+                            className="w-4 h-4 rounded border-gray-300 text-[#00c4cc] focus:ring-[#00c4cc]"
+                          />
+                          <span className="text-xs text-gray-600 flex items-center gap-1">
+                            <ArrowLeft className="w-3 h-3" />
+                            お送り
+                          </span>
+                        </label>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>

@@ -18,9 +18,14 @@ import {
   AlertCircle,
   CheckCircle,
   Route,
+  User,
+  Users,
+  Check,
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
-import { Child, ScheduleItem } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { Child, ScheduleItem, DailyTransportAssignment, TransportCompletionRecord, Staff } from '@/types';
+import { supabase } from '@/lib/supabase';
 import {
   calculateOptimizedRoute,
   calculateCustomRoute,
@@ -47,7 +52,8 @@ interface RouteData {
 }
 
 export default function TransportRouteView() {
-  const { children, facilitySettings, schedules } = useFacilityData();
+  const { children, facilitySettings, schedules, staff } = useFacilityData();
+  const { facility } = useAuth();
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -67,6 +73,20 @@ export default function TransportRouteView() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [facilityLocation, setFacilityLocation] = useState<LatLng | null>(null);
 
+  // 送迎担当者
+  const [transportAssignment, setTransportAssignment] = useState<{
+    driverStaffId: string;
+    driverName: string;
+    attendantStaffId: string;
+    attendantName: string;
+  } | null>(null);
+
+  // 送迎完了チェック記録
+  const [completionRecords, setCompletionRecords] = useState<Record<string, {
+    pickupCompleted: boolean;
+    dropoffCompleted: boolean;
+  }>>({});
+
   // 施設の座標を取得
   useEffect(() => {
     const getFacilityLocation = async () => {
@@ -82,6 +102,99 @@ export default function TransportRouteView() {
     };
     getFacilityLocation();
   }, [facilitySettings]);
+
+  // 送迎担当者と完了記録を取得
+  useEffect(() => {
+    const fetchTransportData = async () => {
+      if (!facility?.id) return;
+
+      // 送迎担当者を取得
+      const { data: assignmentData } = await supabase
+        .from('daily_transport_assignments')
+        .select('*, driver:staff!driver_staff_id(id, name), attendant:staff!attendant_staff_id(id, name)')
+        .eq('facility_id', facility.id)
+        .eq('date', selectedDate)
+        .single();
+
+      if (assignmentData) {
+        setTransportAssignment({
+          driverStaffId: assignmentData.driver_staff_id,
+          driverName: (assignmentData.driver as any)?.name || '未設定',
+          attendantStaffId: assignmentData.attendant_staff_id,
+          attendantName: (assignmentData.attendant as any)?.name || '未設定',
+        });
+      } else {
+        setTransportAssignment(null);
+      }
+
+      // 完了記録を取得
+      const { data: completionData } = await supabase
+        .from('transport_completion_records')
+        .select('*')
+        .eq('facility_id', facility.id)
+        .eq('date', selectedDate);
+
+      if (completionData) {
+        const records: Record<string, { pickupCompleted: boolean; dropoffCompleted: boolean }> = {};
+        completionData.forEach((row: any) => {
+          records[row.child_id] = {
+            pickupCompleted: row.pickup_completed || false,
+            dropoffCompleted: row.dropoff_completed || false,
+          };
+        });
+        setCompletionRecords(records);
+      }
+    };
+
+    fetchTransportData();
+  }, [facility?.id, selectedDate]);
+
+  // 送迎完了をトグル
+  const toggleCompletion = async (childId: string, scheduleId: string, type: 'pickup' | 'dropoff') => {
+    if (!facility?.id) return;
+
+    const currentRecord = completionRecords[childId] || { pickupCompleted: false, dropoffCompleted: false };
+    const newValue = type === 'pickup' ? !currentRecord.pickupCompleted : !currentRecord.dropoffCompleted;
+
+    try {
+      const updateData: any = {
+        facility_id: facility.id,
+        date: selectedDate,
+        schedule_id: scheduleId,
+        child_id: childId,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (type === 'pickup') {
+        updateData.pickup_completed = newValue;
+        if (newValue) {
+          updateData.pickup_completed_at = new Date().toISOString();
+        }
+      } else {
+        updateData.dropoff_completed = newValue;
+        if (newValue) {
+          updateData.dropoff_completed_at = new Date().toISOString();
+        }
+      }
+
+      const { error } = await supabase
+        .from('transport_completion_records')
+        .upsert(updateData, { onConflict: 'facility_id,date,schedule_id' });
+
+      if (error) throw error;
+
+      setCompletionRecords(prev => ({
+        ...prev,
+        [childId]: {
+          ...prev[childId],
+          [type === 'pickup' ? 'pickupCompleted' : 'dropoffCompleted']: newValue,
+        },
+      }));
+    } catch (error) {
+      console.error('完了チェックの更新に失敗:', error);
+      alert('完了チェックの更新に失敗しました');
+    }
+  };
 
   // 選択日に送迎が必要な児童を抽出
   const transportChildren = useMemo(() => {
@@ -394,45 +507,75 @@ export default function TransportRouteView() {
               </div>
 
               {/* 各地点 */}
-              {data.children.map((tc, index) => (
-                <div
-                  key={tc.child.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index, type)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index, type)}
-                  className={`flex items-center gap-3 py-2 px-3 rounded-lg border cursor-move transition-colors ${
-                    tc.isGeocoded
-                      ? 'bg-white border-gray-200 hover:border-[#00c4cc]'
-                      : 'bg-red-50 border-red-200'
-                  }`}
-                >
-                  <GripVertical className="w-4 h-4 text-gray-400" />
-                  <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-800 truncate">{tc.child.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{tc.address}</p>
-                    {!tc.isGeocoded && (
-                      <p className="text-xs text-red-600 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        住所が正しく認識できません
+              {data.children.map((tc, index) => {
+                const schedule = schedules.find(s => s.date === selectedDate && s.childId === tc.child.id);
+                const isCompleted = type === 'pickup'
+                  ? completionRecords[tc.child.id]?.pickupCompleted
+                  : completionRecords[tc.child.id]?.dropoffCompleted;
+
+                return (
+                  <div
+                    key={tc.child.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index, type)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index, type)}
+                    className={`flex items-center gap-3 py-2 px-3 rounded-lg border cursor-move transition-colors ${
+                      isCompleted
+                        ? 'bg-green-50 border-green-300'
+                        : tc.isGeocoded
+                        ? 'bg-white border-gray-200 hover:border-[#00c4cc]'
+                        : 'bg-red-50 border-red-200'
+                    }`}
+                  >
+                    {/* 完了チェックボックス */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (schedule) {
+                          toggleCompletion(tc.child.id, schedule.id, type);
+                        }
+                      }}
+                      className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                        isCompleted
+                          ? 'bg-green-500 border-green-500 text-white'
+                          : 'border-gray-300 hover:border-green-400'
+                      }`}
+                    >
+                      {isCompleted && <Check className="w-4 h-4" />}
+                    </button>
+                    <GripVertical className="w-4 h-4 text-gray-400" />
+                    <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-bold truncate ${isCompleted ? 'text-green-700 line-through' : 'text-gray-800'}`}>
+                        {tc.child.name}
                       </p>
+                      <p className="text-xs text-gray-500 truncate">{tc.address}</p>
+                      {!tc.isGeocoded && (
+                        <p className="text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          住所が正しく認識できません
+                        </p>
+                      )}
+                    </div>
+                    {data.route && data.route.legs[index] && (
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-[#00c4cc]">
+                          {arrivalTimes[index]}着
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {formatDistance(data.route.legs[index].distance)}
+                        </p>
+                      </div>
+                    )}
+                    {isCompleted && (
+                      <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
                     )}
                   </div>
-                  {data.route && data.route.legs[index] && (
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-[#00c4cc]">
-                        {arrivalTimes[index]}着
-                      </p>
-                      <p className="text-[10px] text-gray-500">
-                        {formatDistance(data.route.legs[index].distance)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {/* 到着地点 */}
               <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
@@ -499,6 +642,39 @@ export default function TransportRouteView() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* 本日の送迎担当者 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+        <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+          <Users className="w-4 h-4 text-[#00c4cc]" />
+          本日の送迎担当者
+        </h3>
+        {transportAssignment ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+              <div className="text-xs font-bold text-blue-700 mb-1">運転手</div>
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-bold text-gray-800">{transportAssignment.driverName}</span>
+              </div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+              <div className="text-xs font-bold text-green-700 mb-1">添乗員</div>
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-bold text-gray-800">{transportAssignment.attendantName}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-yellow-600" />
+            <span className="text-sm text-yellow-700">
+              送迎担当者が未設定です。シフト管理画面から設定してください。
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 施設情報確認 */}

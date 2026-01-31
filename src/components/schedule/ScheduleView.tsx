@@ -5,12 +5,12 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap } from 'lucide-react';
+import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap, ClipboardList } from 'lucide-react';
 import { TimeSlot, ScheduleItem, Child } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
-import UsageRecordForm from './UsageRecordForm';
 import SlotAssignmentPanel from './SlotAssignmentPanel';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
+import DailyProgramPlanningView from '@/components/planning/DailyProgramPlanningView';
 
 const ScheduleView: React.FC = () => {
   const {
@@ -20,11 +20,9 @@ const ScheduleView: React.FC = () => {
     facilitySettings,
     deleteSchedule,
     moveSchedule,
+    updateScheduleTransport,
     bulkRegisterFromPatterns,
     resetMonthSchedules,
-    addUsageRecord,
-    updateUsageRecord,
-    deleteUsageRecord,
     getUsageRecordByScheduleId,
   } = useFacilityData();
 
@@ -34,8 +32,6 @@ const ScheduleView: React.FC = () => {
   const [selectedDateForBooking, setSelectedDateForBooking] = useState('');
   const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<TimeSlot | null>(null);
   const [selectedScheduleItem, setSelectedScheduleItem] = useState<ScheduleItem | null>(null);
-  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
-  const [isUsageRecordFormOpen, setIsUsageRecordFormOpen] = useState(false);
 
   // スロット割り当てパネル用の状態
   const [isSlotPanelOpen, setIsSlotPanelOpen] = useState(false);
@@ -43,6 +39,16 @@ const ScheduleView: React.FC = () => {
 
   // 一括操作用の状態
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  // 日別計画モーダル用の状態
+  const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
+  const [selectedDateForPlanning, setSelectedDateForPlanning] = useState<string | null>(null);
+
+  // 日別計画モーダルを開く
+  const openPlanningModal = (date: string) => {
+    setSelectedDateForPlanning(date);
+    setIsPlanningModalOpen(true);
+  };
 
   const [newBooking, setNewBooking] = useState({
     childId: '',
@@ -373,7 +379,6 @@ const ScheduleView: React.FC = () => {
   // スロットパネル内でのスケジュールアイテムクリック
   const handleScheduleItemClickFromPanel = (item: ScheduleItem) => {
     setSelectedScheduleItem(item);
-    setIsActionDialogOpen(true);
   };
 
   // 予約を追加
@@ -441,57 +446,21 @@ const ScheduleView: React.FC = () => {
     }
   };
 
-  // 登録児童をクリックしたときの処理
-  const handleScheduleItemClick = (item: ScheduleItem, e: React.MouseEvent) => {
+  // 登録児童をクリックしたときの処理（予約削除のみ）
+  const handleScheduleItemClick = async (item: ScheduleItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedScheduleItem(item);
-    setIsActionDialogOpen(true);
-  };
-
-  // 実績登録を選択
-  const handleSelectRecord = () => {
-    setIsActionDialogOpen(false);
-    setIsUsageRecordFormOpen(true);
-  };
-
-  // 削除を選択
-  const handleSelectDelete = async () => {
-    if (selectedScheduleItem && confirm(`${selectedScheduleItem.childName}さんの予約を削除しますか？`)) {
+    // 実績登録済みの場合は削除不可
+    const hasUsageRecord = !!getUsageRecordByScheduleId(item.id);
+    if (hasUsageRecord) {
+      alert('実績登録済みのため削除できません。\n業務日誌から実績を削除してください。');
+      return;
+    }
+    if (confirm(`${item.childName}さんの予約を削除しますか？`)) {
       try {
-        await deleteSchedule(selectedScheduleItem.id);
-        setIsActionDialogOpen(false);
-        setSelectedScheduleItem(null);
+        await deleteSchedule(item.id);
       } catch (error) {
         console.error('Error deleting schedule:', error);
         alert('予約の削除に失敗しました。もう一度お試しください。');
-      }
-    }
-  };
-
-  // 実績を保存
-  const handleSaveUsageRecord = (data: any) => {
-    if (selectedScheduleItem) {
-      const existingRecord = getUsageRecordByScheduleId(selectedScheduleItem.id);
-      if (existingRecord) {
-        updateUsageRecord(existingRecord.id, data);
-      } else {
-        addUsageRecord(data);
-      }
-      setIsUsageRecordFormOpen(false);
-      setSelectedScheduleItem(null);
-      alert('実績を保存しました');
-    }
-  };
-
-  // 実績を削除
-  const handleDeleteUsageRecord = () => {
-    if (selectedScheduleItem) {
-      const existingRecord = getUsageRecordByScheduleId(selectedScheduleItem.id);
-      if (existingRecord && confirm('実績を削除しますか？')) {
-        deleteUsageRecord(existingRecord.id);
-        setIsUsageRecordFormOpen(false);
-        setSelectedScheduleItem(null);
-        alert('実績を削除しました');
       }
     }
   };
@@ -686,12 +655,26 @@ const ScheduleView: React.FC = () => {
                       onClick={() => !isHolidayDay && handleDateClick(dateInfo.date)}
                     >
                       <div className="flex justify-between items-center mb-1">
-                        <div
-                          className={`text-sm font-bold leading-tight ${
-                            !dateInfo.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'
-                          }`}
-                        >
-                          {dateInfo.day}
+                        <div className="flex items-center gap-1">
+                          <div
+                            className={`text-sm font-bold leading-tight ${
+                              !dateInfo.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'
+                            }`}
+                          >
+                            {dateInfo.day}
+                          </div>
+                          {!isHolidayDay && dateInfo.isCurrentMonth && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openPlanningModal(dateInfo.date);
+                              }}
+                              className="p-0.5 text-gray-400 hover:text-[#00c4cc] hover:bg-gray-100 rounded transition-colors"
+                              title="日別計画"
+                            >
+                              <ClipboardList className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                         {isHolidayDay && (
                           <span className="text-[10px] bg-red-200 text-red-700 px-1.5 py-0.5 rounded font-bold leading-tight">
@@ -1106,56 +1089,6 @@ const ScheduleView: React.FC = () => {
         </div>
       )}
 
-      {/* アクション選択ダイアログ */}
-      {isActionDialogOpen && selectedScheduleItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-gray-800">
-                {selectedScheduleItem.childName}さん
-              </h3>
-              <button
-                onClick={() => {
-                  setIsActionDialogOpen(false);
-                  setSelectedScheduleItem(null);
-                }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <div className="p-6 space-y-3">
-              <button
-                onClick={handleSelectRecord}
-                className="w-full py-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md shadow-md text-sm transition-all"
-              >
-                実績登録
-              </button>
-              <button
-                onClick={handleSelectDelete}
-                className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-md text-sm transition-all"
-              >
-                削除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 実績登録フォーム */}
-      {isUsageRecordFormOpen && selectedScheduleItem && (
-        <UsageRecordForm
-          scheduleItem={selectedScheduleItem}
-          initialData={getUsageRecordByScheduleId(selectedScheduleItem.id) || undefined}
-          onClose={() => {
-            setIsUsageRecordFormOpen(false);
-            setSelectedScheduleItem(null);
-          }}
-          onSave={handleSaveUsageRecord}
-          onDelete={handleDeleteUsageRecord}
-        />
-      )}
-
       {/* 新しいスロット割り当てパネル */}
       {isSlotPanelOpen && selectedDateForSlotPanel && (
         <SlotAssignmentPanel
@@ -1163,7 +1096,7 @@ const ScheduleView: React.FC = () => {
           schedules={schedules}
           childList={children}
           capacity={capacity}
-          transportCapacity={{ pickup: 3, dropoff: 3 }}
+          transportCapacity={facilitySettings.transportCapacity || { pickup: 4, dropoff: 4 }}
           onClose={() => {
             setIsSlotPanelOpen(false);
             setSelectedDateForSlotPanel('');
@@ -1180,6 +1113,7 @@ const ScheduleView: React.FC = () => {
           }}
           onDeleteSchedule={deleteSchedule}
           onMoveSchedule={moveSchedule}
+          onUpdateTransport={updateScheduleTransport}
           getUsageRecordByScheduleId={getUsageRecordByScheduleId}
           onScheduleItemClick={handleScheduleItemClickFromPanel}
         />
@@ -1193,6 +1127,17 @@ const ScheduleView: React.FC = () => {
             <p className="text-gray-700 font-bold">処理中...</p>
           </div>
         </div>
+      )}
+
+      {/* 日別計画モーダル */}
+      {isPlanningModalOpen && selectedDateForPlanning && (
+        <DailyProgramPlanningView
+          date={selectedDateForPlanning}
+          onClose={() => {
+            setIsPlanningModalOpen(false);
+            setSelectedDateForPlanning(null);
+          }}
+        />
       )}
     </div>
   );

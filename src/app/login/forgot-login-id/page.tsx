@@ -361,7 +361,7 @@ export default function ForgotLoginIdPage() {
             </div>
 
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/career/login')}
               className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
             >
               ログイン画面へ
