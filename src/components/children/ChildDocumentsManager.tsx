@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import {
   DocumentType,
+  DocumentCategoryId,
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_CATEGORIES,
 } from '@/types';
@@ -68,7 +69,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
   const { user } = useAuth();
   const [documents, setDocuments] = useState<ChildDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState(DOCUMENT_CATEGORIES[0].id);
+  const [selectedCategory, setSelectedCategory] = useState<DocumentCategoryId>(DOCUMENT_CATEGORIES[0].id);
   const [isDragging, setIsDragging] = useState(false);
 
   // アップロードモーダル

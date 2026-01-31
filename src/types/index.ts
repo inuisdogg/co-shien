@@ -583,6 +583,9 @@ export const DOCUMENT_CATEGORIES = [
   },
 ] as const;
 
+// 書類カテゴリIDの型
+export type DocumentCategoryId = typeof DOCUMENT_CATEGORIES[number]['id'];
+
 // 書類ステータスのラベル
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, { label: string; color: string }> = {
   required: { label: '未提出', color: 'bg-orange-100 text-orange-700' },

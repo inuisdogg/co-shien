@@ -1130,9 +1130,10 @@ const ScheduleView: React.FC = () => {
       )}
 
       {/* 日別計画モーダル */}
-      {isPlanningModalOpen && selectedDateForPlanning && (
+      {selectedDateForPlanning && (
         <DailyProgramPlanningView
-          date={selectedDateForPlanning}
+          isOpen={isPlanningModalOpen}
+          initialDate={selectedDateForPlanning}
           onClose={() => {
             setIsPlanningModalOpen(false);
             setSelectedDateForPlanning(null);
