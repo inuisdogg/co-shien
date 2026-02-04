@@ -5,8 +5,8 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
@@ -18,6 +18,16 @@ export const dynamic = 'force-dynamic';
 
 export default function PersonalSignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
+
+  // リダイレクト先をlocalStorageに保存（メール認証後に使用）
+  useEffect(() => {
+    if (redirectTo) {
+      localStorage.setItem('signup_redirect', redirectTo);
+    }
+  }, [redirectTo]);
+
   const [formData, setFormData] = useState({
     lastName: '',
     firstName: '',

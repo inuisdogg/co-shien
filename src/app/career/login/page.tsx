@@ -12,7 +12,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
@@ -22,6 +22,8 @@ export const dynamic = 'force-dynamic';
 
 export default function CareerLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -39,7 +41,9 @@ export default function CareerLoginPage() {
           const user = JSON.parse(userStr);
           if (user?.id) {
             // 既にログイン済みなら適切なダッシュボードへ
-            if (user.userType === 'client') {
+            if (user.role === 'owner') {
+              router.push('/admin');
+            } else if (user.userType === 'client') {
               router.push('/parent');
             } else {
               router.push('/career');
@@ -138,8 +142,17 @@ export default function CareerLoginPage() {
         localStorage.removeItem('savedCareerLoginData');
       }
 
-      // キャリアダッシュボードへリダイレクト
-      router.push('/career');
+      // リダイレクト先の決定
+      if (redirectTo) {
+        // リダイレクトパラメータがある場合はそこへ
+        router.push(redirectTo);
+      } else if (userData.role === 'owner') {
+        // プラットフォームオーナーは管理画面へ
+        router.push('/admin');
+      } else {
+        // キャリアダッシュボードへリダイレクト
+        router.push('/career');
+      }
     } catch (err: any) {
       console.log('[Login Debug] Login error:', err);
       setError(err.message || 'ログインに失敗しました');

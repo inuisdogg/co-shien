@@ -90,9 +90,49 @@ export default function AuthCallbackPage() {
               }
               router.push('/parent');
               return;
-            } else if (type === 'personal') {
-              // パーソナルアカウント認証完了
-              router.push('/career/setup?type=confirm');
+            } else if (type === 'personal' || type === 'career') {
+              // キャリアアカウント認証完了
+              // usersテーブルを更新
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                await supabase
+                  .from('users')
+                  .update({
+                    account_status: 'active',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', user.id);
+
+                // ローカルストレージにユーザー情報を保存
+                const { data: userData } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', user.id)
+                  .single();
+
+                if (userData) {
+                  const userSession = {
+                    id: userData.id,
+                    name: userData.name || `${userData.last_name || ''} ${userData.first_name || ''}`.trim(),
+                    lastName: userData.last_name,
+                    firstName: userData.first_name,
+                    email: userData.email,
+                    role: userData.role,
+                    userType: userData.user_type || 'staff',
+                  };
+                  localStorage.setItem('user', JSON.stringify(userSession));
+                }
+              }
+
+              // リダイレクト先をチェック
+              const signupRedirect = localStorage.getItem('signup_redirect');
+              if (signupRedirect) {
+                localStorage.removeItem('signup_redirect');
+                router.push(signupRedirect);
+                return;
+              }
+
+              router.push('/career?verified=true');
               return;
             } else {
               // Bizアカウント認証完了
@@ -145,22 +185,22 @@ export default function AuthCallbackPage() {
               }
               router.push('/parent');
               return;
-            } else if (type === 'personal') {
-              // usersテーブルを更新
+            } else if (type === 'personal' || type === 'career') {
+              // キャリアアカウント認証完了
               if (data.user) {
                 // パスワードが設定されているか確認
                 const { data: userData } = await supabase
                   .from('users')
-                  .select('password_hash')
+                  .select('*')
                   .eq('id', data.user.id)
                   .single();
-                
+
                 if (!userData?.password_hash) {
                   // パスワードが設定されていない場合は、パスワード設定ページへ
                   router.push('/login/reset-password?email=' + encodeURIComponent(data.user.email || ''));
                   return;
                 }
-                
+
                 await supabase
                   .from('users')
                   .update({
@@ -168,7 +208,28 @@ export default function AuthCallbackPage() {
                     updated_at: new Date().toISOString(),
                   })
                   .eq('id', data.user.id);
+
+                // ローカルストレージにユーザー情報を保存
+                const userSession = {
+                  id: userData.id,
+                  name: userData.name || `${userData.last_name || ''} ${userData.first_name || ''}`.trim(),
+                  lastName: userData.last_name,
+                  firstName: userData.first_name,
+                  email: userData.email,
+                  role: userData.role,
+                  userType: userData.user_type || 'staff',
+                };
+                localStorage.setItem('user', JSON.stringify(userSession));
               }
+
+              // リダイレクト先をチェック
+              const signupRedirect = localStorage.getItem('signup_redirect');
+              if (signupRedirect) {
+                localStorage.removeItem('signup_redirect');
+                router.push(signupRedirect);
+                return;
+              }
+
               router.push('/career?verified=true');
               return;
             } else {
