@@ -155,9 +155,13 @@ export default function PersonalSignupPage() {
       // ここではusersテーブルのチェックで十分
 
       // Supabase Authでサインアップ（メール認証を有効化）
-      const redirectUrl = typeof window !== 'undefined'
+      // redirectToがある場合はURLパラメータにも含める（localStorage非共有環境への対策）
+      const baseCallback = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=career`
         : 'https://co-shien.inu.co.jp/auth/callback?type=career';
+      const redirectUrl = redirectTo
+        ? `${baseCallback}&redirect=${encodeURIComponent(redirectTo)}`
+        : baseCallback;
       
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -248,7 +252,7 @@ export default function PersonalSignupPage() {
       localStorage.setItem('pending_signup_email', formData.email.trim().toLowerCase());
 
       // メール認証待機ページにリダイレクト
-      router.push(`/personal/signup/waiting?email=${encodeURIComponent(formData.email)}`);
+      router.push(`/career/signup/waiting?email=${encodeURIComponent(formData.email)}`);
     } catch (err: any) {
       setError(err.message || 'アカウント作成に失敗しました');
     } finally {

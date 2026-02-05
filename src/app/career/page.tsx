@@ -205,12 +205,12 @@ export default function PersonalDashboardPage() {
     basicPensionSymbol: '',
     basicPensionNumber: '',
     // 雇用保険
-    employmentInsuranceStatus: 'joined' as 'joined' | 'not_joined' | 'first_time',
+    employmentInsuranceStatus: 'not_joined' as 'joined' | 'not_joined' | 'first_time',
     employmentInsuranceNumber: '',
     previousRetirementDate: '',
     previousName: '',
     // 社会保険
-    socialInsuranceStatus: 'joined' as 'joined' | 'not_joined',
+    socialInsuranceStatus: 'not_joined' as 'joined' | 'not_joined',
     // 扶養家族
     hasDependents: false,
     dependentCount: 0,
@@ -490,11 +490,11 @@ export default function PersonalDashboardPage() {
             myNumber: userData.my_number || '',
             basicPensionSymbol: userData.basic_pension_symbol || '',
             basicPensionNumber: userData.basic_pension_number || '',
-            employmentInsuranceStatus: userData.employment_insurance_status || 'joined',
+            employmentInsuranceStatus: userData.employment_insurance_status || 'not_joined',
             employmentInsuranceNumber: userData.employment_insurance_number || '',
             previousRetirementDate: userData.previous_retirement_date || '',
             previousName: userData.previous_name || '',
-            socialInsuranceStatus: userData.social_insurance_status || 'joined',
+            socialInsuranceStatus: userData.social_insurance_status || 'not_joined',
             hasDependents: userData.has_dependents || false,
             dependentCount: userData.dependent_count || 0,
             dependents: userData.dependents || [],
@@ -520,11 +520,11 @@ export default function PersonalDashboardPage() {
             myNumber: userData.my_number || '',
             basicPensionSymbol: userData.basic_pension_symbol || '',
             basicPensionNumber: userData.basic_pension_number || '',
-            employmentInsuranceStatus: userData.employment_insurance_status || 'joined',
+            employmentInsuranceStatus: userData.employment_insurance_status || 'not_joined',
             employmentInsuranceNumber: userData.employment_insurance_number || '',
             previousRetirementDate: userData.previous_retirement_date || '',
             previousName: userData.previous_name || '',
-            socialInsuranceStatus: userData.social_insurance_status || 'joined',
+            socialInsuranceStatus: userData.social_insurance_status || 'not_joined',
             hasDependents: userData.has_dependents || false,
             dependentCount: userData.dependent_count || 0,
             dependents: userData.dependents || [],
@@ -1025,6 +1025,32 @@ export default function PersonalDashboardPage() {
       {/* タブコンテンツ */}
       {activeTab === 'home' && (
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+
+        {/* アカウント状態表示 */}
+        {user?.role === 'owner' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-lg shadow-sm p-4 text-white"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold">プラットフォームオーナー</p>
+                <p className="text-sm text-white/70">co-shienの全体管理権限を持っています</p>
+              </div>
+              <button
+                onClick={() => router.push('/admin')}
+                className="bg-white/20 hover:bg-white/30 text-white text-sm font-bold px-4 py-2 rounded-md transition-colors"
+              >
+                管理画面
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* 運営管理画面へのアクセス（施設発行権限がある場合のみ） */}
         <AdminAccessLink userId={user?.id} />
 
@@ -2052,40 +2078,54 @@ export default function PersonalDashboardPage() {
                       : '未登録'}
                   </span>
                 </div>
-                {/* 現在の所属事業所での契約内容 */}
-                <div className="mt-6 pt-6 border-t border-gray-300">
-                  <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-[#818CF8]" />
-                    現在の所属事業所での契約内容
-                  </h3>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="text-sm font-bold text-gray-600 w-32">雇用保険</span>
-                  <span className="text-sm text-gray-800">
-                    {profileData.employmentInsuranceStatus === 'joined' ? '加入' :
-                     profileData.employmentInsuranceStatus === 'not_joined' ? '非加入' :
-                     profileData.employmentInsuranceStatus === 'first_time' ? '初めて加入' : '未登録'}
-                  </span>
-                </div>
-                {profileData.employmentInsuranceStatus === 'joined' && profileData.employmentInsuranceNumber && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm font-bold text-gray-600 w-32">雇用保険番号</span>
-                    <span className="text-sm text-gray-800">{profileData.employmentInsuranceNumber}</span>
+                {/* 現在の所属事業所での契約内容（施設所属時のみ表示） */}
+                {personalFacilities.length > 0 ? (
+                  <>
+                    <div className="mt-6 pt-6 border-t border-gray-300">
+                      <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-[#818CF8]" />
+                        現在の所属事業所での契約内容
+                      </h3>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-sm font-bold text-gray-600 w-32">雇用保険</span>
+                      <span className="text-sm text-gray-800">
+                        {profileData.employmentInsuranceStatus === 'joined' ? '加入' :
+                         profileData.employmentInsuranceStatus === 'not_joined' ? '非加入' :
+                         profileData.employmentInsuranceStatus === 'first_time' ? '初めて加入' : '未登録'}
+                      </span>
+                    </div>
+                    {profileData.employmentInsuranceStatus === 'joined' && profileData.employmentInsuranceNumber && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-sm font-bold text-gray-600 w-32">雇用保険番号</span>
+                        <span className="text-sm text-gray-800">{profileData.employmentInsuranceNumber}</span>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-3">
+                      <span className="text-sm font-bold text-gray-600 w-32">社会保険</span>
+                      <span className="text-sm text-gray-800">
+                        {profileData.socialInsuranceStatus === 'joined' ? '加入' :
+                         profileData.socialInsuranceStatus === 'not_joined' ? '非加入' : '未登録'}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-sm font-bold text-gray-600 w-24">扶養家族</span>
+                      <span className="text-sm text-gray-800">
+                        {profileData.hasDependents ? `${profileData.dependentCount}人` : '無'}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-6 pt-6 border-t border-gray-300">
+                    <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-gray-400" />
+                      雇用・保険情報
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      施設に所属すると、雇用形態に応じて雇用保険・社会保険の情報が表示されます。
+                    </p>
                   </div>
                 )}
-                <div className="flex items-start gap-3">
-                  <span className="text-sm font-bold text-gray-600 w-32">社会保険</span>
-                  <span className="text-sm text-gray-800">
-                    {profileData.socialInsuranceStatus === 'joined' ? '加入' :
-                     profileData.socialInsuranceStatus === 'not_joined' ? '非加入' : '未登録'}
-                  </span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="text-sm font-bold text-gray-600 w-24">扶養家族</span>
-                  <span className="text-sm text-gray-800">
-                    {profileData.hasDependents ? `${profileData.dependentCount}人` : '無'}
-                  </span>
-                </div>
               </div>
             )}
 

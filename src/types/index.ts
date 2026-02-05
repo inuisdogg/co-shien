@@ -112,7 +112,7 @@ export type FacilitySettings = {
 export type UserType = 'staff' | 'client';
 
 // ユーザーロール
-export type UserRole = 'admin' | 'manager' | 'staff' | 'client';
+export type UserRole = 'admin' | 'manager' | 'staff' | 'client' | 'owner';
 
 // 権限設定（マネージャーとスタッフ用）- 各メニュー項目ごとに設定可能
 export type UserPermissions = {

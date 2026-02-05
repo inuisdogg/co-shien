@@ -20,8 +20,9 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // URLからtypeを取得
+        // URLからtypeとredirectを取得
         const type = searchParams.get('type') || 'biz';
+        const urlRedirect = searchParams.get('redirect'); // URLパラメータ経由のリダイレクト先
         const error = searchParams.get('error');
         const errorDescription = searchParams.get('error_description');
 
@@ -124,8 +125,8 @@ export default function AuthCallbackPage() {
                 }
               }
 
-              // リダイレクト先をチェック
-              const signupRedirect = localStorage.getItem('signup_redirect');
+              // リダイレクト先をチェック（URLパラメータ → localStorage の順）
+              const signupRedirect = urlRedirect || localStorage.getItem('signup_redirect');
               if (signupRedirect) {
                 localStorage.removeItem('signup_redirect');
                 router.push(signupRedirect);
@@ -222,8 +223,8 @@ export default function AuthCallbackPage() {
                 localStorage.setItem('user', JSON.stringify(userSession));
               }
 
-              // リダイレクト先をチェック
-              const signupRedirect = localStorage.getItem('signup_redirect');
+              // リダイレクト先をチェック（URLパラメータ → localStorage の順）
+              const signupRedirect = urlRedirect || localStorage.getItem('signup_redirect');
               if (signupRedirect) {
                 localStorage.removeItem('signup_redirect');
                 router.push(signupRedirect);

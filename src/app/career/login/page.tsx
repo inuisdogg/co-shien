@@ -40,8 +40,10 @@ export default function CareerLoginPage() {
         if (userStr) {
           const user = JSON.parse(userStr);
           if (user?.id) {
-            // 既にログイン済みなら適切なダッシュボードへ
-            if (user.role === 'owner') {
+            // リダイレクト先がある場合はそちらを優先
+            if (redirectTo) {
+              router.push(redirectTo);
+            } else if (user.role === 'owner') {
               router.push('/admin');
             } else if (user.userType === 'client') {
               router.push('/parent');
