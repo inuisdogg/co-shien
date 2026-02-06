@@ -72,15 +72,43 @@ export default function AdminPage() {
         }
 
         const userData = JSON.parse(userStr);
-        setUser(userData);
 
-        // admin_permissionsをチェック
+        // DBから最新のユーザー情報を取得して権限確認
+        const { data: dbUser, error: dbError } = await supabase
+          .from('users')
+          .select('id, name, email, role, user_type')
+          .eq('id', userData.id)
+          .single();
+
+        if (dbError || !dbUser) {
+          console.error('ユーザー取得エラー:', dbError);
+          router.push('/career/login');
+          return;
+        }
+
+        // localStorageを最新の情報で更新
+        const updatedUser = {
+          ...userData,
+          role: dbUser.role,
+          name: dbUser.name,
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+
+        // オーナーロールの場合は即座に許可
+        if (dbUser.role === 'owner') {
+          setHasPermission(true);
+          loadData();
+          return;
+        }
+
+        // それ以外はadmin_permissionsをチェック
         const { data: permData, error: permError } = await supabase
           .from('admin_permissions')
           .select('id')
           .eq('user_id', userData.id)
           .eq('permission_type', 'facility_creation')
-          .single();
+          .maybeSingle();
 
         if (permError || !permData) {
           router.push('/career');
@@ -234,7 +262,7 @@ export default function AdminPage() {
 
       // 招待リンクを生成
       const baseUrl = window.location.origin;
-      const inviteLink = `${baseUrl}/facility/join?token=${token}`;
+      const inviteLink = `${baseUrl}/facility/invite/${token}`;
       setGeneratedLink(inviteLink);
 
       // データを再読み込み
@@ -302,7 +330,7 @@ export default function AdminPage() {
                   className="h-8 w-auto"
                 />
                 <span className="text-sm font-bold text-[#818CF8] bg-[#818CF8]/10 px-2 py-1 rounded">
-                  運営管理
+                  {user?.role === 'owner' ? 'プラットフォーム管理' : '運営管理'}
                 </span>
               </div>
             </div>
@@ -508,9 +536,9 @@ export default function AdminPage() {
                     <p className="text-sm text-blue-800 font-bold mb-2">招待フロー</p>
                     <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
                       <li>施設担当者がリンクを開く</li>
-                      <li>キャリアアカウントがない場合は先に作成</li>
-                      <li>施設情報を入力して登録完了</li>
-                      <li>施設オーナーとして管理開始</li>
+                      <li>アカウント作成（名前・メール・パスワード）</li>
+                      <li>施設管理者として自動登録</li>
+                      <li>施設管理画面へ移動</li>
                     </ol>
                   </div>
 
