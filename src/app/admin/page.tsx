@@ -52,14 +52,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [showInviteForm, setShowInviteForm] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteFacilityName, setInviteFacilityName] = useState('');
-  const [inviteCompanyName, setInviteCompanyName] = useState('');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
 
   // 権限チェック
   useEffect(() => {
@@ -190,86 +185,33 @@ export default function AdminPage() {
     }
   };
 
-  // 招待リンク生成
+  // 招待リンク生成（シンプル版：トークンのみ発行）
   const generateInvitation = async () => {
-    if (!inviteFacilityName.trim()) {
-      setError('施設名を入力してください');
-      return;
-    }
-
     setSubmitting(true);
-    setError('');
 
     try {
-      // 企業を作成（または既存を使用）
-      let companyId: string;
-
-      if (inviteCompanyName.trim()) {
-        const { data: newCompany, error: companyError } = await supabase
-          .from('companies')
-          .insert({
-            name: inviteCompanyName.trim(),
-            contact_person_email: inviteEmail.trim() || null,
-          })
-          .select()
-          .single();
-
-        if (companyError) throw companyError;
-        companyId = newCompany.id;
-      } else {
-        // 企業名がない場合は施設名と同じ会社を作成
-        const { data: newCompany, error: companyError } = await supabase
-          .from('companies')
-          .insert({
-            name: inviteFacilityName.trim(),
-            contact_person_email: inviteEmail.trim() || null,
-          })
-          .select()
-          .single();
-
-        if (companyError) throw companyError;
-        companyId = newCompany.id;
-      }
-
-      // 施設を作成（仮登録状態）
-      const { data: newFacility, error: facilityError } = await supabase
-        .from('facilities')
-        .insert({
-          name: inviteFacilityName.trim(),
-          company_id: companyId,
-          pre_registered: true,
-          verification_status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (facilityError) throw facilityError;
-
       // トークンを生成
       const token = crypto.randomUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7); // 7日間有効
 
       const { error: tokenError } = await supabase
-        .from('facility_registration_tokens')
+        .from('platform_invitation_tokens')
         .insert({
-          facility_id: newFacility.id,
           token: token,
           expires_at: expiresAt.toISOString(),
+          created_by: user?.id,
         });
 
       if (tokenError) throw tokenError;
 
       // 招待リンクを生成
       const baseUrl = window.location.origin;
-      const inviteLink = `${baseUrl}/facility/invite/${token}`;
+      const inviteLink = `${baseUrl}/facility/register?token=${token}`;
       setGeneratedLink(inviteLink);
-
-      // データを再読み込み
-      loadData();
     } catch (err: any) {
       console.error('招待生成エラー:', err);
-      setError(err.message || '招待リンクの生成に失敗しました');
+      alert('招待リンクの生成に失敗しました: ' + (err.message || ''));
     } finally {
       setSubmitting(false);
     }
@@ -286,14 +228,9 @@ export default function AdminPage() {
     }
   };
 
-  // フォームをリセット
+  // リンク表示をリセット
   const resetForm = () => {
-    setShowInviteForm(false);
-    setInviteEmail('');
-    setInviteFacilityName('');
-    setInviteCompanyName('');
     setGeneratedLink('');
-    setError('');
   };
 
   if (loading) {
@@ -401,155 +338,89 @@ export default function AdminPage() {
                 <Building2 className="w-5 h-5 text-[#818CF8]" />
                 施設招待
               </h2>
-              {!showInviteForm && (
+              {!generatedLink && (
                 <button
-                  onClick={() => setShowInviteForm(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold rounded-lg transition-colors text-sm"
+                  onClick={generateInvitation}
+                  disabled={submitting}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold rounded-lg transition-colors text-sm disabled:opacity-50"
                 >
-                  <Plus className="w-4 h-4" />
-                  新規施設を招待
+                  {submitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      生成中...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      招待リンクを発行
+                    </>
+                  )}
                 </button>
               )}
             </div>
           </div>
 
-          {/* 招待フォーム */}
-          {showInviteForm && (
+          {/* 生成されたリンク表示 */}
+          {generatedLink && (
             <div className="p-6 bg-gray-50 border-b border-gray-100">
-              {!generatedLink ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">
-                      施設名 <span className="text-red-500">*</span>
-                    </label>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-bold">招待リンクを生成しました</span>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-2">以下のリンクを施設担当者に共有してください：</p>
+                  <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      value={inviteFacilityName}
-                      onChange={(e) => setInviteFacilityName(e.target.value)}
-                      placeholder="例: ○○放課後等デイサービス"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
+                      value={generatedLink}
+                      readOnly
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-mono"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">
-                      企業名（任意）
-                    </label>
-                    <input
-                      type="text"
-                      value={inviteCompanyName}
-                      onChange={(e) => setInviteCompanyName(e.target.value)}
-                      placeholder="例: 株式会社○○"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">空欄の場合、施設名と同じ企業として登録されます</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">
-                      担当者メールアドレス（任意）
-                    </label>
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="例: tanaka@example.com"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
-                    />
-                  </div>
-
-                  {error && (
-                    <div className="bg-red-50 text-red-600 text-sm px-4 py-2 rounded-lg">
-                      {error}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
                     <button
-                      onClick={generateInvitation}
-                      disabled={submitting}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                      onClick={() => copyLink(generatedLink)}
+                      className={`flex items-center gap-1 px-4 py-2 rounded-lg font-bold transition-colors ${
+                        copied
+                          ? 'bg-green-100 text-green-600'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }`}
                     >
-                      {submitting ? (
+                      {copied ? (
                         <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          生成中...
+                          <CheckCircle className="w-4 h-4" />
+                          コピー済み
                         </>
                       ) : (
                         <>
-                          <LinkIcon className="w-4 h-4" />
-                          招待リンクを生成
+                          <Copy className="w-4 h-4" />
+                          コピー
                         </>
                       )}
                     </button>
-                    <button
-                      onClick={resetForm}
-                      className="px-4 py-3 border border-gray-300 text-gray-600 font-bold rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                      キャンセル
-                    </button>
                   </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    ※ このリンクは7日間有効です
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="font-bold">招待リンクを生成しました</span>
-                  </div>
 
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-2">以下のリンクを施設担当者に共有してください：</p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={generatedLink}
-                        readOnly
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-mono"
-                      />
-                      <button
-                        onClick={() => copyLink(generatedLink)}
-                        className={`flex items-center gap-1 px-4 py-2 rounded-lg font-bold transition-colors ${
-                          copied
-                            ? 'bg-green-100 text-green-600'
-                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                        }`}
-                      >
-                        {copied ? (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            コピー済み
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            コピー
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      ※ このリンクは7日間有効です
-                    </p>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800 font-bold mb-2">招待フロー</p>
-                    <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-                      <li>施設担当者がリンクを開く</li>
-                      <li>アカウント作成（名前・メール・パスワード）</li>
-                      <li>施設管理者として自動登録</li>
-                      <li>施設管理画面へ移動</li>
-                    </ol>
-                  </div>
-
-                  <button
-                    onClick={resetForm}
-                    className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors"
-                  >
-                    閉じる
-                  </button>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 font-bold mb-2">登録フロー</p>
+                  <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                    <li>施設担当者がリンクを開く</li>
+                    <li>施設情報・管理者情報を入力</li>
+                    <li>施設＆管理者アカウント作成</li>
+                    <li>施設管理画面へ移動</li>
+                  </ol>
                 </div>
-              )}
+
+                <button
+                  onClick={resetForm}
+                  className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors"
+                >
+                  閉じる
+                </button>
+              </div>
             </div>
           )}
 

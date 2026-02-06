@@ -60,7 +60,8 @@
       "Bash(open:*)",
       "Bash(sync)",
       "Bash(timeout 120 npx tsc:*)",
-      "Bash(timeout 60 npx tsc:*)"
+      "Bash(timeout 60 npx tsc:*)",
+      "Bash(supabase:*)"
     ]
   }
 }
