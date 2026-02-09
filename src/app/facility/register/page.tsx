@@ -41,9 +41,9 @@ export default function FacilityRegisterPage() {
   const [designationFile, setDesignationFile] = useState<File | null>(null);
   const [designationPreview, setDesignationPreview] = useState<string | null>(null);
 
-  // トークンから事前登録施設情報を取得
+  // トークンを検証
   useEffect(() => {
-    const loadPreRegisteredFacility = async () => {
+    const validateToken = async () => {
       const token = searchParams?.get('token');
       if (!token) {
         setLoadingToken(false);
@@ -51,12 +51,40 @@ export default function FacilityRegisterPage() {
       }
 
       try {
-        // トークンを検証
+        // 1. まず新しいplatform_invitation_tokensテーブルをチェック
+        const { data: platformToken, error: platformError } = await supabase
+          .from('platform_invitation_tokens')
+          .select('id, expires_at, used_at')
+          .eq('token', token)
+          .maybeSingle();
+
+        if (platformToken) {
+          // 有効期限チェック
+          if (new Date(platformToken.expires_at) < new Date()) {
+            setError('トークンの有効期限が切れています');
+            setLoadingToken(false);
+            return;
+          }
+
+          // 使用済みチェック
+          if (platformToken.used_at) {
+            setError('このトークンは既に使用されています');
+            setLoadingToken(false);
+            return;
+          }
+
+          // 新しいトークンの場合は事前登録なし（ユーザーが施設情報を入力）
+          setIsPreRegistered(false);
+          setLoadingToken(false);
+          return;
+        }
+
+        // 2. 旧facility_registration_tokensテーブルをチェック（後方互換性）
         const { data: tokenData, error: tokenError } = await supabase
           .from('facility_registration_tokens')
           .select('facility_id, expires_at, used_at')
           .eq('token', token)
-          .single();
+          .maybeSingle();
 
         if (tokenError || !tokenData) {
           setError('無効なトークンです');
@@ -102,7 +130,7 @@ export default function FacilityRegisterPage() {
       }
     };
 
-    loadPreRegisteredFacility();
+    validateToken();
   }, [searchParams]);
 
   // ユーザー情報を取得
@@ -255,15 +283,6 @@ export default function FacilityRegisterPage() {
         if (facilityError) {
           throw new Error(`施設の更新に失敗しました: ${facilityError.message}`);
         }
-
-        // トークンを使用済みにする
-        const token = searchParams?.get('token');
-        if (token) {
-          await supabase
-            .from('facility_registration_tokens')
-            .update({ used_at: new Date().toISOString() })
-            .eq('token', token);
-        }
       } else {
         // 通常の施設登録
         // 施設コードを自動発番（5桁）
@@ -397,9 +416,19 @@ export default function FacilityRegisterPage() {
         localStorage.setItem('user', JSON.stringify(updatedUser));
 
         // トークンを使用済みにする（トークン経由の場合）
-        if (isPreRegistered && preRegisteredFacilityId) {
-          const token = searchParams?.get('token');
-          if (token) {
+        const token = searchParams?.get('token');
+        if (token) {
+          // 新しいplatform_invitation_tokensテーブル
+          await supabase
+            .from('platform_invitation_tokens')
+            .update({
+              used_at: new Date().toISOString(),
+              used_by_facility_id: facilityId,
+            })
+            .eq('token', token);
+
+          // 旧facility_registration_tokensテーブル（後方互換性）
+          if (isPreRegistered && preRegisteredFacilityId) {
             await supabase
               .from('facility_registration_tokens')
               .update({ used_at: new Date().toISOString() })
