@@ -198,18 +198,13 @@ export default function FacilityRegisterPage() {
         throw new Error('施設名を入力してください');
       }
 
-      // トークン経由（事前登録施設）の場合は事業所番号と指定通知書は不要
-      if (!isPreRegistered) {
-        // 通常登録の場合のみ必須
-        if (!businessNumber.match(/^\d{10}$/)) {
-          throw new Error('事業所番号は10桁の数字で入力してください');
-        }
+      // 事業所番号が入力された場合のみバリデーション
+      if (businessNumber && !businessNumber.match(/^\d{10}$/)) {
+        throw new Error('事業所番号は10桁の数字で入力してください');
+      }
 
-        if (!designationFile) {
-          throw new Error('指定通知書をアップロードしてください');
-        }
-
-        // 事業所番号の重複チェック
+      // 事業所番号の重複チェック（入力された場合のみ）
+      if (businessNumber) {
         const { data: existingFacility } = await supabase
           .from('facilities')
           .select('id')
@@ -326,7 +321,7 @@ export default function FacilityRegisterPage() {
             id: facilityId,
             name: facilityName.trim(),
             code: newFacilityCode,
-            business_number: businessNumber,
+            business_number: businessNumber || null,
             designation_document_path: fileName || null,
             verification_status: 'unverified',
             pre_registered: false,
@@ -542,37 +537,33 @@ export default function FacilityRegisterPage() {
               )}
             </div>
 
-            {/* 事業所番号（トークン経由の場合は任意） */}
-            {!isPreRegistered && (
-              <div>
-                <label htmlFor="businessNumber" className="block text-sm font-bold text-gray-700 mb-2">
-                  事業所番号（10桁） <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="businessNumber"
-                  type="text"
-                  value={businessNumber}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                    setBusinessNumber(val);
-                  }}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent font-mono"
-                  placeholder="1234567890"
-                  disabled={loading}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  指定通知書に記載されている10桁の番号
-                </p>
-              </div>
-            )}
+            {/* 事業所番号（任意） */}
+            <div>
+              <label htmlFor="businessNumber" className="block text-sm font-bold text-gray-700 mb-2">
+                事業所番号（10桁） <span className="text-xs text-gray-400 font-normal">任意</span>
+              </label>
+              <input
+                id="businessNumber"
+                type="text"
+                value={businessNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setBusinessNumber(val);
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent font-mono"
+                placeholder="1234567890"
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                指定通知書に記載されている10桁の番号（指定後に入力可能）
+              </p>
+            </div>
 
-            {/* 指定通知書アップロード（トークン経由の場合は任意） */}
-            {!isPreRegistered && (
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  指定通知書 <span className="text-red-500">*</span>
-                </label>
+            {/* 指定通知書アップロード（任意） */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                指定通知書 <span className="text-xs text-gray-400 font-normal">任意</span>
+              </label>
 
               {!designationFile ? (
                 <div
@@ -626,21 +617,17 @@ export default function FacilityRegisterPage() {
                 onChange={handleFileSelect}
                 className="hidden"
               />
-                <p className="text-xs text-gray-500 mt-1">
-                  行政から交付された指定通知書の画像またはPDF
-                </p>
-              </div>
-            )}
+              <p className="text-xs text-gray-500 mt-1">
+                行政から交付された指定通知書の画像またはPDF（指定後に入力可能）
+              </p>
+            </div>
 
-            {isPreRegistered && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>事前登録済みの施設</strong>です。施設名の確認のみで登録を完了できます。
-                  <br />
-                  事業所番号と指定通知書は後から追加できます。
-                </p>
-              </div>
-            )}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <p className="text-sm text-blue-800">
+                事業所番号・指定通知書は<strong>任意</strong>です。<br />
+                指定前の事業所でも登録できます。指定後に追加してください。
+              </p>
+            </div>
 
             <button
               type="submit"
