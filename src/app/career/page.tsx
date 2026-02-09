@@ -2570,7 +2570,7 @@ export default function PersonalDashboardPage() {
                       }));
                     }
                     const bizBaseUrl = getBizBaseUrl();
-                    window.location.href = `${bizBaseUrl}/?facilityId=${facilityId}`;
+                    window.location.href = `${bizBaseUrl}/business?facilityId=${facilityId}`;
                   } else if (toolId === 'payslip') {
                     // 給与明細
                     if (facilityData) {
