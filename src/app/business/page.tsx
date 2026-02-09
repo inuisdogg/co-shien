@@ -78,10 +78,26 @@ export default function BusinessPage() {
           router.push('/parent');
           return;
         }
-        // スタッフアカウント（非管理者）の場合はキャリアダッシュボードへリダイレクト
-        if (userData?.userType === 'staff' && userData?.role !== 'admin') {
-          router.push('/career');
-          return;
+        // facilityIdクエリパラメータがない場合のみ、スタッフ権限チェック
+        // （facilityIdがある場合はemployment_recordsで権限を確認する）
+        if (!facilityIdFromQuery && userData?.userType === 'staff' && userData?.role !== 'admin') {
+          // selectedFacilityがある場合は権限を確認
+          if (facilityStr) {
+            try {
+              const selectedFacility = JSON.parse(facilityStr);
+              // 施設での役割が管理者またはマネージャーでなければリダイレクト
+              if (selectedFacility.role !== '管理者' && selectedFacility.role !== 'マネージャー') {
+                router.push('/career');
+                return;
+              }
+            } catch (e) {
+              router.push('/career');
+              return;
+            }
+          } else {
+            router.push('/career');
+            return;
+          }
         }
       } catch (e) {
         router.push('/career/login');
