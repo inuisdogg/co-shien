@@ -144,14 +144,12 @@ export default function CareerLoginPage() {
         localStorage.removeItem('savedCareerLoginData');
       }
 
-      // リダイレクト先の決定
+      // リダイレクト先の決定（window.location.hrefでハードナビゲーション）
+      // これにより AuthContext が localStorage から正しくデータを読み込む
       if (redirectTo) {
-        // リダイレクトパラメータがある場合はそこへ
-        router.push(redirectTo);
+        window.location.href = redirectTo;
       } else {
-        // キャリアログインは常にキャリアダッシュボードへ
-        // オーナーもキャリアダッシュボードから管理画面へアクセス可能
-        router.push('/career');
+        window.location.href = '/career';
       }
     } catch (err: any) {
       console.log('[Login Debug] Login error:', err);
