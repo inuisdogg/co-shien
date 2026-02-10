@@ -16,6 +16,8 @@ interface AuthContextType {
   facility: Facility | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isFacilityAdmin: boolean; // 施設管理者（employment_records.role === '管理者' or 'マネージャー'）
+  facilityRole: string | null; // 施設での役割
   isMaster: boolean; // マスター管理者（施設オーナー）かどうか
   isLoading: boolean; // 認証状態の読み込み中かどうか
   login: (facilityCode: string, loginId: string, password: string) => Promise<void>;
@@ -28,6 +30,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [facility, setFacility] = useState<Facility | null>(null);
+  const [facilityRole, setFacilityRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // セッション復元（ページリロード時など）
@@ -78,7 +81,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // 通常モード: ローカルストレージから復元
         const storedUser = localStorage.getItem('user');
         const storedFacility = localStorage.getItem('facility');
-        
+        const storedSelectedFacility = localStorage.getItem('selectedFacility');
+
         if (storedUser) {
           const userData = JSON.parse(storedUser);
           // 古いデータにuserTypeがない場合はデフォルト値を設定
@@ -86,13 +90,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             userData.userType = 'staff';
           }
           setUser(userData);
-          
+
           if (storedFacility) {
             const facilityData = JSON.parse(storedFacility);
             setFacility(facilityData);
           } else {
             // facilityが存在しない場合はnullに設定
             setFacility(null);
+          }
+
+          // selectedFacilityから役割を取得
+          if (storedSelectedFacility) {
+            try {
+              const selectedFacilityData = JSON.parse(storedSelectedFacility);
+              setFacilityRole(selectedFacilityData.role || null);
+            } catch (e) {
+              setFacilityRole(null);
+            }
+          } else {
+            setFacilityRole(null);
           }
         }
       } catch (error) {
@@ -392,14 +408,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const isAuthenticated = user !== null;
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'owner';
+  // 施設管理者かどうか（employment_records.role が '管理者' or 'マネージャー'）
+  const isFacilityAdmin = facilityRole === '管理者' || facilityRole === 'マネージャー';
   // マスター管理者（施設オーナー）かどうか
   const isMaster = !!(user && facility?.ownerUserId && user.id === facility.ownerUserId);
 
   // 権限チェック関数
   const hasPermission = (permission: keyof UserPermissions): boolean => {
     if (!user) return false;
-    if (isAdmin || isMaster) return true; // 管理者およびマスターは全権限
+    // グローバル管理者、施設管理者、マスターは全権限
+    if (isAdmin || isFacilityAdmin || isMaster) return true;
     if (user.role === 'manager' || user.role === 'staff') {
       return user.permissions?.[permission] === true;
     }
@@ -416,6 +435,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     facility,
     isAuthenticated,
     isAdmin,
+    isFacilityAdmin,
+    facilityRole,
     isMaster,
     isLoading: loading,
     login,

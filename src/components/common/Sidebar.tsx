@@ -102,7 +102,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  const { isAdmin, isMaster, hasPermission } = useAuth();
+  const { isAdmin, isFacilityAdmin, isMaster, hasPermission } = useAuth();
+  // 施設管理者としてのフルアクセス権限
+  const hasFullAccess = isAdmin || isFacilityAdmin || isMaster;
   const isCareer = mode === 'career';
   const primaryColor = isCareer ? '#818CF8' : '#00c4cc';
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -207,11 +209,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       if (menuPhase > currentPhase) return false;
 
       // 権限によるフィルタリング
-      if (isAdmin) return true; // 管理者は全メニューにアクセス可能
+      // グローバル管理者、施設管理者、マスターは全メニューにアクセス可能
+      if (hasFullAccess) return true;
       return hasPermission(item.permission);
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  })).filter((category) => category.items.length > 0), [isAdmin, currentPhase]);
+  })).filter((category) => category.items.length > 0), [hasFullAccess, currentPhase]);
 
   // アクティブなタブが含まれるカテゴリを自動展開
   useEffect(() => {
@@ -261,8 +264,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       <div className="p-6 flex items-center space-x-3">
         <button
           onClick={() => {
-            // 管理者はdashboard、それ以外はscheduleをホームに
-            const homeTab = isAdmin ? 'dashboard' : 'schedule';
+            // 管理者・施設管理者はdashboard、それ以外はscheduleをホームに
+            const homeTab = hasFullAccess ? 'dashboard' : 'schedule';
             setActiveTab(homeTab);
             onClose?.();
           }}

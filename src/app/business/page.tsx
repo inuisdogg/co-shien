@@ -49,7 +49,9 @@ import { supabase } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 export default function BusinessPage() {
-  const { isAuthenticated, isAdmin, hasPermission, facility, user } = useAuth();
+  const { isAuthenticated, isAdmin, isFacilityAdmin, hasPermission, facility, user } = useAuth();
+  // 施設管理者としてのフルアクセス権限
+  const hasFullAccess = isAdmin || isFacilityAdmin;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>('');
@@ -218,7 +220,7 @@ export default function BusinessPage() {
       };
 
       let defaultTab: string;
-      if (isAdmin) {
+      if (hasFullAccess) {
         defaultTab = 'dashboard';
       } else {
         if (hasPermission('schedule')) {
@@ -233,7 +235,7 @@ export default function BusinessPage() {
       setActiveTab(defaultTab);
       setInitialTabSet(true);
     }
-  }, [isAuthenticated, isAdmin, hasPermission, initialTabSet]);
+  }, [isAuthenticated, hasFullAccess, hasPermission, initialTabSet]);
 
   // 権限に基づいてアクセス制御
   useEffect(() => {
@@ -250,14 +252,14 @@ export default function BusinessPage() {
       };
 
       const requiredPermission = permissionMap[activeTab];
-      if (requiredPermission && !isAdmin && !hasPermission(requiredPermission)) {
+      if (requiredPermission && !hasFullAccess && !hasPermission(requiredPermission)) {
         const accessibleTab = Object.entries(permissionMap).find(
           ([_, perm]) => hasPermission(perm)
         )?.[0] || 'schedule';
         setActiveTab(accessibleTab);
       }
     }
-  }, [isAuthenticated, isAdmin, activeTab, hasPermission, initialTabSet]);
+  }, [isAuthenticated, hasFullAccess, activeTab, hasPermission, initialTabSet]);
 
   // 認証確認中はローディング表示
   if (checkingAuth) {
@@ -353,7 +355,7 @@ export default function BusinessPage() {
             facilityName={facility.name}
             userId={user.id}
             userName={user.name || ''}
-            isAdmin={isAdmin}
+            isAdmin={hasFullAccess}
             onClose={() => setActiveTab('dashboard')}
           />
         ) : null;
@@ -376,7 +378,7 @@ export default function BusinessPage() {
           mode="business"
           onMenuClick={() => setIsSidebarOpen(true)}
           onLogoClick={() => {
-            const homeTab = isAdmin ? 'dashboard' : 'schedule';
+            const homeTab = hasFullAccess ? 'dashboard' : 'schedule';
             setActiveTab(homeTab);
           }}
         />
