@@ -43,11 +43,11 @@ export default function CareerLoginPage() {
             // リダイレクト先がある場合はそちらを優先
             if (redirectTo) {
               router.push(redirectTo);
-            } else if (user.role === 'owner') {
-              router.push('/admin');
             } else if (user.userType === 'client') {
               router.push('/parent');
             } else {
+              // キャリアログインは常にキャリアダッシュボードへ
+              // オーナーもキャリアダッシュボードから管理画面へアクセス可能
               router.push('/career');
             }
             return;
@@ -148,11 +148,9 @@ export default function CareerLoginPage() {
       if (redirectTo) {
         // リダイレクトパラメータがある場合はそこへ
         router.push(redirectTo);
-      } else if (userData.role === 'owner') {
-        // プラットフォームオーナーは管理画面へ
-        router.push('/admin');
       } else {
-        // キャリアダッシュボードへリダイレクト
+        // キャリアログインは常にキャリアダッシュボードへ
+        // オーナーもキャリアダッシュボードから管理画面へアクセス可能
         router.push('/career');
       }
     } catch (err: any) {

@@ -86,13 +86,18 @@ const createDailySummary = (
 };
 
 export function usePersonalData(): UsePersonalDataReturn {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [facilities, setFacilities] = useState<FacilityWorkData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // データ取得
   const fetchData = useCallback(async () => {
+    // 認証状態の読み込み中は待機
+    if (authLoading) {
+      return;
+    }
+
     if (!user?.id) {
       setFacilities([]);
       setIsLoading(false);
@@ -304,7 +309,7 @@ export function usePersonalData(): UsePersonalDataReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   // 打刻処理の共通関数（ローカルステートを即座に更新、リロードなし）
   const recordAttendance = async (facilityId: string, type: AttendanceType) => {
