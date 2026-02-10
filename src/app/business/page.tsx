@@ -41,6 +41,7 @@ import AdditionCatalogView from '@/components/management/AdditionCatalogView';
 import StaffInfoManagementView from '@/components/management/StaffInfoManagementView';
 import GovernmentPortalView from '@/components/government/GovernmentPortalView';
 import KnowledgeBaseView from '@/components/knowledge/KnowledgeBaseView';
+import AdditionSimulationView from '@/components/simulation/AdditionSimulationView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -320,6 +321,8 @@ export default function BusinessPage() {
         return facility?.id ? <FacilityAdditionSettings facilityId={facility.id} /> : null;
       case 'addition-catalog':
         return <AdditionCatalogView />;
+      case 'addition-simulation':
+        return <AdditionSimulationView />;
       case 'daily-log':
         return <DailyLogView />;
       case 'support-plan':

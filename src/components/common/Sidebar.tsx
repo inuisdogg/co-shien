@@ -35,6 +35,7 @@ import {
   ChevronRight,
   Zap,
   Library,
+  Calculator,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -60,6 +61,7 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'documents': 1,     // 書類管理
   'addition-settings': 1, // 加算体制設定
   'knowledge': 1,     // ナレッジベース
+  'addition-simulation': 1, // 加算シミュレーション
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
@@ -180,6 +182,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       icon: BarChart3,
       items: [
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
+        { id: 'addition-simulation', label: '加算シミュレーション', icon: Calculator, permission: 'dashboard' as const },
         { id: 'addition-catalog', label: '加算一覧', icon: Zap, permission: 'dashboard' as const },
         { id: 'profit-loss', label: '損益計算書', icon: TrendingUp, permission: 'profitLoss' as const },
         { id: 'cash-flow', label: 'キャッシュフロー', icon: Wallet, permission: 'cashFlow' as const },
