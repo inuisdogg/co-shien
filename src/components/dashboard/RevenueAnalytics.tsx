@@ -100,9 +100,10 @@ export default function RevenueAnalytics({ facilityId, childrenData }: RevenueAn
 
   // 施設設定
   const [facilityConfig, setFacilityConfig] = useState({
-    serviceTypeCode: 'hokago_day',
-    regionalGrade: '1級地',
-    capacity: 10,
+    serviceTypeCode: '',  // 空文字 = 未設定
+    regionalGrade: '',    // 空文字 = 未設定
+    capacity: 0,          // 0 = 未設定
+    isConfigured: false,  // 設定済みフラグ
   });
 
   // 加算選択状態（シミュレーション用）
@@ -138,10 +139,13 @@ export default function RevenueAnalytics({ facilityId, childrenData }: RevenueAn
       setFacilityAdditionSettings(facilitySettingsData || []);
 
       if (facilityConfigData) {
+        const hasServiceType = !!facilityConfigData.service_type_code;
+        const hasRegionalGrade = !!facilityConfigData.regional_grade;
         setFacilityConfig({
-          serviceTypeCode: facilityConfigData.service_type_code || 'hokago_day',
-          regionalGrade: facilityConfigData.regional_grade || '1級地',
-          capacity: facilityConfigData.capacity || 10,
+          serviceTypeCode: facilityConfigData.service_type_code || '',
+          regionalGrade: facilityConfigData.regional_grade || '',
+          capacity: facilityConfigData.capacity ?? 0,
+          isConfigured: hasServiceType && hasRegionalGrade,
         });
       }
 
@@ -178,19 +182,21 @@ export default function RevenueAnalytics({ facilityId, childrenData }: RevenueAn
     fetchData();
   }, [fetchData]);
 
-  // 地域区分単価
+  // 地域区分単価（未設定時は0）
   const unitPrice = useMemo(() => {
+    if (!facilityConfig.isConfigured || !facilityConfig.regionalGrade) return 0;
     const region = regionalUnits.find(r => r.grade === facilityConfig.regionalGrade);
-    return region?.unit_price || 11.20;
-  }, [regionalUnits, facilityConfig.regionalGrade]);
+    return region?.unit_price || 0;
+  }, [regionalUnits, facilityConfig.regionalGrade, facilityConfig.isConfigured]);
 
-  // 基本報酬（時間区分2を基準）
+  // 基本報酬（時間区分2を基準、未設定時は0）
   const baseRewardUnits = useMemo(() => {
+    if (!facilityConfig.isConfigured || !facilityConfig.serviceTypeCode) return 0;
     const reward = baseRewards.find(
       r => r.service_type_code === facilityConfig.serviceTypeCode && r.time_category === 2
     );
-    return reward?.units || 480;
-  }, [baseRewards, facilityConfig.serviceTypeCode]);
+    return reward?.units || 0;
+  }, [baseRewards, facilityConfig.serviceTypeCode, facilityConfig.isConfigured]);
 
   // 営業日数
   const businessDays = useMemo(() => {
@@ -389,6 +395,43 @@ export default function RevenueAnalytics({ facilityId, childrenData }: RevenueAn
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // 施設設定が未完了の場合はガイダンスを表示
+  if (!facilityConfig.isConfigured) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Calculator className="w-6 h-6 text-purple-600" />
+            売上シミュレーター
+          </h2>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Settings className="w-8 h-8 text-amber-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">
+            施設設定が必要です
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            売上シミュレーションを行うには、まず施設情報で<br />
+            <strong>サービス種別</strong>と<strong>地域区分</strong>を設定してください。
+          </p>
+          <div className="bg-white rounded-lg p-4 border border-amber-100 inline-block">
+            <p className="text-xs text-gray-500 mb-2">設定が必要な項目:</p>
+            <div className="flex gap-3 justify-center text-sm">
+              <span className={`px-3 py-1 rounded ${facilityConfig.serviceTypeCode ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {facilityConfig.serviceTypeCode ? '✓' : '×'} サービス種別
+              </span>
+              <span className={`px-3 py-1 rounded ${facilityConfig.regionalGrade ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {facilityConfig.regionalGrade ? '✓' : '×'} 地域区分
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

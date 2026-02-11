@@ -16,6 +16,7 @@ import {
   BarChart3,
   MapPin,
   AlertCircle,
+  AlertTriangle,
   ArrowUp,
   ArrowDown,
   Car,
@@ -60,7 +61,36 @@ const DashboardView: React.FC = () => {
     staff,
     managementTargets,
     getManagementTarget,
+    timeSlots,
+    loadingTimeSlots,
   } = useFacilityData();
+
+  // 時間枠が設定されているかチェック
+  const hasTimeSlots = timeSlots.length > 0;
+
+  // 時間枠の名前と定員を取得
+  const slotInfo = useMemo(() => {
+    if (timeSlots.length >= 2) {
+      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
+      return {
+        AM: { name: sorted[0]?.name || '午前', capacity: sorted[0]?.capacity || 0 },
+        PM: { name: sorted[1]?.name || '午後', capacity: sorted[1]?.capacity || 0 },
+        isConfigured: true,
+      };
+    } else if (timeSlots.length === 1) {
+      return {
+        AM: { name: timeSlots[0].name || '終日', capacity: timeSlots[0].capacity || 0 },
+        PM: null,
+        isConfigured: true,
+      };
+    }
+    // 未設定
+    return {
+      AM: { name: '午前', capacity: 0 },
+      PM: { name: '午後', capacity: 0 },
+      isConfigured: false,
+    };
+  }, [timeSlots]);
 
   const [dashboardMode, setDashboardMode] = useState<'operations' | 'revenue' | 'compliance'>('operations');
   const [viewPeriod, setViewPeriod] = useState<'week' | 'month'>('month');
@@ -373,10 +403,18 @@ const DashboardView: React.FC = () => {
               />
             </div>
           )}
-          <div className="mt-2 text-xs sm:text-sm text-gray-600 leading-tight">
-            <div>午前: {ampmOccupancyRate.amRate.toFixed(1)}% ({ampmOccupancyRate.amCount}/{ampmOccupancyRate.amCapacity})</div>
-            <div>午後: {ampmOccupancyRate.pmRate.toFixed(1)}% ({ampmOccupancyRate.pmCount}/{ampmOccupancyRate.pmCapacity})</div>
-          </div>
+          {slotInfo.isConfigured ? (
+            <div className="mt-2 text-xs sm:text-sm text-gray-600 leading-tight">
+              <div>{slotInfo.AM.name}: {ampmOccupancyRate.amRate.toFixed(1)}% ({ampmOccupancyRate.amCount}/{ampmOccupancyRate.amCapacity})</div>
+              {slotInfo.PM && (
+                <div>{slotInfo.PM.name}: {ampmOccupancyRate.pmRate.toFixed(1)}% ({ampmOccupancyRate.pmCount}/{ampmOccupancyRate.pmCapacity})</div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 text-xs text-amber-600">
+              時間枠を設定すると詳細が表示されます
+            </div>
+          )}
         </div>
 
         {/* キャンセル率 */}
@@ -487,13 +525,18 @@ const DashboardView: React.FC = () => {
           {/* 曜日別稼働率 */}
           <div className="mb-4">
             <h4 className="text-sm font-bold text-gray-700 mb-2">曜日別稼働率</h4>
+            {!slotInfo.isConfigured ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center text-sm text-amber-700">
+                時間枠を設定すると詳細が表示されます
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-2 px-3 text-xs font-bold text-gray-600">曜日</th>
-                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午前</th>
-                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午後</th>
+                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">{slotInfo.AM.name}</th>
+                    {slotInfo.PM && <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">{slotInfo.PM.name}</th>}
                     <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">合計</th>
                   </tr>
                 </thead>
@@ -631,8 +674,9 @@ const DashboardView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
-          
+
           {/* 月をクリックして詳細を見る */}
           <button
             onClick={() => setSelectedForecastMonth({
@@ -900,46 +944,72 @@ const DashboardView: React.FC = () => {
           <Calendar size={20} className="mr-2 text-[#00c4cc]" />
           曜日別利用率
         </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 px-3 text-xs font-bold text-gray-600">曜日</th>
-                <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午前</th>
-                <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">午後</th>
-                <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">合計利用率</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dayOfWeekUtilization.map((day) => (
-                <tr key={day.dayIndex} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-2 px-3 font-bold text-gray-800">{day.dayOfWeek}</td>
-                  <td className="py-2 px-3 text-right">
-                    <div className="text-sm font-bold text-gray-800">
-                      {day.amUtilization.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {day.amCount}件
-                    </div>
-                  </td>
-                  <td className="py-2 px-3 text-right">
-                    <div className="text-sm font-bold text-gray-800">
-                      {day.pmUtilization.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {day.pmCount}件
-                    </div>
-                  </td>
-                  <td className="py-2 px-3 text-right">
-                    <div className="text-sm font-bold text-[#00c4cc]">
-                      {day.totalUtilization.toFixed(1)}%
-                    </div>
-                  </td>
+        {!slotInfo.isConfigured ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+            <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+            <p className="text-sm font-medium text-gray-700 mb-2">時間枠が設定されていません</p>
+            <p className="text-xs text-gray-500 mb-3">
+              施設情報で時間枠を設定すると、曜日別の稼働率が表示されます
+            </p>
+            <a
+              href="/business?tab=facility-settings"
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded transition-colors"
+            >
+              施設情報を設定
+            </a>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-2 px-3 text-xs font-bold text-gray-600">曜日</th>
+                  <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">
+                    {slotInfo.AM.name}
+                    <span className="text-gray-400 font-normal ml-1">(定員{slotInfo.AM.capacity})</span>
+                  </th>
+                  {slotInfo.PM && (
+                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">
+                      {slotInfo.PM.name}
+                      <span className="text-gray-400 font-normal ml-1">(定員{slotInfo.PM.capacity})</span>
+                    </th>
+                  )}
+                  <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">合計利用率</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {dayOfWeekUtilization.map((day) => (
+                  <tr key={day.dayIndex} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-bold text-gray-800">{day.dayOfWeek}</td>
+                    <td className="py-2 px-3 text-right">
+                      <div className="text-sm font-bold text-gray-800">
+                        {day.amUtilization.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {day.amCount}件
+                      </div>
+                    </td>
+                    {slotInfo.PM && (
+                      <td className="py-2 px-3 text-right">
+                        <div className="text-sm font-bold text-gray-800">
+                          {day.pmUtilization.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {day.pmCount}件
+                        </div>
+                      </td>
+                    )}
+                    <td className="py-2 px-3 text-right">
+                      <div className="text-sm font-bold text-[#00c4cc]">
+                        {day.totalUtilization.toFixed(1)}%
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* 年齢別・地区別利用児童 */}
@@ -1041,6 +1111,30 @@ const DashboardView: React.FC = () => {
             </div>
             
             <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              {/* 時間枠未設定時のガイダンス */}
+              {!slotInfo.isConfigured && (
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <AlertTriangle size={20} />
+                    <span className="font-bold">時間枠が設定されていません</span>
+                  </div>
+                  <p className="mt-2 text-sm text-amber-600">
+                    正確な稼働率を表示するには、まず施設情報から時間枠（定員）を設定してください。
+                  </p>
+                  <button
+                    onClick={() => {
+                      setSelectedForecastMonth(null);
+                      // 施設情報設定への遷移をトリガー
+                    }}
+                    className="mt-3 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-bold"
+                  >
+                    施設情報を設定する
+                  </button>
+                </div>
+              )}
+
+              {slotInfo.isConfigured && (
+              <>
               <div className="mb-4 flex gap-2">
                 <button
                   onClick={() => setForecastDetailView('week')}
@@ -1063,7 +1157,7 @@ const DashboardView: React.FC = () => {
                   日別
                 </button>
               </div>
-              
+
               {forecastDetailView === 'week' ? (
                 <div className="space-y-4">
                   {selectedForecast.weeklyBreakdown.map((week) => (
@@ -1073,7 +1167,7 @@ const DashboardView: React.FC = () => {
                           第{week.week}週 ({week.startDate} ～ {week.endDate})
                         </h4>
                         <div className="text-sm text-gray-600">
-                          午前: {week.amSlots}枠 / 午後: {week.pmSlots}枠 / 合計: {week.totalSlots}枠
+                          {slotInfo.AM.name}: {week.amSlots}枠{slotInfo.PM && ` / ${slotInfo.PM.name}: ${week.pmSlots}枠`} / 合計: {week.totalSlots}枠
                         </div>
                       </div>
                       <div className="mt-3">
@@ -1099,7 +1193,7 @@ const DashboardView: React.FC = () => {
                           {day.date} ({day.dayOfWeek})
                         </div>
                         <div className="text-sm text-gray-600">
-                          午前: {day.amSlots}枠 / 午後: {day.pmSlots}枠 / 合計: {day.totalSlots}枠
+                          {slotInfo.AM.name}: {day.amSlots}枠{slotInfo.PM && ` / ${slotInfo.PM.name}: ${day.pmSlots}枠`} / 合計: {day.totalSlots}枠
                         </div>
                       </div>
                       <div className="mt-2">
@@ -1116,6 +1210,8 @@ const DashboardView: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              )}
+              </>
               )}
             </div>
           </div>

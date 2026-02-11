@@ -36,6 +36,7 @@ import {
   Zap,
   Library,
   Calculator,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -54,7 +55,8 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'children': 1,      // 児童管理
   'daily-log': 1,     // 業務日誌
   'support-plan': 1,  // 個別支援計画
-  'staff': 1,         // スタッフ管理
+  'staff': 1,         // スタッフ管理（旧）
+  'staff-master': 1,  // スタッフマスタ（新）
   'shift': 1,         // シフト管理
   'dashboard': 1,     // ダッシュボード
   'facility': 1,      // 施設情報
@@ -62,6 +64,8 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'addition-settings': 1, // 加算体制設定
   'knowledge': 1,     // ナレッジベース
   'addition-simulation': 1, // 加算シミュレーション
+  'staffing': 1,            // 人員配置管理
+  'work-schedule': 1,       // 勤務体制一覧表
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
@@ -160,10 +164,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       category: 'スタッフ',
       icon: CalendarCheck,
       items: [
-        { id: 'staff', label: 'スタッフ管理', icon: Users, permission: 'staff' as const },
+        { id: 'staff-master', label: 'スタッフマスタ', icon: Users, permission: 'staff' as const },
+        { id: 'staffing', label: '人員配置管理', icon: UserCheck, permission: 'staff' as const },
         { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'shift' as const },
         { id: 'training', label: '研修記録', icon: GraduationCap, permission: 'training' as const },
-        { id: 'knowledge', label: 'ナレッジ', icon: Library, permission: 'staff' as const },
       ],
     },
     {
@@ -174,6 +178,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'audit-preparation', label: '運営指導準備', icon: ClipboardCheck, permission: 'auditPreparation' as const },
         { id: 'committee', label: '委員会管理', icon: UsersRound, permission: 'committee' as const },
         { id: 'documents', label: '書類管理', icon: FileText, permission: 'documents' as const },
+        { id: 'knowledge', label: 'ナレッジ', icon: Library, permission: 'staff' as const },
         { id: 'government', label: '行政連携', icon: Building2, permission: 'dashboard' as const },
       ],
     },

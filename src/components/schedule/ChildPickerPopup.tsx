@@ -17,6 +17,12 @@ export interface SelectedChildWithTransport {
   hasDropoff: boolean;
 }
 
+// 時間枠情報の型
+interface SlotInfoType {
+  AM: { name: string; startTime: string; endTime: string };
+  PM: { name: string; startTime: string; endTime: string } | null;
+}
+
 interface ChildPickerPopupProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,6 +33,7 @@ interface ChildPickerPopupProps {
   onSelect: (childIds: string[]) => void;
   onSelectWithTransport?: (children: SelectedChildWithTransport[]) => void; // 送迎オプション付き
   multiSelect?: boolean;
+  slotInfo?: SlotInfoType;
 }
 
 export default function ChildPickerPopup({
@@ -39,6 +46,10 @@ export default function ChildPickerPopup({
   onSelect,
   onSelectWithTransport,
   multiSelect = true,
+  slotInfo = {
+    AM: { name: '午前', startTime: '09:00', endTime: '12:00' },
+    PM: { name: '午後', startTime: '13:00', endTime: '18:00' },
+  },
 }: ChildPickerPopupProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -195,7 +206,7 @@ export default function ChildPickerPopup({
               <span className={`ml-2 text-sm font-normal ${
                 targetSlot === 'AM' ? 'text-gray-700' : 'text-gray-700'
               }`}>
-                （{targetSlot === 'AM' ? '午前' : '午後'}枠）
+                （{targetSlot === 'AM' ? slotInfo.AM.name : (slotInfo.PM?.name || '午後')}枠）
               </span>
             </h3>
             {patternMatchCount > 0 && (

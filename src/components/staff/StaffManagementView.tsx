@@ -775,9 +775,9 @@ const StaffManagementView: React.FC = () => {
                 <th className="p-3 text-left font-bold text-gray-700">名前</th>
                 <th className="p-3 text-left font-bold text-gray-700">ステータス</th>
                 <th className="p-3 text-left font-bold text-gray-700">ダッシュボード</th>
-                <th className="p-3 text-left font-bold text-gray-700">役職</th>
+                <th className="p-3 text-left font-bold text-gray-700">権限</th>
                 <th className="p-3 text-left font-bold text-gray-700">雇用形態</th>
-                <th className="p-3 text-left font-bold text-gray-700">施設での役割</th>
+                <th className="p-3 text-left font-bold text-gray-700">職種</th>
                 <th className="p-3 text-center font-bold text-gray-700">操作</th>
               </tr>
             </thead>
@@ -794,7 +794,7 @@ const StaffManagementView: React.FC = () => {
                     <div className="flex items-center gap-1">
                       {s.name}
                       {s.isMaster && (
-                        <span className="text-yellow-500" title="マスター管理者">★</span>
+                        <span className="text-yellow-500" title="施設オーナー">★</span>
                       )}
                     </div>
                   </td>
@@ -806,7 +806,7 @@ const StaffManagementView: React.FC = () => {
                   <td className="p-3">
                     {s.isMaster ? (
                       <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-bold rounded">
-                        マスター
+                        オーナー
                       </span>
                     ) : s.hasDashboardAccess ? (
                       <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded">
@@ -1046,7 +1046,8 @@ const StaffManagementView: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">
-                        役職
+                        権限
+                        <span className="text-xs text-gray-400 font-normal ml-1">（システム上の権限）</span>
                       </label>
                       <select
                         value={manualFormData.role}
@@ -1055,7 +1056,7 @@ const StaffManagementView: React.FC = () => {
                       >
                         <option value="一般スタッフ">一般スタッフ</option>
                         <option value="マネージャー">マネージャー</option>
-                        <option value="管理者">管理者</option>
+                        <option value="管理者">管理者（フル権限）</option>
                       </select>
                     </div>
                     <div>
@@ -2412,7 +2413,7 @@ const StaffManagementView: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="bg-gray-50 rounded-lg p-3">
-                            <span className="text-xs text-gray-500 block mb-1">役職</span>
+                            <span className="text-xs text-gray-500 block mb-1">権限</span>
                             <span className="text-sm font-medium text-gray-800">{selectedStaff.role || '未登録'}</span>
                           </div>
                           <div className="bg-gray-50 rounded-lg p-3">
@@ -2420,7 +2421,7 @@ const StaffManagementView: React.FC = () => {
                             <span className="text-sm font-medium text-gray-800">{selectedStaff.type || '未登録'}</span>
                           </div>
                           <div className="bg-gray-50 rounded-lg p-3">
-                            <span className="text-xs text-gray-500 block mb-1">施設での役割</span>
+                            <span className="text-xs text-gray-500 block mb-1">職種</span>
                             <span className="text-sm font-medium text-gray-800">{facilityRole || '未登録'}</span>
                           </div>
                           <div className="bg-gray-50 rounded-lg p-3">
@@ -2689,7 +2690,7 @@ const StaffManagementView: React.FC = () => {
                   {selectedStaff.isMaster ? (
                     <div className="w-full px-4 py-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md text-sm font-bold flex items-center justify-center gap-2">
                       <span className="text-yellow-500">★</span>
-                      マスター管理者（全機能にアクセス可能）
+                      施設オーナー（全機能にアクセス可能）
                     </div>
                   ) : (
                     <button
@@ -4364,7 +4365,8 @@ const StaffManagementView: React.FC = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">
-                            役職
+                            権限
+                            <span className="text-xs text-gray-400 font-normal ml-1">（システム上の権限）</span>
                           </label>
                           <select
                             value={editFormData.role || '一般スタッフ'}
@@ -4373,7 +4375,7 @@ const StaffManagementView: React.FC = () => {
                           >
                             <option value="一般スタッフ">一般スタッフ</option>
                             <option value="マネージャー">マネージャー</option>
-                            <option value="管理者">管理者</option>
+                            <option value="管理者">管理者（フル権限）</option>
                           </select>
                         </div>
                         <div>
@@ -4420,13 +4422,13 @@ const StaffManagementView: React.FC = () => {
                         </div>
                       )}
 
-                      {/* 施設での役割（チェックボックス） */}
+                      {/* 職種（チェックボックス） */}
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">
-                          施設での役割 <span className="text-xs text-gray-500 font-normal">（複数選択可）</span>
+                          職種 <span className="text-xs text-gray-500 font-normal">（複数選択可）</span>
                         </label>
                         <div className="space-y-2">
-                          {['児童発達支援管理責任者', '管理者', '指導員', '機能性担当職員', '訪問支援員'].map((role) => {
+                          {['児童発達支援管理責任者（児発管）', '施設管理者', '指導員', '機能性担当職員', '訪問支援員'].map((role) => {
                             const facilityRoles = editFormData.facilityRole ? editFormData.facilityRole.split(',').map((r: string) => r.trim()) : [];
                             const isChecked = Array.isArray(facilityRoles) ? facilityRoles.includes(role) : facilityRoles === role;
                             return (

@@ -22,6 +22,9 @@ import ChildrenView from '@/components/children/ChildrenView';
 import TransportRouteView from '@/components/transport/TransportRouteView';
 import StaffView from '@/components/staff/StaffView';
 import StaffManagementView from '@/components/staff/StaffManagementView';
+import { StaffMasterView } from '@/components/staff/master';
+import { ShiftManagementView } from '@/components/staff/shift';
+import { StaffingView } from '@/components/staff/staffing';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 import ClientInvitationView from '@/components/client/ClientInvitationView';
 import ChatManagementView from '@/components/chat/ChatManagementView';
@@ -42,6 +45,8 @@ import StaffInfoManagementView from '@/components/management/StaffInfoManagement
 import GovernmentPortalView from '@/components/government/GovernmentPortalView';
 import KnowledgeBaseView from '@/components/knowledge/KnowledgeBaseView';
 import AdditionSimulationView from '@/components/simulation/AdditionSimulationView';
+import { StaffingDashboard } from '@/components/staffing';
+import WorkScheduleReportView from '@/components/compliance/WorkScheduleReportView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -216,6 +221,8 @@ export default function BusinessPage() {
         schedule: 'schedule',
         children: 'children',
         staff: 'staff',
+        'staff-master': 'staff',
+        staffing: 'staff',
         shift: 'staff',
         facility: 'facility',
       };
@@ -248,6 +255,8 @@ export default function BusinessPage() {
         schedule: 'schedule',
         children: 'children',
         staff: 'staff',
+        'staff-master': 'staff',
+        staffing: 'staff',
         shift: 'staff',
         facility: 'facility',
       };
@@ -311,10 +320,12 @@ export default function BusinessPage() {
         return <ChatManagementView />;
       case 'staff':
         return <StaffManagementView />;
+      case 'staff-master':
+        return <StaffMasterView />;
       case 'staff-info':
         return <StaffInfoManagementView facilityId={facility?.id || ''} facilityName={facility?.name} />;
       case 'shift':
-        return <StaffView />;
+        return <ShiftManagementView />;
       case 'facility':
         return <FacilitySettingsView />;
       case 'addition-settings':
@@ -362,6 +373,8 @@ export default function BusinessPage() {
             onClose={() => setActiveTab('dashboard')}
           />
         ) : null;
+      case 'staffing':
+        return <StaffingView />;
       default:
         return null;
     }

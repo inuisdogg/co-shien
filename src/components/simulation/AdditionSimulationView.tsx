@@ -17,6 +17,7 @@ import {
   Calendar,
   AlertCircle,
   Check,
+  Settings,
 } from 'lucide-react';
 import { useAdditionSimulation, PLANNABLE_ADDITIONS } from '@/hooks/useAdditionSimulation';
 import ChildAdditionCard from './ChildAdditionCard';
@@ -40,6 +41,7 @@ const AdditionSimulationView: React.FC = () => {
     savePlans,
     copyFromPreviousMonth,
     monthlyLimits,
+    isConfigured,
   } = useAdditionSimulation();
 
   const [showCopyConfirm, setShowCopyConfirm] = useState(false);
@@ -75,6 +77,41 @@ const AdditionSimulationView: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
         <span className="ml-3 text-gray-600">データを読み込み中...</span>
+      </div>
+    );
+  }
+
+  // 施設設定が未完了の場合はガイダンスを表示
+  if (!isConfigured) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Calculator className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">加算シミュレーション</h1>
+              <p className="text-sm text-gray-500">児童別の月間加算計画と売上見込み</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Settings className="w-8 h-8 text-amber-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">
+            施設設定が必要です
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            加算シミュレーションを行うには、まず施設情報で<br />
+            <strong>サービス種別</strong>と<strong>地域区分</strong>を設定してください。
+          </p>
+          <p className="text-xs text-gray-500">
+            設定することで、正確な報酬単価と基本報酬を使った<br />
+            シミュレーションが可能になります。
+          </p>
+        </div>
       </div>
     );
   }

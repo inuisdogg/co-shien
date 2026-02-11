@@ -76,8 +76,9 @@ export function useAdditionSimulation() {
   const [plans, setPlans] = useState<ChildAdditionPlan[]>([]);
   const [scheduledDays, setScheduledDays] = useState<Record<string, number>>({}); // childId -> days
   const [actualCounts, setActualCounts] = useState<Record<string, Record<string, number>>>({}); // childId -> { additionCode -> count }
-  const [unitPrice, setUnitPrice] = useState(11.2); // 1級地のデフォルト単価
-  const [baseRewardUnits, setBaseRewardUnits] = useState(480); // 放デイ区分2のデフォルト
+  const [unitPrice, setUnitPrice] = useState(0); // 施設設定から取得（0 = 未設定）
+  const [baseRewardUnits, setBaseRewardUnits] = useState(0); // 施設設定から取得（0 = 未設定）
+  const [isConfigured, setIsConfigured] = useState(false); // 施設設定が完了しているか
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -216,14 +217,18 @@ export function useAdditionSimulation() {
       }
       setActualCounts(counts);
 
-      // 6. 施設設定から単価を取得
+      // 6. 施設設定から単価・基本報酬を取得
       const { data: settingsData } = await supabase
         .from('facility_settings')
-        .select('regional_grade')
+        .select('regional_grade, service_type_code')
         .eq('facility_id', facilityId)
         .single();
 
-      if (settingsData?.regional_grade) {
+      const hasRegionalGrade = !!settingsData?.regional_grade;
+      const hasServiceType = !!settingsData?.service_type_code;
+      setIsConfigured(hasRegionalGrade && hasServiceType);
+
+      if (hasRegionalGrade) {
         const { data: unitData } = await supabase
           .from('regional_units')
           .select('unit_price')
@@ -232,6 +237,19 @@ export function useAdditionSimulation() {
 
         if (unitData) {
           setUnitPrice(unitData.unit_price);
+        }
+      }
+
+      if (hasServiceType) {
+        const { data: rewardData } = await supabase
+          .from('base_rewards')
+          .select('units')
+          .eq('service_type_code', settingsData.service_type_code)
+          .eq('time_category', 2) // 区分2を基準
+          .single();
+
+        if (rewardData) {
+          setBaseRewardUnits(rewardData.units);
         }
       }
 
@@ -466,6 +484,7 @@ export function useAdditionSimulation() {
     setShowComparison,
     unitPrice,
     baseRewardUnits,
+    isConfigured, // 施設設定が完了しているか
 
     // ローディング・エラー
     isLoading,

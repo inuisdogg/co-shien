@@ -222,36 +222,82 @@ export const getAlerts = (
   return alerts;
 };
 
+// 時間枠情報の型
+interface TimeSlotInfo {
+  id: string;
+  name: string;
+  capacity: number;
+  displayOrder: number;
+}
+
 // 曜日別・時間枠別稼働ヒートマップデータ
 export const getOccupancyHeatmapData = (
   schedules: ScheduleItem[],
-  currentMonth: Date = new Date()
-): { dayOfWeek: string; slot: string; occupancy: number; capacity: number }[] => {
+  currentMonth: Date = new Date(),
+  capacity?: { AM: number; PM: number },
+  timeSlots?: TimeSlotInfo[]
+): { dayOfWeek: string; slot: string; slotName: string; occupancy: number; capacity: number; isConfigured: boolean }[] => {
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
-  
+
+  // 時間枠が未設定の場合は空配列を返す
+  const hasTimeSlots = timeSlots && timeSlots.length > 0;
+  const hasCapacity = capacity && (capacity.AM > 0 || capacity.PM > 0);
+
+  if (!hasTimeSlots && !hasCapacity) {
+    // 未設定時は空データを返す（isConfigured: false でUIにガイダンスを表示）
+    const daysOfWeek = ['日', '月', '火', '水', '木', '金', '土'];
+    return daysOfWeek.map(day => ({
+      dayOfWeek: day,
+      slot: 'NONE',
+      slotName: '未設定',
+      occupancy: 0,
+      capacity: 0,
+      isConfigured: false,
+    }));
+  }
+
   const monthlySchedules = schedules.filter((schedule) => {
     const scheduleDate = new Date(schedule.date);
     return scheduleDate.getFullYear() === year && scheduleDate.getMonth() === month;
   });
 
   const daysOfWeek = ['日', '月', '火', '水', '木', '金', '土'];
-  const slots = ['AM', 'PM'];
-  
-  const heatmapData: { dayOfWeek: string; slot: string; occupancy: number; capacity: number }[] = [];
+
+  // 時間枠情報を構築
+  let slotsConfig: { key: string; name: string; capacity: number }[] = [];
+
+  if (hasTimeSlots) {
+    const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
+    slotsConfig = sorted.map((ts, i) => ({
+      key: i === 0 ? 'AM' : i === 1 ? 'PM' : `SLOT${i}`,
+      name: ts.name,
+      capacity: ts.capacity,
+    }));
+  } else if (hasCapacity) {
+    // capacityがあるがtimeSlotsがない場合は従来の午前/午後
+    slotsConfig = [
+      { key: 'AM', name: '午前', capacity: capacity.AM },
+      { key: 'PM', name: '午後', capacity: capacity.PM },
+    ].filter(s => s.capacity > 0);
+  }
+
+  const heatmapData: { dayOfWeek: string; slot: string; slotName: string; occupancy: number; capacity: number; isConfigured: boolean }[] = [];
 
   daysOfWeek.forEach((day, dayIndex) => {
-    slots.forEach((slot) => {
+    slotsConfig.forEach((slotConfig) => {
       const count = monthlySchedules.filter((s) => {
         const scheduleDate = new Date(s.date);
-        return scheduleDate.getDay() === dayIndex && s.slot === slot;
+        return scheduleDate.getDay() === dayIndex && s.slot === slotConfig.key;
       }).length;
-      
+
       heatmapData.push({
         dayOfWeek: day,
-        slot,
+        slot: slotConfig.key,
+        slotName: slotConfig.name,
         occupancy: count,
-        capacity: 10, // 仮定の定員
+        capacity: slotConfig.capacity,
+        isConfigured: true,
       });
     });
   });

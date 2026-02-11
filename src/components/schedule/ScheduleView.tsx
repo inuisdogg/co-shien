@@ -5,8 +5,8 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap, ClipboardList } from 'lucide-react';
-import { TimeSlot, ScheduleItem, Child } from '@/types';
+import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap, ClipboardList, Settings, AlertTriangle } from 'lucide-react';
+import { TimeSlot, ScheduleItem, Child, FacilityTimeSlot } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import SlotAssignmentPanel from './SlotAssignmentPanel';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
@@ -24,6 +24,8 @@ const ScheduleView: React.FC = () => {
     bulkRegisterFromPatterns,
     resetMonthSchedules,
     getUsageRecordByScheduleId,
+    timeSlots,
+    loadingTimeSlots,
   } = useFacilityData();
 
   const [viewFormat, setViewFormat] = useState<'month' | 'week'>('month');
@@ -58,9 +60,70 @@ const ScheduleView: React.FC = () => {
     dropoff: false,
   });
 
+  // 時間枠が設定されているかチェック
+  const hasTimeSlots = timeSlots.length > 0;
+
   // 施設設定から受け入れ人数を取得（リアクティブに更新される）
-  // facilitySettingsが更新されると自動的に再計算される
-  const capacity = useMemo(() => facilitySettings.capacity, [facilitySettings]);
+  // timeSlots（施設設定の時間枠）があればそこから定員を取得、なければデフォルト値
+  const capacity = useMemo(() => {
+    if (timeSlots.length >= 2) {
+      // 時間枠が2つ以上あれば、displayOrder順でAM/PMに対応させる
+      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
+      return {
+        AM: sorted[0]?.capacity || 0,
+        PM: sorted[1]?.capacity || 0,
+      };
+    } else if (timeSlots.length === 1) {
+      // 1枠のみの場合
+      return {
+        AM: timeSlots[0].capacity || 0,
+        PM: 0,
+      };
+    }
+    // 未設定の場合はデフォルト（0 = 未設定を示す）
+    return facilitySettings.capacity || { AM: 0, PM: 0 };
+  }, [timeSlots, facilitySettings.capacity]);
+
+  // 時間枠の名前と時間を取得
+  const slotInfo = useMemo(() => {
+    if (timeSlots.length >= 2) {
+      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
+      return {
+        AM: {
+          name: sorted[0]?.name || '午前',
+          startTime: sorted[0]?.startTime || '09:00',
+          endTime: sorted[0]?.endTime || '12:00',
+        },
+        PM: {
+          name: sorted[1]?.name || '午後',
+          startTime: sorted[1]?.startTime || '13:00',
+          endTime: sorted[1]?.endTime || '18:00',
+        },
+      };
+    } else if (timeSlots.length === 1) {
+      return {
+        AM: {
+          name: timeSlots[0].name || '終日',
+          startTime: timeSlots[0].startTime || '09:00',
+          endTime: timeSlots[0].endTime || '18:00',
+        },
+        PM: null,
+      };
+    }
+    // デフォルト
+    return {
+      AM: {
+        name: '午前',
+        startTime: facilitySettings.businessHours?.AM?.start || '09:00',
+        endTime: facilitySettings.businessHours?.AM?.end || '12:00',
+      },
+      PM: {
+        name: '午後',
+        startTime: facilitySettings.businessHours?.PM?.start || '13:00',
+        endTime: facilitySettings.businessHours?.PM?.end || '18:00',
+      },
+    };
+  }, [timeSlots, facilitySettings.businessHours]);
 
   // 当月の日付を生成
   const monthDates = useMemo(() => {
@@ -591,7 +654,47 @@ const ScheduleView: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-auto bg-white relative p-4">
-          {viewFormat === 'month' && (
+          {/* 時間枠未設定時のガイダンス */}
+          {!loadingTimeSlots && !hasTimeSlots && (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 max-w-md shadow-sm">
+                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle className="w-8 h-8 text-amber-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800 mb-2">
+                  時間枠の設定が必要です
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  利用予約カレンダーを使用するには、<br />
+                  まず施設情報で時間枠を設定してください。
+                </p>
+                <div className="bg-white rounded-lg p-4 border border-amber-100 mb-4">
+                  <p className="text-xs text-gray-500 mb-2">設定例:</p>
+                  <div className="flex gap-2 justify-center">
+                    <span className="bg-[#e0f7fa] text-[#006064] px-3 py-1 rounded text-sm font-medium">午前 9:00-12:00</span>
+                    <span className="bg-orange-50 text-orange-900 px-3 py-1 rounded text-sm font-medium">午後 13:00-18:00</span>
+                  </div>
+                </div>
+                <a
+                  href="/business?tab=facility-settings"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  施設情報を設定する
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* 読み込み中 */}
+          {loadingTimeSlots && (
+            <div className="flex items-center justify-center h-full min-h-[400px]">
+              <div className="animate-spin w-8 h-8 border-4 border-[#00c4cc] border-t-transparent rounded-full"></div>
+            </div>
+          )}
+
+          {/* カレンダー表示（時間枠設定済みの場合） */}
+          {!loadingTimeSlots && hasTimeSlots && viewFormat === 'month' && (
             <div className="w-full">
               {/* 曜日ヘッダー */}
               <div className="grid grid-cols-7 gap-1 mb-1">
@@ -684,10 +787,10 @@ const ScheduleView: React.FC = () => {
                       </div>
                       {!isHolidayDay ? (
                         <div className="flex flex-col gap-1 mt-1">
-                          {/* 午前 */}
+                          {/* 午前（第1枠） */}
                           <div className="bg-[#e0f7fa] rounded px-1.5 py-1">
                             <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-[#006064] text-[10px] sm:text-[11px] leading-tight">午前</span>
+                              <span className="font-bold text-[#006064] text-[10px] sm:text-[11px] leading-tight">{slotInfo.AM.name}</span>
                               <span className="text-[#006064] font-bold text-[10px] sm:text-[11px] leading-tight">
                                 {amCount}/{capacity.AM}
                               </span>
@@ -713,10 +816,11 @@ const ScheduleView: React.FC = () => {
                               />
                             </div>
                           </div>
-                          {/* 午後 */}
+                          {/* 午後（第2枠） */}
+                          {slotInfo.PM && (
                           <div className="bg-orange-50 rounded px-1.5 py-1">
                             <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-orange-900 text-[10px] sm:text-[11px] leading-tight">午後</span>
+                              <span className="font-bold text-orange-900 text-[10px] sm:text-[11px] leading-tight">{slotInfo.PM.name}</span>
                               <span className="text-orange-900 font-bold text-[10px] sm:text-[11px] leading-tight">
                                 {pmCount}/{capacity.PM}
                               </span>
@@ -742,6 +846,7 @@ const ScheduleView: React.FC = () => {
                               />
                             </div>
                           </div>
+                          )}
                         </div>
                       ) : (
                         <div className="text-[10px] text-red-600 text-center mt-2 leading-tight">
@@ -755,7 +860,7 @@ const ScheduleView: React.FC = () => {
             </div>
           )}
 
-          {viewFormat === 'week' && (
+          {!loadingTimeSlots && hasTimeSlots && viewFormat === 'week' && (
             <div className="min-w-[700px] overflow-x-auto">
               <div className="flex border-b border-gray-200 sticky top-0 bg-gray-50 z-10">
                 <div className="w-16 sm:w-20 p-2 shrink-0 border-r border-gray-200 text-xs sm:text-sm text-center font-bold text-gray-500 flex items-center justify-center">
@@ -785,7 +890,7 @@ const ScheduleView: React.FC = () => {
               {/* AM Row */}
               <div className="flex border-b border-gray-200 min-h-[120px]">
                 <div className="w-16 sm:w-20 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                  <div className="text-xs sm:text-sm font-bold text-gray-600">午前</div>
+                  <div className="text-xs sm:text-sm font-bold text-gray-600">{slotInfo.AM.name}</div>
                   <div className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">定員{capacity.AM}</div>
                 </div>
                 {weekDates.map((d, i) => {
@@ -849,9 +954,10 @@ const ScheduleView: React.FC = () => {
                 })}
               </div>
               {/* PM Row */}
+              {slotInfo.PM && (
               <div className="flex min-h-[200px]">
                 <div className="w-16 sm:w-20 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                  <div className="text-xs sm:text-sm font-bold text-gray-600">午後</div>
+                  <div className="text-xs sm:text-sm font-bold text-gray-600">{slotInfo.PM.name}</div>
                   <div className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">定員{capacity.PM}</div>
                 </div>
                 {weekDates.map((d, i) => {
@@ -914,6 +1020,7 @@ const ScheduleView: React.FC = () => {
                   );
                 })}
               </div>
+              )}
             </div>
           )}
         </div>
@@ -993,13 +1100,14 @@ const ScheduleView: React.FC = () => {
                     />
                     <div className="flex-1">
                       <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
-                        午前
+                        {slotInfo.AM.name}
                       </span>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {facilitySettings.businessHours?.AM?.start || '09:00'} ～ {facilitySettings.businessHours?.AM?.end || '12:00'}
+                        {slotInfo.AM.startTime} ～ {slotInfo.AM.endTime}
                       </p>
                     </div>
                   </label>
+                  {slotInfo.PM && (
                   <label className="flex items-center space-x-3 cursor-pointer group p-2 rounded-md border border-gray-200 hover:bg-gray-50">
                     <input
                       type="checkbox"
@@ -1014,13 +1122,14 @@ const ScheduleView: React.FC = () => {
                     />
                     <div className="flex-1">
                       <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
-                        午後
+                        {slotInfo.PM.name}
                       </span>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {facilitySettings.businessHours?.PM?.start || '13:00'} ～ {facilitySettings.businessHours?.PM?.end || '18:00'}
+                        {slotInfo.PM.startTime} ～ {slotInfo.PM.endTime}
                       </p>
                     </div>
                   </label>
+                  )}
                 </div>
               </div>
 
@@ -1096,6 +1205,7 @@ const ScheduleView: React.FC = () => {
           schedules={schedules}
           childList={children}
           capacity={capacity}
+          slotInfo={slotInfo}
           transportCapacity={facilitySettings.transportCapacity || { pickup: 4, dropoff: 4 }}
           onClose={() => {
             setIsSlotPanelOpen(false);

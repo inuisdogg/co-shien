@@ -19,7 +19,7 @@ import { useAdditionComplianceCheck } from '@/hooks/useAdditionComplianceCheck';
 import AdditionComplianceBanner from '@/components/staff/AdditionComplianceBanner';
 
 const StaffView: React.FC = () => {
-  const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings, saveShifts, fetchShifts } = useFacilityData();
+  const { staff, addStaff, updateStaff, deleteStaff, schedules, children, facilitySettings, timeSlots, saveShifts, fetchShifts } = useFacilityData();
   const { facility } = useAuth();
   const [subTab, setSubTab] = useState<'shift' | 'list'>('shift');
 
@@ -46,6 +46,26 @@ const StaffView: React.FC = () => {
       return a.name.localeCompare(b.name, 'ja');
     });
   }, [staff]);
+
+  // 時間枠の名前を動的に取得
+  const slotInfo = useMemo(() => {
+    if (timeSlots.length >= 2) {
+      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
+      return {
+        AM: { name: sorted[0]?.name || '午前', capacity: sorted[0]?.capacity || 0 },
+        PM: { name: sorted[1]?.name || '午後', capacity: sorted[1]?.capacity || 0 },
+      };
+    } else if (timeSlots.length === 1) {
+      return {
+        AM: { name: timeSlots[0].name || '終日', capacity: timeSlots[0].capacity || 0 },
+        PM: null,
+      };
+    }
+    return {
+      AM: { name: '午前', capacity: facilitySettings.capacity.AM },
+      PM: { name: '午後', capacity: facilitySettings.capacity.PM },
+    };
+  }, [timeSlots, facilitySettings.capacity]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -1598,11 +1618,11 @@ const StaffView: React.FC = () => {
                     );
                   })}
                 </div>
-                {/* 午前行 */}
+                {/* 第1枠行 */}
                 <div className="flex border-b border-gray-200 min-h-[80px] sm:min-h-[100px]">
                   <div className="w-12 sm:w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                    <div className="text-xs font-bold text-gray-600">午前</div>
-                    <div className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 leading-none">定員{facilitySettings.capacity.AM}</div>
+                    <div className="text-xs font-bold text-gray-600">{slotInfo.AM.name}</div>
+                    <div className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 leading-none">定員{slotInfo.AM.capacity}</div>
                   </div>
                   {weekDates.map((d, i) => {
                     const items = schedules.filter((s) => s.date === d.date && s.slot === 'AM');
@@ -1644,11 +1664,12 @@ const StaffView: React.FC = () => {
                     );
                   })}
                 </div>
-                {/* 午後行 */}
+                {/* 第2枠行 */}
+                {slotInfo.PM && (
                 <div className="flex min-h-[100px] sm:min-h-[150px]">
                   <div className="w-12 sm:w-16 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                    <div className="text-xs font-bold text-gray-600">午後</div>
-                    <div className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 leading-none">定員{facilitySettings.capacity.PM}</div>
+                    <div className="text-xs font-bold text-gray-600">{slotInfo.PM.name}</div>
+                    <div className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 leading-none">定員{slotInfo.PM.capacity}</div>
                   </div>
                   {weekDates.map((d, i) => {
                     const items = schedules.filter((s) => s.date === d.date && s.slot === 'PM');
@@ -1690,6 +1711,7 @@ const StaffView: React.FC = () => {
                     );
                   })}
                 </div>
+                )}
               </div>
             </div>
           </div>

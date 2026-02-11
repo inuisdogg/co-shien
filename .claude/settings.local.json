@@ -61,7 +61,10 @@
       "Bash(sync)",
       "Bash(timeout 120 npx tsc:*)",
       "Bash(timeout 60 npx tsc:*)",
-      "Bash(supabase:*)"
+      "Bash(supabase:*)",
+      "Bash(pgrep:*)",
+      "WebSearch",
+      "Bash(git -C /Users/inu/Desktop/kidos status --porcelain)"
     ]
   }
 }

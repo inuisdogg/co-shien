@@ -645,8 +645,8 @@ export default function PersonalDashboardPage() {
                   PM: { start: '13:00', end: '18:00' },
                 },
                 capacity: settingsData.capacity || {
-                  AM: 10,
-                  PM: 10,
+                  AM: 0, // 未設定時は0
+                  PM: 0,
                 },
                 createdAt: settingsData.created_at || new Date().toISOString(),
                 updatedAt: settingsData.updated_at || new Date().toISOString(),

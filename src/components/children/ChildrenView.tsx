@@ -59,7 +59,24 @@ type PendingInvitation = {
 
 const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const { facility } = useAuth();
-  const { children, addChild, updateChild, getLeadsByChildId } = useFacilityData();
+  const { children, addChild, updateChild, getLeadsByChildId, timeSlots, facilitySettings } = useFacilityData();
+
+  // 時間枠の名前を取得
+  const slotInfo = useMemo(() => {
+    if (timeSlots.length >= 2) {
+      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
+      return {
+        AM: sorted[0]?.name || '午前',
+        PM: sorted[1]?.name || '午後',
+      };
+    } else if (timeSlots.length === 1) {
+      return {
+        AM: timeSlots[0].name || '終日',
+        PM: null,
+      };
+    }
+    return { AM: '午前', PM: '午後' };
+  }, [timeSlots]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<'user' | 'facility'>('user');
@@ -1288,8 +1305,9 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                       }}
                                       className="accent-[#00c4cc] w-2.5 h-2.5"
                                     />
-                                    <span className="text-[10px] text-gray-600 ml-0.5">午前</span>
+                                    <span className="text-[10px] text-gray-600 ml-0.5">{slotInfo.AM}</span>
                                   </label>
+                                  {slotInfo.PM && (
                                   <label className="flex items-center cursor-pointer">
                                     <input
                                       type="radio"
@@ -1307,8 +1325,9 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                       }}
                                       className="accent-[#00c4cc] w-2.5 h-2.5"
                                     />
-                                    <span className="text-[10px] text-gray-600 ml-0.5">午後</span>
+                                    <span className="text-[10px] text-gray-600 ml-0.5">{slotInfo.PM}</span>
                                   </label>
+                                  )}
                                   <label className="flex items-center cursor-pointer">
                                     <input
                                       type="radio"
@@ -2108,7 +2127,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                             className="accent-[#00c4cc] w-2.5 h-2.5"
                                           />
                                           <span className="text-[10px] text-gray-600 ml-0.5">
-                                            {slot === 'AM' ? '午前' : slot === 'PM' ? '午後' : '終日'}
+                                            {slot === 'AM' ? slotInfo.AM : slot === 'PM' ? (slotInfo.PM || '午後') : '終日'}
                                           </span>
                                         </label>
                                       ))}
@@ -2410,6 +2429,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
           childId={selectedChild.id}
           childName={selectedChild.name}
           facilityId={facility.id}
+          slotInfo={slotInfo}
           onSave={() => {
             // 必要に応じてデータを再読み込み
           }}

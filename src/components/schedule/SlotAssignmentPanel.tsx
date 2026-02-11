@@ -20,11 +20,18 @@ type DropTarget = {
   transport: 'pickup' | 'none' | 'dropoff' | 'both';
 };
 
+// 時間枠情報の型
+interface SlotInfoType {
+  AM: { name: string; startTime: string; endTime: string };
+  PM: { name: string; startTime: string; endTime: string } | null;
+}
+
 interface SlotAssignmentPanelProps {
   date: string;
   schedules: ScheduleItem[];
   childList: Child[];
   capacity: { AM: number; PM: number };
+  slotInfo?: SlotInfoType;
   transportCapacity?: { pickup: number; dropoff: number };
   onClose: () => void;
   onAddSchedule: (data: {
@@ -47,6 +54,10 @@ export default function SlotAssignmentPanel({
   schedules,
   childList,
   capacity,
+  slotInfo = {
+    AM: { name: '午前', startTime: '09:00', endTime: '12:00' },
+    PM: { name: '午後', startTime: '13:00', endTime: '18:00' },
+  },
   transportCapacity = { pickup: 3, dropoff: 3 },
   onClose,
   onAddSchedule,
@@ -375,7 +386,7 @@ export default function SlotAssignmentPanel({
         }`}>
           <div className="flex items-center gap-3">
             <h3 className={`font-bold text-sm ${slot === 'AM' ? 'text-blue-800' : 'text-orange-800'}`}>
-              {slot === 'AM' ? '午前' : '午後'}
+              {slot === 'AM' ? slotInfo.AM.name : slotInfo.PM?.name || '午後'}
             </h3>
             <div className="flex items-center gap-1">
               <Users className="w-3.5 h-3.5 text-gray-500" />
@@ -507,7 +518,7 @@ export default function SlotAssignmentPanel({
                             <Car className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                           )}
                           <span className="text-[10px] text-gray-500">
-                            {patternMatchAM && patternMatchPM ? '終日' : patternMatchAM ? '午前' : '午後'}
+                            {patternMatchAM && patternMatchPM ? '終日' : patternMatchAM ? slotInfo.AM.name : (slotInfo.PM?.name || '午後')}
                           </span>
                         </div>
                       );
@@ -556,10 +567,10 @@ export default function SlotAssignmentPanel({
             </div>
           </div>
 
-          {/* 右側: 午前・午後の枠 */}
+          {/* 右側: 時間枠 */}
           <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-4">
             {renderSlotSection('AM')}
-            {renderSlotSection('PM')}
+            {slotInfo.PM && renderSlotSection('PM')}
           </div>
         </div>
 
@@ -567,7 +578,7 @@ export default function SlotAssignmentPanel({
         <div className="px-4 lg:px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <div className="text-sm text-gray-600">
             登録済み: <span className="font-bold text-gray-800">{registeredChildIds.length}名</span>
-            <span className="text-xs text-gray-500 ml-2">（午前{schedulesBySlot.AM.length} / 午後{schedulesBySlot.PM.length}）</span>
+            <span className="text-xs text-gray-500 ml-2">（{slotInfo.AM.name}{schedulesBySlot.AM.length}{slotInfo.PM ? ` / ${slotInfo.PM.name}${schedulesBySlot.PM.length}` : ''}）</span>
           </div>
           <button
             onClick={onClose}
@@ -585,6 +596,7 @@ export default function SlotAssignmentPanel({
         childList={childList}
         targetSlot={pickerSlot || 'AM'}
         date={date}
+        slotInfo={slotInfo}
         alreadyRegisteredIds={
           pickerSlot === 'AM'
             ? schedulesBySlot.AM.map(s => s.childId)

@@ -443,8 +443,8 @@ export default function AdminSetupPage() {
             PM: { start: '13:00', end: '18:00' },
           },
           capacity: {
-            AM: 10,
-            PM: 10,
+            AM: 0, // 初期状態は0（施設情報で設定が必要）
+            PM: 0,
           },
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

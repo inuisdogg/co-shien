@@ -10,10 +10,16 @@ import { X, Save, Calendar, Truck, Users, FileText } from 'lucide-react';
 import { FacilityChildrenSettings, Staff } from '@/types';
 import { supabase } from '@/lib/supabase';
 
+type SlotInfo = {
+  AM: string;
+  PM: string | null;
+};
+
 type Props = {
   childId: string;
   childName: string;
   facilityId: string;
+  slotInfo?: SlotInfo;
   onSave: () => void;
   onClose: () => void;
 };
@@ -34,6 +40,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
   childId,
   childName,
   facilityId,
+  slotInfo = { AM: '午前', PM: '午後' },
   onSave,
   onClose,
 }) => {
@@ -262,8 +269,8 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                         className="mt-1 text-xs border border-gray-300 rounded px-1 py-0.5"
                       >
                         <option value="AMPM">終日</option>
-                        <option value="AM">午前</option>
-                        <option value="PM">午後</option>
+                        <option value="AM">{slotInfo.AM}</option>
+                        {slotInfo.PM && <option value="PM">{slotInfo.PM}</option>}
                       </select>
                     )}
                   </div>

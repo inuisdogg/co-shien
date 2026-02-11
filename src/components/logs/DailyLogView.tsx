@@ -65,6 +65,7 @@ export default function DailyLogView() {
     children: facilityChildren,
     usageRecords,
     contactLogs,
+    timeSlots,
     getUsageRecordByScheduleId,
     getContactLogByScheduleId,
     addUsageRecord,
@@ -74,6 +75,26 @@ export default function DailyLogView() {
     updateContactLog,
     deleteContactLog,
   } = useFacilityData();
+
+  // 時間枠の名前を動的に取得
+  const slotInfo = useMemo(() => {
+    if (timeSlots.length >= 2) {
+      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
+      return {
+        AM: { name: sorted[0]?.name || '午前' },
+        PM: { name: sorted[1]?.name || '午後' },
+      };
+    } else if (timeSlots.length === 1) {
+      return {
+        AM: { name: timeSlots[0].name || '終日' },
+        PM: null,
+      };
+    }
+    return {
+      AM: { name: '午前' },
+      PM: { name: '午後' },
+    };
+  }, [timeSlots]);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -489,11 +510,11 @@ export default function DailyLogView() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* 午前の予約 */}
+                  {/* 第1枠の予約 */}
                   {selectedDayInfo.schedules.filter(s => s.schedule.slot === 'AM').length > 0 && (
                     <div>
                       <h4 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">午前</span>
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">{slotInfo.AM.name}</span>
                         <span className="text-gray-500 font-normal">
                           ({selectedDayInfo.schedules.filter(s => s.schedule.slot === 'AM').length}名)
                         </span>
@@ -549,11 +570,11 @@ export default function DailyLogView() {
                     </div>
                   )}
 
-                  {/* 午後の予約 */}
-                  {selectedDayInfo.schedules.filter(s => s.schedule.slot === 'PM').length > 0 && (
+                  {/* 第2枠の予約 */}
+                  {slotInfo.PM && selectedDayInfo.schedules.filter(s => s.schedule.slot === 'PM').length > 0 && (
                     <div>
                       <h4 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">午後</span>
+                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">{slotInfo.PM.name}</span>
                         <span className="text-gray-500 font-normal">
                           ({selectedDayInfo.schedules.filter(s => s.schedule.slot === 'PM').length}名)
                         </span>
@@ -630,7 +651,8 @@ export default function DailyLogView() {
                     const [y, m, d] = selectedScheduleItem.date.split('-').map(Number);
                     const date = new Date(y, m - 1, d);
                     const days = ['日', '月', '火', '水', '木', '金', '土'];
-                    return `${m}月${d}日(${days[date.getDay()]}) ${selectedScheduleItem.slot === 'AM' ? '午前' : '午後'}`;
+                    const slotName = selectedScheduleItem.slot === 'AM' ? slotInfo.AM.name : (slotInfo.PM?.name || '午後');
+                    return `${m}月${d}日(${days[date.getDay()]}) ${slotName}`;
                   })()}
                 </p>
               </div>
