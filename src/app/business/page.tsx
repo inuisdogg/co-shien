@@ -26,7 +26,6 @@ import { StaffMasterView } from '@/components/staff/master';
 import { ShiftManagementView } from '@/components/staff/shift';
 import { StaffingView } from '@/components/staff/staffing';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
-import ClientInvitationView from '@/components/client/ClientInvitationView';
 import ChatManagementView from '@/components/chat/ChatManagementView';
 import DailyLogView from '@/components/logs/DailyLogView';
 import ServicePlanView from '@/components/logs/ServicePlanView';
@@ -38,7 +37,6 @@ import DocumentManagementView from '@/components/management/DocumentManagementVi
 import ExpenseManagementView from '@/components/management/ExpenseManagementView';
 import ProfitLossView from '@/components/management/ProfitLossView';
 import CashFlowView from '@/components/management/CashFlowView';
-import ConnectView from '@/components/connect/ConnectView';
 import FacilityAdditionSettings from '@/components/settings/FacilityAdditionSettings';
 import AdditionCatalogView from '@/components/management/AdditionCatalogView';
 import StaffInfoManagementView from '@/components/management/StaffInfoManagementView';
@@ -312,10 +310,6 @@ export default function BusinessPage() {
         return <TransportRouteView />;
       case 'children':
         return <ChildrenView setActiveTab={setActiveTab} />;
-      case 'client-invitation':
-        return <ClientInvitationView />;
-      case 'connect':
-        return <ConnectView />;
       case 'chat':
         return <ChatManagementView />;
       case 'staff':

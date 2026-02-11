@@ -17,7 +17,6 @@ import {
   BarChart3,
   DollarSign,
   CalendarCheck,
-  UserPlus,
   MessageSquare,
   BookOpen,
   ClipboardList,
@@ -29,7 +28,6 @@ import {
   Receipt,
   Wallet,
   TrendingUp,
-  Link2,
   Truck,
   ChevronDown,
   ChevronRight,
@@ -81,8 +79,6 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   // Phase 3: 外部連携・SaaS化
   'transport': 1,         // 送迎ルート（Phase 1で表示）
   'chat': 3,              // チャット
-  'connect': 3,           // コネクト
-  'client-invitation': 3, // 利用者招待
   'lead': 3,              // リード管理
   'government': 2,        // 行政連携
 };
@@ -146,8 +142,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'schedule', label: '利用予約', icon: CalendarDays, permission: 'schedule' as const },
         { id: 'children', label: '児童管理', icon: Users, permission: 'children' as const },
         { id: 'chat', label: 'チャット', icon: MessageSquare, permission: 'chat' as const },
-        { id: 'connect', label: 'コネクト', icon: Link2, permission: 'connect' as const },
-        { id: 'client-invitation', label: '保護者招待', icon: UserPlus, permission: 'clientInvitation' as const },
         { id: 'lead', label: 'リード管理', icon: Target, permission: 'lead' as const },
       ],
     },

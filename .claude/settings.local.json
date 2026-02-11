@@ -64,7 +64,8 @@
       "Bash(supabase:*)",
       "Bash(pgrep:*)",
       "WebSearch",
-      "Bash(git -C /Users/inu/Desktop/kidos status --porcelain)"
+      "Bash(git -C /Users/inu/Desktop/kidos status --porcelain)",
+      "Bash(for dir in /Users/inu/Desktop/kidos/src/components/*/)"
     ]
   }
 }
