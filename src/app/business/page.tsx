@@ -32,9 +32,7 @@ import TrainingRecordView from '@/components/staff/TrainingRecordView';
 import CommitteeView from '@/components/management/CommitteeView';
 import AuditPreparationView from '@/components/management/AuditPreparationView';
 import DocumentManagementView from '@/components/management/DocumentManagementView';
-import ExpenseManagementView from '@/components/management/ExpenseManagementView';
-import ProfitLossView from '@/components/management/ProfitLossView';
-import CashFlowView from '@/components/management/CashFlowView';
+import FinanceView from '@/components/management/FinanceView';
 import FacilityAdditionSettings from '@/components/settings/FacilityAdditionSettings';
 import AdditionCatalogView from '@/components/management/AdditionCatalogView';
 import StaffInfoManagementView from '@/components/management/StaffInfoManagementView';
@@ -336,16 +334,12 @@ export default function BusinessPage() {
         return <CommitteeView />;
       case 'documents':
         return <DocumentManagementView />;
-      case 'profit-loss':
-        return facility?.id ? <ProfitLossView facilityId={facility.id} /> : null;
-      case 'cash-flow':
-        return facility?.id ? <CashFlowView facilityId={facility.id} /> : null;
-      case 'expense-management':
+      case 'finance':
         return facility?.id && user?.id ? (
-          <ExpenseManagementView
+          <FinanceView
             facilityId={facility.id}
-            approverId={user.id}
-            approverName={user.name || ''}
+            userId={user.id}
+            userName={user.name || ''}
           />
         ) : null;
       case 'government':

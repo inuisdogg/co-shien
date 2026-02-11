@@ -25,9 +25,7 @@ import {
   AlertTriangle,
   GraduationCap,
   UsersRound,
-  Receipt,
   Wallet,
-  TrendingUp,
   Truck,
   ChevronDown,
   ChevronRight,
@@ -71,9 +69,7 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'addition-catalog': 1,  // 加算一覧（Phase 1で表示）
   'training': 2,          // 研修記録
   'committee': 2,         // 委員会管理
-  'profit-loss': 2,       // 損益計算書
-  'cash-flow': 2,         // キャッシュフロー
-  'expense-management': 2, // 経費管理
+  'finance': 2,           // 財務管理（損益・CF・経費を統合）
   'incident': 2,          // 苦情・事故報告
 
   // Phase 3: 外部連携・SaaS化
@@ -183,9 +179,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
         { id: 'addition-simulation', label: '加算シミュレーション', icon: Calculator, permission: 'dashboard' as const },
         { id: 'addition-catalog', label: '加算一覧', icon: Zap, permission: 'dashboard' as const },
-        { id: 'profit-loss', label: '損益計算書', icon: TrendingUp, permission: 'profitLoss' as const },
-        { id: 'cash-flow', label: 'キャッシュフロー', icon: Wallet, permission: 'cashFlow' as const },
-        { id: 'expense-management', label: '経費管理', icon: Receipt, permission: 'expenseManagement' as const },
+        { id: 'finance', label: '財務管理', icon: Wallet, permission: 'dashboard' as const },
         { id: 'management', label: '経営設定', icon: DollarSign, permission: 'management' as const },
       ],
     },
