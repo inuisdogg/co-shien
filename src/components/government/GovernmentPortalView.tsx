@@ -39,9 +39,8 @@ import {
   DocumentSubmissionStatus,
 } from '@/types';
 import ContractReportModal from './ContractReportModal';
-import WorkScheduleReportView from '@/components/compliance/WorkScheduleReportView';
 
-type TabType = 'submissions' | 'messages' | 'settings' | 'work-schedule';
+type TabType = 'submissions' | 'messages' | 'settings';
 
 export default function GovernmentPortalView() {
   const { facility, user } = useAuth();
@@ -330,17 +329,6 @@ export default function GovernmentPortalView() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab('work-schedule')}
-              className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'work-schedule'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Calendar className="w-4 h-4 inline mr-2" />
-              勤務体制
-            </button>
-            <button
               onClick={() => setActiveTab('settings')}
               className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'settings'
@@ -500,13 +488,6 @@ export default function GovernmentPortalView() {
         )}
 
         {/* 設定タブ */}
-        {/* 勤務体制一覧表タブ */}
-        {activeTab === 'work-schedule' && (
-          <div className="p-4">
-            <WorkScheduleReportView />
-          </div>
-        )}
-
         {activeTab === 'settings' && (
           <div className="p-4">
             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">

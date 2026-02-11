@@ -65,7 +65,9 @@
       "Bash(pgrep:*)",
       "WebSearch",
       "Bash(git -C /Users/inu/Desktop/kidos status --porcelain)",
-      "Bash(for dir in /Users/inu/Desktop/kidos/src/components/*/)"
+      "Bash(for dir in /Users/inu/Desktop/kidos/src/components/*/)",
+      "Bash(for f in /Users/inu/Desktop/kidos/src/components/staff/StaffView.tsx /Users/inu/Desktop/kidos/src/components/staff/StaffManagementView.tsx)",
+      "Bash(do echo '=== $\\(basename $f\\) ===' head -20 $f)"
     ]
   }
 }
