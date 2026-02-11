@@ -58,6 +58,7 @@ export default function BusinessPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const facilityIdFromQuery = searchParams?.get('facilityId') || null;
+  const tabFromQuery = searchParams?.get('tab') || null;
 
   // 認証フローチェック
   useEffect(() => {
@@ -215,12 +216,36 @@ export default function BusinessPage() {
         staff: 'staff',
         'staff-master': 'staff',
         staffing: 'staff',
-        shift: 'staff',
+        shift: 'shift',
         facility: 'facility',
+        'addition-settings': 'facility',
+        'addition-simulation': 'dashboard',
+        'addition-catalog': 'dashboard',
+        finance: 'dashboard',
       };
 
       let defaultTab: string;
-      if (hasFullAccess) {
+
+      // クエリパラメータでタブが指定されている場合は優先
+      if (tabFromQuery) {
+        const requiredPermission = permissionMap[tabFromQuery];
+        if (hasFullAccess || (requiredPermission && hasPermission(requiredPermission))) {
+          defaultTab = tabFromQuery;
+        } else if (hasFullAccess) {
+          defaultTab = 'dashboard';
+        } else if (hasPermission('schedule')) {
+          defaultTab = 'schedule';
+        } else {
+          const accessibleTab = Object.entries(permissionMap).find(
+            ([_, perm]) => hasPermission(perm)
+          )?.[0];
+          defaultTab = accessibleTab || 'schedule';
+        }
+        // URLからtabパラメータを削除（履歴を汚さないため）
+        const url = new URL(window.location.href);
+        url.searchParams.delete('tab');
+        window.history.replaceState({}, '', url.toString());
+      } else if (hasFullAccess) {
         defaultTab = 'dashboard';
       } else {
         if (hasPermission('schedule')) {
@@ -235,7 +260,7 @@ export default function BusinessPage() {
       setActiveTab(defaultTab);
       setInitialTabSet(true);
     }
-  }, [isAuthenticated, hasFullAccess, hasPermission, initialTabSet]);
+  }, [isAuthenticated, hasFullAccess, hasPermission, initialTabSet, tabFromQuery]);
 
   // 権限に基づいてアクセス制御
   useEffect(() => {

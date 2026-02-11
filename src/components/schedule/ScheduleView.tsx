@@ -676,7 +676,7 @@ const ScheduleView: React.FC = () => {
                   </div>
                 </div>
                 <a
-                  href="/business?tab=facility-settings"
+                  href="/business?tab=facility"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition-colors"
                 >
                   <Settings className="w-4 h-4" />

@@ -952,7 +952,7 @@ const DashboardView: React.FC = () => {
               施設情報で時間枠を設定すると、曜日別の稼働率が表示されます
             </p>
             <a
-              href="/business?tab=facility-settings"
+              href="/business?tab=facility"
               className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded transition-colors"
             >
               施設情報を設定
