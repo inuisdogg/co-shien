@@ -22,9 +22,12 @@ import {
   Car,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Zap,
   PieChart,
   FileText,
+  Settings,
+  CheckCircle2,
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,6 +94,40 @@ const DashboardView: React.FC = () => {
       isConfigured: false,
     };
   }, [timeSlots]);
+
+  // 初期セットアップの進捗を計算
+  const setupSteps = useMemo(() => {
+    const steps = [
+      {
+        id: 'timeSlots',
+        label: '時間枠を設定',
+        description: '利用時間と定員を設定してください',
+        completed: timeSlots.length > 0,
+        href: '/business?tab=facility',
+        priority: 1,
+      },
+      {
+        id: 'staff',
+        label: 'スタッフを登録',
+        description: '施設で働くスタッフを登録してください',
+        completed: staff.length > 0,
+        href: '/business?tab=staff-master',
+        priority: 2,
+      },
+      {
+        id: 'children',
+        label: '児童を登録',
+        description: '利用する児童を登録してください',
+        completed: children.filter(c => c.contractStatus === 'active').length > 0,
+        href: '/business?tab=children',
+        priority: 3,
+      },
+    ];
+    const completedCount = steps.filter(s => s.completed).length;
+    const isAllCompleted = completedCount === steps.length;
+    const nextStep = steps.find(s => !s.completed);
+    return { steps, completedCount, isAllCompleted, nextStep };
+  }, [timeSlots, staff, children]);
 
   const [dashboardMode, setDashboardMode] = useState<'operations' | 'revenue' | 'compliance'>('operations');
   const [viewPeriod, setViewPeriod] = useState<'week' | 'month'>('month');
@@ -246,6 +283,66 @@ const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* 初期セットアップガイド（未完了の場合のみ表示） */}
+      {!setupSteps.isAllCompleted && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-amber-600" />
+                初期セットアップ
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                サービスを利用開始するために、以下の設定を完了してください
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-bold text-amber-700">
+                {setupSteps.completedCount} / {setupSteps.steps.length} 完了
+              </div>
+              <div className="w-24 h-2 bg-amber-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-amber-500 transition-all duration-300"
+                  style={{ width: `${(setupSteps.completedCount / setupSteps.steps.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            {setupSteps.steps.map((step, index) => (
+              <a
+                key={step.id}
+                href={step.href}
+                className={`flex items-center gap-3 p-4 rounded-lg border transition-all ${
+                  step.completed
+                    ? 'bg-white/50 border-green-200'
+                    : 'bg-white border-amber-300 hover:border-amber-400 hover:shadow-md'
+                }`}
+              >
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                  step.completed ? 'bg-green-100' : 'bg-amber-100'
+                }`}>
+                  {step.completed ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <span className="text-sm font-bold text-amber-600">{index + 1}</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-bold ${step.completed ? 'text-green-700' : 'text-gray-800'}`}>
+                    {step.label}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">{step.description}</div>
+                </div>
+                {!step.completed && (
+                  <ChevronRight className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                )}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* メインタブ切り替え */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2">
         <div className="flex gap-2">
