@@ -4,26 +4,41 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck } from 'lucide-react';
-import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory } from '@/types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck, AlertTriangle, FileText, ChevronRight, Bell } from 'lucide-react';
+import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory, ChangeNotification, CHANGE_NOTIFICATION_TYPE_LABELS, CHANGE_NOTIFICATION_STATUS_CONFIG } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
+import { useChangeNotifications, detectSettingsChanges, daysUntilDeadline, getDeadlineColor, getDeadlineBgColor } from '@/hooks/useChangeNotifications';
+import ChangeNotificationList from './ChangeNotificationList';
 // タブの種類
-type SettingsTab = 'basic' | 'operation';
+type SettingsTab = 'basic' | 'operation' | 'change_notifications';
 
-const SETTINGS_TABS: { id: SettingsTab; label: string; icon: 'building' | 'clock' }[] = [
+const SETTINGS_TABS: { id: SettingsTab; label: string; icon: 'building' | 'clock' | 'bell' }[] = [
   { id: 'basic', label: '基本情報', icon: 'building' },
   { id: 'operation', label: '営業・休日', icon: 'clock' },
+  { id: 'change_notifications', label: '変更届', icon: 'bell' },
 ];
 
 const FacilitySettingsView: React.FC = () => {
   const { facilitySettings, updateFacilitySettings, timeSlots, addTimeSlot, updateTimeSlot, deleteTimeSlot } = useFacilityData();
   const { facility } = useAuth();
+  const {
+    pendingNotifications,
+    pendingCount,
+    createNotificationsFromChanges,
+    updateStatus: updateNotificationStatus,
+    notifications: allNotifications,
+    refetch: refetchNotifications,
+  } = useChangeNotifications();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
   const [activeTab, setActiveTab] = useState<SettingsTab>('basic');
+  const [showChangeWarning, setShowChangeWarning] = useState(false);
+  const [detectedChanges, setDetectedChanges] = useState<{ type: import('@/types').ChangeNotificationType; description: string; oldValue: any; newValue: any }[]>([]);
+  const [showPostSaveAlert, setShowPostSaveAlert] = useState(false);
+  const settingsSnapshotRef = useRef<FacilitySettings>(facilitySettings);
 
   // 最新の施設コードを取得
   useEffect(() => {
@@ -88,6 +103,7 @@ const FacilitySettingsView: React.FC = () => {
   // facilitySettingsが更新されたらローカル状態も更新
   useEffect(() => {
     setSettings(facilitySettings);
+    settingsSnapshotRef.current = facilitySettings;
   }, [facilitySettings]);
 
   const weekDays = [
@@ -101,23 +117,39 @@ const FacilitySettingsView: React.FC = () => {
   ];
 
   const handleSave = async () => {
+    // Check for changes that require notification
+    const changes = detectSettingsChanges(settingsSnapshotRef.current, settings);
+
+    if (changes.length > 0) {
+      setDetectedChanges(changes);
+      setShowChangeWarning(true);
+      return;
+    }
+
+    await performSave();
+  };
+
+  const performSave = async () => {
     try {
-      console.log('💾 施設情報を保存中...', {
-        facilityName: settings.facilityName,
-        capacity: settings.capacity,
-        regularHolidays: settings.regularHolidays,
-        customHolidays: settings.customHolidays,
-        includeHolidays: settings.includeHolidays,
-        businessHours: settings.businessHours,
-        holidayPeriods: settings.holidayPeriods,
-        businessHoursPeriods: settings.businessHoursPeriods,
-      });
       await updateFacilitySettings(settings, '施設情報を更新しました');
-      alert('施設情報を保存しました');
+
+      // If there were detected changes, create notifications
+      if (detectedChanges.length > 0) {
+        await createNotificationsFromChanges(detectedChanges);
+        setDetectedChanges([]);
+        setShowPostSaveAlert(true);
+      } else {
+        alert('施設情報を保存しました');
+      }
     } catch (error: any) {
-      console.error('❌ Error saving facility settings:', error);
+      console.error('Error saving facility settings:', error);
       alert(`施設情報の保存に失敗しました: ${error.message || '不明なエラー'}`);
     }
+  };
+
+  const handleConfirmSaveWithNotification = async () => {
+    setShowChangeWarning(false);
+    await performSave();
   };
 
   // 履歴を取得
@@ -302,6 +334,38 @@ const FacilitySettingsView: React.FC = () => {
         </div>
       </div>
 
+      {/* 変更届アラートバナー */}
+      {pendingCount > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+            <AlertTriangle size={16} className="text-red-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-red-800">変更届の提出が必要です</p>
+            <div className="space-y-1 mt-1">
+              {pendingNotifications.slice(0, 3).map((n) => {
+                const daysLeft = daysUntilDeadline(n.deadline);
+                return (
+                  <p key={n.id} className="text-xs text-red-700">
+                    {CHANGE_NOTIFICATION_TYPE_LABELS[n.changeType]}
+                    {' - '}
+                    <span className={`font-bold ${getDeadlineColor(daysLeft)}`}>
+                      {daysLeft < 0 ? `期限超過（${Math.abs(daysLeft)}日）` : `期限まであと${daysLeft}日（${new Date(n.deadline).toLocaleDateString('ja-JP')}）`}
+                    </span>
+                  </p>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setActiveTab('change_notifications')}
+              className="mt-2 text-xs font-bold text-red-700 hover:text-red-900 flex items-center gap-1"
+            >
+              変更届の管理へ <ChevronRight size={12} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* タブナビゲーション */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
         <div className="flex gap-1">
@@ -316,8 +380,13 @@ const FacilitySettingsView: React.FC = () => {
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {tab.icon === 'building' ? <Building2 size={16} /> : <Clock size={16} />}
+              {tab.icon === 'building' ? <Building2 size={16} /> : tab.icon === 'clock' ? <Clock size={16} /> : <Bell size={16} />}
               {tab.label}
+              {tab.id === 'change_notifications' && pendingCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                  {pendingCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -1196,7 +1265,99 @@ const FacilitySettingsView: React.FC = () => {
           </>
         )}
 
+        {/* ========== 変更届タブ ========== */}
+        {activeTab === 'change_notifications' && (
+          <ChangeNotificationList
+            notifications={allNotifications}
+            onUpdateStatus={updateNotificationStatus}
+            onRefetch={refetchNotifications}
+          />
+        )}
       </div>
+
+      {/* 変更警告ダイアログ */}
+      {showChangeWarning && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <AlertTriangle size={20} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800">変更届の提出が必要です</h3>
+                  <p className="text-sm text-gray-500">この変更には行政への届出が必要です</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 space-y-3">
+              {detectedChanges.map((change, i) => (
+                <div key={i} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm font-bold text-amber-800">
+                    {CHANGE_NOTIFICATION_TYPE_LABELS[change.type as keyof typeof CHANGE_NOTIFICATION_TYPE_LABELS] || change.type}
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">{change.description}</p>
+                </div>
+              ))}
+              <p className="text-xs text-gray-500">
+                保存すると、変更届の管理画面に提出期限付きの通知が自動作成されます。
+              </p>
+            </div>
+            <div className="p-5 border-t border-gray-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowChangeWarning(false);
+                  setDetectedChanges([]);
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleConfirmSaveWithNotification}
+                className="px-6 py-2 text-sm bg-[#00c4cc] text-white rounded-lg font-bold hover:bg-[#00b0b8] transition-colors"
+              >
+                保存して変更届を作成
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 保存後アラート */}
+      {showPostSaveAlert && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="p-6 text-center">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <FileText size={24} className="text-green-600" />
+              </div>
+              <h3 className="font-bold text-lg text-gray-800 mb-2">施設情報を保存しました</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                変更届の通知が作成されました。期限内に届出を完了してください。
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setShowPostSaveAlert(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  閉じる
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPostSaveAlert(false);
+                    setActiveTab('change_notifications');
+                  }}
+                  className="px-6 py-2 text-sm bg-[#00c4cc] text-white rounded-lg font-bold hover:bg-[#00b0b8] transition-colors flex items-center gap-2"
+                >
+                  <FileText size={14} />
+                  変更届を管理
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 履歴モーダル */}
       {isHistoryModalOpen && (

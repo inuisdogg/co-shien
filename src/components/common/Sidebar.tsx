@@ -31,6 +31,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useSetupGuide } from '@/contexts/SetupGuideContext';
+import { useChangeNotifications } from '@/hooks/useChangeNotifications';
 import { supabase } from '@/lib/supabase';
 
 // フェーズ定義
@@ -88,6 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
   const { facility } = useAuth();
   const { facilitySettings } = useFacilityData();
   const { currentStepInfo, isSetupComplete, canAccessMenu, isLoading: isSetupLoading } = useSetupGuide();
+  const { pendingCount: changeNotificationCount } = useChangeNotifications();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
@@ -313,6 +315,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                         >
                           <item.icon size={16} strokeWidth={2} className="w-5 h-5 shrink-0" />
                           <span className="truncate">{item.label}</span>
+                          {item.id === 'facility' && changeNotificationCount > 0 && (
+                            <span className="ml-auto inline-flex items-center justify-center w-5 h-5 text-[9px] font-bold text-white bg-red-500 rounded-full shrink-0">
+                              {changeNotificationCount}
+                            </span>
+                          )}
                         </button>
                         {/* セットアップガイドのツールチップ */}
                         {isCurrentSetupStep && (

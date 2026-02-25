@@ -563,6 +563,7 @@ function mapStaffFromDb(record: Record<string, unknown>): Staff {
     hourlyWage: record.hourly_wage as number | undefined,
     phone: record.phone as string | undefined,
     email: record.email as string | undefined,
+    defaultWorkPattern: record.default_work_pattern as Staff['defaultWorkPattern'],
     createdAt: record.created_at as string,
     updatedAt: record.updated_at as string,
   };

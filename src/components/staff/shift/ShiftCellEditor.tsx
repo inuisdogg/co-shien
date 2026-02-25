@@ -4,13 +4,15 @@
  * - パターンをビジュアルカードで表示
  * - 時間範囲を目立つ表示
  * - カスタム時間入力
+ * - デフォルトパターン推奨表示
+ * - 希望状況インジケータ
  */
 
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Clock, Check } from 'lucide-react';
-import { ShiftPattern, ShiftWithPattern } from '@/types';
+import { X, Clock, Check, Star, AlertCircle, CheckCircle } from 'lucide-react';
+import { ShiftPattern, ShiftWithPattern, DefaultWorkPattern } from '@/types';
 import { formatShiftDisplay, formatPatternTimeRange, patternColorToRgba } from '@/utils/shiftDisplayFormatter';
 
 interface ShiftCellEditorProps {
@@ -19,6 +21,10 @@ interface ShiftCellEditorProps {
   onSelect: (patternId: string | null, customTime?: { startTime: string; endTime: string }) => void;
   onClose: () => void;
   position?: { x: number; y: number };
+  /** Default work pattern for this staff on this day of week */
+  defaultPattern?: DefaultWorkPattern;
+  /** Whether the staff is available on this date (undefined = no data) */
+  staffAvailable?: boolean;
 }
 
 const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
@@ -27,60 +33,66 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
   onSelect,
   onClose,
   position,
+  defaultPattern,
+  staffAvailable,
 }) => {
   const [mode, setMode] = useState<'pattern' | 'custom'>('pattern');
-  const [customStart, setCustomStart] = useState('09:00');
-  const [customEnd, setCustomEnd] = useState('17:00');
+  const [customStart, setCustomStart] = useState(
+    defaultPattern?.startTime || '09:00'
+  );
+  const [customEnd, setCustomEnd] = useState(
+    defaultPattern?.endTime || '17:00'
+  );
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // 外側クリックで閉じる
+  // Click outside to close
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  // ESCキーで閉じる
+  // ESC to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
-
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // パターン選択
   const handleSelectPattern = (pattern: ShiftPattern) => {
     onSelect(pattern.id);
     onClose();
   };
 
-  // シフトなし
   const handleClearShift = () => {
     onSelect(null);
     onClose();
   };
 
-  // カスタム時間で確定
   const handleConfirmCustom = () => {
     onSelect(null, { startTime: customStart, endTime: customEnd });
     onClose();
   };
 
-  // 休日パターンを取得
   const dayOffPattern = patterns.find((p) => p.isDayOff);
   const workPatterns = patterns.filter((p) => !p.isDayOff);
 
-  // 現在の表示値
   const currentDisplay = shift ? formatShiftDisplay(shift) : '未設定';
+
+  // Determine which pattern is recommended by default
+  const recommendedPatternId = defaultPattern?.patternId;
+
+  // Determine if a pattern matches the default for this day
+  const isRecommended = (patternId: string): boolean => {
+    if (!defaultPattern) return false;
+    return patternId === recommendedPatternId;
+  };
 
   return (
     <div
@@ -96,7 +108,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
           : undefined
       }
     >
-      {/* ヘッダー */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-gray-800">シフト編集</span>
@@ -112,7 +124,43 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
         </button>
       </div>
 
-      {/* モード切り替え */}
+      {/* Availability indicator */}
+      {staffAvailable !== undefined && (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 text-xs ${
+            staffAvailable
+              ? 'bg-green-50 text-green-700 border-b border-green-100'
+              : 'bg-red-50 text-red-700 border-b border-red-100'
+          }`}
+        >
+          {staffAvailable ? (
+            <>
+              <CheckCircle size={14} />
+              <span>この日は出勤希望あり</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle size={14} />
+              <span>この日は出勤希望なし</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Default pattern recommendation */}
+      {defaultPattern && !shift?.hasShift && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 text-xs border-b border-amber-100">
+          <Star size={14} />
+          <span>
+            デフォルト: {defaultPattern.type === 'full' ? 'フル' : defaultPattern.type === 'am' ? '午前' : '午後'}
+            {defaultPattern.startTime && defaultPattern.endTime
+              ? ` (${defaultPattern.startTime}-${defaultPattern.endTime})`
+              : ''}
+          </span>
+        </div>
+      )}
+
+      {/* Mode tabs */}
       <div className="flex border-b border-gray-100">
         <button
           onClick={() => setMode('pattern')}
@@ -136,14 +184,15 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
         </button>
       </div>
 
-      {/* コンテンツ */}
+      {/* Content */}
       <div className="max-h-72 overflow-y-auto">
         {mode === 'pattern' ? (
           <div className="p-2 space-y-1">
-            {/* 勤務パターン - ビジュアルカード */}
+            {/* Work patterns */}
             {workPatterns.map((pattern) => {
               const timeRange = formatPatternTimeRange(pattern);
               const isSelected = shift?.shiftPattern?.id === pattern.id;
+              const recommended = isRecommended(pattern.id);
 
               return (
                 <button
@@ -152,6 +201,8 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 text-left min-h-10 ${
                     isSelected
                       ? 'ring-2 ring-[#00c4cc]/30'
+                      : recommended
+                      ? 'ring-1 ring-amber-300 bg-amber-50/50'
                       : 'hover:bg-gray-50'
                   }`}
                   style={
@@ -160,16 +211,21 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
                       : undefined
                   }
                 >
-                  {/* カラードット */}
+                  {/* Color dot */}
                   <div
                     className="w-4 h-4 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm"
                     style={{ backgroundColor: pattern.color || '#00c4cc' }}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-gray-800">
-                        {pattern.name}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-bold text-gray-800">
+                          {pattern.name}
+                        </span>
+                        {recommended && (
+                          <Star size={12} className="text-amber-500 fill-amber-500" />
+                        )}
+                      </div>
                       {isSelected && <Check size={14} className="text-[#00c4cc]" />}
                     </div>
                     <span className="text-xs text-gray-500 font-mono">{timeRange}</span>
@@ -178,12 +234,12 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
               );
             })}
 
-            {/* 区切り線 */}
+            {/* Separator */}
             {workPatterns.length > 0 && (
               <div className="border-t border-gray-100 my-1.5" />
             )}
 
-            {/* 休日 */}
+            {/* Day off */}
             {dayOffPattern && (
               <button
                 onClick={() => handleSelectPattern(dayOffPattern)}
@@ -205,7 +261,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
               </button>
             )}
 
-            {/* シフトなし */}
+            {/* Clear shift */}
             <button
               onClick={handleClearShift}
               className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-red-50 transition-all duration-200 text-left min-h-10"
@@ -216,7 +272,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
           </div>
         ) : (
           <div className="p-4 space-y-4">
-            {/* カスタム時間入力 */}
+            {/* Custom time input */}
             <div className="flex items-center gap-2">
               <Clock size={16} className="text-[#00c4cc]" />
               <span className="text-sm font-bold text-gray-700">勤務時間</span>
@@ -238,7 +294,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
               />
             </div>
 
-            {/* プレビュー */}
+            {/* Preview */}
             <div className="p-3 bg-[#00c4cc]/5 rounded-lg text-center border border-[#00c4cc]/10">
               <span className="text-sm text-gray-500">表示: </span>
               <span className="text-lg font-bold text-[#00c4cc]">
@@ -248,7 +304,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
               </span>
             </div>
 
-            {/* 確定ボタン */}
+            {/* Confirm button */}
             <button
               onClick={handleConfirmCustom}
               className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 font-medium"

@@ -57,6 +57,8 @@ import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays
 import { runDeductionCheck, type DeductionCheckResult } from '@/lib/deductionEngine';
 import { checkQualificationExpiry, type QualificationCheckResult } from '@/lib/qualificationTracker';
 import ComplianceManagement from './ComplianceManagement';
+import { useChangeNotifications, daysUntilDeadline, getDeadlineColor } from '@/hooks/useChangeNotifications';
+import { CHANGE_NOTIFICATION_TYPE_LABELS } from '@/types';
 
 const DashboardView: React.FC = () => {
   const { facility } = useAuth();
@@ -72,6 +74,9 @@ const DashboardView: React.FC = () => {
     timeSlots,
     loadingTimeSlots,
   } = useFacilityData();
+
+  // 変更届通知
+  const { pendingNotifications, pendingCount: changeNotificationPendingCount } = useChangeNotifications();
 
   // 時間枠が設定されているかチェック
   const hasTimeSlots = timeSlots.length > 0;
@@ -335,12 +340,27 @@ const DashboardView: React.FC = () => {
         items.push({ text: `スタッフ資格が${qualificationResult.summary.urgentCount}件30日以内に期限切れです`, level: 'warning' });
       }
     }
+    // 変更届アラート
+    if (changeNotificationPendingCount > 0) {
+      const urgentNotifications = pendingNotifications.filter(n => daysUntilDeadline(n.deadline) <= 3);
+      if (urgentNotifications.length > 0) {
+        items.push({
+          text: `変更届の提出期限が迫っています（${urgentNotifications.length}件）`,
+          level: 'critical',
+        });
+      } else {
+        items.push({
+          text: `未提出の変更届が${changeNotificationPendingCount}件あります`,
+          level: 'warning',
+        });
+      }
+    }
     return items;
-  }, [deductionResult, qualificationResult]);
+  }, [deductionResult, qualificationResult, changeNotificationPendingCount, pendingNotifications]);
 
   // 対応が必要な項目
   const actionItems = useMemo(() => {
-    const items: { label: string; detail: string; level: 'critical' | 'warning' | 'info' }[] = [];
+    const items: { label: string; detail: string; level: 'critical' | 'warning' | 'info'; href?: string }[] = [];
     // 減算リスク
     if (deductionResult) {
       deductionResult.risks.forEach((risk) => {
@@ -363,8 +383,20 @@ const DashboardView: React.FC = () => {
         });
       });
     }
+    // 変更届
+    pendingNotifications.slice(0, 3).forEach((notification) => {
+      const daysLeft = daysUntilDeadline(notification.deadline);
+      items.push({
+        label: `変更届: ${CHANGE_NOTIFICATION_TYPE_LABELS[notification.changeType]}`,
+        detail: daysLeft < 0
+          ? `期限超過（${Math.abs(daysLeft)}日）`
+          : `提出期限まで${daysLeft}日`,
+        level: daysLeft <= 3 ? 'critical' : daysLeft <= 5 ? 'warning' : 'info',
+        href: '/business?tab=facility',
+      });
+    });
     return items;
-  }, [deductionResult, qualificationResult]);
+  }, [deductionResult, qualificationResult, pendingNotifications]);
 
   // 本日のフォーマット
   const todayFormatted = useMemo(() => {
@@ -657,18 +689,26 @@ const DashboardView: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {actionItems.map((item, i) => (
-                    <div key={i} className={`p-3 rounded-lg border ${
+                  {actionItems.map((item, i) => {
+                    const inner = (
+                      <>
+                        <p className={`text-sm font-semibold ${
+                          item.level === 'critical' ? 'text-red-800' : item.level === 'warning' ? 'text-amber-800' : 'text-blue-800'
+                        }`}>{item.label}</p>
+                        <p className={`text-xs mt-0.5 ${
+                          item.level === 'critical' ? 'text-red-600' : item.level === 'warning' ? 'text-amber-600' : 'text-blue-600'
+                        }`}>{item.detail}</p>
+                      </>
+                    );
+                    const cls = `p-3 rounded-lg border ${
                       item.level === 'critical' ? 'bg-red-50 border-red-200' : item.level === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
-                    }`}>
-                      <p className={`text-sm font-semibold ${
-                        item.level === 'critical' ? 'text-red-800' : item.level === 'warning' ? 'text-amber-800' : 'text-blue-800'
-                      }`}>{item.label}</p>
-                      <p className={`text-xs mt-0.5 ${
-                        item.level === 'critical' ? 'text-red-600' : item.level === 'warning' ? 'text-amber-600' : 'text-blue-600'
-                      }`}>{item.detail}</p>
-                    </div>
-                  ))}
+                    }`;
+                    return item.href ? (
+                      <a key={i} href={item.href} className={`${cls} block hover:opacity-90 transition-opacity`}>{inner}</a>
+                    ) : (
+                      <div key={i} className={cls}>{inner}</div>
+                    );
+                  })}
                 </div>
               )}
             </div>

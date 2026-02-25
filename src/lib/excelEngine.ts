@@ -1,6 +1,6 @@
 /**
  * Excel Export Engine for Roots
- * 勤務体制一覧表、出勤簿、月次財務サマリーのExcelエクスポート
+ * 勤務体制一覧表、勤務形態一覧表、出勤簿、月次財務サマリー、変更届のExcelエクスポート
  */
 
 import * as XLSX from 'xlsx';
@@ -11,7 +11,10 @@ import type {
   WorkStyle,
   PERSONNEL_TYPE_LABELS,
   WORK_STYLE_LABELS,
+  ChangeNotification,
+  ChangeNotificationType,
 } from '@/types';
+import { CHANGE_NOTIFICATION_TYPE_LABELS } from '@/types';
 import type {
   MonthlyFinancial,
   ProfitLossData,
@@ -125,13 +128,15 @@ export interface ExportWorkScheduleOptions {
 }
 
 /**
- * Export a WorkScheduleReport to an Excel file (勤務体制一覧表).
+ * Export a WorkScheduleReport to an Excel file (勤務形態一覧表).
  *
- * The sheet contains:
+ * The sheet matches the official government format with:
  *  - Header rows with facility / period information
- *  - A table of staff assignments with columns for name, type, work style,
- *    qualifications, weekly hours, FTE, role, and assigned additions.
- *  - Summary rows at the bottom with totals.
+ *  - Staff details: name, qualifications, employment type, work style
+ *  - Weekly work schedule grid (月-日)
+ *  - Work hours, total weekly hours, contracted hours
+ *  - FTE calculation, dedicated/concurrent status
+ *  - Summary rows at the bottom with totals
  */
 export function exportWorkScheduleToExcel(
   report: WorkScheduleReport,
@@ -139,66 +144,104 @@ export function exportWorkScheduleToExcel(
   options?: ExportWorkScheduleOptions,
 ): Blob | void {
   const { year, month, staffAssignments, totalStandardStaff, totalAdditionStaff, fteTotal } = report;
+  const totalDays = daysInMonth(year, month);
 
   // -- Build AOA data --
   const data: unknown[][] = [];
 
-  // Title
-  data.push(['勤務体制一覧表']);
+  // Title (official format: 勤務形態一覧表)
+  data.push(['勤務形態一覧表']);
   data.push([]);
 
   // Meta information
-  data.push(['施設名', facilityName ?? '', '', '対象年月', `${year}年${month}月`]);
   data.push([
-    '作成日',
-    report.generatedAt
+    '事業所名', facilityName ?? '',
+    '', '',
+    '対象年月', `${year}年${month}月`,
+    '', '',
+    '作成日', report.generatedAt
       ? new Date(report.generatedAt).toLocaleDateString('ja-JP')
       : new Date().toLocaleDateString('ja-JP'),
-    '',
-    'ステータス',
-    report.status === 'approved' ? '承認済' : report.status === 'submitted' ? '提出済' : '下書き',
   ]);
   if (report.submittedTo) {
     data.push(['提出先', report.submittedTo]);
   }
   data.push([]);
 
-  // Column headers
-  data.push([
+  // Column headers - matching official format
+  // Row 1: Main categories
+  const headerRow1: unknown[] = [
     'No.',
+    '職種',
     '氏名',
-    '人員区分',
-    '勤務形態',
     '資格',
-    '経験年数',
-    '週所定労働時間',
-    '常勤換算 (FTE)',
-    '役割',
-    '配置加算',
-  ]);
+    '雇用形態',        // 常勤/非常勤
+    '勤務形態',        // 専従/兼務
+    '週所定\n労働時間',
+  ];
+  // Add day columns (1-31)
+  for (let d = 1; d <= totalDays; d++) {
+    const dateObj = new Date(year, month - 1, d);
+    const wd = jpWeekday(dateObj);
+    headerRow1.push(`${d}\n${wd}`);
+  }
+  headerRow1.push('勤務\n時間計');
+  headerRow1.push('常勤換算\n(FTE)');
+  data.push(headerRow1);
 
   // Data rows
   staffAssignments.forEach((sa: WorkScheduleStaffAssignment, idx: number) => {
-    data.push([
+    // Determine employment type and work form
+    const isFulltime = sa.workStyle === 'fulltime_dedicated' || sa.workStyle === 'fulltime_concurrent';
+    const employmentType = isFulltime ? '常勤' : '非常勤';
+    const workForm = sa.workStyle === 'fulltime_dedicated' ? '専従'
+      : sa.workStyle === 'fulltime_concurrent' ? '兼務' : '-';
+
+    const role = sa.role || '-';
+    const qualStr = (sa.qualifications ?? []).join(', ') || '-';
+
+    const row: unknown[] = [
       idx + 1,
+      role,
       sa.name,
-      PERSONNEL_LABELS[sa.personnelType] ?? sa.personnelType,
-      WORK_STYLE_LABEL_MAP[sa.workStyle] ?? sa.workStyle,
-      (sa.qualifications ?? []).join(', '),
-      sa.yearsOfExperience != null ? `${sa.yearsOfExperience}年` : '-',
-      `${sa.weeklyHours}h`,
-      sa.fte,
-      sa.role ?? '-',
-      (sa.assignedAdditions ?? []).join(', ') || '-',
-    ]);
+      qualStr,
+      employmentType,
+      workForm,
+      sa.weeklyHours,
+    ];
+
+    // Daily work hours (estimate based on weekly hours / 5 workdays)
+    const dailyHours = sa.weeklyHours > 0 ? Math.round((sa.weeklyHours / 5) * 10) / 10 : 0;
+    let totalMonthlyHours = 0;
+    for (let d = 1; d <= totalDays; d++) {
+      const dateObj = new Date(year, month - 1, d);
+      const dayOfWeek = dateObj.getDay();
+      // Simple assumption: no work on Sunday (0) and Saturday (6)
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        row.push('');
+      } else {
+        row.push(dailyHours);
+        totalMonthlyHours += dailyHours;
+      }
+    }
+    row.push(Math.round(totalMonthlyHours * 10) / 10);
+    row.push(sa.fte.toFixed(2));
+    data.push(row);
   });
 
   // Blank row + Summary
   data.push([]);
-  data.push(['合計', '', '', '', '', '', '', '', '', '']);
-  data.push(['基準人員数', totalStandardStaff]);
-  data.push(['加算人員数', totalAdditionStaff]);
-  data.push(['常勤換算合計', fteTotal]);
+  const summaryRow: unknown[] = ['合計', '', '', '', '', '', ''];
+  // Fill daily columns with blanks
+  for (let d = 1; d <= totalDays; d++) {
+    summaryRow.push('');
+  }
+  summaryRow.push('');
+  summaryRow.push(fteTotal.toFixed(2));
+  data.push(summaryRow);
+
+  data.push([]);
+  data.push(['基準人員数', totalStandardStaff, '', '加算人員数', totalAdditionStaff, '', '常勤換算合計', fteTotal.toFixed(2)]);
 
   if (report.notes) {
     data.push([]);
@@ -209,12 +252,30 @@ export function exportWorkScheduleToExcel(
   const wb = XLSX.utils.book_new();
   const ws = aoaToSheet(data);
 
-  // Merge title cell across columns
-  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
+  // Set column widths
+  const colWidths: { wch: number }[] = [
+    { wch: 4 },   // No.
+    { wch: 18 },  // 職種
+    { wch: 12 },  // 氏名
+    { wch: 14 },  // 資格
+    { wch: 6 },   // 雇用形態
+    { wch: 6 },   // 勤務形態
+    { wch: 7 },   // 週所定労働時間
+  ];
+  for (let d = 1; d <= totalDays; d++) {
+    colWidths.push({ wch: 4 }); // Day columns
+  }
+  colWidths.push({ wch: 7 });  // 勤務時間計
+  colWidths.push({ wch: 7 });  // FTE
+  ws['!cols'] = colWidths;
 
-  XLSX.utils.book_append_sheet(wb, ws, '勤務体制一覧表');
+  // Merge title cell
+  const totalCols = 7 + totalDays + 2;
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } }];
 
-  const filename = `勤務体制一覧表_${year}年${pad2(month)}月.xlsx`;
+  XLSX.utils.book_append_sheet(wb, ws, '勤務形態一覧表');
+
+  const filename = `勤務形態一覧表_${year}年${pad2(month)}月.xlsx`;
 
   if (options?.asBlob) {
     return workbookToBlob(wb);
@@ -591,6 +652,113 @@ export function exportFinancialSummaryToExcel(
   }
 
   const filename = `財務サマリー_${yearLabel}年度.xlsx`;
+
+  if (options?.asBlob) {
+    return workbookToBlob(wb);
+  }
+  downloadWorkbook(wb, filename);
+}
+
+// ---------- 4. Change Notification (変更届出書) ----------
+
+export interface ExportChangeNotificationOptions {
+  asBlob?: boolean;
+}
+
+/**
+ * Export a ChangeNotification to an Excel file (変更届出書).
+ *
+ * Generates an official-format change notification form with:
+ *  - Facility information
+ *  - Change type and description
+ *  - Before/after values
+ *  - Date information
+ */
+export function exportChangeNotificationToExcel(
+  notification: ChangeNotification,
+  facilityName?: string,
+  options?: ExportChangeNotificationOptions,
+): Blob | void {
+  const wb = XLSX.utils.book_new();
+  const data: unknown[][] = [];
+
+  // Title
+  data.push(['変更届出書']);
+  data.push([]);
+
+  // Date
+  const detectedDate = new Date(notification.detectedAt);
+  const jpDate = `${detectedDate.getFullYear()}年${detectedDate.getMonth() + 1}月${detectedDate.getDate()}日`;
+  data.push(['', '', '', '', '', '', '', `届出日: ${jpDate}`]);
+  data.push([]);
+
+  // Destination (placeholder)
+  data.push(['宛先', '○○市長 殿']);
+  data.push([]);
+
+  // Facility info
+  data.push(['事業所の名称', facilityName ?? '']);
+  data.push(['事業所番号', '']);
+  data.push(['所在地', '']);
+  data.push(['連絡先', '']);
+  data.push(['代表者名', '']);
+  data.push([]);
+
+  // Change type
+  const typeLabel = CHANGE_NOTIFICATION_TYPE_LABELS[notification.changeType] ?? notification.changeType;
+  data.push(['変更事項', typeLabel]);
+  data.push([]);
+
+  // Description
+  data.push(['変更の内容']);
+  data.push([notification.changeDescription || '']);
+  data.push([]);
+
+  // Before/After
+  data.push(['変更前', '', '', '', '変更後']);
+  const oldStr = notification.oldValue ? JSON.stringify(notification.oldValue, null, 2) : '(なし)';
+  const newStr = notification.newValue ? JSON.stringify(notification.newValue, null, 2) : '(なし)';
+
+  // Format before/after as readable text
+  const oldLines = oldStr.split('\n');
+  const newLines = newStr.split('\n');
+  const maxLines = Math.max(oldLines.length, newLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    data.push([oldLines[i] || '', '', '', '', newLines[i] || '']);
+  }
+  data.push([]);
+
+  // Change date and deadline
+  data.push(['変更年月日', jpDate]);
+  const deadline = new Date(notification.deadline);
+  const deadlineStr = `${deadline.getFullYear()}年${deadline.getMonth() + 1}月${deadline.getDate()}日`;
+  data.push(['届出期限', deadlineStr]);
+  data.push([]);
+
+  // Notes
+  data.push(['備考']);
+  data.push(['この届出書はRootsシステムから自動生成されました。']);
+  data.push(['正式な届出には、管轄の行政機関が指定する様式をご確認ください。']);
+
+  const ws = aoaToSheet(data);
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+
+  // Set column widths
+  ws['!cols'] = [
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 12 },
+    { wch: 12 },
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, '変更届出書');
+
+  const dateStr = `${detectedDate.getFullYear()}${pad2(detectedDate.getMonth() + 1)}${pad2(detectedDate.getDate())}`;
+  const filename = `変更届出書_${typeLabel}_${dateStr}.xlsx`;
 
   if (options?.asBlob) {
     return workbookToBlob(wb);

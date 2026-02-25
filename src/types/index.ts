@@ -655,8 +655,20 @@ export type Staff = {
   hourlyWage?: number; // 時給（非常勤の場合）
   // 基本シフトパターン（週の曜日ごとのシフト有無、月～土の6日分）
   defaultShiftPattern?: boolean[]; // [月, 火, 水, 木, 金, 土]の順（true=シフトあり、false=シフトなし）
+  // デフォルト勤務パターン（シフト自動入力用）
+  defaultWorkPattern?: DefaultWorkPattern;
   createdAt: string;
   updatedAt: string;
+};
+
+// デフォルト勤務パターン
+export type DefaultWorkPattern = {
+  days: number[];           // 勤務曜日 (0=日, 1=月, ..., 6=土)
+  type: 'full' | 'am' | 'pm'; // 勤務タイプ
+  startTime?: string;       // 開始時刻 (HH:mm)
+  endTime?: string;         // 終了時刻 (HH:mm)
+  patternId?: string;       // デフォルトのシフトパターンID
+  label?: string;           // 表示用ラベル（例: "月-金 Full"）
 };
 
 // スケジュールデータ（利用実績・予定）
@@ -1662,6 +1674,68 @@ export type GovernmentMessage = {
 export type SupportPlanFileStatus = 'draft' | 'active' | 'completed' | 'archived';
 export type SupportPlanType = 'initial' | 'renewal' | 'modification';
 
+// 5領域（発達支援の基本領域）
+export type DevelopmentalDomain =
+  | 'health_daily_life'        // 健康・生活
+  | 'movement_sensory'         // 運動・感覚
+  | 'cognition_behavior'       // 認知・行動
+  | 'language_communication'   // 言語・コミュニケーション
+  | 'human_relations_social';  // 人間関係・社会性
+
+// アセスメント（5領域ごとの現在の発達状況）
+export type DomainAssessment = {
+  domain: DevelopmentalDomain;
+  currentLevel: string; // 現在の発達状況
+};
+
+// 短期目標
+export type ShortTermGoal = {
+  id: string;
+  goalText: string;           // 目標内容
+  domains: DevelopmentalDomain[]; // 関連する5領域
+  supportContent: string;     // 支援内容の詳細
+  achievementCriteria: string; // 達成基準
+  responsibleStaff: string;   // 担当者
+  // 評価
+  midEvaluation?: string;     // 中間評価
+  midEvaluationLevel?: 'achieved' | 'progressing' | 'unchanged' | 'regressed';
+  finalEvaluation?: string;   // 期末評価
+  finalEvaluationLevel?: 'achieved' | 'progressing' | 'unchanged' | 'regressed';
+};
+
+// 個別支援計画の詳細コンテンツ（JSONB格納）
+export type SupportPlanContent = {
+  // ヘッダー情報
+  guardianName?: string;         // 保護者氏名
+  beneficiaryNumber?: string;    // 受給者証番号
+  planStartDate?: string;        // 計画開始日
+  planEndDate?: string;          // 計画終了日
+  managerName?: string;          // 児童発達支援管理責任者名
+  monitoringDate?: string;       // モニタリング予定日
+
+  // アセスメント
+  disabilityStatus?: string;     // 障害の状況
+  childWishes?: string;          // 本人の希望・興味
+  familyWishes?: string;         // 家族の希望
+  domainAssessments?: DomainAssessment[]; // 5領域ごとの発達状況
+
+  // 支援目標
+  overallPolicy?: string;        // 総合的な援助の方針
+  longTermGoal?: string;         // 長期目標（1年）
+  shortTermGoals?: ShortTermGoal[]; // 短期目標（3-6ヶ月）
+
+  // 家族支援
+  familySupportContent?: string;       // 家族支援の内容
+  interAgencyCoordination?: string;    // 関係機関連携の内容
+
+  // 評価
+  midEvaluationDate?: string;          // 中間評価日
+  midEvaluationOverallNotes?: string;  // 中間評価全体メモ
+  finalEvaluationDate?: string;        // 期末評価日
+  finalEvaluationOverallNotes?: string; // 期末評価全体メモ
+  nextPlanRecommendations?: string;    // 次期計画への提言
+};
+
 export type SupportPlanFile = {
   id: string;
   facilityId: string;
@@ -1672,7 +1746,7 @@ export type SupportPlanFile = {
   planCreatedDate: string;
   planCreatorName?: string;
   filePath?: string;
-  fileName: string;
+  fileName?: string;
   fileSize?: number;
   parentAgreed: boolean;
   parentAgreedAt?: string;
@@ -1685,8 +1759,9 @@ export type SupportPlanFile = {
   nextRenewalDate?: string;
   renewalReminderSent: boolean;
   notes?: string;
+  planContent?: SupportPlanContent; // 詳細コンテンツ（JSONB）
   uploadedBy?: string;
-  uploadedAt: string;
+  uploadedAt?: string;
   createdAt: string;
   updatedAt: string;
   // 参照データ
@@ -2037,6 +2112,58 @@ export type CompanyRegulation = {
   // タイムスタンプ
   createdAt: string;
   updatedAt: string;
+};
+
+// 変更届通知タイプ
+export type ChangeNotificationType =
+  | 'business_hours'    // 営業日/営業時間の変更
+  | 'manager'           // 管理者の変更
+  | 'service_manager'   // 児童発達支援管理責任者の変更
+  | 'capacity'          // 定員の変更
+  | 'facility_name'     // 事業所名称の変更
+  | 'address'           // 事業所所在地の変更
+  | 'equipment'         // 設備の変更
+  | 'subsidy';          // 加算の追加・変更
+
+// 変更届通知ステータス
+export type ChangeNotificationStatus = 'pending' | 'in_progress' | 'submitted' | 'completed';
+
+// 変更届通知
+export type ChangeNotification = {
+  id: string;
+  facilityId: string;
+  changeType: ChangeNotificationType;
+  changeDescription?: string;
+  oldValue?: Record<string, unknown>;
+  newValue?: Record<string, unknown>;
+  detectedAt: string;
+  deadline: string;
+  status: ChangeNotificationStatus;
+  submittedAt?: string;
+  relatedDocuments?: unknown[];
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// 変更届タイプのラベル定義
+export const CHANGE_NOTIFICATION_TYPE_LABELS: Record<ChangeNotificationType, string> = {
+  business_hours: '営業日/営業時間の変更',
+  manager: '管理者の変更',
+  service_manager: '児童発達支援管理責任者の変更',
+  capacity: '定員の変更',
+  facility_name: '事業所名称の変更',
+  address: '事業所所在地の変更',
+  equipment: '設備の変更',
+  subsidy: '加算の追加・変更',
+};
+
+// 変更届ステータスのラベル定義
+export const CHANGE_NOTIFICATION_STATUS_CONFIG: Record<ChangeNotificationStatus, { label: string; color: string; bg: string }> = {
+  pending: { label: '未対応', color: 'text-red-600', bg: 'bg-red-100' },
+  in_progress: { label: '作成中', color: 'text-amber-600', bg: 'bg-amber-100' },
+  submitted: { label: '提出済', color: 'text-blue-600', bg: 'bg-blue-100' },
+  completed: { label: '完了', color: 'text-green-600', bg: 'bg-green-100' },
 };
 
 // 規定文書作成/更新用
