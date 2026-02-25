@@ -8,9 +8,12 @@ import {
   CheckCircle,
   Clock,
   FileText,
+  Send,
+  CheckSquare,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { exportWorkScheduleToExcel } from '@/lib/excelEngine';
 import {
   WorkScheduleReport,
   WorkScheduleStaffAssignment,
@@ -55,6 +58,15 @@ export default function WorkScheduleView() {
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<WorkScheduleReport | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+
+  // Month selector state
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+
+  // Year options: current year -1 to current year +1
+  const yearOptions = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 
   useEffect(() => {
     if (!facilityId) return;
@@ -88,9 +100,8 @@ export default function WorkScheduleView() {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1;
+      const year = selectedYear;
+      const month = selectedMonth;
 
       // Fetch current staff personnel settings to generate report
       const { data: staffData } = await supabase
@@ -197,6 +208,43 @@ export default function WorkScheduleView() {
     }
   };
 
+  const handleStatusTransition = async (report: WorkScheduleReport, newStatus: WorkScheduleReportStatus) => {
+    setUpdatingStatus(report.id);
+    try {
+      const updates: Record<string, unknown> = {
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      };
+      if (newStatus === 'submitted') {
+        updates.submitted_at = new Date().toISOString();
+      } else if (newStatus === 'approved') {
+        updates.approved_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('work_schedule_reports')
+        .update(updates)
+        .eq('id', report.id);
+
+      if (error) throw error;
+
+      const updated = {
+        ...report,
+        status: newStatus,
+        ...(newStatus === 'submitted' ? { submittedAt: new Date().toISOString() } : {}),
+        ...(newStatus === 'approved' ? { approvedAt: new Date().toISOString() } : {}),
+      };
+      setReports(prev => prev.map(r => r.id === report.id ? updated : r));
+      if (selectedReport?.id === report.id) {
+        setSelectedReport(updated);
+      }
+    } catch (error) {
+      console.error('Error updating report status:', error);
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -213,18 +261,54 @@ export default function WorkScheduleView() {
           <ClipboardList className="w-6 h-6 text-cyan-500" />
           <h1 className="text-xl font-bold text-gray-800">勤務体制一覧表</h1>
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors disabled:opacity-50 text-sm"
-        >
-          {generating ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-          ) : (
-            <FileText className="w-4 h-4" />
-          )}
-          今月分を生成
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Month selector */}
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="px-2 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+          >
+            {yearOptions.map(y => (
+              <option key={y} value={y}>{y}年</option>
+            ))}
+          </select>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+            className="px-2 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+              <option key={m} value={m}>{m}月</option>
+            ))}
+          </select>
+
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors disabled:opacity-50 text-sm"
+          >
+            {generating ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+            ) : (
+              <FileText className="w-4 h-4" />
+            )}
+            {selectedYear}年{selectedMonth}月分を生成
+          </button>
+
+          <button
+            onClick={() => {
+              if (reports.length > 0) {
+                const latestReport = selectedReport || reports[0];
+                exportWorkScheduleToExcel(latestReport, facility?.name);
+              }
+            }}
+            disabled={reports.length === 0}
+            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Excel出力
+          </button>
+        </div>
       </div>
 
       {/* Report List */}
@@ -246,17 +330,40 @@ export default function WorkScheduleView() {
                 const isSelected = selectedReport?.id === r.id;
                 const sc = STATUS_CONFIG[r.status];
                 return (
-                  <button
+                  <div
                     key={r.id}
                     onClick={() => setSelectedReport(r)}
-                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${isSelected ? 'bg-cyan-50' : ''}`}
+                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-cyan-50' : ''}`}
                   >
                     <p className="font-medium text-gray-800 text-sm">{r.year}年{r.month}月</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${sc.bg} ${sc.color}`}>{sc.label}</span>
                       <span className="text-xs text-gray-400">FTE: {r.fteTotal}</span>
                     </div>
-                  </button>
+                    {/* Status transition buttons */}
+                    <div className="flex items-center gap-1 mt-2">
+                      {r.status === 'draft' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleStatusTransition(r, 'submitted'); }}
+                          disabled={updatingStatus === r.id}
+                          className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors disabled:opacity-50"
+                        >
+                          <Send className="w-3 h-3" />
+                          提出
+                        </button>
+                      )}
+                      {r.status === 'submitted' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleStatusTransition(r, 'approved'); }}
+                          disabled={updatingStatus === r.id}
+                          className="flex items-center gap-1 px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors disabled:opacity-50"
+                        >
+                          <CheckSquare className="w-3 h-3" />
+                          承認
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>

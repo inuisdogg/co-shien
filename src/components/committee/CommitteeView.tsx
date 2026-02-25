@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Users,
   Search,
@@ -11,6 +11,9 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  Plus,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -49,10 +52,43 @@ const COMMITTEE_TYPE_LABELS: Record<CommitteeType, string> = {
   other: 'その他',
 };
 
+// Committee requirements based on committeeTracker.ts logic
+const COMMITTEE_REQUIREMENTS: {
+  type: CommitteeType;
+  name: string;
+  frequency: 'quarterly' | 'biannual' | 'annual';
+  frequencyLabel: string;
+}[] = [
+  { type: 'abuse_prevention', name: '虐待防止委員会', frequency: 'quarterly', frequencyLabel: '四半期' },
+  { type: 'restraint_review', name: '身体拘束適正化委員会', frequency: 'quarterly', frequencyLabel: '四半期' },
+  { type: 'operation_promotion', name: '運営推進会議', frequency: 'biannual', frequencyLabel: '半年' },
+  { type: 'safety', name: '安全委員会', frequency: 'annual', frequencyLabel: '年次' },
+  { type: 'infection_control', name: '感染症対策委員会', frequency: 'annual', frequencyLabel: '年次' },
+  { type: 'quality_improvement', name: '質の改善委員会', frequency: 'annual', frequencyLabel: '年次' },
+];
+
 const STATUS_CONFIG: Record<MeetingStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   draft: { label: '下書き', color: 'text-gray-500', bg: 'bg-gray-100', icon: Clock },
   finalized: { label: '確定', color: 'text-gray-600', bg: 'bg-gray-100', icon: FileText },
   approved: { label: '承認済', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
+};
+
+interface NewMeetingForm {
+  committeeType: CommitteeType;
+  meetingDate: string;
+  location: string;
+  attendeesText: string;
+  agendaText: string;
+  decisions: string;
+}
+
+const INITIAL_FORM: NewMeetingForm = {
+  committeeType: 'abuse_prevention',
+  meetingDate: new Date().toISOString().split('T')[0],
+  location: '',
+  attendeesText: '',
+  agendaText: '',
+  decisions: '',
 };
 
 function mapRow(row: any): CommitteeMeeting {
@@ -77,6 +113,26 @@ function mapRow(row: any): CommitteeMeeting {
   };
 }
 
+/** Compute the period range for a given committee frequency */
+function getPeriodRange(frequency: 'quarterly' | 'biannual' | 'annual', now: Date): { start: string; end: string } {
+  if (frequency === 'quarterly') {
+    const quarter = Math.floor(now.getMonth() / 3);
+    const startMonth = quarter * 3;
+    const start = new Date(now.getFullYear(), startMonth, 1);
+    const end = new Date(now.getFullYear(), startMonth + 3, 0);
+    return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+  }
+  if (frequency === 'biannual') {
+    const half = now.getMonth() < 6 ? 0 : 1;
+    const startMonth = half * 6;
+    const start = new Date(now.getFullYear(), startMonth, 1);
+    const end = new Date(now.getFullYear(), startMonth + 6, 0);
+    return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+  }
+  // annual
+  return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
+}
+
 export default function CommitteeView() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
@@ -86,28 +142,62 @@ export default function CommitteeView() {
   const [selectedType, setSelectedType] = useState<CommitteeType | 'all'>('all');
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Meeting creation form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newMeeting, setNewMeeting] = useState<NewMeetingForm>(INITIAL_FORM);
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchMeetings = useCallback(async () => {
     if (!facilityId) return;
-    const fetch = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('committee_meetings')
-          .select('*')
-          .eq('facility_id', facilityId)
-          .order('meeting_date', { ascending: false });
-        if (error) {
-          console.error('Error fetching committee meetings:', error);
-          return;
-        }
-        if (data) setMeetings(data.map(mapRow));
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('committee_meetings')
+        .select('*')
+        .eq('facility_id', facilityId)
+        .order('meeting_date', { ascending: false });
+      if (error) {
+        console.error('Error fetching committee meetings:', error);
+        return;
       }
-    };
-    fetch();
+      if (data) setMeetings(data.map(mapRow));
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [facilityId]);
+
+  useEffect(() => {
+    fetchMeetings();
+  }, [fetchMeetings]);
+
+  // Committee overview: compute status for each required committee type
+  const committeeOverview = useMemo(() => {
+    const now = new Date();
+    return COMMITTEE_REQUIREMENTS.map(req => {
+      const range = getPeriodRange(req.frequency, now);
+      const meetingsInPeriod = meetings.filter(
+        m => m.committeeType === req.type && m.meetingDate >= range.start && m.meetingDate <= range.end
+      );
+      const lastMeeting = meetings
+        .filter(m => m.committeeType === req.type)
+        .sort((a, b) => b.meetingDate.localeCompare(a.meetingDate))[0];
+
+      const nextDueDate = range.end;
+      const daysUntilDue = Math.ceil((new Date(nextDueDate).getTime() - now.getTime()) / 86400000);
+      const isOk = meetingsInPeriod.length >= 1;
+      const isOverdue = !isOk && daysUntilDue <= 14;
+
+      return {
+        ...req,
+        lastMeetingDate: lastMeeting?.meetingDate || null,
+        meetingsInPeriod: meetingsInPeriod.length,
+        nextDueDate,
+        daysUntilDue,
+        status: isOk ? 'ok' as const : isOverdue ? 'overdue' as const : 'upcoming' as const,
+      };
+    });
+  }, [meetings]);
 
   const stats = useMemo(() => {
     const total = meetings.length;
@@ -122,6 +212,56 @@ export default function CommitteeView() {
     return meetings.filter(m => m.committeeType === selectedType);
   }, [meetings, selectedType]);
 
+  const handleCreateMeeting = async () => {
+    if (!facilityId || !newMeeting.meetingDate || !newMeeting.committeeType) return;
+
+    setSubmitting(true);
+    try {
+      const attendees = newMeeting.attendeesText
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const agenda = newMeeting.agendaText
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const { error } = await supabase
+        .from('committee_meetings')
+        .insert({
+          facility_id: facilityId,
+          committee_type: newMeeting.committeeType,
+          committee_name: COMMITTEE_TYPE_LABELS[newMeeting.committeeType],
+          meeting_date: newMeeting.meetingDate,
+          location: newMeeting.location || null,
+          meeting_type: 'regular',
+          attendees,
+          agenda,
+          decisions: newMeeting.decisions || null,
+          action_items: [],
+          reports: null,
+          status: 'draft',
+        });
+
+      if (error) {
+        console.error('Error creating meeting:', error);
+        alert('会議の作成に失敗しました: ' + error.message);
+        return;
+      }
+
+      // Reset form and refetch
+      setNewMeeting(INITIAL_FORM);
+      setShowCreateForm(false);
+      await fetchMeetings();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('会議の作成に失敗しました');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -133,9 +273,156 @@ export default function CommitteeView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Users className="w-6 h-6 text-cyan-500" />
-        <h1 className="text-xl font-bold text-gray-800">委員会管理</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Users className="w-6 h-6 text-cyan-500" />
+          <h1 className="text-xl font-bold text-gray-800">委員会管理</h1>
+        </div>
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          {showCreateForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+          {showCreateForm ? '閉じる' : '新規会議を作成'}
+        </button>
+      </div>
+
+      {/* Meeting Creation Form */}
+      {showCreateForm && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+          <h2 className="font-bold text-gray-800 text-base">新規会議を作成</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">委員会種別</label>
+              <select
+                value={newMeeting.committeeType}
+                onChange={e => setNewMeeting(prev => ({ ...prev, committeeType: e.target.value as CommitteeType }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              >
+                <option value="abuse_prevention">虐待防止委員会</option>
+                <option value="restraint_review">身体拘束適正化委員会</option>
+                <option value="operation_promotion">運営推進会議</option>
+                <option value="safety">安全委員会</option>
+                <option value="infection_control">感染対策委員会</option>
+                <option value="quality_improvement">質の改善委員会</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">開催日</label>
+              <input
+                type="date"
+                value={newMeeting.meetingDate}
+                onChange={e => setNewMeeting(prev => ({ ...prev, meetingDate: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-600 mb-1">開催場所</label>
+              <input
+                type="text"
+                value={newMeeting.location}
+                onChange={e => setNewMeeting(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="例: 2F会議室"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">出席者（1行に1名）</label>
+              <textarea
+                value={newMeeting.attendeesText}
+                onChange={e => setNewMeeting(prev => ({ ...prev, attendeesText: e.target.value }))}
+                placeholder={"山田太郎\n佐藤花子\n田中一郎"}
+                rows={4}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">議題（1行に1件）</label>
+              <textarea
+                value={newMeeting.agendaText}
+                onChange={e => setNewMeeting(prev => ({ ...prev, agendaText: e.target.value }))}
+                placeholder={"前回議事録の確認\n事故報告の検討\n次回の日程調整"}
+                rows={4}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-600 mb-1">決定事項</label>
+              <textarea
+                value={newMeeting.decisions}
+                onChange={e => setNewMeeting(prev => ({ ...prev, decisions: e.target.value }))}
+                placeholder="会議で決定した事項を記入"
+                rows={3}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              onClick={() => { setShowCreateForm(false); setNewMeeting(INITIAL_FORM); }}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleCreateMeeting}
+              disabled={submitting || !newMeeting.meetingDate}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              下書きとして保存
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Committee Overview Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-400" />
+            委員会開催状況
+          </h2>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {committeeOverview.map(item => (
+            <div key={item.type} className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                  item.status === 'ok' ? 'bg-green-500' : item.status === 'overdue' ? 'bg-red-500' : 'bg-yellow-500'
+                }`} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                  <p className="text-xs text-gray-400">
+                    頻度: {item.frequencyLabel}
+                    {item.lastMeetingDate && ` / 最終開催: ${item.lastMeetingDate}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-gray-400">
+                  期限: {item.nextDueDate}
+                </span>
+                {item.status === 'ok' ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-700 font-medium">
+                    <CheckCircle className="w-3 h-3" />
+                    OK
+                  </span>
+                ) : item.status === 'overdue' ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-50 text-red-700 font-medium">
+                    <AlertTriangle className="w-3 h-3" />
+                    要開催
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-yellow-50 text-yellow-700 font-medium">
+                    <Clock className="w-3 h-3" />
+                    要開催
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Summary Cards */}

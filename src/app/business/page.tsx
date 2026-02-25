@@ -25,12 +25,13 @@ import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
 import DailyLogView from '@/components/logs/DailyLogView';
 import SupportPlanView from '@/components/support-plan/SupportPlanView';
 import DocumentManagementView from '@/components/documents/DocumentManagementView';
-import AdditionSettingsView from '@/components/addition/AdditionSettingsView';
+import RevenueManagementView from '@/components/addition/RevenueManagementView';
 import StaffingView from '@/components/staffing/StaffingView';
 import TrainingRecordView from '@/components/training/TrainingRecordView';
 import IncidentReportView from '@/components/incident/IncidentReportView';
 import LeaveApprovalView from '@/components/staff/LeaveApprovalView';
 import { useAuth } from '@/contexts/AuthContext';
+import { SetupGuideProvider, useSetupGuide, SETUP_STEPS } from '@/contexts/SetupGuideContext';
 import { UserPermissions } from '@/types';
 import { supabase } from '@/lib/supabase';
 
@@ -45,6 +46,89 @@ const FinanceView = dynamicImport(
   () => import('@/components/finance/FinanceView'),
   { ssr: false, loading: DynamicLoadingSpinner }
 );
+
+/**
+ * Onboarding welcome screen shown when setup is incomplete.
+ * Uses the SetupGuideContext to determine current setup progress.
+ */
+function OnboardingWelcome({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const { isSetupComplete, currentStepIndex, completedSteps, isLoading, getStepStatus } = useSetupGuide();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-6 h-6 border-2 border-t-transparent border-gray-800 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isSetupComplete) return null;
+
+  return (
+    <div className="max-w-2xl mx-auto py-12">
+      <h1 className="text-2xl font-semibold text-gray-800 mb-2">Rootsへようこそ</h1>
+      <p className="text-gray-500 mb-8">利用を開始するには、以下の初期設定を完了してください。</p>
+
+      <div className="space-y-4">
+        {SETUP_STEPS.map((step, i) => {
+          const status = getStepStatus(step.id);
+          const isCompleted = status === 'completed';
+          const isCurrent = i === currentStepIndex;
+          return (
+            <div
+              key={step.id}
+              className={`p-4 border rounded-lg ${isCompleted ? 'border-gray-200 bg-gray-50' : isCurrent ? 'border-gray-800' : 'border-gray-100'}`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${isCompleted ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                  {isCompleted ? '\u2713' : i + 1}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800">{step.label}</p>
+                  <p className="text-xs text-gray-400">{step.description}</p>
+                </div>
+                {isCurrent && !isCompleted && (
+                  <button
+                    onClick={() => setActiveTab(step.menuId)}
+                    className="ml-auto px-4 py-1.5 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    設定する
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Gate component that conditionally shows onboarding or regular content.
+ * Must be rendered inside SetupGuideProvider to access setup state.
+ */
+function SetupGateContent({
+  activeTab,
+  setActiveTab,
+  renderContent,
+}: {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  renderContent: () => React.ReactNode;
+}) {
+  const { isSetupComplete, isLoading } = useSetupGuide();
+
+  // While loading setup state, show regular content (don't flash onboarding)
+  if (isLoading) return <>{renderContent()}</>;
+
+  // If setup is not complete and user is on dashboard, show onboarding
+  if (!isSetupComplete && activeTab === 'dashboard') {
+    return <OnboardingWelcome setActiveTab={setActiveTab} />;
+  }
+
+  return <>{renderContent()}</>;
+}
 
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
@@ -331,7 +415,7 @@ export default function BusinessPage() {
       case 'documents':
         return <DocumentManagementView />;
       case 'addition-settings':
-        return <AdditionSettingsView />;
+        return <RevenueManagementView />;
       case 'staffing':
         return <StaffingView />;
       case 'training':
@@ -348,29 +432,31 @@ export default function BusinessPage() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f5f6f8] font-sans text-gray-800">
-      <Sidebar
-        mode="business"
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header
+    <SetupGuideProvider>
+      <div className="flex h-screen bg-[#f5f6f8] font-sans text-gray-800">
+        <Sidebar
           mode="business"
-          onMenuClick={() => setIsSidebarOpen(true)}
-          onLogoClick={() => {
-            const homeTab = hasFullAccess ? 'dashboard' : 'schedule';
-            setActiveTab(homeTab);
-          }}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 md:p-8">
-          <div className="max-w-[1600px] mx-auto h-full flex flex-col">
-            {renderContent()}
-          </div>
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header
+            mode="business"
+            onMenuClick={() => setIsSidebarOpen(true)}
+            onLogoClick={() => {
+              const homeTab = hasFullAccess ? 'dashboard' : 'schedule';
+              setActiveTab(homeTab);
+            }}
+          />
+          <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 md:p-8">
+            <div className="max-w-[1600px] mx-auto h-full flex flex-col">
+              <SetupGateContent activeTab={activeTab} setActiveTab={setActiveTab} renderContent={renderContent} />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </SetupGuideProvider>
   );
 }

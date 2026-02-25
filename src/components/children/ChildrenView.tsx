@@ -691,6 +691,23 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
         </div>
       </div>
 
+      {/* 利用開始までの流れ（ワークフローガイド） - 児童が5人未満の場合のみ表示 */}
+      {children.length < 5 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+          <p className="text-sm text-gray-600 font-medium mb-2">利用開始までの流れ</p>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">1</span>
+            <span>児童を登録</span>
+            <span className="text-gray-300">&rarr;</span>
+            <span className="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">2</span>
+            <span>保護者にメールで招待</span>
+            <span className="text-gray-300">&rarr;</span>
+            <span className="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">3</span>
+            <span>保護者が承認して連携完了</span>
+          </div>
+        </div>
+      )}
+
       {/* 招待中の利用者一覧 */}
       {pendingInvitations.length > 0 && (
         <div className="bg-orange-50 rounded-lg border border-orange-200 shadow-sm p-4">

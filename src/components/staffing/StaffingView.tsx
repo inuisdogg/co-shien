@@ -32,6 +32,8 @@ interface StaffRow {
   id: string;
   name: string;
   qualifications: string[];
+  role?: string;
+  type?: string;
   personnelSettings?: StaffPersonnelSettings;
 }
 
@@ -69,7 +71,7 @@ function StaffingContent() {
         // Fetch staff with personnel settings
         const { data: staffData } = await supabase
           .from('staff')
-          .select('id, name, qualifications')
+          .select('id, name, qualifications, role, type')
           .eq('facility_id', facilityId);
 
         const { data: settingsData } = await supabase
@@ -111,6 +113,8 @@ function StaffingContent() {
           id: s.id,
           name: s.name,
           qualifications: s.qualifications || [],
+          role: s.role,
+          type: s.type,
           personnelSettings: settingsMap.get(s.id),
         })));
 
@@ -373,9 +377,242 @@ function StaffingContent() {
   );
 }
 
+/** Org Chart: groups staff by role in a visual hierarchy */
+interface OrgGroup {
+  label: string;
+  members: StaffRow[];
+}
+
+function classifyStaff(staffList: StaffRow[]): OrgGroup[] {
+  const groups: Record<string, StaffRow[]> = {
+    'service_manager': [],
+    'manager': [],
+    'fulltime': [],
+    'parttime': [],
+  };
+
+  for (const staff of staffList) {
+    const ps = staff.personnelSettings;
+
+    if (ps) {
+      // Use personnel settings when available
+      if (ps.isServiceManager) {
+        groups['service_manager'].push(staff);
+      } else if (ps.isManager) {
+        groups['manager'].push(staff);
+      } else if (ps.workStyle === 'fulltime_dedicated' || ps.workStyle === 'fulltime_concurrent') {
+        groups['fulltime'].push(staff);
+      } else if (ps.workStyle === 'parttime') {
+        groups['parttime'].push(staff);
+      } else {
+        groups['fulltime'].push(staff);
+      }
+    } else {
+      // Fallback to employment_records / staff role
+      const role = staff.role || '';
+      if (role === '管理者' || role === 'マネージャー') {
+        groups['manager'].push(staff);
+      } else if (staff.type === '常勤' || role === '一般スタッフ常勤') {
+        groups['fulltime'].push(staff);
+      } else if (staff.type === '非常勤' || role === '一般スタッフ非常勤') {
+        groups['parttime'].push(staff);
+      } else {
+        // Default to fulltime group
+        groups['fulltime'].push(staff);
+      }
+    }
+  }
+
+  const result: OrgGroup[] = [];
+  if (groups['manager'].length > 0) {
+    result.push({ label: '管理者', members: groups['manager'] });
+  }
+  if (groups['service_manager'].length > 0) {
+    result.push({ label: '児童発達支援管理責任者', members: groups['service_manager'] });
+  }
+  if (groups['fulltime'].length > 0) {
+    result.push({ label: '常勤スタッフ', members: groups['fulltime'] });
+  }
+  if (groups['parttime'].length > 0) {
+    result.push({ label: '非常勤スタッフ', members: groups['parttime'] });
+  }
+
+  return result;
+}
+
+function OrgChartContent() {
+  const { facility } = useAuth();
+  const facilityId = facility?.id || '';
+
+  const [staffList, setStaffList] = useState<StaffRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!facilityId) return;
+    const fetchData = async () => {
+      try {
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('id, name, qualifications, role, type')
+          .eq('facility_id', facilityId);
+
+        const { data: settingsData } = await supabase
+          .from('staff_personnel_settings')
+          .select('*')
+          .eq('facility_id', facilityId);
+
+        const settingsMap = new Map<string, StaffPersonnelSettings>();
+        (settingsData || []).forEach((row: any) => {
+          settingsMap.set(row.staff_id, {
+            id: row.id,
+            facilityId: row.facility_id,
+            staffId: row.staff_id,
+            personnelType: row.personnel_type,
+            workStyle: row.work_style,
+            isManager: row.is_manager,
+            isServiceManager: row.is_service_manager,
+            contractedWeeklyHours: row.contracted_weekly_hours,
+            assignedAdditionCodes: row.assigned_addition_codes || [],
+            effectiveFrom: row.effective_from,
+            effectiveTo: row.effective_to,
+            notes: row.notes,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          });
+        });
+
+        setStaffList((staffData || []).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          qualifications: s.qualifications || [],
+          role: s.role,
+          type: s.type,
+          personnelSettings: settingsMap.get(s.id),
+        })));
+      } catch (error) {
+        console.error('Error fetching staff for org chart:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [facilityId]);
+
+  const orgGroups = useMemo(() => classifyStaff(staffList), [staffList]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+      </div>
+    );
+  }
+
+  if (staffList.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+        スタッフが登録されていません
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Users className="w-6 h-6 text-cyan-500" />
+        <h1 className="text-xl font-bold text-gray-800">組織図</h1>
+        <span className="text-sm text-gray-400 ml-2">{staffList.length}名</span>
+      </div>
+
+      {/* Org Chart Tree */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="space-y-0">
+          {orgGroups.map((group, groupIndex) => (
+            <div key={group.label} className="relative">
+              {/* Vertical connecting line from previous group */}
+              {groupIndex > 0 && (
+                <div className="absolute left-[11px] -top-2 w-px h-2 bg-gray-200" />
+              )}
+
+              {/* Group header */}
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-[22px] h-[22px] rounded-md bg-gray-800 text-white flex items-center justify-center shrink-0">
+                  <Users className="w-3 h-3" />
+                </div>
+                <span className="text-sm font-bold text-gray-800">{group.label}</span>
+                <span className="text-xs text-gray-400">({group.members.length}名)</span>
+              </div>
+
+              {/* Members */}
+              <div className="ml-[11px] border-l border-gray-200 pl-6 pb-4 space-y-1">
+                {group.members.map((staff, memberIndex) => {
+                  const ps = staff.personnelSettings;
+                  const workStyleLabel = ps
+                    ? WORK_STYLE_LABELS[ps.workStyle]
+                    : staff.type || '';
+                  const quals = staff.qualifications
+                    .map(q => QUALIFICATION_CODES[q as keyof typeof QUALIFICATION_CODES] || q)
+                    .filter(Boolean);
+
+                  return (
+                    <div key={staff.id} className="relative flex items-center gap-3 py-2">
+                      {/* Horizontal connector line */}
+                      <div className="absolute -left-6 top-1/2 w-6 h-px bg-gray-200" />
+                      {/* Vertical segment for last item rounded corner */}
+                      {memberIndex === group.members.length - 1 && (
+                        <div className="absolute -left-[1px] top-1/2 bottom-0 w-px bg-white" />
+                      )}
+
+                      {/* Staff card */}
+                      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-100 min-w-0 flex-1">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-gray-600">
+                            {staff.name.charAt(0)}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm text-gray-800 truncate">{staff.name}</span>
+                            {workStyleLabel && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 shrink-0">
+                                {workStyleLabel}
+                              </span>
+                            )}
+                            {ps?.isManager && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-white shrink-0">
+                                管理者
+                              </span>
+                            )}
+                            {ps?.isServiceManager && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-white shrink-0">
+                                児発管
+                              </span>
+                            )}
+                          </div>
+                          {quals.length > 0 && (
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">
+                              {quals.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const STAFFING_TABS = [
   { id: 'staffing', label: '人員配置' },
   { id: 'work-schedule', label: '勤務体制一覧表' },
+  { id: 'org-chart', label: '組織図' },
 ] as const;
 
 export default function StaffingView() {
@@ -403,7 +640,9 @@ export default function StaffingView() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'staffing' ? <StaffingContent /> : <WorkScheduleView />}
+      {activeTab === 'staffing' && <StaffingContent />}
+      {activeTab === 'work-schedule' && <WorkScheduleView />}
+      {activeTab === 'org-chart' && <OrgChartContent />}
     </div>
   );
 }
