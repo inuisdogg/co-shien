@@ -14,9 +14,9 @@ import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
 // タブの種類
 type SettingsTab = 'basic' | 'operation';
 
-const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
-  { id: 'basic', label: '基本情報' },
-  { id: 'operation', label: '営業・休日' },
+const SETTINGS_TABS: { id: SettingsTab; label: string; icon: 'building' | 'clock' }[] = [
+  { id: 'basic', label: '基本情報', icon: 'building' },
+  { id: 'operation', label: '営業・休日', icon: 'clock' },
 ];
 
 const FacilitySettingsView: React.FC = () => {
@@ -286,34 +286,37 @@ const FacilitySettingsView: React.FC = () => {
 
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-500">
+    <div className="space-y-5 animate-in fade-in duration-500">
       {/* ヘッダー */}
-      <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 flex items-center">
-            <Settings size={24} className="mr-2 text-[#00c4cc]" />
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+              <Settings size={18} className="text-[#00c4cc]" />
+            </div>
             施設情報設定
           </h2>
-          <p className="text-gray-500 text-xs mt-1">
-            定休日、営業時間、受け入れ人数などの施設情報を設定します。
+          <p className="text-gray-500 text-sm mt-2">
+            定休日、営業時間、受け入れ人数などの施設情報を設定します
           </p>
         </div>
       </div>
 
       {/* タブナビゲーション */}
-      <div className="bg-white rounded-lg border border-gray-100 shadow-sm">
-        <div className="flex border-b border-gray-200">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
+        <div className="flex gap-1">
           {SETTINGS_TABS.map((tab) => (
             <button
               key={tab.id}
               data-tour={tab.id === 'operation' ? 'operation-tab' : undefined}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-3 px-4 text-sm font-bold transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-bold rounded-lg transition-all ${
                 activeTab === tab.id
-                  ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+                  ? 'text-white bg-[#00c4cc] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
+              {tab.icon === 'building' ? <Building2 size={16} /> : <Clock size={16} />}
               {tab.label}
             </button>
           ))}
@@ -326,7 +329,7 @@ const FacilitySettingsView: React.FC = () => {
         {activeTab === 'basic' && (
           <>
             {/* 施設名設定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <Building2 size={20} className="mr-2 text-[#00c4cc]" />
           施設名設定
@@ -368,7 +371,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 施設住所設定 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <MapPin size={20} className="mr-2 text-[#00c4cc]" />
           施設住所設定
@@ -430,7 +433,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 送迎設定 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <Truck size={20} className="mr-2 text-[#00c4cc]" />
           送迎設定
@@ -497,7 +500,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 事業区分設定 */}
-      <div data-tour="service-categories" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div data-tour="service-categories" className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <Building2 size={20} className="mr-2 text-[#00c4cc]" />
           事業区分
@@ -602,7 +605,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
             {/* 勤怠設定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
                 <UserCheck size={20} className="mr-2 text-[#00c4cc]" />
                 勤怠設定
@@ -641,14 +644,15 @@ const FacilitySettingsView: React.FC = () => {
             </div>
 
             {/* 基本情報の保存ボタン */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <div className="flex justify-end">
+            <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 shadow-lg p-4 z-10">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500">変更内容を保存してください</p>
                 <button
                   data-tour="save-basic-button"
                   onClick={handleSave}
-                  className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
+                  className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white h-10 px-6 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-all min-w-[120px] justify-center"
                 >
-                  <Save size={16} className="mr-2" />
+                  <Save size={16} />
                   基本情報を保存
                 </button>
               </div>
@@ -660,7 +664,7 @@ const FacilitySettingsView: React.FC = () => {
         {activeTab === 'operation' && (
           <>
             {/* 定休日設定 */}
-            <div data-tour="regular-holidays" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <div data-tour="regular-holidays" className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-lg text-gray-800 flex items-center">
                   <Calendar size={20} className="mr-2 text-[#00c4cc]" />
@@ -841,7 +845,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 営業時間・サービス提供時間設定 */}
-      <div data-tour="business-hours" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div data-tour="business-hours" className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg text-gray-800 flex items-center">
             <Clock size={20} className="mr-2 text-[#00c4cc]" />
@@ -981,7 +985,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 時間枠設定 */}
-      <div data-tour="timeslot-section" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div data-tour="timeslot-section" className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <Clock size={20} className="mr-2 text-[#00c4cc]" />
           利用時間枠設定
@@ -1176,14 +1180,15 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
             {/* 営業設定の保存ボタン */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <div className="flex justify-end">
+            <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 shadow-lg p-4 z-10">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500">変更内容を保存してください</p>
                 <button
                   data-tour="save-operation-button"
                   onClick={handleSave}
-                  className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
+                  className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white h-10 px-6 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-all min-w-[120px] justify-center"
                 >
-                  <Save size={16} className="mr-2" />
+                  <Save size={16} />
                   営業設定を保存
                 </button>
               </div>

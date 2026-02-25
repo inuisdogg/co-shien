@@ -281,9 +281,32 @@ export const ChildDocumentsManager: React.FC<Props> = ({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc] mx-auto"></div>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="animate-pulse flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="h-5 bg-gray-200 rounded w-24" />
+                <div className="h-3 bg-gray-200 rounded w-16" />
+              </div>
+              <div className="w-6 h-6 bg-gray-200 rounded" />
+            </div>
+          </div>
+          <div className="flex">
+            <div className="w-48 border-r border-gray-200 bg-gray-50 p-3 space-y-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="animate-pulse h-10 bg-gray-200 rounded" />
+              ))}
+            </div>
+            <div className="flex-1 p-4 space-y-4">
+              <div className="animate-pulse h-24 bg-gray-100 rounded-lg border-2 border-dashed border-gray-200" />
+              <div className="animate-pulse space-y-3">
+                <div className="h-4 bg-gray-200 rounded w-32" />
+                <div className="h-16 bg-gray-100 rounded" />
+                <div className="h-16 bg-gray-100 rounded" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -453,9 +476,12 @@ export const ChildDocumentsManager: React.FC<Props> = ({
             })}
 
             {categoryDocuments.length === 0 && (
-              <div className="text-center py-8 text-gray-400">
-                <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">このカテゴリには書類がありません</p>
+              <div className="text-center py-10 text-gray-400">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <FileText className="w-8 h-8 text-gray-300" />
+                </div>
+                <p className="text-sm font-medium text-gray-500 mb-1">書類がまだ登録されていません</p>
+                <p className="text-xs text-gray-400">上のドロップゾーンにPDFをドラッグするか、「ファイルを選択」をクリックしてください</p>
               </div>
             )}
           </div>

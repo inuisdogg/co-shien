@@ -8,7 +8,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Users, AlertCircle } from 'lucide-react';
+import { Users, AlertCircle, UserPlus } from 'lucide-react';
 import { useStaffMaster } from '@/hooks/useStaffMaster';
 import { Staff, StaffPersonnelSettings, StaffLeaveSettings } from '@/types';
 import StaffListPanel from './StaffListPanel';
@@ -182,6 +182,13 @@ const StaffMasterView: React.FC = () => {
               </p>
             </div>
           </div>
+          <button
+            onClick={handleOpenInvite}
+            className="flex items-center gap-2 min-h-10 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 font-medium text-sm shadow-sm"
+          >
+            <UserPlus size={18} />
+            スタッフを招待
+          </button>
         </div>
       </div>
 

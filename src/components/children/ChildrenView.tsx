@@ -25,6 +25,8 @@ import {
   FileWarning,
   Truck,
   MapPin,
+  Search,
+  Users,
 } from 'lucide-react';
 import { Child, ChildFormData, ContractStatus, Lead, FacilityIntakeData } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -83,6 +85,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [sortStatus, setSortStatus] = useState<ContractStatus | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [drafts, setDrafts] = useState<ChildFormData[]>([]);
   const [selectedDraft, setSelectedDraft] = useState<string | null>(null);
   const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
@@ -539,11 +542,21 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     return counts;
   }, [children]);
 
-  // ソート済み児童リスト
+  // ソート済み児童リスト（検索対応）
   const sortedChildren = useMemo(() => {
     let filtered = children;
     if (sortStatus !== 'all') {
       filtered = children.filter((child) => child.contractStatus === sortStatus);
+    }
+    // 検索フィルタ
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter((child) =>
+        child.name.toLowerCase().includes(q) ||
+        (child.nameKana && child.nameKana.toLowerCase().includes(q)) ||
+        (child.guardianName && child.guardianName.toLowerCase().includes(q)) ||
+        (child.beneficiaryNumber && child.beneficiaryNumber.includes(q))
+      );
     }
     return [...filtered].sort((a, b) => {
       // 契約ステータスでソート（契約中 > 契約前 > 休止中 > 解約）
@@ -555,7 +568,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       };
       return statusOrder[a.contractStatus] - statusOrder[b.contractStatus];
     });
-  }, [children, sortStatus]);
+  }, [children, sortStatus, searchQuery]);
 
   // 児童詳細を開く
   const handleOpenDetail = (child: Child) => {
@@ -654,59 +667,54 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800">児童管理</h2>
-          <p className="text-gray-500 text-xs sm:text-sm mt-1">
-            利用児童の台帳管理、受給者証情報の更新を行います。
-          </p>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setIsInvitationSlotModalOpen(true)}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all flex-1 sm:flex-none justify-center"
-          >
-            <Mail size={16} className="mr-2 shrink-0" />
-            利用者招待
-          </button>
-          <button
-            data-tour="add-child-button"
-            onClick={handleOpenWizard}
-            className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all flex-1 sm:flex-none justify-center"
-          >
-            <UserPlus size={16} className="mr-2 shrink-0" />
-            新規児童登録
-          </button>
-        </div>
-        {/* 登録方法の案内 */}
-        <div className="hidden lg:flex items-center gap-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-            利用者招待: 保護者アカウントと児童を紐付け
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[#00c4cc]"></span>
-            新規登録: 施設で児童情報を直接入力
-          </span>
-        </div>
-      </div>
-
-      {/* 利用開始までの流れ（ワークフローガイド） - 児童が5人未満の場合のみ表示 */}
-      {children.length < 5 && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-          <p className="text-sm text-gray-600 font-medium mb-2">利用開始までの流れ</p>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">1</span>
-            <span>児童を登録</span>
-            <span className="text-gray-300">&rarr;</span>
-            <span className="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">2</span>
-            <span>保護者にメールで招待</span>
-            <span className="text-gray-300">&rarr;</span>
-            <span className="bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">3</span>
-            <span>保護者が承認して連携完了</span>
+      {/* ヘッダー: 新規登録ボタンを目立たせる */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">児童管理</h2>
+              <p className="text-gray-500 text-xs sm:text-sm mt-1">
+                利用児童 <span className="font-bold text-gray-700">{children.length}</span> 名の台帳管理
+              </p>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setIsInvitationSlotModalOpen(true)}
+                className="bg-white hover:bg-orange-50 text-orange-600 border border-orange-300 px-3 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all flex-1 sm:flex-none justify-center"
+              >
+                <Mail size={16} className="mr-2 shrink-0" />
+                利用者招待
+              </button>
+              <button
+                data-tour="add-child-button"
+                onClick={handleOpenWizard}
+                className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-4 sm:px-6 py-2.5 rounded-lg text-xs sm:text-sm font-bold flex items-center shadow-md hover:shadow-lg transition-all flex-1 sm:flex-none justify-center"
+              >
+                <UserPlus size={16} className="mr-2 shrink-0" />
+                児童を新規登録
+              </button>
+            </div>
           </div>
         </div>
-      )}
+        {/* 登録方法の案内 - 児童が少ない場合のみ */}
+        {children.length < 5 && (
+          <div className="bg-gray-50 border-t border-gray-100 px-4 sm:px-6 py-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-6 text-xs text-gray-500">
+              <span className="font-medium text-gray-600">利用開始までの流れ:</span>
+              <div className="flex items-center gap-2">
+                <span className="bg-[#00c4cc] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">1</span>
+                <span>児童を登録</span>
+                <span className="text-gray-300 mx-1">&rarr;</span>
+                <span className="bg-[#00c4cc] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">2</span>
+                <span>保護者に招待メール</span>
+                <span className="text-gray-300 mx-1">&rarr;</span>
+                <span className="bg-[#00c4cc] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">3</span>
+                <span>保護者が承認して連携完了</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* 招待中の利用者一覧 */}
       {pendingInvitations.length > 0 && (
@@ -818,28 +826,31 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
         </div>
       )}
 
-      {/* 契約ステータスフィルターと人数表示 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-700">契約ステータスで絞り込み</h3>
-          <div className="flex items-center space-x-4 text-xs text-gray-600">
-            <span>契約前: <span className="font-bold text-yellow-700">{statusCounts['pre-contract']}名</span></span>
-            <span>契約中: <span className="font-bold text-green-700">{statusCounts.active}名</span></span>
-            <span>休止中: <span className="font-bold text-orange-700">{statusCounts.inactive}名</span></span>
-            <span>解約: <span className="font-bold text-red-700">{statusCounts.terminated}名</span></span>
-            <span className="ml-2">合計: <span className="font-bold text-gray-800">{children.length}名</span></span>
-          </div>
+      {/* 検索とフィルター */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        {/* 検索 */}
+        <div className="relative mb-4">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="児童名、保護者名、受給者証番号で検索..."
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] transition-colors"
+          />
         </div>
+
+        {/* ステータスタブ */}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setSortStatus('all')}
-            className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
               sortStatus === 'all'
-                ? 'bg-[#00c4cc] text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#00c4cc] text-white shadow-sm'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
             }`}
           >
-            すべて ({children.length})
+            全員 ({children.length})
           </button>
           {Object.entries(statusCounts).map(([status, count]) => {
             const statusInfo = getStatusLabel(status as ContractStatus);
@@ -847,10 +858,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               <button
                 key={status}
                 onClick={() => setSortStatus(status as ContractStatus)}
-                className={`px-4 py-2 text-xs font-bold rounded-md transition-colors flex items-center space-x-1 ${
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                   sortStatus === status
-                    ? `${statusInfo.color} border-2 border-current`
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? `${statusInfo.color} shadow-sm`
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
                 <statusInfo.icon size={14} />
@@ -861,103 +872,107 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
         </div>
       </div>
 
-      {/* 児童一覧テーブル */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs sm:text-sm text-left">
-            <thead className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200 uppercase text-xs tracking-wider">
-              <tr>
-                <th className="px-3 sm:px-6 py-3 sm:py-4">氏名</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4">年齢</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">保護者名</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">受給者証番号</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4">契約ステータス</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4">契約日数</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4">送迎</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedChildren.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 sm:px-6 py-6 sm:py-8 text-center text-gray-400 text-xs sm:text-sm">
-                    {sortStatus === 'all'
-                      ? '登録されている児童はいません'
-                      : '該当する児童はいません'}
-                  </td>
-                </tr>
-              ) : (
-                sortedChildren.map((child: Child) => {
-                  const statusInfo = getStatusLabel(child.contractStatus);
-                  const StatusIcon = statusInfo.icon;
-                  return (
-                    <tr
-                      key={child.id}
-                      className="hover:bg-[#f0fdfe] transition-colors group"
-                    >
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleOpenDetail(child)}
-                            className="font-bold text-gray-800 group-hover:text-[#00c4cc] hover:underline transition-colors text-left text-xs sm:text-sm"
-                          >
-                            {child.name}
-                          </button>
-                          {child.ownerProfileId ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium" title="利用者アカウント連携済み">
-                              <UserCheck size={12} />
-                              <span className="hidden sm:inline">連携</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium" title="利用者アカウント未連携">
-                              <span className="hidden sm:inline">未連携</span>
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 text-xs sm:text-sm">
-                        {child.birthDate ? calculateAgeWithMonths(child.birthDate).display : child.age ? `${child.age}歳` : '-'}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 text-xs sm:text-sm hidden sm:table-cell">
-                        {child.guardianName || '-'}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 font-mono text-xs sm:text-sm hidden md:table-cell">
-                        {child.beneficiaryNumber || '-'}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span
-                          className={`inline-flex items-center space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-bold ${statusInfo.color}`}
-                        >
-                          <StatusIcon size={10} className="sm:w-3 sm:h-3" />
-                          <span>{statusInfo.label}</span>
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="bg-gray-100 text-gray-600 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs border border-gray-200 font-medium">
-                          {child.contractDays ? `${child.contractDays}日` : '-'}
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600">
-                        <div className="flex space-x-1 sm:space-x-2">
-                          {child.needsPickup && (
-                            <span className="text-[10px] sm:text-xs bg-[#e0f7fa] text-[#006064] px-1.5 sm:px-2 py-0.5 rounded font-bold">
-                              迎
-                            </span>
-                          )}
-                          {child.needsDropoff && (
-                            <span className="text-[10px] sm:text-xs bg-[#e0f7fa] text-[#006064] px-1.5 sm:px-2 py-0.5 rounded font-bold">
-                              送
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* 児童一覧カード */}
+      {sortedChildren.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 sm:p-12 text-center">
+          {children.length === 0 ? (
+            <>
+              <div className="w-20 h-20 bg-[#00c4cc]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users size={36} className="text-[#00c4cc]" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-800 mb-2">まだ児童が登録されていません</h3>
+              <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+                「児童を新規登録」ボタンから最初の児童を登録しましょう。<br />
+                登録後、保護者にメールで招待を送ることができます。
+              </p>
+              <button
+                onClick={handleOpenWizard}
+                className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-3 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all inline-flex items-center gap-2"
+              >
+                <UserPlus size={18} />
+                児童を新規登録
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search size={28} className="text-gray-400" />
+              </div>
+              <h3 className="text-base font-bold text-gray-700 mb-1">該当する児童が見つかりません</h3>
+              <p className="text-sm text-gray-500">検索条件やフィルターを変更してください</p>
+            </>
+          )}
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sortedChildren.map((child: Child) => {
+            const statusInfo = getStatusLabel(child.contractStatus);
+            const StatusIcon = statusInfo.icon;
+            const initials = child.name.slice(0, 2);
+            return (
+              <button
+                key={child.id}
+                onClick={() => handleOpenDetail(child)}
+                className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-[#00c4cc]/30 transition-all text-left group"
+              >
+                <div className="flex items-start gap-3">
+                  {/* アバター */}
+                  <div className="w-12 h-12 bg-[#00c4cc]/10 rounded-full flex items-center justify-center shrink-0">
+                    <span className="text-[#00c4cc] font-bold text-sm">{initials}</span>
+                  </div>
+
+                  {/* 情報 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-gray-800 text-sm truncate group-hover:text-[#00c4cc] transition-colors">
+                        {child.name}
+                      </h3>
+                      {child.ownerProfileId && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium shrink-0">
+                          <UserCheck size={10} />
+                          連携
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {child.birthDate ? calculateAgeWithMonths(child.birthDate).display : child.age ? `${child.age}歳` : '年齢未登録'}
+                      {child.guardianName && ` / ${child.guardianName}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 下部情報 */}
+                <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold ${statusInfo.color}`}
+                  >
+                    <StatusIcon size={10} />
+                    {statusInfo.label}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {child.beneficiaryNumber && (
+                      <span className="text-[10px] text-gray-400 font-mono">{child.beneficiaryNumber}</span>
+                    )}
+                    {child.contractDays && (
+                      <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200">
+                        {child.contractDays}日/月
+                      </span>
+                    )}
+                    <div className="flex gap-0.5">
+                      {child.needsPickup && (
+                        <span className="text-[10px] bg-[#e0f7fa] text-[#006064] px-1 py-0.5 rounded font-bold">迎</span>
+                      )}
+                      {child.needsDropoff && (
+                        <span className="text-[10px] bg-[#e0f7fa] text-[#006064] px-1 py-0.5 rounded font-bold">送</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* 登録モーダル */}
       {isModalOpen && (

@@ -133,12 +133,17 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
       <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col">
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800">
-            {isNew ? 'スタッフを追加' : 'スタッフを編集'}
-          </h2>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
+              <User size={20} className="text-[#00c4cc]" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">
+              {isNew ? 'スタッフを追加' : 'スタッフを編集'}
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="min-h-10 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200"
           >
             <X size={20} />
           </button>

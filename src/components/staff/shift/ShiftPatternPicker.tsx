@@ -1,14 +1,14 @@
 /**
  * シフトパターンピッカー
- * シフトパターンを選択するためのドロップダウンコンポーネント
+ * ビジュアルパターンカードで選択するドロップダウンコンポーネント
  */
 
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Plus, Settings } from 'lucide-react';
+import { ChevronDown, Check, Settings } from 'lucide-react';
 import { ShiftPattern } from '@/types';
-import { formatPatternTimeRange } from '@/utils/shiftDisplayFormatter';
+import { formatPatternTimeRange, patternColorToRgba } from '@/utils/shiftDisplayFormatter';
 
 interface ShiftPatternPickerProps {
   patterns: ShiftPattern[];
@@ -50,9 +50,9 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
 
   // サイズクラス
   const sizeClasses = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-2 text-sm',
-    lg: 'px-4 py-2.5 text-base',
+    sm: 'px-2 py-1.5 text-xs min-h-8',
+    md: 'px-3 py-2 text-sm min-h-10',
+    lg: 'px-4 py-2.5 text-base min-h-11',
   };
 
   // 勤務パターンと休日パターンを分離
@@ -65,7 +65,7 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between gap-2 border rounded-lg bg-white transition-colors ${sizeClasses[size]} ${
+        className={`w-full flex items-center justify-between gap-2 border rounded-lg bg-white transition-all duration-200 ${sizeClasses[size]} ${
           isOpen
             ? 'border-[#00c4cc] ring-2 ring-[#00c4cc]/20'
             : 'border-gray-300 hover:border-gray-400'
@@ -76,7 +76,7 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
             <>
               {selectedPattern.color && (
                 <div
-                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  className="w-3.5 h-3.5 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm"
                   style={{ backgroundColor: selectedPattern.color }}
                 />
               )}
@@ -84,8 +84,8 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
                 {selectedPattern.name}
               </span>
               {showTimeRange && !selectedPattern.isDayOff && (
-                <span className="text-gray-500 truncate">
-                  ({formatPatternTimeRange(selectedPattern)})
+                <span className="text-gray-400 truncate font-mono text-xs">
+                  {formatPatternTimeRange(selectedPattern)}
                 </span>
               )}
             </>
@@ -95,7 +95,7 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
         </div>
         <ChevronDown
           size={16}
-          className={`text-gray-400 flex-shrink-0 transition-transform ${
+          className={`text-gray-400 flex-shrink-0 transition-transform duration-200 ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -103,12 +103,12 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
 
       {/* ドロップダウン */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-          <div className="max-h-64 overflow-y-auto">
-            {/* 勤務パターン */}
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          <div className="max-h-72 overflow-y-auto">
+            {/* 勤務パターン - ビジュアルカード */}
             {workPatterns.length > 0 && (
-              <div className="p-1">
-                <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase">
+              <div className="p-1.5">
+                <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider">
                   勤務パターン
                 </div>
                 {workPatterns.map((pattern) => {
@@ -120,27 +120,28 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
                         onSelect(pattern);
                         setIsOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors ${
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 min-h-10 ${
                         isSelected
-                          ? 'bg-[#00c4cc]/5 text-[#00c4cc]'
-                          : 'hover:bg-gray-50 text-gray-700'
+                          ? 'ring-1 ring-[#00c4cc]/30'
+                          : 'hover:bg-gray-50'
                       }`}
+                      style={
+                        isSelected
+                          ? { backgroundColor: patternColorToRgba(pattern.color, 0.08) }
+                          : undefined
+                      }
                     >
-                      <div className="flex items-center gap-2">
-                        {pattern.color && (
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: pattern.color }}
-                          />
-                        )}
-                        <span className="text-sm font-medium">{pattern.name}</span>
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm"
+                        style={{ backgroundColor: pattern.color || '#00c4cc' }}
+                      />
+                      <div className="flex-1 text-left">
+                        <span className="text-sm font-medium text-gray-800">{pattern.name}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">
-                          {formatPatternTimeRange(pattern)}
-                        </span>
-                        {isSelected && <Check size={14} className="text-[#00c4cc]" />}
-                      </div>
+                      <span className="text-xs text-gray-400 font-mono">
+                        {formatPatternTimeRange(pattern)}
+                      </span>
+                      {isSelected && <Check size={14} className="text-[#00c4cc] flex-shrink-0" />}
                     </button>
                   );
                 })}
@@ -149,8 +150,8 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
 
             {/* 休日パターン */}
             {dayOffPatterns.length > 0 && (
-              <div className="p-1 border-t border-gray-100">
-                <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase">
+              <div className="p-1.5 border-t border-gray-100">
+                <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider">
                   休日
                 </div>
                 {dayOffPatterns.map((pattern) => {
@@ -162,14 +163,15 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
                         onSelect(pattern);
                         setIsOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors ${
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 min-h-10 ${
                         isSelected
-                          ? 'bg-gray-100 text-gray-700'
-                          : 'hover:bg-gray-50 text-gray-600'
+                          ? 'bg-gray-100 ring-1 ring-gray-300'
+                          : 'hover:bg-gray-50'
                       }`}
                     >
-                      <span className="text-sm">{pattern.name}</span>
-                      {isSelected && <Check size={14} className="text-gray-600" />}
+                      <div className="w-4 h-4 rounded-full bg-gray-300 flex-shrink-0 ring-2 ring-white shadow-sm" />
+                      <span className="text-sm text-gray-600">{pattern.name}</span>
+                      {isSelected && <Check size={14} className="text-gray-600 ml-auto flex-shrink-0" />}
                     </button>
                   );
                 })}
@@ -179,13 +181,13 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
 
           {/* パターン管理 */}
           {onManagePatterns && (
-            <div className="border-t border-gray-200 p-1">
+            <div className="border-t border-gray-200 p-1.5">
               <button
                 onClick={() => {
                   onManagePatterns();
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-all duration-200 min-h-10"
               >
                 <Settings size={14} />
                 パターンを管理

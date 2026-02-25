@@ -11,15 +11,37 @@ import {
   Clock,
   XCircle,
   Calendar,
+  Plus,
+  Download,
+  Minus,
+  ArrowRight,
+  Printer,
+  X,
+  Receipt,
+  Wallet,
+  PiggyBank,
+  ArrowUpRight,
+  ArrowDownRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Expense, ExpenseStatus, MonthlyFinancial } from '@/types/expense';
 
-const EXPENSE_STATUS_CONFIG: Record<ExpenseStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  pending: { label: '申請中', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
-  approved: { label: '承認済', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
-  rejected: { label: '却下', color: 'text-gray-500', bg: 'bg-gray-100', icon: XCircle },
+const EXPENSE_STATUS_CONFIG: Record<ExpenseStatus, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
+  pending: { label: '申請中', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', icon: Clock },
+  approved: { label: '承認済', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', icon: CheckCircle },
+  rejected: { label: '却下', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200', icon: XCircle },
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  '交通費': '🚃',
+  '消耗品費': '📦',
+  '食費': '🍱',
+  '通信費': '📞',
+  '水道光熱費': '💡',
+  '修繕費': '🔧',
+  '研修費': '📚',
+  'その他': '📋',
 };
 
 const DEFAULT_CATEGORIES = ['交通費', '消耗品費', '食費', '通信費', '水道光熱費', '修繕費', '研修費', 'その他'];
@@ -80,6 +102,23 @@ function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(amount);
 }
 
+function formatCompactCurrency(amount: number): string {
+  if (Math.abs(amount) >= 10000) {
+    return `${(amount / 10000).toFixed(1)}万円`;
+  }
+  return formatCurrency(amount);
+}
+
+// Skeleton loader
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-20 mb-2" />
+      <div className="h-8 bg-gray-100 rounded w-24" />
+    </div>
+  );
+}
+
 export default function FinanceView() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
@@ -90,6 +129,17 @@ export default function FinanceView() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ExpenseStatus | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest');
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // Add expense form
+  const [newExpense, setNewExpense] = useState({
+    title: '',
+    amount: '',
+    expenseDate: new Date().toISOString().split('T')[0],
+    category: DEFAULT_CATEGORIES[0],
+    description: '',
+  });
 
   useEffect(() => {
     if (!facilityId) return;
@@ -110,6 +160,25 @@ export default function FinanceView() {
     fetchData();
   }, [facilityId]);
 
+  // KPI calculations
+  const kpi = useMemo(() => {
+    const latest = financials[0];
+    const previous = financials[1];
+    if (!latest) return null;
+
+    const revenue = latest.revenueService + latest.revenueOther;
+    const totalExpense = latest.expensePersonnel + latest.expenseFixed + latest.expenseVariable + latest.expenseOther;
+    const profit = revenue - totalExpense;
+
+    let revenueChange = 0;
+    if (previous) {
+      const prevRevenue = previous.revenueService + previous.revenueOther;
+      revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
+    }
+
+    return { revenue, totalExpense, profit, revenueChange, month: latest.month, year: latest.year };
+  }, [financials]);
+
   const expenseStats = useMemo(() => {
     const total = expenses.reduce((sum, e) => sum + e.amount, 0);
     const approved = expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + e.amount, 0);
@@ -122,12 +191,41 @@ export default function FinanceView() {
   }, [expenses]);
 
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => {
+    let result = expenses.filter(e => {
       if (statusFilter !== 'all' && e.status !== statusFilter) return false;
       if (searchTerm && !e.title.includes(searchTerm) && !e.category.includes(searchTerm)) return false;
       return true;
     });
-  }, [expenses, statusFilter, searchTerm]);
+
+    if (sortBy === 'oldest') {
+      result.sort((a, b) => a.expenseDate.localeCompare(b.expenseDate));
+    } else if (sortBy === 'amount') {
+      result.sort((a, b) => b.amount - a.amount);
+    }
+
+    return result;
+  }, [expenses, statusFilter, searchTerm, sortBy]);
+
+  // Monthly trend chart data (last 6 months)
+  const trendData = useMemo(() => {
+    return [...financials].reverse().slice(-6).map(f => {
+      const revenue = f.revenueService + f.revenueOther;
+      const expense = f.expensePersonnel + f.expenseFixed + f.expenseVariable + f.expenseOther;
+      return { label: `${f.month}月`, revenue, expense, profit: revenue - expense };
+    });
+  }, [financials]);
+
+  const trendMaxValue = useMemo(() => {
+    if (trendData.length === 0) return 1;
+    return Math.max(...trendData.flatMap(d => [d.revenue, d.expense]));
+  }, [trendData]);
+
+  // Category breakdown for expense bar chart
+  const categoryBreakdown = useMemo(() => {
+    const entries = Array.from(expenseStats.byCategory.entries()).sort((a, b) => b[1] - a[1]);
+    const maxAmount = entries.length > 0 ? entries[0][1] : 1;
+    return entries.map(([cat, amount]) => ({ category: cat, amount, percentage: (amount / maxAmount) * 100 }));
+  }, [expenseStats.byCategory]);
 
   const handleApprove = async (expenseId: string) => {
     try {
@@ -144,8 +242,14 @@ export default function FinanceView() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-6 h-6 bg-gray-200 rounded animate-pulse" />
+          <div className="h-6 w-24 bg-gray-200 rounded animate-pulse" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
       </div>
     );
   }
@@ -153,10 +257,106 @@ export default function FinanceView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <BarChart3 className="w-6 h-6 text-[#00c4cc]" />
-        <h1 className="text-xl font-bold text-gray-800">財務管理</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <BarChart3 className="w-6 h-6 text-[#00c4cc]" />
+          <h1 className="text-xl font-bold text-gray-800">財務管理</h1>
+        </div>
+        <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+          <Printer className="w-4 h-4" />
+          月次レポート
+        </button>
       </div>
+
+      {/* KPI Cards */}
+      {kpi && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-[#00c4cc]/10 rounded-lg"><Wallet className="w-5 h-5 text-[#00c4cc]" /></div>
+              <div>
+                <p className="text-xs text-gray-500">月間売上 ({kpi.month}月)</p>
+                <p className="text-xl font-bold text-gray-800">{formatCompactCurrency(kpi.revenue)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-50 rounded-lg"><Receipt className="w-5 h-5 text-red-500" /></div>
+              <div>
+                <p className="text-xs text-gray-500">月間経費</p>
+                <p className="text-xl font-bold text-gray-800">{formatCompactCurrency(kpi.totalExpense)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${kpi.profit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                <PiggyBank className={`w-5 h-5 ${kpi.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">純利益</p>
+                <p className={`text-xl font-bold ${kpi.profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {formatCompactCurrency(kpi.profit)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${kpi.revenueChange >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                {kpi.revenueChange >= 0 ? (
+                  <ArrowUpRight className="w-5 h-5 text-emerald-600" />
+                ) : (
+                  <ArrowDownRight className="w-5 h-5 text-red-500" />
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">前月比</p>
+                <p className={`text-xl font-bold ${kpi.revenueChange >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {kpi.revenueChange >= 0 ? '+' : ''}{kpi.revenueChange.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Trend Chart (CSS-based) */}
+      {trendData.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 className="text-sm font-bold text-gray-700 mb-4">月次推移（直近6ヶ月）</h2>
+          <div className="flex items-end gap-3 h-32">
+            {trendData.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <div className="w-full flex gap-0.5 items-end justify-center h-24">
+                  {/* Revenue bar */}
+                  <div
+                    className="flex-1 max-w-4 bg-[#00c4cc]/30 rounded-t-sm transition-all"
+                    style={{ height: `${(d.revenue / trendMaxValue) * 100}%`, minHeight: d.revenue > 0 ? '2px' : '0' }}
+                    title={`売上: ${formatCurrency(d.revenue)}`}
+                  />
+                  {/* Expense bar */}
+                  <div
+                    className="flex-1 max-w-4 bg-red-300/50 rounded-t-sm transition-all"
+                    style={{ height: `${(d.expense / trendMaxValue) * 100}%`, minHeight: d.expense > 0 ? '2px' : '0' }}
+                    title={`経費: ${formatCurrency(d.expense)}`}
+                  />
+                </div>
+                <span className="text-[10px] text-gray-400">{d.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[#00c4cc]/30" /> 売上
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-red-300/50" /> 経費
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex gap-1">
@@ -168,7 +368,9 @@ export default function FinanceView() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === tab.id ? 'bg-[#00c4cc] text-white' : 'text-gray-600 hover:bg-gray-100'
+            }`}
           >
             {tab.label}
           </button>
@@ -178,43 +380,105 @@ export default function FinanceView() {
       {/* Expenses Tab */}
       {activeTab === 'expenses' && (
         <>
-          {/* Summary */}
+          {/* Expense Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-              <p className="text-sm text-gray-500">経費総額</p>
-              <p className="text-xl font-bold text-gray-800">{formatCurrency(expenseStats.total)}</p>
+              <p className="text-xs text-gray-500 mb-1">経費総額</p>
+              <p className="text-xl font-bold text-gray-800">{formatCompactCurrency(expenseStats.total)}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-              <p className="text-sm text-gray-500">承認済み</p>
-              <p className="text-xl font-bold text-gray-800">{formatCurrency(expenseStats.approved)}</p>
+              <p className="text-xs text-gray-500 mb-1">承認済み</p>
+              <p className="text-xl font-bold text-gray-800">{formatCompactCurrency(expenseStats.approved)}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-              <p className="text-sm text-gray-500">申請中</p>
-              <p className="text-2xl font-bold text-gray-800">{expenseStats.pending}</p>
+              <p className="text-xs text-gray-500 mb-1">申請中</p>
+              <p className="text-2xl font-bold text-amber-600">{expenseStats.pending}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-              <p className="text-sm text-gray-500">カテゴリ数</p>
+              <p className="text-xs text-gray-500 mb-1">カテゴリ数</p>
               <p className="text-2xl font-bold text-gray-800">{expenseStats.byCategory.size}</p>
             </div>
           </div>
+
+          {/* Category Breakdown */}
+          {categoryBreakdown.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <h2 className="text-sm font-bold text-gray-700 mb-4">カテゴリ別内訳</h2>
+              <div className="space-y-3">
+                {categoryBreakdown.map(item => (
+                  <div key={item.category} className="flex items-center gap-3">
+                    <span className="text-lg w-6 text-center">{CATEGORY_ICONS[item.category] || '📋'}</span>
+                    <span className="text-sm text-gray-700 w-24 flex-shrink-0">{item.category}</span>
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#00c4cc] rounded-full transition-all"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-gray-800 w-24 text-right">{formatCurrency(item.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Filters */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="タイトル・カテゴリで検索..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm" />
+              <input
+                type="text"
+                placeholder="タイトル・カテゴリで検索..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+              />
             </div>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as any)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+            >
               <option value="all">全ステータス</option>
               {Object.entries(EXPENSE_STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+            >
+              <option value="newest">新しい順</option>
+              <option value="oldest">古い順</option>
+              <option value="amount">金額順</option>
+            </select>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              経費追加
+            </button>
           </div>
 
           {/* Expense List */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {filteredExpenses.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                {expenses.length === 0 ? '経費がまだ登録されていません' : '条件に一致する経費がありません'}
+              <div className="p-12 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
+                  <Receipt className="w-8 h-8 text-gray-300" />
+                </div>
+                <p className="text-gray-500 mb-2">
+                  {expenses.length === 0 ? '経費がまだ登録されていません' : '条件に一致する経費がありません'}
+                </p>
+                {expenses.length === 0 && (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors mt-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    経費を追加
+                  </button>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
@@ -222,28 +486,45 @@ export default function FinanceView() {
                   const sc = EXPENSE_STATUS_CONFIG[exp.status];
                   const StatusIcon = sc.icon;
                   return (
-                    <div key={exp.id} className="p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-gray-800">{exp.title}</p>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{exp.category}</span>
+                    <div key={exp.id} className="p-4 hover:bg-gray-50/50 transition-colors group">
+                      <div className="flex items-center gap-4">
+                        {/* Category icon */}
+                        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-lg flex-shrink-0">
+                          {CATEGORY_ICONS[exp.category] || '📋'}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="font-medium text-gray-800 truncate">{exp.title}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 flex-shrink-0">
+                              {exp.category}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                            <span>{exp.expenseDate}</span>
-                            {exp.description && <span className="line-clamp-1">{exp.description}</span>}
+                          <div className="flex items-center gap-3 text-xs text-gray-400">
+                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{exp.expenseDate}</span>
+                            {exp.description && <span className="truncate">{exp.description}</span>}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <p className="font-bold text-gray-800">{formatCurrency(exp.amount)}</p>
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${sc.bg} ${sc.color}`}>
-                            <StatusIcon className="w-3 h-3" />
-                            {sc.label}
-                          </span>
-                          {exp.status === 'pending' && (
-                            <button onClick={() => handleApprove(exp.id)} className="text-xs px-3 py-1 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8]">承認</button>
-                          )}
-                        </div>
+
+                        {/* Amount */}
+                        <p className="text-base font-bold text-gray-800 flex-shrink-0">{formatCurrency(exp.amount)}</p>
+
+                        {/* Status */}
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0 ${sc.bg} ${sc.color} ${sc.border}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {sc.label}
+                        </span>
+
+                        {/* Approve button */}
+                        {exp.status === 'pending' && (
+                          <button
+                            onClick={() => handleApprove(exp.id)}
+                            className="px-3 py-1.5 text-xs font-medium bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                          >
+                            承認
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -257,8 +538,15 @@ export default function FinanceView() {
       {/* P&L Tab */}
       {activeTab === 'pl' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="font-bold text-gray-800">損益計算書</h2>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+              <Printer className="w-3.5 h-3.5" />
+              印刷
+            </button>
+          </div>
           {financials.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">月次財務データがありません</div>
+            <div className="p-12 text-center text-gray-500">月次財務データがありません</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -286,14 +574,18 @@ export default function FinanceView() {
                         <td className="p-3 text-right text-gray-600">{formatCurrency(f.expenseFixed)}</td>
                         <td className="p-3 text-right text-gray-600">{formatCurrency(f.expenseVariable)}</td>
                         <td className="p-3 text-right text-gray-800">{formatCurrency(f.grossProfit)}</td>
-                        <td className="p-3 text-right font-medium text-gray-800">
+                        <td className={`p-3 text-right font-medium ${isProfit ? 'text-emerald-700' : 'text-red-600'}`}>
                           <span className="inline-flex items-center gap-1">
-                            {isProfit ? <TrendingUp className="w-3.5 h-3.5 text-gray-500" /> : <TrendingDown className="w-3.5 h-3.5 text-gray-500" />}
+                            {isProfit ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                             {formatCurrency(f.operatingProfit)}
                           </span>
                         </td>
                         <td className="p-3 text-center">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${f.isFinalized ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
+                            f.isFinalized
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-gray-50 text-gray-500 border-gray-200'
+                          }`}>
                             {f.isFinalized ? '確定' : '未確定'}
                           </span>
                         </td>
@@ -310,54 +602,148 @@ export default function FinanceView() {
       {/* Cash Flow Tab */}
       {activeTab === 'cashflow' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="font-bold text-gray-800">キャッシュフロー推移</h2>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+              <Printer className="w-3.5 h-3.5" />
+              印刷
+            </button>
+          </div>
           {financials.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">月次財務データがありません</div>
+            <div className="p-12 text-center text-gray-500">月次財務データがありません</div>
           ) : (
-            <>
-              {/* Cash Flow Summary */}
-              <div className="p-4 border-b border-gray-100">
-                <h2 className="font-bold text-gray-800">キャッシュフロー推移</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left p-3 font-medium text-gray-600">年月</th>
-                      <th className="text-right p-3 font-medium text-gray-600">収入</th>
-                      <th className="text-right p-3 font-medium text-gray-600">支出</th>
-                      <th className="text-right p-3 font-medium text-gray-600">収支</th>
-                      <th className="text-right p-3 font-medium text-gray-600">累計</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {(() => {
-                      let cumulative = 0;
-                      return [...financials].reverse().map(f => {
-                        const totalRevenue = f.revenueService + f.revenueOther;
-                        const totalExpense = f.expensePersonnel + f.expenseFixed + f.expenseVariable + f.expenseOther;
-                        const cashFlow = totalRevenue - totalExpense;
-                        cumulative += cashFlow;
-                        const isPositive = cashFlow >= 0;
-                        return (
-                          <tr key={f.id} className="hover:bg-gray-50">
-                            <td className="p-3 font-medium text-gray-800">{f.year}年{f.month}月</td>
-                            <td className="p-3 text-right text-gray-800">{formatCurrency(totalRevenue)}</td>
-                            <td className="p-3 text-right text-gray-600">{formatCurrency(totalExpense)}</td>
-                            <td className="p-3 text-right font-medium text-gray-800">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left p-3 font-medium text-gray-600">年月</th>
+                    <th className="text-right p-3 font-medium text-gray-600">収入</th>
+                    <th className="text-right p-3 font-medium text-gray-600">支出</th>
+                    <th className="text-right p-3 font-medium text-gray-600">収支</th>
+                    <th className="text-right p-3 font-medium text-gray-600">累計</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(() => {
+                    let cumulative = 0;
+                    return [...financials].reverse().map(f => {
+                      const totalRevenue = f.revenueService + f.revenueOther;
+                      const totalExpense = f.expensePersonnel + f.expenseFixed + f.expenseVariable + f.expenseOther;
+                      const cashFlow = totalRevenue - totalExpense;
+                      cumulative += cashFlow;
+                      const isPositive = cashFlow >= 0;
+                      const isCumPositive = cumulative >= 0;
+                      return (
+                        <tr key={f.id} className="hover:bg-gray-50">
+                          <td className="p-3 font-medium text-gray-800">{f.year}年{f.month}月</td>
+                          <td className="p-3 text-right text-gray-800">{formatCurrency(totalRevenue)}</td>
+                          <td className="p-3 text-right text-gray-600">{formatCurrency(totalExpense)}</td>
+                          <td className={`p-3 text-right font-medium ${isPositive ? 'text-emerald-700' : 'text-red-600'}`}>
+                            <span className="inline-flex items-center gap-1">
+                              {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                               {formatCurrency(cashFlow)}
-                            </td>
-                            <td className="p-3 text-right font-medium text-gray-800">
-                              {formatCurrency(cumulative)}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                            </span>
+                          </td>
+                          <td className={`p-3 text-right font-medium ${isCumPositive ? 'text-gray-800' : 'text-red-600'}`}>
+                            {formatCurrency(cumulative)}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           )}
+        </div>
+      )}
+
+      {/* Add Expense Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-800">経費を追加</h2>
+              <button onClick={() => setShowAddModal(false)}>
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  タイトル <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newExpense.title}
+                  onChange={e => setNewExpense(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  placeholder="経費の名称"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    金額 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={newExpense.amount}
+                    onChange={e => setNewExpense(prev => ({ ...prev, amount: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    日付 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={newExpense.expenseDate}
+                    onChange={e => setNewExpense(prev => ({ ...prev, expenseDate: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+                <select
+                  value={newExpense.category}
+                  onChange={e => setNewExpense(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                >
+                  {DEFAULT_CATEGORIES.map(c => (
+                    <option key={c} value={c}>{CATEGORY_ICONS[c] || ''} {c}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">備考</label>
+                <textarea
+                  value={newExpense.description}
+                  onChange={e => setNewExpense(prev => ({ ...prev, description: e.target.value }))}
+                  rows={2}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  placeholder="補足説明..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                disabled={!newExpense.title || !newExpense.amount}
+                className="px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                追加
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

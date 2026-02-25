@@ -1,7 +1,9 @@
 /**
  * シフトセルエディタ
- * シフトカレンダーの各セルを編集するコンポーネント
- * 時間表記（9-17形式）で表示し、パターン選択または直接入力で編集
+ * クリーンなポップオーバーでシフトを編集
+ * - パターンをビジュアルカードで表示
+ * - 時間範囲を目立つ表示
+ * - カスタム時間入力
  */
 
 'use client';
@@ -9,7 +11,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Clock, Check } from 'lucide-react';
 import { ShiftPattern, ShiftWithPattern } from '@/types';
-import { formatShiftDisplay, formatPatternTimeRange } from '@/utils/shiftDisplayFormatter';
+import { formatShiftDisplay, formatPatternTimeRange, patternColorToRgba } from '@/utils/shiftDisplayFormatter';
 
 interface ShiftCellEditorProps {
   shift?: ShiftWithPattern;
@@ -78,12 +80,12 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
   const workPatterns = patterns.filter((p) => !p.isDayOff);
 
   // 現在の表示値
-  const currentDisplay = shift ? formatShiftDisplay(shift) : '-';
+  const currentDisplay = shift ? formatShiftDisplay(shift) : '未設定';
 
   return (
     <div
       ref={editorRef}
-      className="absolute z-50 bg-white rounded-xl shadow-2xl border border-gray-200 w-64 overflow-hidden"
+      className="fixed z-50 bg-white rounded-xl shadow-2xl border border-gray-200 w-72 overflow-hidden"
       style={
         position
           ? {
@@ -95,39 +97,39 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
       }
     >
       {/* ヘッダー */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <div>
-          <span className="text-sm font-medium text-gray-800">シフト編集</span>
-          {shift?.hasShift && (
-            <span className="ml-2 text-xs text-gray-500">現在: {currentDisplay}</span>
-          )}
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-gray-800">シフト編集</span>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+            {currentDisplay}
+          </span>
         </div>
         <button
           onClick={onClose}
-          className="p-1 text-gray-400 hover:text-gray-600 rounded"
+          className="min-h-10 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
         >
           <X size={16} />
         </button>
       </div>
 
       {/* モード切り替え */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-100">
         <button
           onClick={() => setMode('pattern')}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+          className={`flex-1 min-h-10 py-2.5 text-sm font-medium transition-all duration-200 ${
             mode === 'pattern'
-              ? 'text-[#00c4cc] border-b-2 border-[#00c4cc]'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
           パターン
         </button>
         <button
           onClick={() => setMode('custom')}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+          className={`flex-1 min-h-10 py-2.5 text-sm font-medium transition-all duration-200 ${
             mode === 'custom'
-              ? 'text-[#00c4cc] border-b-2 border-[#00c4cc]'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
           カスタム
@@ -135,10 +137,10 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
       </div>
 
       {/* コンテンツ */}
-      <div className="max-h-64 overflow-y-auto">
+      <div className="max-h-72 overflow-y-auto">
         {mode === 'pattern' ? (
           <div className="p-2 space-y-1">
-            {/* 勤務パターン */}
+            {/* 勤務パターン - ビジュアルカード */}
             {workPatterns.map((pattern) => {
               const timeRange = formatPatternTimeRange(pattern);
               const isSelected = shift?.shiftPattern?.id === pattern.id;
@@ -147,65 +149,77 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
                 <button
                   key={pattern.id}
                   onClick={() => handleSelectPattern(pattern)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors text-left ${
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 text-left min-h-10 ${
                     isSelected
-                      ? 'bg-[#00c4cc]/5 border border-[#00c4cc]/20'
+                      ? 'ring-2 ring-[#00c4cc]/30'
                       : 'hover:bg-gray-50'
                   }`}
+                  style={
+                    isSelected
+                      ? { backgroundColor: patternColorToRgba(pattern.color, 0.1) }
+                      : undefined
+                  }
                 >
-                  <div className="flex items-center gap-2">
-                    {pattern.color && (
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: pattern.color }}
-                      />
-                    )}
-                    <span className="text-sm font-medium text-gray-800">
-                      {pattern.name}
-                    </span>
+                  {/* カラードット */}
+                  <div
+                    className="w-4 h-4 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm"
+                    style={{ backgroundColor: pattern.color || '#00c4cc' }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-gray-800">
+                        {pattern.name}
+                      </span>
+                      {isSelected && <Check size={14} className="text-[#00c4cc]" />}
+                    </div>
+                    <span className="text-xs text-gray-500 font-mono">{timeRange}</span>
                   </div>
-                  <span className="text-sm text-gray-500">{timeRange}</span>
                 </button>
               );
             })}
 
             {/* 区切り線 */}
             {workPatterns.length > 0 && (
-              <div className="border-t border-gray-200 my-2" />
+              <div className="border-t border-gray-100 my-1.5" />
             )}
 
             {/* 休日 */}
             {dayOffPattern && (
               <button
                 onClick={() => handleSelectPattern(dayOffPattern)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors text-left ${
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 text-left min-h-10 ${
                   shift?.shiftPattern?.isDayOff
-                    ? 'bg-gray-100 border border-gray-300'
+                    ? 'bg-gray-100 ring-2 ring-gray-300'
                     : 'hover:bg-gray-50'
                 }`}
               >
-                <span className="text-sm font-medium text-gray-600">
-                  {dayOffPattern.name}
-                </span>
-                <span className="text-sm text-gray-400">休</span>
+                <div className="w-4 h-4 rounded-full bg-gray-300 flex-shrink-0 ring-2 ring-white shadow-sm" />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-gray-600">
+                    {dayOffPattern.name}
+                  </span>
+                </div>
+                {shift?.shiftPattern?.isDayOff && (
+                  <Check size={14} className="text-gray-500" />
+                )}
               </button>
             )}
 
             {/* シフトなし */}
             <button
               onClick={handleClearShift}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-red-50 transition-all duration-200 text-left min-h-10"
             >
+              <div className="w-4 h-4 rounded-full border-2 border-dashed border-gray-300 flex-shrink-0" />
               <span className="text-sm text-gray-500">シフトを削除</span>
-              <span className="text-sm text-gray-400">-</span>
             </button>
           </div>
         ) : (
           <div className="p-4 space-y-4">
             {/* カスタム時間入力 */}
             <div className="flex items-center gap-2">
-              <Clock size={16} className="text-gray-400" />
-              <span className="text-sm text-gray-600">勤務時間</span>
+              <Clock size={16} className="text-[#00c4cc]" />
+              <span className="text-sm font-bold text-gray-700">勤務時間</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -213,33 +227,31 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
                 type="time"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                className="flex-1 min-h-10 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm font-mono transition-all duration-200"
               />
-              <span className="text-gray-400">〜</span>
+              <span className="text-gray-400 font-bold">~</span>
               <input
                 type="time"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
+                className="flex-1 min-h-10 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm font-mono transition-all duration-200"
               />
             </div>
 
             {/* プレビュー */}
-            <div className="p-3 bg-gray-50 rounded-lg text-center">
+            <div className="p-3 bg-[#00c4cc]/5 rounded-lg text-center border border-[#00c4cc]/10">
               <span className="text-sm text-gray-500">表示: </span>
               <span className="text-lg font-bold text-[#00c4cc]">
-                {customStart.replace(':', '').replace(/^0/, '').slice(0, -2) ||
-                  customStart.split(':')[0].replace(/^0/, '')}
+                {customStart.split(':')[0].replace(/^0/, '')}
                 -
-                {customEnd.replace(':', '').replace(/^0/, '').slice(0, -2) ||
-                  customEnd.split(':')[0].replace(/^0/, '')}
+                {customEnd.split(':')[0].replace(/^0/, '')}
               </span>
             </div>
 
             {/* 確定ボタン */}
             <button
               onClick={handleConfirmCustom}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
+              className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 font-medium"
             >
               <Check size={16} />
               確定

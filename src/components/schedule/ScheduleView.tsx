@@ -571,18 +571,27 @@ const ScheduleView: React.FC = () => {
               <>
                 <button
                   onClick={() => changeMonth(-1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="前月"
                 >
-                  ←
+                  <CalendarDays className="w-4 h-4 sm:hidden" />
+                  <span className="hidden sm:inline text-sm">←</span>
                 </button>
                 <h3 className="font-bold text-base sm:text-lg text-gray-800 whitespace-nowrap">
                   {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
                 </h3>
                 <button
                   onClick={() => changeMonth(1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="次月"
                 >
-                  →
+                  <span className="text-sm">→</span>
+                </button>
+                <button
+                  onClick={() => setCurrentDate(new Date())}
+                  className="ml-2 px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors shadow-sm"
+                >
+                  本日
                 </button>
               </>
             )}
@@ -590,18 +599,26 @@ const ScheduleView: React.FC = () => {
               <>
                 <button
                   onClick={() => changeWeek(-1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="前週"
                 >
-                  ←
+                  <span className="text-sm">←</span>
                 </button>
                 <h3 className="font-bold text-sm sm:text-lg text-gray-800">
                   {weekDates[0].date.split('-')[1]}月 {weekDates[0].date.split('-')[2]}日 ～ {weekDates[6].date.split('-')[1]}月 {weekDates[6].date.split('-')[2]}日
                 </h3>
                 <button
                   onClick={() => changeWeek(1)}
-                  className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="次週"
                 >
-                  →
+                  <span className="text-sm">→</span>
+                </button>
+                <button
+                  onClick={() => setCurrentDate(new Date())}
+                  className="ml-2 px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors shadow-sm"
+                >
+                  本日
                 </button>
               </>
             )}
@@ -747,20 +764,28 @@ const ScheduleView: React.FC = () => {
                   return (
                     <div
                       key={index}
-                      className={`min-h-[85px] sm:min-h-[100px] border rounded-lg p-1.5 transition-colors ${
+                      className={`min-h-[85px] sm:min-h-[100px] border rounded-xl p-1.5 transition-all ${
                         isHolidayDay
                           ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
                           : !dateInfo.isCurrentMonth
-                          ? 'bg-gray-50 opacity-50 border-gray-200 cursor-pointer hover:bg-gray-100'
-                          : 'bg-white border-gray-200 cursor-pointer hover:bg-gray-50'
-                      } ${isToday ? 'ring-2 ring-[#00c4cc]' : ''}`}
+                          ? 'bg-gray-50 opacity-40 border-gray-200 cursor-pointer hover:bg-gray-100'
+                          : amUtilization >= 100 && pmUtilization >= 100
+                          ? 'bg-red-50/30 border-red-200 cursor-pointer hover:bg-red-50/50'
+                          : (amUtilization >= 80 || pmUtilization >= 80)
+                          ? 'bg-amber-50/30 border-amber-200 cursor-pointer hover:bg-amber-50/50'
+                          : 'bg-white border-gray-200 cursor-pointer hover:bg-gray-50 hover:shadow-sm'
+                      } ${isToday ? 'ring-2 ring-[#00c4cc] shadow-md' : ''}`}
                       onClick={() => !isHolidayDay && handleDateClick(dateInfo.date)}
                     >
                       <div className="flex justify-between items-center mb-1">
                         <div className="flex items-center gap-1">
                           <div
-                            className={`text-sm font-bold leading-tight ${
-                              !dateInfo.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'
+                            className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-bold leading-tight ${
+                              isToday
+                                ? 'bg-[#00c4cc] text-white'
+                                : !dateInfo.isCurrentMonth
+                                ? 'text-gray-400'
+                                : 'text-gray-700'
                             }`}
                           >
                             {dateInfo.day}
@@ -778,11 +803,18 @@ const ScheduleView: React.FC = () => {
                             </button>
                           )}
                         </div>
-                        {isHolidayDay && (
-                          <span className="text-[10px] bg-red-200 text-red-700 px-1.5 py-0.5 rounded font-bold leading-tight">
-                            休業
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {!isHolidayDay && uniqueChildrenForDay > 0 && dateInfo.isCurrentMonth && (
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium leading-tight">
+                              {uniqueChildrenForDay}名
+                            </span>
+                          )}
+                          {isHolidayDay && (
+                            <span className="text-[10px] bg-red-200 text-red-700 px-1.5 py-0.5 rounded font-bold leading-tight">
+                              休業
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {!isHolidayDay ? (
                         <div className="flex flex-col gap-1 mt-1">

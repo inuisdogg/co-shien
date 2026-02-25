@@ -29,6 +29,10 @@ import {
   Shield,
   Sun,
   Sunset,
+  BookOpen,
+  ClipboardList,
+  MessageSquare,
+  UserCog,
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
@@ -191,7 +195,7 @@ const DashboardView: React.FC = () => {
   const monthlyProfit = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    
+
     const monthlyRecords = usageRecords.filter((record) => {
       const recordDate = new Date(record.date);
       return recordDate.getFullYear() === year && recordDate.getMonth() === month;
@@ -365,47 +369,45 @@ const DashboardView: React.FC = () => {
   // 本日のフォーマット
   const todayFormatted = useMemo(() => {
     const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    return `${today.getMonth() + 1}月${today.getDate()}日（${dayNames[today.getDay()]}）`;
+  }, [today]);
+
+  const todayFullFormatted = useMemo(() => {
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
     return `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日（${dayNames[today.getDay()]}）`;
   }, [today]);
+
+  // 稼働率のトレンド（前月比）
+  const occupancyTrend = useMemo(() => {
+    const prevDate = new Date(today);
+    prevDate.setMonth(prevDate.getMonth() - 1);
+    // Simplified trend indicator
+    return occupancyRate.rate > 0 ? 'up' : 'neutral';
+  }, [occupancyRate, today]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* メインタブ切り替え */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setDashboardMode('today')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
-              dashboardMode === 'today'
-                ? 'bg-gray-800 text-white shadow-md'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Clock size={18} />
-            本日
-          </button>
-          <button
-            onClick={() => setDashboardMode('operations')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
-              dashboardMode === 'operations'
-                ? 'bg-gray-800 text-white shadow-md'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <BarChart3 size={18} />
-            月次分析
-          </button>
-          <button
-            onClick={() => setDashboardMode('compliance')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
-              dashboardMode === 'compliance'
-                ? 'bg-gray-800 text-white shadow-md'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <FileText size={18} />
-            コンプライアンス
-          </button>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
+        <div className="flex gap-1">
+          {[
+            { id: 'today' as const, label: '本日', icon: Clock },
+            { id: 'operations' as const, label: '月次分析', icon: BarChart3 },
+            { id: 'compliance' as const, label: 'コンプライアンス', icon: Shield },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setDashboardMode(tab.id)}
+              className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
+                dashboardMode === tab.id
+                  ? 'bg-[#00c4cc] text-white shadow-md'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+            >
+              <tab.icon size={18} />
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -413,80 +415,131 @@ const DashboardView: React.FC = () => {
       {/* ========== 本日タブ ========== */}
       {dashboardMode === 'today' && (
         <>
-          {/* Row 1: Alert Banner */}
-          {alertItems.length > 0 && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle size={18} className="text-gray-500 mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  {alertItems.map((item, i) => (
-                    <p key={i} className="text-sm text-gray-700">
-                      <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                        item.level === 'critical' ? 'bg-gray-800' : item.level === 'warning' ? 'bg-gray-500' : 'bg-gray-300'
-                      }`} />
-                      {item.text}
-                    </p>
-                  ))}
-                </div>
+          {/* Hero: Large Date Display */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{todayFormatted}</h1>
+                <p className="text-sm text-gray-500 mt-1">{today.getFullYear()}年</p>
               </div>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Clock size={16} />
+                <span>リアルタイム</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Alert Section */}
+          {alertItems.length > 0 && (
+            <div className="rounded-xl border overflow-hidden">
+              {alertItems.some(i => i.level === 'critical') ? (
+                <div className="bg-red-50 border-red-200 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                      <AlertTriangle size={16} className="text-red-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      {alertItems.filter(i => i.level === 'critical').map((item, i) => (
+                        <p key={i} className="text-sm font-medium text-red-800">{item.text}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {alertItems.some(i => i.level === 'warning') ? (
+                <div className="bg-amber-50 border-amber-200 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                      <AlertCircle size={16} className="text-amber-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      {alertItems.filter(i => i.level === 'warning').map((item, i) => (
+                        <p key={i} className="text-sm font-medium text-amber-800">{item.text}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {alertItems.some(i => i.level === 'info') ? (
+                <div className="bg-blue-50 border-blue-200 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                      <AlertCircle size={16} className="text-blue-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      {alertItems.filter(i => i.level === 'info').map((item, i) => (
+                        <p key={i} className="text-sm font-medium text-blue-800">{item.text}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
-          {/* 日付ヘッダー */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-800">{todayFormatted}</h2>
-          </div>
-
-          {/* Row 2: Four KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* 4 KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: 本日の利用予定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-xs font-bold text-gray-500">本日の利用予定</div>
-                <Users size={16} className="text-gray-400" />
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">本日の利用</span>
+                <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                  <Users size={16} className="text-[#00c4cc]" />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-gray-800">
-                {todayTotalCount}<span className="text-sm font-normal text-gray-500">名</span>
-                <span className="text-sm font-normal text-gray-400"> / {totalCapacity}名定員</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-gray-900">{todayTotalCount}</span>
+                <span className="text-sm text-gray-500">/ {totalCapacity}名</span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+              <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
                 <div
-                  className="bg-gray-700 h-1.5 rounded-full transition-all"
+                  className="bg-[#00c4cc] h-2 rounded-full transition-all"
                   style={{ width: `${Math.min((todayTotalCount / (totalCapacity || 1)) * 100, 100)}%` }}
                 />
               </div>
-              <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                <span className="flex items-center gap-1"><Sun size={12} /> {slotInfo.AM.name}: {todayAMCount}名</span>
-                {slotInfo.PM && <span className="flex items-center gap-1"><Sunset size={12} /> {slotInfo.PM.name}: {todayPMCount}名</span>}
+              <div className="flex items-center gap-3 mt-2.5 text-xs text-gray-500">
+                <span className="flex items-center gap-1"><Sun size={12} /> {slotInfo.AM.name}: {todayAMCount}</span>
+                {slotInfo.PM && <span className="flex items-center gap-1"><Sunset size={12} /> {slotInfo.PM.name}: {todayPMCount}</span>}
               </div>
             </div>
 
-            {/* Card 2: 本日の出勤スタッフ */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+            {/* Card 2: 出勤スタッフ */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-xs font-bold text-gray-500">出勤スタッフ</div>
-                <UserCheck size={16} className="text-gray-400" />
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">出勤スタッフ</span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <UserCheck size={16} className="text-indigo-500" />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-gray-800">
-                {activeStaffCount}<span className="text-sm font-normal text-gray-500">名配置</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-gray-900">{activeStaffCount}</span>
+                <span className="text-sm text-gray-500">名</span>
               </div>
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-3 text-xs text-gray-500">
                 登録スタッフ総数
               </div>
             </div>
 
             {/* Card 3: 月間稼働率 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-xs font-bold text-gray-500">月間稼働率</div>
-                <BarChart3 size={16} className="text-gray-400" />
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">月間稼働率</span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <BarChart3 size={16} className="text-emerald-500" />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-gray-800">
-                {occupancyRate.rate.toFixed(1)}<span className="text-sm font-normal text-gray-500">%</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-gray-900">{occupancyRate.rate.toFixed(1)}</span>
+                <span className="text-sm text-gray-500">%</span>
+                {occupancyTrend === 'up' && (
+                  <span className="ml-2 flex items-center text-xs text-emerald-600 font-medium">
+                    <ArrowUp size={12} />
+                  </span>
+                )}
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+              <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
                 <div
-                  className="bg-gray-700 h-1.5 rounded-full transition-all"
+                  className="bg-emerald-500 h-2 rounded-full transition-all"
                   style={{ width: `${Math.min(occupancyRate.rate, 100)}%` }}
                 />
               </div>
@@ -496,141 +549,185 @@ const DashboardView: React.FC = () => {
             </div>
 
             {/* Card 4: 当月売上見込み */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-xs font-bold text-gray-500">当月売上見込み</div>
-                <DollarSign size={16} className="text-gray-400" />
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">当月売上</span>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <DollarSign size={16} className="text-amber-500" />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-gray-800">
-                <span className="text-sm font-normal text-gray-500">¥</span>{totalMonthlyRevenue.toLocaleString()}
+              <div className="flex items-baseline gap-0.5">
+                <span className="text-sm text-gray-500">¥</span>
+                <span className="text-3xl font-bold text-gray-900">{(totalMonthlyRevenue / 10000).toFixed(0)}</span>
+                <span className="text-sm text-gray-500">万</span>
               </div>
               {targetRevenue !== null && (
-                <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+                <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
                   <div
-                    className="bg-gray-700 h-1.5 rounded-full transition-all"
+                    className="bg-amber-500 h-2 rounded-full transition-all"
                     style={{ width: `${Math.min((totalMonthlyRevenue / targetRevenue) * 100, 100)}%` }}
                   />
                 </div>
               )}
               <div className="mt-2 text-xs text-gray-500">
-                目標: {targetRevenue !== null ? `¥${targetRevenue.toLocaleString()}` : '未設定'}
+                目標: {targetRevenue !== null ? `¥${(targetRevenue / 10000).toFixed(0)}万` : '未設定'}
               </div>
             </div>
           </div>
 
-          {/* Row 3: Two-column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left: 今週の利用予定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center">
-                <Calendar size={16} className="mr-2 text-gray-500" />
+          {/* Today's Schedule: Visual Timeline */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left: 今週の利用予定 (spanning 2 cols) */}
+            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Calendar size={16} className="text-[#00c4cc]" />
                 今週の利用予定
               </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 px-2 text-xs font-bold text-gray-500">曜日</th>
-                      <th className="text-left py-2 px-2 text-xs font-bold text-gray-500">日付</th>
-                      <th className="text-center py-2 px-2 text-xs font-bold text-gray-500">{slotInfo.AM.name}</th>
-                      {slotInfo.PM && (
-                        <th className="text-center py-2 px-2 text-xs font-bold text-gray-500">{slotInfo.PM.name}</th>
-                      )}
-                      <th className="text-center py-2 px-2 text-xs font-bold text-gray-500">合計</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {weeklyScheduleData.map((day) => (
-                      <tr
-                        key={day.dateStr}
-                        className={`border-b border-gray-50 ${day.isToday ? 'bg-gray-50 font-bold' : 'hover:bg-gray-50'}`}
-                      >
-                        <td className="py-2.5 px-2 text-gray-700">
-                          {day.isToday && <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-800 mr-1.5" />}
+              <div className="space-y-2">
+                {weeklyScheduleData.map((day) => {
+                  const amPct = slotInfo.AM.capacity > 0 ? (day.am / slotInfo.AM.capacity) * 100 : 0;
+                  const pmPct = slotInfo.PM && slotInfo.PM.capacity > 0 ? (day.pm / slotInfo.PM.capacity) * 100 : 0;
+                  return (
+                    <div
+                      key={day.dateStr}
+                      className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${
+                        day.isToday ? 'bg-[#00c4cc]/5 ring-1 ring-[#00c4cc]/20' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="w-16 flex items-center gap-2">
+                        {day.isToday && <span className="w-2 h-2 rounded-full bg-[#00c4cc] animate-pulse" />}
+                        <span className={`text-sm font-bold ${day.isToday ? 'text-[#00c4cc]' : 'text-gray-700'}`}>
                           {day.label}
-                        </td>
-                        <td className="py-2.5 px-2 text-gray-500 text-xs">
+                        </span>
+                        <span className="text-xs text-gray-400">
                           {day.date.getMonth() + 1}/{day.date.getDate()}
-                        </td>
-                        <td className="py-2.5 px-2 text-center text-gray-800">{day.am}</td>
+                        </span>
+                      </div>
+                      <div className="flex-1 flex items-center gap-3">
+                        {/* AM Bar */}
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] text-gray-400">{slotInfo.AM.name}</span>
+                            <span className="text-[10px] font-medium text-gray-600">{day.am}名</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-1.5">
+                            <div
+                              className="bg-[#00c4cc] h-1.5 rounded-full transition-all"
+                              style={{ width: `${Math.min(amPct, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        {/* PM Bar */}
                         {slotInfo.PM && (
-                          <td className="py-2.5 px-2 text-center text-gray-800">{day.pm}</td>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] text-gray-400">{slotInfo.PM.name}</span>
+                              <span className="text-[10px] font-medium text-gray-600">{day.pm}名</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-1.5">
+                              <div
+                                className="bg-indigo-400 h-1.5 rounded-full transition-all"
+                                style={{ width: `${Math.min(pmPct, 100)}%` }}
+                              />
+                            </div>
+                          </div>
                         )}
-                        <td className="py-2.5 px-2 text-center font-bold text-gray-800">{day.total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      </div>
+                      <div className="w-12 text-right">
+                        <span className="text-sm font-bold text-gray-900">{day.total}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             {/* Right: 対応が必要な項目 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center">
-                <AlertCircle size={16} className="mr-2 text-gray-500" />
-                対応が必要な項目
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <AlertCircle size={16} className="text-amber-500" />
+                対応が必要
               </h3>
               {actionItems.length === 0 ? (
                 <div className="text-center py-8">
-                  <Shield size={32} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-400">現在、対応が必要な項目はありません</p>
+                  <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Shield size={20} className="text-emerald-500" />
+                  </div>
+                  <p className="text-sm text-gray-500">対応が必要な項目はありません</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {actionItems.map((item, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                      <span className={`mt-1 shrink-0 w-2 h-2 rounded-full ${
-                        item.level === 'critical' ? 'bg-gray-800' : item.level === 'warning' ? 'bg-gray-500' : 'bg-gray-300'
-                      }`} />
-                      <div>
-                        <p className="text-sm font-bold text-gray-700">{item.label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{item.detail}</p>
-                      </div>
+                    <div key={i} className={`p-3 rounded-lg border ${
+                      item.level === 'critical' ? 'bg-red-50 border-red-200' : item.level === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+                    }`}>
+                      <p className={`text-sm font-semibold ${
+                        item.level === 'critical' ? 'text-red-800' : item.level === 'warning' ? 'text-amber-800' : 'text-blue-800'
+                      }`}>{item.label}</p>
+                      <p className={`text-xs mt-0.5 ${
+                        item.level === 'critical' ? 'text-red-600' : item.level === 'warning' ? 'text-amber-600' : 'text-blue-600'
+                      }`}>{item.detail}</p>
                     </div>
                   ))}
                 </div>
               )}
-
-              {/* 加算・収益リンクカード */}
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-700">加算・収益の改善提案</p>
-                    <p className="text-xs text-gray-500 mt-0.5">加算取得状況を確認して収益を最大化</p>
-                  </div>
-                  <a
-                    href="/business?tab=addition-settings"
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded transition-colors"
-                  >
-                    確認する
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Row 4: Quick access card */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Zap size={18} className="text-gray-600" />
+          {/* Quick Actions Bar */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Zap size={16} className="text-[#00c4cc]" />
+              <h3 className="text-sm font-bold text-gray-900">クイックアクション</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <a
+                href="/business?tab=daily-log"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
+                  <BookOpen size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-800">加算取得状況</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    取得中: {/* Simple count based on facility settings if available */}
-                    {facilitySettings ? '確認可能' : '未設定'}
-                  </p>
+                  <p className="text-sm font-bold text-gray-800">日誌を書く</p>
+                  <p className="text-[10px] text-gray-400">業務日誌の作成</p>
                 </div>
-              </div>
+              </a>
               <a
-                href="/business?tab=addition-settings"
-                className="flex items-center gap-1 px-4 py-2 text-sm font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors"
+                href="/business?tab=daily-log"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
               >
-                詳細を見る
-                <ExternalLink size={14} />
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
+                  <ClipboardList size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">実績登録</p>
+                  <p className="text-[10px] text-gray-400">利用実績の入力</p>
+                </div>
+              </a>
+              <a
+                href="/business?tab=daily-log"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
+                  <MessageSquare size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">連絡帳確認</p>
+                  <p className="text-[10px] text-gray-400">保護者からの連絡</p>
+                </div>
+              </a>
+              <a
+                href="/business?tab=staffing"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
+                  <UserCog size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">出勤管理</p>
+                  <p className="text-[10px] text-gray-400">勤務状況の確認</p>
+                </div>
               </a>
             </div>
           </div>
@@ -646,18 +743,18 @@ const DashboardView: React.FC = () => {
       {dashboardMode === 'operations' && (
         <>
       {/* ヘッダー */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800">月次分析</h2>
-          <p className="text-gray-500 text-xs sm:text-sm mt-1">
-            月次の経営指標を確認できます。
+          <h2 className="text-xl font-bold text-gray-900">月次分析</h2>
+          <p className="text-gray-500 text-sm mt-1">
+            月次の経営指標を確認できます
           </p>
         </div>
         <div className="flex items-center flex-wrap gap-2 sm:gap-4">
-          <div className="flex bg-gray-100 p-1 rounded">
+          <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               onClick={() => setViewPeriod('week')}
-              className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
+              className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
                 viewPeriod === 'week'
                   ? 'bg-white text-[#00c4cc] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -667,7 +764,7 @@ const DashboardView: React.FC = () => {
             </button>
             <button
               onClick={() => setViewPeriod('month')}
-              className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
+              className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
                 viewPeriod === 'month'
                   ? 'bg-white text-[#00c4cc] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -676,45 +773,49 @@ const DashboardView: React.FC = () => {
               月単位
             </button>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => changeMonth(-1)}
-              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+              className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              ←
+              <ChevronDown size={16} className="rotate-90" />
             </button>
-            <span className="text-xs sm:text-sm font-bold text-gray-800 min-w-[100px] sm:min-w-[120px] text-center">
+            <span className="text-sm font-bold text-gray-800 min-w-[120px] text-center">
               {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
             </span>
             <button
               onClick={() => changeMonth(1)}
-              className="px-2 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors text-sm sm:text-base"
+              className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              →
+              <ChevronDown size={16} className="-rotate-90" />
             </button>
           </div>
         </div>
       </div>
 
       {/* 主要指標カード */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* 当月見込み売り上げ */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs sm:text-sm font-bold text-gray-500">当月見込み売り上げ</div>
-            <DollarSign size={16} className="text-[#00c4cc] shrink-0" />
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">当月売上見込</span>
+            <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+              <DollarSign size={16} className="text-[#00c4cc]" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-gray-800">
+          <div className="text-2xl font-bold text-gray-900">
             ¥{totalMonthlyRevenue.toLocaleString()}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500 mt-1 leading-tight">
+          <div className="text-xs text-gray-500 mt-1">
             目標: {targetRevenue !== null ? `¥${targetRevenue.toLocaleString()}` : '未設定'}
             {targetRevenue !== null && (
-              <> / 達成率: {((totalMonthlyRevenue / targetRevenue) * 100).toFixed(1)}%</>
+              <span className="ml-2 font-medium text-[#00c4cc]">
+                {((totalMonthlyRevenue / targetRevenue) * 100).toFixed(1)}%
+              </span>
             )}
           </div>
           {targetRevenue !== null && (
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
               <div
                 className="bg-[#00c4cc] h-2 rounded-full transition-all"
                 style={{ width: `${Math.min((totalMonthlyRevenue / targetRevenue) * 100, 100)}%` }}
@@ -724,25 +825,27 @@ const DashboardView: React.FC = () => {
         </div>
 
         {/* 稼働率 */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs sm:text-sm font-bold text-gray-500">稼働率</div>
-            <BarChart3 size={16} className="text-[#00c4cc] shrink-0" />
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">稼働率</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <BarChart3 size={16} className="text-emerald-500" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-gray-800">
+          <div className="text-2xl font-bold text-gray-900">
             {occupancyRate.rate.toFixed(1)}%
           </div>
-          <div className="text-xs sm:text-sm text-gray-500 mt-1 leading-tight">
+          <div className="text-xs text-gray-500 mt-1">
             目標: {targetOccupancyRate !== null ? `${targetOccupancyRate}%` : '未設定'}
           </div>
           {targetOccupancyRate !== null && (
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
               <div
                 className={`h-2 rounded-full transition-all ${
                   occupancyRate.rate >= targetOccupancyRate
-                    ? 'bg-green-500'
+                    ? 'bg-emerald-500'
                     : occupancyRate.rate >= targetOccupancyRate * 0.8
-                    ? 'bg-yellow-500'
+                    ? 'bg-amber-500'
                     : 'bg-red-500'
                 }`}
                 style={{ width: `${Math.min(occupancyRate.rate, 100)}%` }}
@@ -750,10 +853,10 @@ const DashboardView: React.FC = () => {
             </div>
           )}
           {slotInfo.isConfigured ? (
-            <div className="mt-2 text-xs sm:text-sm text-gray-600 leading-tight">
-              <div>{slotInfo.AM.name}: {ampmOccupancyRate.amRate.toFixed(1)}% ({ampmOccupancyRate.amCount}/{ampmOccupancyRate.amCapacity})</div>
+            <div className="mt-2 flex gap-4 text-xs text-gray-600">
+              <span>{slotInfo.AM.name}: {ampmOccupancyRate.amRate.toFixed(1)}%</span>
               {slotInfo.PM && (
-                <div>{slotInfo.PM.name}: {ampmOccupancyRate.pmRate.toFixed(1)}% ({ampmOccupancyRate.pmCount}/{ampmOccupancyRate.pmCapacity})</div>
+                <span>{slotInfo.PM.name}: {ampmOccupancyRate.pmRate.toFixed(1)}%</span>
               )}
             </div>
           ) : (
@@ -764,25 +867,27 @@ const DashboardView: React.FC = () => {
         </div>
 
         {/* キャンセル率 */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs sm:text-sm font-bold text-gray-500">キャンセル率</div>
-            <AlertCircle size={16} className="text-[#00c4cc] shrink-0" />
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">キャンセル率</span>
+            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+              <AlertCircle size={16} className="text-red-500" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-gray-800">
+          <div className="text-2xl font-bold text-gray-900">
             {slotStats.cancellationRate.toFixed(1)}%
           </div>
-          <div className="text-xs sm:text-sm text-gray-500 mt-1 leading-tight">
+          <div className="text-xs text-gray-500 mt-1">
             キャンセル数: {slotStats.cancelledSlots}件
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+          <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
             <div
               className={`h-2 rounded-full transition-all ${
                 slotStats.cancellationRate > 20
                   ? 'bg-red-500'
                   : slotStats.cancellationRate > 10
-                  ? 'bg-yellow-500'
-                  : 'bg-green-500'
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-500'
               }`}
               style={{ width: `${Math.min(slotStats.cancellationRate, 100)}%` }}
             />
@@ -791,24 +896,24 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 週別見込み売り上げ */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center">
-          <TrendingUp size={18} className="sm:w-5 sm:h-5 mr-2 text-[#00c4cc] shrink-0" />
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <TrendingUp size={18} className="text-[#00c4cc]" />
           週別見込み売り上げ
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           {weeklyRevenue.map((week) => (
             <div
               key={week.week}
-              className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200"
+              className="bg-gray-50 rounded-xl p-4 border border-gray-100"
             >
-              <div className="text-xs sm:text-sm font-bold text-gray-500 mb-2 leading-tight">
+              <div className="text-xs font-semibold text-gray-500 mb-2">
                 {week.week}週目
               </div>
-              <div className="text-lg sm:text-xl font-bold text-gray-800 mb-1 leading-tight">
+              <div className="text-lg font-bold text-gray-900 mb-1">
                 ¥{week.revenue.toLocaleString()}
               </div>
-              <div className="text-xs sm:text-sm text-gray-500 leading-tight">
+              <div className="text-xs text-gray-500">
                 予定: {week.scheduledCount} / 実績: {week.actualCount}
               </div>
             </div>
@@ -817,14 +922,14 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 送迎利用率 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-          <Car size={20} className="mr-2 text-[#00c4cc]" />
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <Car size={18} className="text-[#00c4cc]" />
           送迎利用率
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-            <div className="text-xs font-bold text-blue-700 mb-1">お迎え利用率</div>
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <div className="text-xs font-semibold text-blue-600 mb-1">お迎え利用率</div>
             <div className="text-2xl font-bold text-blue-800">
               {pickupDropoffRate.pickupRate.toFixed(1)}%
             </div>
@@ -832,17 +937,17 @@ const DashboardView: React.FC = () => {
               {pickupDropoffRate.pickupCount}件 / {pickupDropoffRate.totalSchedules}件
             </div>
           </div>
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-            <div className="text-xs font-bold text-green-700 mb-1">お送り利用率</div>
-            <div className="text-2xl font-bold text-green-800">
+          <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+            <div className="text-xs font-semibold text-emerald-600 mb-1">お送り利用率</div>
+            <div className="text-2xl font-bold text-emerald-800">
               {pickupDropoffRate.dropoffRate.toFixed(1)}%
             </div>
             <div className="text-xs text-gray-600 mt-1">
               {pickupDropoffRate.dropoffCount}件 / {pickupDropoffRate.totalSchedules}件
             </div>
           </div>
-          <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-            <div className="text-xs font-bold text-purple-700 mb-1">両方利用</div>
+          <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+            <div className="text-xs font-semibold text-purple-600 mb-1">両方利用</div>
             <div className="text-2xl font-bold text-purple-800">
               {pickupDropoffRate.bothRate.toFixed(1)}%
             </div>
@@ -854,13 +959,13 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 曜日別利用率 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-          <Calendar size={20} className="mr-2 text-[#00c4cc]" />
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <Calendar size={18} className="text-[#00c4cc]" />
           曜日別利用率
         </h3>
         {!slotInfo.isConfigured ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+          <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 text-center">
             <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
             <p className="text-sm font-medium text-gray-700 mb-2">時間枠が設定されていません</p>
             <p className="text-xs text-gray-500 mb-3">
@@ -868,7 +973,7 @@ const DashboardView: React.FC = () => {
             </p>
             <a
               href="/business?tab=facility"
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded transition-colors"
+              className="inline-flex items-center gap-1 px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-xs font-bold rounded-lg transition-colors"
             >
               施設情報を設定
             </a>
@@ -878,25 +983,25 @@ const DashboardView: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 text-xs font-bold text-gray-600">曜日</th>
-                  <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">
+                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-gray-500">曜日</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500">
                     {slotInfo.AM.name}
                     <span className="text-gray-400 font-normal ml-1">(定員{slotInfo.AM.capacity})</span>
                   </th>
                   {slotInfo.PM && (
-                    <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">
+                    <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500">
                       {slotInfo.PM.name}
                       <span className="text-gray-400 font-normal ml-1">(定員{slotInfo.PM.capacity})</span>
                     </th>
                   )}
-                  <th className="text-right py-2 px-3 text-xs font-bold text-gray-600">合計利用率</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500">合計利用率</th>
                 </tr>
               </thead>
               <tbody>
                 {dayOfWeekUtilization.map((day) => (
-                  <tr key={day.dayIndex} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-2 px-3 font-bold text-gray-800">{day.dayOfWeek}</td>
-                    <td className="py-2 px-3 text-right">
+                  <tr key={day.dayIndex} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="py-2.5 px-3 font-bold text-gray-800">{day.dayOfWeek}</td>
+                    <td className="py-2.5 px-3 text-right">
                       <div className="text-sm font-bold text-gray-800">
                         {day.amUtilization.toFixed(1)}%
                       </div>
@@ -905,7 +1010,7 @@ const DashboardView: React.FC = () => {
                       </div>
                     </td>
                     {slotInfo.PM && (
-                      <td className="py-2 px-3 text-right">
+                      <td className="py-2.5 px-3 text-right">
                         <div className="text-sm font-bold text-gray-800">
                           {day.pmUtilization.toFixed(1)}%
                         </div>
@@ -914,10 +1019,10 @@ const DashboardView: React.FC = () => {
                         </div>
                       </td>
                     )}
-                    <td className="py-2 px-3 text-right">
-                      <div className="text-sm font-bold text-[#00c4cc]">
+                    <td className="py-2.5 px-3 text-right">
+                      <span className="text-sm font-bold text-[#00c4cc]">
                         {day.totalUtilization.toFixed(1)}%
-                      </div>
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -930,21 +1035,21 @@ const DashboardView: React.FC = () => {
       {/* 年齢別・地区別利用児童 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 年齢別利用児童 */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <Users size={20} className="mr-2 text-[#00c4cc]" />
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Users size={18} className="text-[#00c4cc]" />
             年齢別利用児童
           </h3>
           <div className="space-y-3">
             {ageDistribution.map((item) => (
               <div key={item.age}>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-bold text-gray-700">{item.age}</span>
-                  <span className="text-sm font-bold text-gray-800">
+                  <span className="text-sm font-medium text-gray-700">{item.age}</span>
+                  <span className="text-sm font-bold text-gray-900">
                     {item.count}名 ({item.percentage.toFixed(1)}%)
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
                     className="bg-[#00c4cc] h-2 rounded-full transition-all"
                     style={{ width: `${item.percentage}%` }}
@@ -956,21 +1061,21 @@ const DashboardView: React.FC = () => {
         </div>
 
         {/* 居住地区別利用児童 */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <MapPin size={20} className="mr-2 text-[#00c4cc]" />
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <MapPin size={18} className="text-[#00c4cc]" />
             利用児童の居住地区
           </h3>
           <div className="space-y-3">
             {areaDistribution.slice(0, 10).map((item) => (
               <div key={item.area}>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-bold text-gray-700">{item.area}</span>
-                  <span className="text-sm font-bold text-gray-800">
+                  <span className="text-sm font-medium text-gray-700">{item.area}</span>
+                  <span className="text-sm font-bold text-gray-900">
                     {item.count}名 ({item.percentage.toFixed(1)}%)
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
                     className="bg-[#00c4cc] h-2 rounded-full transition-all"
                     style={{ width: `${item.percentage}%` }}
@@ -984,23 +1089,23 @@ const DashboardView: React.FC = () => {
 
       {/* その他の経営指標 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="text-xs font-bold text-gray-500 mb-2">平均単価（ARPU）</div>
-          <div className="text-2xl font-bold text-gray-800">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">平均単価（ARPU）</div>
+          <div className="text-2xl font-bold text-gray-900">
             ¥{arpu.arpu.toLocaleString()}
           </div>
           <div className="text-xs text-gray-500 mt-1">目標: ¥{arpu.target.toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="text-xs font-bold text-gray-500 mb-2">人件費率（L/R比）</div>
-          <div className="text-2xl font-bold text-gray-800">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">人件費率（L/R比）</div>
+          <div className="text-2xl font-bold text-gray-900">
             {laborRatio.ratio.toFixed(1)}%
           </div>
           <div className="text-xs text-gray-500 mt-1">目標: {laborRatio.target}%</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="text-xs font-bold text-gray-500 mb-2">アクティブ児童数</div>
-          <div className="text-2xl font-bold text-gray-800">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">アクティブ児童数</div>
+          <div className="text-2xl font-bold text-gray-900">
             {children.filter((c) => c.contractStatus === 'active').length}名
           </div>
           <div className="text-xs text-gray-500 mt-1">
@@ -1010,13 +1115,13 @@ const DashboardView: React.FC = () => {
       </div>
 
       {/* 営業データ（折りたたみ） */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
         <button
           onClick={() => setIsSalesDataExpanded(!isSalesDataExpanded)}
-          className="w-full flex items-center justify-between p-4 sm:p-5 text-left"
+          className="w-full flex items-center justify-between p-5 text-left hover:bg-gray-50 rounded-xl transition-colors"
         >
-          <h3 className="text-base sm:text-lg font-bold text-gray-800 flex items-center">
-            <Target size={18} className="sm:w-5 sm:h-5 mr-2 text-gray-500 shrink-0" />
+          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+            <Target size={18} className="text-gray-500" />
             営業データ
           </h3>
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -1026,121 +1131,121 @@ const DashboardView: React.FC = () => {
         </button>
 
         {isSalesDataExpanded && (
-          <div className="px-4 sm:px-5 pb-5 space-y-6 border-t border-gray-100 pt-4">
+          <div className="px-5 pb-5 space-y-6 border-t border-gray-100 pt-4">
             {/* リード管理進捗 */}
             <div>
-              <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
-                <Target size={14} className="mr-1.5 text-gray-400" />
+              <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
+                <Target size={14} className="text-gray-400" />
                 リード管理進捗（当月新規）
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 sm:gap-4">
-                <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-200">
-                  <div className="text-xs sm:text-sm font-bold text-blue-700 mb-1 leading-tight">新規問い合わせ</div>
-                  <div className="text-xl sm:text-2xl font-bold text-blue-800 leading-tight">{leadProgress.current.newInquiries}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                  <div className="text-xs font-semibold text-blue-600 mb-1">新規問い合わせ</div>
+                  <div className="text-xl font-bold text-blue-800">{leadProgress.current.newInquiries}</div>
                   {leadProgress.previous && (
                     <div className="flex items-center text-xs mt-1">
                       {leadProgress.trends.newInquiries >= 0 ? (
-                        <ArrowUp size={12} className="text-green-600 mr-1" />
+                        <ArrowUp size={12} className="text-emerald-600 mr-1" />
                       ) : (
                         <ArrowDown size={12} className="text-red-600 mr-1" />
                       )}
-                      <span className={leadProgress.trends.newInquiries >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <span className={leadProgress.trends.newInquiries >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                         {leadProgress.trends.newInquiries >= 0 ? '+' : ''}{leadProgress.trends.newInquiries.toFixed(1)}%
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="bg-yellow-50 rounded-lg p-3 sm:p-4 border border-yellow-200">
-                  <div className="text-xs sm:text-sm font-bold text-yellow-700 mb-1 leading-tight">見学/面談予定</div>
-                  <div className="text-xl sm:text-2xl font-bold text-yellow-800 leading-tight">{leadProgress.current.visits}</div>
+                <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-100">
+                  <div className="text-xs font-semibold text-yellow-600 mb-1">見学/面談予定</div>
+                  <div className="text-xl font-bold text-yellow-800">{leadProgress.current.visits}</div>
                   {leadProgress.previous && (
                     <div className="flex items-center text-xs mt-1">
                       {leadProgress.trends.visits >= 0 ? (
-                        <ArrowUp size={12} className="text-green-600 mr-1" />
+                        <ArrowUp size={12} className="text-emerald-600 mr-1" />
                       ) : (
                         <ArrowDown size={12} className="text-red-600 mr-1" />
                       )}
-                      <span className={leadProgress.trends.visits >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <span className={leadProgress.trends.visits >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                         {leadProgress.trends.visits >= 0 ? '+' : ''}{leadProgress.trends.visits.toFixed(1)}%
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="bg-orange-50 rounded-lg p-3 sm:p-4 border border-orange-200">
-                  <div className="text-xs sm:text-sm font-bold text-orange-700 mb-1 leading-tight">検討中</div>
-                  <div className="text-xl sm:text-2xl font-bold text-orange-800 leading-tight">{leadProgress.current.considering}</div>
+                <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
+                  <div className="text-xs font-semibold text-orange-600 mb-1">検討中</div>
+                  <div className="text-xl font-bold text-orange-800">{leadProgress.current.considering}</div>
                   {leadProgress.previous && (
                     <div className="flex items-center text-xs mt-1">
                       {leadProgress.trends.considering >= 0 ? (
-                        <ArrowUp size={12} className="text-green-600 mr-1" />
+                        <ArrowUp size={12} className="text-emerald-600 mr-1" />
                       ) : (
                         <ArrowDown size={12} className="text-red-600 mr-1" />
                       )}
-                      <span className={leadProgress.trends.considering >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <span className={leadProgress.trends.considering >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                         {leadProgress.trends.considering >= 0 ? '+' : ''}{leadProgress.trends.considering.toFixed(1)}%
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="bg-purple-50 rounded-lg p-3 sm:p-4 border border-purple-200">
-                  <div className="text-xs sm:text-sm font-bold text-purple-700 mb-1 leading-tight">受給者証待ち</div>
-                  <div className="text-xl sm:text-2xl font-bold text-purple-800 leading-tight">{leadProgress.current.waitingBenefit}</div>
+                <div className="bg-purple-50 rounded-xl p-3 border border-purple-100">
+                  <div className="text-xs font-semibold text-purple-600 mb-1">受給者証待ち</div>
+                  <div className="text-xl font-bold text-purple-800">{leadProgress.current.waitingBenefit}</div>
                   {leadProgress.previous && (
                     <div className="flex items-center text-xs mt-1">
                       {leadProgress.trends.waitingBenefit >= 0 ? (
-                        <ArrowUp size={12} className="text-green-600 mr-1" />
+                        <ArrowUp size={12} className="text-emerald-600 mr-1" />
                       ) : (
                         <ArrowDown size={12} className="text-red-600 mr-1" />
                       )}
-                      <span className={leadProgress.trends.waitingBenefit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <span className={leadProgress.trends.waitingBenefit >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                         {leadProgress.trends.waitingBenefit >= 0 ? '+' : ''}{leadProgress.trends.waitingBenefit.toFixed(1)}%
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="bg-indigo-50 rounded-lg p-3 sm:p-4 border border-indigo-200">
-                  <div className="text-xs sm:text-sm font-bold text-indigo-700 mb-1 leading-tight">契約進行中</div>
-                  <div className="text-xl sm:text-2xl font-bold text-indigo-800 leading-tight">{leadProgress.current.contractProgress}</div>
+                <div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
+                  <div className="text-xs font-semibold text-indigo-600 mb-1">契約進行中</div>
+                  <div className="text-xl font-bold text-indigo-800">{leadProgress.current.contractProgress}</div>
                   {leadProgress.previous && (
                     <div className="flex items-center text-xs mt-1">
                       {leadProgress.trends.contractProgress >= 0 ? (
-                        <ArrowUp size={12} className="text-green-600 mr-1" />
+                        <ArrowUp size={12} className="text-emerald-600 mr-1" />
                       ) : (
                         <ArrowDown size={12} className="text-red-600 mr-1" />
                       )}
-                      <span className={leadProgress.trends.contractProgress >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <span className={leadProgress.trends.contractProgress >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                         {leadProgress.trends.contractProgress >= 0 ? '+' : ''}{leadProgress.trends.contractProgress.toFixed(1)}%
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="bg-green-50 rounded-lg p-3 sm:p-4 border border-green-200">
-                  <div className="text-xs sm:text-sm font-bold text-green-700 mb-1 leading-tight">契約済み</div>
-                  <div className="text-xl sm:text-2xl font-bold text-green-800 leading-tight">{leadProgress.current.contracts}</div>
+                <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                  <div className="text-xs font-semibold text-emerald-600 mb-1">契約済み</div>
+                  <div className="text-xl font-bold text-emerald-800">{leadProgress.current.contracts}</div>
                   {leadProgress.previous && (
                     <div className="flex items-center text-xs mt-1">
                       {leadProgress.trends.contracts >= 0 ? (
-                        <ArrowUp size={12} className="text-green-600 mr-1" />
+                        <ArrowUp size={12} className="text-emerald-600 mr-1" />
                       ) : (
                         <ArrowDown size={12} className="text-red-600 mr-1" />
                       )}
-                      <span className={leadProgress.trends.contracts >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <span className={leadProgress.trends.contracts >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                         {leadProgress.trends.contracts >= 0 ? '+' : ''}{leadProgress.trends.contracts.toFixed(1)}%
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="bg-red-50 rounded-lg p-3 sm:p-4 border border-red-200">
-                  <div className="text-xs sm:text-sm font-bold text-red-700 mb-1 leading-tight">失注</div>
-                  <div className="text-xl sm:text-2xl font-bold text-red-800 leading-tight">{leadProgress.current.lost}</div>
+                <div className="bg-red-50 rounded-xl p-3 border border-red-100">
+                  <div className="text-xs font-semibold text-red-600 mb-1">失注</div>
+                  <div className="text-xl font-bold text-red-800">{leadProgress.current.lost}</div>
                   {leadProgress.previous && (
                     <div className="flex items-center text-xs mt-1">
                       {leadProgress.trends.lost >= 0 ? (
-                        <ArrowUp size={12} className="text-green-600 mr-1" />
+                        <ArrowUp size={12} className="text-emerald-600 mr-1" />
                       ) : (
                         <ArrowDown size={12} className="text-red-600 mr-1" />
                       )}
-                      <span className={leadProgress.trends.lost >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <span className={leadProgress.trends.lost >= 0 ? 'text-emerald-600' : 'text-red-600'}>
                         {leadProgress.trends.lost >= 0 ? '+' : ''}{leadProgress.trends.lost.toFixed(1)}%
                       </span>
                     </div>
@@ -1152,8 +1257,8 @@ const DashboardView: React.FC = () => {
             {/* 契約数・問い合わせ数推移 */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-bold text-gray-700 flex items-center">
-                  <Users size={14} className="mr-1.5 text-gray-400" />
+                <h4 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                  <Users size={14} className="text-gray-400" />
                   契約数・問い合わせ数推移（過去6ヶ月）
                 </h4>
                 <button
@@ -1177,16 +1282,16 @@ const DashboardView: React.FC = () => {
                 {(isContractTrendExpanded ? inquiriesBySource : inquiriesBySource.slice(-3)).map((item, index) => (
                   <div key={index} className="text-center">
                     <div className="text-xs font-bold text-gray-500 mb-2">{item.month}</div>
-                    <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 mb-2">
-                      <div className="text-xs text-blue-700 mb-1">契約数</div>
+                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 mb-2">
+                      <div className="text-xs text-blue-600 mb-1">契約数</div>
                       <div className="text-xl font-bold text-blue-800">{item.contracts}</div>
                     </div>
-                    <div className="bg-green-50 rounded-lg p-3 border border-green-200 mb-2">
-                      <div className="text-xs text-green-700 mb-1">新規問い合わせ</div>
-                      <div className="text-xl font-bold text-green-800">{item.inquiries.total}</div>
+                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 mb-2">
+                      <div className="text-xs text-emerald-600 mb-1">新規問い合わせ</div>
+                      <div className="text-xl font-bold text-emerald-800">{item.inquiries.total}</div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-2 border border-gray-200 text-xs">
-                      <div className="text-gray-600 mb-1">問い合わせ経路別</div>
+                    <div className="bg-gray-50 rounded-xl p-2 border border-gray-100 text-xs">
+                      <div className="text-gray-600 mb-1">経路別</div>
                       <div className="space-y-0.5">
                         <div className="flex justify-between">
                           <span>発達ナビ:</span>
@@ -1221,4 +1326,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-

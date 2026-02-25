@@ -593,10 +593,19 @@ export default function ClientDashboardPage() {
         )}
 
         {/* ウェルカムメッセージ */}
-        <div className="bg-gradient-to-r from-[#FBBF6A] to-[#F6AD55] rounded-lg p-6 text-gray-800 mb-6">
+        <div className="bg-gradient-to-r from-[#FBBF6A] to-[#F6AD55] rounded-xl p-6 text-gray-800 mb-6 shadow-sm">
           <h1 className="text-2xl font-bold">
             ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
           </h1>
+          <p className="text-gray-700/80 mt-1 text-sm">
+            お子様の利用状況を確認できます
+          </p>
+          {currentMonthUsage > 0 && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-white/30 rounded-lg px-3 py-1.5">
+              <CalendarDays className="w-4 h-4" />
+              <span className="text-sm font-medium">今月の利用: {currentMonthUsage}回</span>
+            </div>
+          )}
         </div>
 
         {/* お知らせセクション（チャット機能はフェーズ3以上で表示） */}
@@ -733,34 +742,44 @@ export default function ClientDashboardPage() {
                       {children.map((child) => {
                         const ageInfo = child.birthDate ? calculateAgeWithMonths(child.birthDate) : null;
                         const childContracts = contracts.filter(c => c.child_id === child.id && c.status === 'active');
+                        const childUsage = usageRecords.filter(r => r.child_id === child.id);
+                        const nextSchedule = childUsage.find(r => new Date(r.date) >= new Date());
 
                         return (
                           <div
                             key={child.id}
-                            className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
+                            className="bg-white rounded-xl p-5 hover:shadow-md transition-all cursor-pointer border border-gray-200 hover:border-[#F6AD55]/50 group"
                             onClick={() => router.push(`/parent/children/${child.id}`)}
                           >
-                            <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
+                            <div className="flex items-start gap-4">
+                              <div className="w-14 h-14 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                                 <User className="w-7 h-7 text-[#F6AD55]" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-bold text-gray-800 truncate">{child.name}</h3>
+                                  <h3 className="font-bold text-gray-800 truncate text-lg">{child.name}</h3>
                                   {ageInfo && (
-                                    <span className="text-sm text-gray-500 flex-shrink-0">{ageInfo.display}</span>
+                                    <span className="text-sm text-gray-500 flex-shrink-0 bg-gray-100 px-2 py-0.5 rounded-full">{ageInfo.display}</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                  <Building2 className="w-4 h-4" />
-                                  <span>
-                                    {childContracts.length > 0
-                                      ? `${childContracts.length}施設と契約中`
-                                      : '施設未連携'}
-                                  </span>
+                                <div className="flex items-center gap-3 text-sm text-gray-500 mt-2">
+                                  <div className="flex items-center gap-1">
+                                    <Building2 className="w-3.5 h-3.5" />
+                                    <span>
+                                      {childContracts.length > 0
+                                        ? `${childContracts.length}施設`
+                                        : '未連携'}
+                                    </span>
+                                  </div>
+                                  {nextSchedule && (
+                                    <div className="flex items-center gap-1">
+                                      <CalendarDays className="w-3.5 h-3.5" />
+                                      <span>次回: {nextSchedule.date}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 group-hover:text-[#F6AD55] transition-colors mt-2" />
                             </div>
                           </div>
                         );

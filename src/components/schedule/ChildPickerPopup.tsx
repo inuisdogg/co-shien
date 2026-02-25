@@ -7,8 +7,9 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, Car, Check, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Search, X, Car, Check, ArrowRight, ArrowLeft, User } from 'lucide-react';
 import { Child, TimeSlot } from '@/types';
+import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 
 // 選択された児童の情報（送迎オプション付き）
 export interface SelectedChildWithTransport {
@@ -271,7 +272,7 @@ export default function ChildPickerPopup({
                     {/* 児童名と選択 */}
                     <button
                       onClick={() => toggleChild(child.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+                      className="w-full flex items-center gap-3 px-3 py-3 text-left"
                     >
                       {/* 選択チェック */}
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -282,10 +283,25 @@ export default function ChildPickerPopup({
                         {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
                       </div>
 
-                      {/* 名前 */}
-                      <span className="text-sm font-medium text-gray-800 flex-1">
-                        {child.name}
-                      </span>
+                      {/* 写真プレースホルダー */}
+                      <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200">
+                        <User className="w-4 h-4 text-gray-400" />
+                      </div>
+
+                      {/* 名前と年齢 */}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-800 block truncate">
+                          {child.name}
+                        </span>
+                        {(() => {
+                          const ageDisplay = child.birthDate
+                            ? calculateAgeWithMonths(child.birthDate).display
+                            : child.age ? `${child.age}歳` : null;
+                          return ageDisplay ? (
+                            <span className="text-xs text-gray-500">{ageDisplay}</span>
+                          ) : null;
+                        })()}
+                      </div>
 
                       {/* デフォルト送迎設定の表示（未選択時） */}
                       {!isSelected && (child.needsPickup || child.needsDropoff) && (

@@ -148,7 +148,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
           <button
             data-tour="add-staff-button"
             onClick={onInviteStaff}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors text-sm font-medium"
+            className="flex items-center gap-1.5 min-h-10 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 text-sm font-medium shadow-sm"
           >
             <UserPlus size={16} />
             スタッフを追加

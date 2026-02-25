@@ -224,17 +224,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       {/* モバイル用オーバーレイ */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
           onClick={onClose}
         />
       )}
       {/* サイドバー */}
       <div
-        className={`fixed md:relative top-0 left-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col z-50 shrink-0 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed md:relative top-0 left-0 h-full w-64 bg-white border-r border-gray-100 flex flex-col z-50 shrink-0 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 md:flex`}
       >
-      <div className="p-6 flex items-center space-x-3">
+      <div className="p-5 flex items-center">
         <button
           onClick={() => {
             // 管理者・施設管理者はdashboard、それ以外はscheduleをホームに
@@ -244,11 +244,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
           }}
           className="cursor-pointer hover:opacity-80 transition-opacity"
         >
-          <Image src="/logo.svg" alt="Roots" width={150} height={48} className="h-12 w-auto object-contain" priority />
+          <Image src="/logo.svg" alt="Roots" width={150} height={48} className="h-10 w-auto object-contain" priority />
         </button>
       </div>
 
-      <div className="px-2 py-3 flex-1 overflow-y-auto">
+      <div className="px-3 py-2 flex-1 overflow-y-auto">
         {filteredCategories.map((category, categoryIndex) => {
           const isExpanded = expandedCategories.has(category.category);
           const hasActiveItem = category.items.some(item => item.id === activeTab);
@@ -263,21 +263,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
               {/* カテゴリヘッダー（クリックで展開/折りたたみ） */}
               <button
                 onClick={() => toggleCategory(category.category)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 ${
                   hasActiveItem
                     ? `${isCareer ? 'bg-purple-50 text-purple-700' : 'bg-[#00c4cc]/5 text-[#00c4cc]'}`
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <CategoryIcon size={16} strokeWidth={2} />
+                  <CategoryIcon size={16} strokeWidth={2} className="w-5 h-5" />
                   <span className="text-[13px] font-bold">{category.category}</span>
                 </div>
-                {isExpanded ? (
-                  <ChevronDown size={14} className="text-gray-400" />
-                ) : (
-                  <ChevronRight size={14} className="text-gray-400" />
-                )}
+                <ChevronDown
+                  size={14}
+                  className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
+                />
               </button>
 
               {/* サブメニュー（展開時のみ表示） */}
@@ -286,10 +285,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                   isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
-                <nav className="pl-3 pt-1 space-y-0.5">
+                <nav className="pl-2 pt-1 space-y-0.5">
                   {category.items.map((item) => {
                     const isCurrentSetupStep = !isSetupComplete && currentStepInfo?.menuId === item.id;
                     const canAccess = isSetupComplete || canAccessMenu(item.id);
+                    const isActive = activeTab === item.id;
 
                     return (
                       <div key={item.id} className="relative" data-tour={`menu-${item.id}`}>
@@ -301,18 +301,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                             }
                           }}
                           disabled={!canAccess}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-[13px] ${
-                            activeTab === item.id
-                              ? `${isCareer ? 'bg-[#818CF8]' : 'bg-[#00c4cc]'} text-white font-bold shadow-sm`
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 text-[13px] ${
+                            isActive
+                              ? `${isCareer ? 'bg-[#818CF8]/10 text-[#818CF8] border-l-[3px] border-[#818CF8]' : 'bg-[#00c4cc]/10 text-[#00c4cc] border-l-[3px] border-[#00c4cc]'} font-bold`
                               : isCurrentSetupStep
                               ? 'bg-amber-100 text-amber-800 font-bold ring-2 ring-amber-400 animate-pulse'
                               : canAccess
-                              ? 'text-gray-600 hover:bg-gray-100 font-medium'
+                              ? 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
                               : 'text-gray-400 cursor-not-allowed opacity-50 font-medium'
                           }`}
                         >
-                          <item.icon size={15} strokeWidth={2} />
-                          <span>{item.label}</span>
+                          <item.icon size={16} strokeWidth={2} className="w-5 h-5 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </button>
                         {/* セットアップガイドのツールチップ */}
                         {isCurrentSetupStep && (
@@ -333,14 +333,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         })}
       </div>
 
-      <div className="mt-auto p-4 border-t border-gray-200">
-        <div className="flex items-center space-x-2 px-2">
-          <Building2 size={16} className="text-gray-400" />
-          <div className="flex-1">
-            <div className="text-[10px] text-gray-400 font-semibold mb-0.5 uppercase tracking-wider">施設</div>
-            <div className="text-sm font-bold text-gray-800">{facilitySettings?.facilityName || '施設名'}</div>
+      <div className="mt-auto p-4 border-t border-gray-100">
+        <div className="flex items-center gap-3 px-2">
+          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+            <Building2 size={16} className="text-gray-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-gray-800 truncate">{facilitySettings?.facilityName || '施設名'}</div>
             {(currentFacilityCode || facility?.code) && (
-              <div className="text-[10px] text-gray-500 font-mono mt-0.5">ID: {currentFacilityCode || facility?.code}</div>
+              <div className="text-[10px] text-gray-500 font-mono">ID: {currentFacilityCode || facility?.code}</div>
             )}
           </div>
         </div>

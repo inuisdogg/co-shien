@@ -1,15 +1,16 @@
 /**
  * 児童登録ウィザード
- * 3ステップ形式で児童情報を登録
+ * 4ステップ形式で児童情報を登録
  * ステップ1: 基本情報（必須）
  * ステップ2: 受給者証情報（任意）
- * ステップ3: 連絡先・その他（任意）
+ * ステップ3: 保護者情報（任意）
+ * ステップ4: 確認
  */
 
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, ChevronRight, ChevronLeft, Check, Loader2 } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Check, Loader2, User, FileText, Shield, ClipboardCheck, Save, Info } from 'lucide-react';
 import { ChildFormData } from '@/types';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import { saveDraft, deleteDraft } from '@/utils/draftStorage';
@@ -35,7 +36,7 @@ const fetchAddressByPostalCode = async (postalCode: string): Promise<{ address: 
   }
 };
 
-type WizardStep = 'basic' | 'certificate' | 'contact';
+type WizardStep = 'basic' | 'certificate' | 'contact' | 'confirm';
 
 type Props = {
   onComplete: (data: ChildFormData) => Promise<void>;
@@ -44,10 +45,11 @@ type Props = {
   mode: 'create' | 'edit';
 };
 
-const steps: { id: WizardStep; label: string; description: string }[] = [
-  { id: 'basic', label: '基本情報', description: '児童名・生年月日（必須）' },
-  { id: 'certificate', label: '受給者証', description: '任意' },
-  { id: 'contact', label: '連絡先等', description: '任意' },
+const steps: { id: WizardStep; label: string; description: string; icon: React.ElementType }[] = [
+  { id: 'basic', label: '基本情報', description: '児童名・生年月日', icon: User },
+  { id: 'certificate', label: '受給者証情報', description: '受給者証番号・支給日数', icon: Shield },
+  { id: 'contact', label: '保護者情報', description: '連絡先・住所', icon: FileText },
+  { id: 'confirm', label: '確認', description: '入力内容の確認', icon: ClipboardCheck },
 ];
 
 const initialFormData: ChildFormData & { postalCode?: string } = {
@@ -230,98 +232,124 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
     }
   };
 
+  // 共通の入力フィールドスタイル
+  const inputClass = (hasError?: boolean) =>
+    `w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] transition-colors ${
+      hasError ? 'border-red-400 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
+    }`;
+
+  const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5';
+  const helpClass = 'text-xs text-gray-400 mt-1';
+  const sectionClass = 'bg-gray-50/50 rounded-xl p-4 border border-gray-100';
+
   // ステップ1: 基本情報
   const renderBasicStep = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-6">
+      {/* ヒントカード */}
+      <div className="flex items-start gap-3 bg-[#00c4cc]/5 border border-[#00c4cc]/20 rounded-xl p-4">
+        <Info size={18} className="text-[#00c4cc] mt-0.5 shrink-0" />
         <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">
-            児童氏名 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className={`w-full border rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc] ${
-              errors.name ? 'border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="山田 太郎"
-          />
-          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">フリガナ</label>
-          <input
-            type="text"
-            value={formData.nameKana || ''}
-            onChange={(e) => setFormData({ ...formData, nameKana: e.target.value })}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-            placeholder="ヤマダ タロウ"
-          />
+          <p className="text-sm font-medium text-gray-700">児童の基本情報を入力してください</p>
+          <p className="text-xs text-gray-500 mt-0.5">児童名、生年月日、保護者メールアドレスは必須項目です。</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">
-            生年月日 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={formData.birthDate || ''}
-            onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-            className={`w-full border rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc] ${
-              errors.birthDate ? 'border-red-500' : 'border-gray-300'
-            }`}
-          />
-          {errors.birthDate && <p className="text-red-500 text-xs mt-1">{errors.birthDate}</p>}
-          {formData.birthDate && (
-            <p className="text-xs text-gray-500 mt-1">
-              年齢: {calculateAgeWithMonths(formData.birthDate).display}
-            </p>
-          )}
+      {/* 児童情報 */}
+      <div className={sectionClass}>
+        <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
+          <User size={16} className="text-[#00c4cc]" />
+          児童情報
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>
+              児童氏名 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className={inputClass(!!errors.name)}
+              placeholder="例: 山田 太郎"
+            />
+            {errors.name && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><X size={12} />{errors.name}</p>}
+          </div>
+          <div>
+            <label className={labelClass}>フリガナ</label>
+            <input
+              type="text"
+              value={formData.nameKana || ''}
+              onChange={(e) => setFormData({ ...formData, nameKana: e.target.value })}
+              className={inputClass()}
+              placeholder="例: ヤマダ タロウ"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">利用終了予定日</label>
-          <input
-            type="date"
-            value={formData.contractEndDate || ''}
-            onChange={(e) => setFormData({ ...formData, contractEndDate: e.target.value })}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-          />
-          <p className="text-xs text-gray-400 mt-1">※生年月日から自動計算されます</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className={labelClass}>
+              生年月日 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={formData.birthDate || ''}
+              onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+              className={inputClass(!!errors.birthDate)}
+            />
+            {errors.birthDate && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><X size={12} />{errors.birthDate}</p>}
+            {formData.birthDate && (
+              <p className="text-xs text-[#00c4cc] font-medium mt-1.5">
+                現在 {calculateAgeWithMonths(formData.birthDate).display}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className={labelClass}>利用終了予定日</label>
+            <input
+              type="date"
+              value={formData.contractEndDate || ''}
+              onChange={(e) => setFormData({ ...formData, contractEndDate: e.target.value })}
+              className={inputClass()}
+            />
+            <p className={helpClass}>生年月日から自動計算されます（満6歳後の3月31日）</p>
+          </div>
         </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-4 mt-4">
-        <h4 className="font-bold text-sm text-gray-700 mb-3">保護者情報</h4>
+      {/* 保護者連絡先（必須） */}
+      <div className={sectionClass}>
+        <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
+          <FileText size={16} className="text-[#00c4cc]" />
+          保護者連絡先
+        </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">保護者名</label>
+            <label className={labelClass}>保護者名</label>
             <input
               type="text"
               value={formData.guardianName || ''}
               onChange={(e) => setFormData({ ...formData, guardianName: e.target.value })}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-              placeholder="山田 花子"
+              className={inputClass()}
+              placeholder="例: 山田 花子"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">フリガナ</label>
+            <label className={labelClass}>フリガナ</label>
             <input
               type="text"
               value={formData.guardianNameKana || ''}
               onChange={(e) => setFormData({ ...formData, guardianNameKana: e.target.value })}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-              placeholder="ヤマダ ハナコ"
+              className={inputClass()}
+              placeholder="例: ヤマダ ハナコ"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">続柄</label>
+            <label className={labelClass}>続柄</label>
             <select
               value={formData.guardianRelationship || ''}
               onChange={(e) => setFormData({ ...formData, guardianRelationship: e.target.value })}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+              className={inputClass()}
             >
               <option value="">選択してください</option>
               <option value="母">母</option>
@@ -333,22 +361,18 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
           </div>
         </div>
         <div className="mt-4">
-          <label className="block text-xs font-bold text-gray-500 mb-1">
+          <label className={labelClass}>
             保護者メールアドレス <span className="text-red-500">*</span>
           </label>
           <input
             type="email"
             value={formData.email || ''}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className={`w-full border rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc] ${
-              errors.email ? 'border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="example@email.com"
+            className={inputClass(!!errors.email)}
+            placeholder="例: parent@example.com"
           />
-          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-          <p className="text-xs text-gray-400 mt-1">
-            ※ 保護者への招待メール送信に使用します
-          </p>
+          {errors.email && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><X size={12} />{errors.email}</p>}
+          <p className={helpClass}>保護者への招待メール送信に使用します。正確に入力してください。</p>
         </div>
       </div>
     </div>
@@ -356,150 +380,289 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
 
   // ステップ2: 受給者証情報
   const renderCertificateStep = () => (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500 mb-4">
-        受給者証情報は後から追加・編集できます。スキップして先に進むことも可能です。
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-6">
+      {/* ヒントカード */}
+      <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <Info size={18} className="text-amber-500 mt-0.5 shrink-0" />
         <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">受給者証番号</label>
-          <input
-            type="text"
-            value={formData.beneficiaryNumber || ''}
-            onChange={(e) => setFormData({ ...formData, beneficiaryNumber: e.target.value })}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-            placeholder="0123456789"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">支給日数</label>
-          <input
-            type="number"
-            value={formData.grantDays || ''}
-            onChange={(e) =>
-              setFormData({ ...formData, grantDays: e.target.value ? parseInt(e.target.value) : undefined })
-            }
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-            placeholder="23"
-            min="0"
-            max="31"
-          />
+          <p className="text-sm font-medium text-gray-700">受給者証情報は後から追加・編集できます</p>
+          <p className="text-xs text-gray-500 mt-0.5">お手元に受給者証がない場合は「スキップ」で先に進めます。</p>
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-bold text-gray-500 mb-1">契約日数（月）</label>
-        <input
-          type="number"
-          value={formData.contractDays || ''}
-          onChange={(e) =>
-            setFormData({ ...formData, contractDays: e.target.value ? parseInt(e.target.value) : undefined })
-          }
-          className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-          placeholder="10"
-          min="0"
-          max="31"
-        />
+      <div className={sectionClass}>
+        <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
+          <Shield size={16} className="text-[#00c4cc]" />
+          受給者証
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>受給者証番号</label>
+            <input
+              type="text"
+              value={formData.beneficiaryNumber || ''}
+              onChange={(e) => setFormData({ ...formData, beneficiaryNumber: e.target.value })}
+              className={`${inputClass()} font-mono`}
+              placeholder="例: 0123456789（10桁）"
+            />
+            <p className={helpClass}>受給者証に記載の10桁の番号</p>
+          </div>
+          <div>
+            <label className={labelClass}>支給日数</label>
+            <input
+              type="number"
+              value={formData.grantDays || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, grantDays: e.target.value ? parseInt(e.target.value) : undefined })
+              }
+              className={inputClass()}
+              placeholder="例: 23"
+              min="0"
+              max="31"
+            />
+            <p className={helpClass}>受給者証に記載の月あたり支給日数</p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className={labelClass}>契約日数（月あたり）</label>
+          <input
+            type="number"
+            value={formData.contractDays || ''}
+            onChange={(e) =>
+              setFormData({ ...formData, contractDays: e.target.value ? parseInt(e.target.value) : undefined })
+            }
+            className={inputClass()}
+            placeholder="例: 10"
+            min="0"
+            max="31"
+          />
+          <p className={helpClass}>施設との契約で定めた月あたりの利用日数</p>
+        </div>
       </div>
     </div>
   );
 
   // ステップ3: 連絡先・その他
   const renderContactStep = () => (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500 mb-4">
-        連絡先情報は後から追加・編集できます。スキップして先に進むことも可能です。
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-6">
+      {/* ヒントカード */}
+      <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <Info size={18} className="text-amber-500 mt-0.5 shrink-0" />
         <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">郵便番号</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={formData.postalCode || ''}
-              onChange={(e) => handlePostalCodeChange(e.target.value)}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-              placeholder="1234567 または 123-4567"
-              maxLength={8}
-            />
-            {isLoadingAddress && (
-              <Loader2 className="w-5 h-5 text-[#00c4cc] animate-spin" />
-            )}
-          </div>
-          {postalCodeError && (
-            <p className="text-amber-600 text-xs mt-1">{postalCodeError}</p>
-          )}
-          <p className="text-xs text-gray-400 mt-1">※ 7桁入力で住所を自動入力</p>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 mb-1">電話番号</label>
-          <input
-            type="tel"
-            value={formData.phone || ''}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-            placeholder="090-1234-5678"
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-xs font-bold text-gray-500 mb-1">住所</label>
-          <input
-            type="text"
-            value={formData.address || ''}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
-            placeholder="東京都渋谷区..."
-          />
-          <p className="text-xs text-gray-400 mt-1">※ 郵便番号から自動入力後、番地等を追記してください</p>
+          <p className="text-sm font-medium text-gray-700">連絡先情報は後から追加・編集できます</p>
+          <p className="text-xs text-gray-500 mt-0.5">すべて任意項目です。「スキップ」で先に進めます。</p>
         </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-4 mt-4">
-        <h4 className="font-bold text-sm text-gray-700 mb-3">その他の情報</h4>
+      {/* 住所・電話 */}
+      <div className={sectionClass}>
+        <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
+          <FileText size={16} className="text-[#00c4cc]" />
+          住所・電話番号
+        </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">かかりつけ医</label>
+            <label className={labelClass}>郵便番号</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={formData.postalCode || ''}
+                onChange={(e) => handlePostalCodeChange(e.target.value)}
+                className={inputClass()}
+                placeholder="例: 1234567 または 123-4567"
+                maxLength={8}
+              />
+              {isLoadingAddress && (
+                <Loader2 className="w-5 h-5 text-[#00c4cc] animate-spin shrink-0" />
+              )}
+            </div>
+            {postalCodeError && (
+              <p className="text-amber-600 text-xs mt-1.5">{postalCodeError}</p>
+            )}
+            <p className={helpClass}>7桁入力で住所を自動入力します</p>
+          </div>
+          <div>
+            <label className={labelClass}>電話番号</label>
+            <input
+              type="tel"
+              value={formData.phone || ''}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className={inputClass()}
+              placeholder="例: 090-1234-5678"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className={labelClass}>住所</label>
+            <input
+              type="text"
+              value={formData.address || ''}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className={inputClass()}
+              placeholder="例: 東京都渋谷区..."
+            />
+            <p className={helpClass}>郵便番号から自動入力後、番地等を追記してください</p>
+          </div>
+        </div>
+      </div>
+
+      {/* その他の情報 */}
+      <div className={sectionClass}>
+        <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
+          <Info size={16} className="text-[#00c4cc]" />
+          その他の情報
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>かかりつけ医</label>
             <input
               type="text"
               value={formData.doctorName || ''}
               onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+              className={inputClass()}
+              placeholder="例: 田中 医師"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">医療機関名</label>
+            <label className={labelClass}>医療機関名</label>
             <input
               type="text"
               value={formData.doctorClinic || ''}
               onChange={(e) => setFormData({ ...formData, doctorClinic: e.target.value })}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+              className={inputClass()}
+              placeholder="例: ○○クリニック"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">通園先・学校名</label>
+            <label className={labelClass}>通園先・学校名</label>
             <input
               type="text"
               value={formData.schoolName || ''}
               onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+              className={inputClass()}
+              placeholder="例: ○○幼稚園"
             />
           </div>
         </div>
         <div className="mt-4">
-          <label className="block text-xs font-bold text-gray-500 mb-1">特性・備考</label>
+          <label className={labelClass}>特性・備考</label>
           <textarea
             value={formData.characteristics || ''}
             onChange={(e) => setFormData({ ...formData, characteristics: e.target.value })}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+            className={inputClass()}
             rows={3}
-            placeholder="アレルギー、服薬情報、配慮事項など"
+            placeholder="例: アレルギー、服薬情報、配慮事項など"
           />
         </div>
       </div>
     </div>
   );
+
+  // ステップ4: 確認
+  const renderConfirmStep = () => {
+    const ConfirmItem = ({ label, value }: { label: string; value: string | number | undefined | null }) => (
+      <div className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
+        <span className="text-sm text-gray-500 shrink-0 mr-4">{label}</span>
+        <span className="text-sm font-medium text-gray-800 text-right">{value || '-'}</span>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* 成功ヒント */}
+        <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl p-4">
+          <Check size={18} className="text-green-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-gray-700">入力内容をご確認ください</p>
+            <p className="text-xs text-gray-500 mt-0.5">問題がなければ「登録する」ボタンで登録を完了できます。修正がある場合は「戻る」で各ステップに戻れます。</p>
+          </div>
+        </div>
+
+        {/* 基本情報 */}
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
+              <User size={16} className="text-[#00c4cc]" />
+              基本情報
+            </h4>
+            <button
+              onClick={() => setCurrentStep('basic')}
+              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+            >
+              編集する
+            </button>
+          </div>
+          <ConfirmItem label="児童氏名" value={formData.name} />
+          <ConfirmItem label="フリガナ" value={formData.nameKana} />
+          <ConfirmItem label="生年月日" value={formData.birthDate} />
+          <ConfirmItem label="年齢" value={formData.birthDate ? calculateAgeWithMonths(formData.birthDate).display : undefined} />
+          <ConfirmItem label="利用終了予定日" value={formData.contractEndDate} />
+        </div>
+
+        {/* 保護者情報 */}
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
+              <FileText size={16} className="text-[#00c4cc]" />
+              保護者情報
+            </h4>
+            <button
+              onClick={() => setCurrentStep('basic')}
+              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+            >
+              編集する
+            </button>
+          </div>
+          <ConfirmItem label="保護者名" value={formData.guardianName} />
+          <ConfirmItem label="フリガナ" value={formData.guardianNameKana} />
+          <ConfirmItem label="続柄" value={formData.guardianRelationship} />
+          <ConfirmItem label="メールアドレス" value={formData.email} />
+        </div>
+
+        {/* 受給者証情報 */}
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
+              <Shield size={16} className="text-[#00c4cc]" />
+              受給者証情報
+            </h4>
+            <button
+              onClick={() => setCurrentStep('certificate')}
+              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+            >
+              編集する
+            </button>
+          </div>
+          <ConfirmItem label="受給者証番号" value={formData.beneficiaryNumber} />
+          <ConfirmItem label="支給日数" value={formData.grantDays ? `${formData.grantDays}日` : undefined} />
+          <ConfirmItem label="契約日数" value={formData.contractDays ? `${formData.contractDays}日` : undefined} />
+        </div>
+
+        {/* 連絡先・その他 */}
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
+              <Info size={16} className="text-[#00c4cc]" />
+              連絡先・その他
+            </h4>
+            <button
+              onClick={() => setCurrentStep('contact')}
+              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+            >
+              編集する
+            </button>
+          </div>
+          <ConfirmItem label="郵便番号" value={formData.postalCode} />
+          <ConfirmItem label="住所" value={formData.address} />
+          <ConfirmItem label="電話番号" value={formData.phone} />
+          <ConfirmItem label="かかりつけ医" value={formData.doctorName} />
+          <ConfirmItem label="医療機関名" value={formData.doctorClinic} />
+          <ConfirmItem label="通園先・学校名" value={formData.schoolName} />
+          {formData.characteristics && <ConfirmItem label="特性・備考" value={formData.characteristics} />}
+        </div>
+      </div>
+    );
+  };
 
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -509,6 +672,8 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
         return renderCertificateStep();
       case 'contact':
         return renderContactStep();
+      case 'confirm':
+        return renderConfirmStep();
       default:
         return null;
     }
@@ -516,92 +681,105 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
 
   const isLastStep = currentStepIndex === steps.length - 1;
   const isFirstStep = currentStepIndex === 0;
-  const canSkip = currentStep !== 'basic'; // 基本情報以外はスキップ可能
+  const canSkip = currentStep === 'certificate' || currentStep === 'contact';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-100">
         {/* ヘッダー */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
           <div>
             <h2 className="text-lg font-bold text-gray-800">
-              {mode === 'create' ? '児童登録' : '児童情報編集'}
+              {mode === 'create' ? '児童を新規登録' : '児童情報を編集'}
             </h2>
-            <p className="text-sm text-gray-500">
-              ステップ {currentStepIndex + 1}/{steps.length}: {steps[currentStepIndex].label}
+            <p className="text-sm text-gray-500 mt-0.5">
+              ステップ {currentStepIndex + 1} / {steps.length}
             </p>
           </div>
           <button
             onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
 
         {/* プログレスバー */}
-        <div className="px-4 pt-4">
-          <div className="flex items-center justify-between mb-2">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    index < currentStepIndex
-                      ? 'bg-[#00c4cc] text-white'
-                      : index === currentStepIndex
-                      ? 'bg-[#00c4cc] text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}
-                >
-                  {index < currentStepIndex ? <Check size={16} /> : index + 1}
-                </div>
-                {index < steps.length - 1 && (
-                  <div
-                    className={`w-full h-1 mx-2 ${
-                      index < currentStepIndex ? 'bg-[#00c4cc]' : 'bg-gray-200'
-                    }`}
-                    style={{ width: '60px' }}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-gray-500">
-            {steps.map((step) => (
-              <span key={step.id} className="text-center" style={{ width: '80px' }}>
-                {step.label}
-              </span>
-            ))}
+        <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => {
+              const StepIcon = step.icon;
+              const isCompleted = index < currentStepIndex;
+              const isCurrent = index === currentStepIndex;
+              return (
+                <React.Fragment key={step.id}>
+                  <div className="flex flex-col items-center flex-1">
+                    <button
+                      onClick={() => {
+                        // Only allow going back to completed steps or current
+                        if (index <= currentStepIndex) {
+                          setCurrentStep(step.id);
+                        }
+                      }}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        isCompleted
+                          ? 'bg-[#00c4cc] text-white shadow-sm cursor-pointer hover:bg-[#00b0b8]'
+                          : isCurrent
+                          ? 'bg-[#00c4cc] text-white shadow-md ring-4 ring-[#00c4cc]/20'
+                          : 'bg-gray-200 text-gray-400'
+                      } ${index <= currentStepIndex ? 'cursor-pointer' : 'cursor-default'}`}
+                    >
+                      {isCompleted ? <Check size={18} /> : <StepIcon size={18} />}
+                    </button>
+                    <span className={`text-xs mt-2 font-medium text-center ${
+                      isCurrent ? 'text-[#00c4cc]' : isCompleted ? 'text-gray-600' : 'text-gray-400'
+                    }`}>
+                      {step.label}
+                    </span>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className="flex-shrink-0 w-8 md:w-12 h-0.5 mt-[-16px] mx-1">
+                      <div
+                        className={`h-full rounded-full transition-colors ${
+                          index < currentStepIndex ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                        }`}
+                      />
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
 
         {/* コンテンツ */}
-        <div className="flex-1 overflow-y-auto p-4">{renderCurrentStep()}</div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">{renderCurrentStep()}</div>
 
         {/* フッター */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+          <div className="flex items-center gap-2">
             {!isFirstStep && (
               <button
                 onClick={handlePrev}
-                className="flex items-center space-x-1 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium"
               >
                 <ChevronLeft size={16} />
-                <span>戻る</span>
+                戻る
               </button>
             )}
             <button
               onClick={handleSaveDraft}
-              className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-gray-400 hover:text-gray-600 text-sm transition-colors rounded-lg hover:bg-gray-100"
             >
+              <Save size={14} />
               下書き保存
             </button>
           </div>
-          <div className="flex items-center space-x-2">
-            {canSkip && !isLastStep && (
+          <div className="flex items-center gap-2">
+            {canSkip && (
               <button
                 onClick={handleSkip}
-                className="px-4 py-2 text-gray-500 hover:text-gray-700 transition-colors"
+                className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors rounded-lg hover:bg-gray-100"
               >
                 スキップ
               </button>
@@ -610,17 +788,26 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="flex items-center space-x-1 px-6 py-2 bg-[#00c4cc] text-white rounded-md hover:bg-[#00b0b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-6 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm shadow-sm"
               >
-                <Check size={16} />
-                <span>{isSubmitting ? '登録中...' : '登録する'}</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    登録中...
+                  </>
+                ) : (
+                  <>
+                    <Check size={16} />
+                    登録する
+                  </>
+                )}
               </button>
             ) : (
               <button
                 onClick={handleNext}
-                className="flex items-center space-x-1 px-6 py-2 bg-[#00c4cc] text-white rounded-md hover:bg-[#00b0b8] transition-colors"
+                className="flex items-center gap-1.5 px-6 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors font-bold text-sm shadow-sm"
               >
-                <span>次へ</span>
+                次へ
                 <ChevronRight size={16} />
               </button>
             )}

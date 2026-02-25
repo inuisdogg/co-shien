@@ -135,67 +135,67 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shadow-sm z-10 shrink-0">
+    <header className="bg-white border-b border-gray-100 h-14 flex items-center justify-between px-4 md:px-6 z-10 shrink-0">
+      {/* Mobile: hamburger + logo */}
       <div className="flex items-center md:hidden">
-        <button onClick={onMenuClick} className="text-gray-500 mr-4">
-          <Menu size={24} />
+        <button onClick={onMenuClick} className="text-gray-500 hover:text-gray-700 mr-3 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+          <Menu size={22} />
         </button>
         <button
           onClick={onLogoClick}
           className="cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2"
         >
-          <Image src="/logo.svg" alt="Roots" width={150} height={40} className="h-10 w-auto object-contain" priority />
+          <Image src="/logo.svg" alt="Roots" width={120} height={36} className="h-8 w-auto object-contain" priority />
           <span
-            className={`text-xs font-bold px-2 py-1 rounded ${
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
               isCareer
-                ? 'bg-[#818CF8] text-white'
-                : 'bg-[#00c4cc] text-white'
+                ? 'bg-[#818CF8]/10 text-[#818CF8]'
+                : 'bg-[#00c4cc]/10 text-[#00c4cc]'
             }`}
           >
-            {isCareer ? 'キャリア' : 'ビジネス'}
+            {isCareer ? 'Career' : 'Business'}
           </span>
         </button>
       </div>
+
+      {/* Desktop: search + mode badge */}
       <div className="hidden md:flex items-center gap-4">
         <div
-          className={`flex items-center text-gray-400 bg-gray-100 rounded-md px-3 py-2 w-72 transition-colors focus-within:bg-white focus-within:ring-2 ${
+          className={`flex items-center text-gray-400 bg-gray-50 rounded-lg px-3 py-2 w-64 border border-gray-100 transition-all focus-within:bg-white focus-within:ring-2 focus-within:border-transparent ${
             isCareer
-              ? 'focus-within:ring-[#818CF8]/20 focus-within:border-[#818CF8]'
-              : 'focus-within:ring-[#00c4cc]/20 focus-within:border-[#00c4cc]'
+              ? 'focus-within:ring-[#818CF8]/30'
+              : 'focus-within:ring-[#00c4cc]/30'
           }`}
         >
-          <Search size={16} className="mr-2" />
+          <Search size={15} className="mr-2 shrink-0" />
           <input
             type="text"
             placeholder="児童名、メモを検索..."
-            className="bg-transparent border-none outline-none text-sm w-full text-gray-700"
+            className="bg-transparent border-none outline-none text-sm w-full text-gray-700 placeholder:text-gray-400"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="Roots" width={120} height={32} className="h-8 w-auto object-contain" priority />
-          <span
-            className={`text-xs font-bold px-2 py-1 rounded ${
-              isCareer
-                ? 'bg-[#818CF8] text-white'
-                : 'bg-[#00c4cc] text-white'
-            }`}
-          >
-            {isCareer ? 'キャリア' : 'ビジネス'}
-          </span>
-        </div>
+        <span
+          className={`text-[10px] font-bold px-2.5 py-1 rounded-md ${
+            isCareer
+              ? 'bg-[#818CF8]/10 text-[#818CF8]'
+              : 'bg-[#00c4cc]/10 text-[#00c4cc]'
+          }`}
+        >
+          {isCareer ? 'Career' : 'Business'}
+        </span>
       </div>
-      <div className="flex items-center space-x-5">
+
+      {/* Right side: user info, notifications, logout */}
+      <div className="flex items-center gap-3">
         {user && (
           <div className="text-sm font-medium text-gray-700 hidden md:block">
             {isCareer ? (
-              // キャリアモード：個人名を表示
               <span>
                 {user.lastName && user.firstName
                   ? `${user.lastName} ${user.firstName}`
                   : user.name || user.email}
               </span>
             ) : (
-              // ビジネスモード：施設のスタッフ名を表示
               <span>
                 {user.lastName && user.firstName
                   ? `${user.lastName} ${user.firstName}`
@@ -207,29 +207,29 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
         {!isCareer && user && (
           <button
             onClick={() => {
-              // キャリア画面に遷移（localStorageの情報は保持される）
               const personalUrl = getPersonalBaseUrl();
-              // キャリア画面のパスを追加
               const targetUrl = personalUrl.endsWith('/')
                 ? `${personalUrl}career`
                 : `${personalUrl}/career`;
               window.location.href = targetUrl;
             }}
-            className="text-sm text-gray-600 hover:text-[#818CF8] transition-colors flex items-center space-x-1 px-2 py-1 rounded hover:bg-[#818CF8]/10"
+            className="text-sm text-gray-500 hover:text-[#818CF8] transition-colors flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-[#818CF8]/5"
             title="キャリアダッシュボードへ"
           >
-            <User size={18} />
-            <span className="hidden md:inline">キャリア</span>
+            <User size={16} />
+            <span className="hidden md:inline text-xs">キャリア</span>
           </button>
         )}
+
+        {/* Notification Bell */}
         <div className="relative" ref={notificationRef}>
           <button
             onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-            className="relative cursor-pointer group p-1"
+            className="relative cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            <Bell size={20} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+            <Bell size={18} className="text-gray-500" />
             {(unreadCount > 0 || pendingCount > 0) && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold px-1">
                 {unreadCount + pendingCount}
               </span>
             )}
@@ -237,9 +237,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
 
           {/* 通知ポップアップ */}
           {isNotificationOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-              <div className="p-3 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="font-bold text-sm text-gray-800">通知</h3>
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-100 z-50">
+              <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-bold text-sm text-gray-900">通知</h3>
                 {unreadCount > 0 && (
                   <button
                     onClick={markAllAsRead}
@@ -252,15 +252,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 text-sm">
+                  <div className="p-8 text-center text-gray-400 text-sm">
                     通知はありません
                   </div>
                 ) : (
                   notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
-                        !notification.isRead ? 'bg-blue-50' : ''
+                      className={`p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${
+                        !notification.isRead ? 'bg-[#00c4cc]/5' : ''
                       }`}
                       onClick={() => {
                         if (!notification.isRead) {
@@ -296,13 +296,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
             </div>
           )}
         </div>
+
+        {/* Logout */}
         <button
           onClick={handleLogout}
-          className="text-gray-400 hover:text-gray-600 transition-colors flex items-center space-x-1"
+          className="text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1 p-1.5 rounded-lg hover:bg-gray-100"
           title="ログアウト"
         >
-          <LogOut size={18} />
-          <span className="hidden md:inline text-sm">ログアウト</span>
+          <LogOut size={16} />
+          <span className="hidden md:inline text-xs">ログアウト</span>
         </button>
       </div>
     </header>

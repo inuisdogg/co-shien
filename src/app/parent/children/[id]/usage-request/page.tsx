@@ -208,137 +208,146 @@ export default function UsageRequestPage() {
             <p className="text-sm text-gray-500">施設と契約すると、利用曜日を申請できます</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                施設
-              </label>
-              <select
-                value={selectedFacility}
-                onChange={(e) => setSelectedFacility(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
-                required
-              >
-                <option value="">施設を選択</option>
-                {contracts.map((contract) => (
-                  <option key={contract.id} value={contract.facility_id}>
-                    {contract.facilities?.name || '施設名不明'}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-3">
-                利用曜日
-              </label>
-              <div className="grid grid-cols-7 gap-2">
-                {weekDays.map((day, index) => {
-                  const isSelected = selectedDays.includes(index);
-                  const timeSlot = timeSlots[index] || 'PM';
-                  return (
-                    <div key={index} className="border border-gray-200 rounded-lg p-2">
-                      <label className="flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedDays([...selectedDays, index]);
-                            } else {
-                              setSelectedDays(selectedDays.filter(d => d !== index));
-                              const newTimeSlots = { ...timeSlots };
-                              delete newTimeSlots[index];
-                              setTimeSlots(newTimeSlots);
-                            }
-                          }}
-                          className="accent-[#F6AD55]"
-                        />
-                        <span className="ml-2 text-sm font-medium">{day}</span>
-                      </label>
-                      {isSelected && (
-                        <div className="mt-2 space-y-1">
-                          <label className="flex items-center text-xs">
-                            <input
-                              type="radio"
-                              name={`slot-${index}`}
-                              checked={timeSlot === 'AM'}
-                              onChange={() => setTimeSlots({ ...timeSlots, [index]: 'AM' })}
-                              className="accent-[#F6AD55]"
-                            />
-                            <span className="ml-1">午前</span>
-                          </label>
-                          <label className="flex items-center text-xs">
-                            <input
-                              type="radio"
-                              name={`slot-${index}`}
-                              checked={timeSlot === 'PM'}
-                              onChange={() => setTimeSlots({ ...timeSlots, [index]: 'PM' })}
-                              className="accent-[#F6AD55]"
-                            />
-                            <span className="ml-1">午後</span>
-                          </label>
-                          <label className="flex items-center text-xs">
-                            <input
-                              type="radio"
-                              name={`slot-${index}`}
-                              checked={timeSlot === 'AMPM'}
-                              onChange={() => setTimeSlots({ ...timeSlots, [index]: 'AMPM' })}
-                              className="accent-[#F6AD55]"
-                            />
-                            <span className="ml-1">終日</span>
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-6 space-y-6">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  利用開始日
+                  施設
                 </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                <select
+                  value={selectedFacility}
+                  onChange={(e) => setSelectedFacility(e.target.value)}
+                  className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-[#F6AD55] text-base"
                   required
-                />
+                >
+                  <option value="">施設を選択</option>
+                  {contracts.map((contract) => (
+                    <option key={contract.id} value={contract.facility_id}>
+                      {contract.facilities?.name || '施設名不明'}
+                    </option>
+                  ))}
+                </select>
               </div>
+
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  利用終了日（任意）
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  利用曜日
                 </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
-                />
+                <div className="grid grid-cols-7 gap-2">
+                  {weekDays.map((day, index) => {
+                    const isSelected = selectedDays.includes(index);
+                    const timeSlot = timeSlots[index] || 'PM';
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedDays(selectedDays.filter(d => d !== index));
+                            const newTimeSlots = { ...timeSlots };
+                            delete newTimeSlots[index];
+                            setTimeSlots(newTimeSlots);
+                          } else {
+                            setSelectedDays([...selectedDays, index]);
+                          }
+                        }}
+                        className={`rounded-xl p-3 border-2 transition-all text-center ${
+                          isSelected
+                            ? 'border-[#F6AD55] bg-[#FEF3E2] shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        } ${index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : ''}`}
+                      >
+                        <div className={`text-sm font-bold ${isSelected ? 'text-[#ED8936]' : ''}`}>{day}</div>
+                        {isSelected && (
+                          <div className="mt-2 space-y-1">
+                            {['AM', 'PM', 'AMPM'].map((slot) => (
+                              <button
+                                key={slot}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTimeSlots({ ...timeSlots, [index]: slot as 'AM' | 'PM' | 'AMPM' });
+                                }}
+                                className={`w-full px-1 py-1 rounded text-[10px] font-medium transition-colors ${
+                                  timeSlot === slot
+                                    ? 'bg-[#F6AD55] text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                              >
+                                {slot === 'AM' ? '午前' : slot === 'PM' ? '午後' : '終日'}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    利用開始日
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-[#F6AD55] text-base"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    利用終了日（任意）
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-[#F6AD55] text-base"
+                  />
+                </div>
+              </div>
+
+              {/* 選択サマリー */}
+              {selectedDays.length > 0 && (
+                <div className="bg-[#FEF3E2] rounded-xl p-4 border border-[#F6AD55]/20">
+                  <h4 className="text-sm font-bold text-[#ED8936] mb-2">選択内容</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedDays.sort().map(dayIndex => {
+                      const timeSlot = timeSlots[dayIndex] || 'PM';
+                      return (
+                        <span key={dayIndex} className="text-sm bg-white rounded-lg px-3 py-1.5 border border-[#F6AD55]/30 text-gray-700">
+                          {weekDays[dayIndex]} / {timeSlot === 'AM' ? '午前' : timeSlot === 'PM' ? '午後' : '終日'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  送信中...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-5 h-5" />
-                  申請を送信
-                </>
-              )}
-            </button>
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+              <button
+                type="submit"
+                disabled={submitting || selectedDays.length === 0}
+                className="w-full h-14 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base shadow-md active:shadow-sm"
+              >
+                {submitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    送信中...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    申請を送信
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         )}
       </main>

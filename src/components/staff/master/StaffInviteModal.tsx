@@ -316,11 +316,26 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                     )}
                   </div>
 
+                  {/* 招待プレビュー */}
+                  {name && email && (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-xs font-medium text-gray-500 mb-2">招待メールプレビュー</p>
+                      <div className="p-3 bg-white rounded-lg border border-gray-100 text-sm text-gray-600 space-y-1">
+                        <p className="font-medium text-gray-800">{name}様</p>
+                        <p>スタッフとして招待されました。</p>
+                        <p>以下のリンクからアカウントを作成してください。</p>
+                        <div className="mt-2 px-3 py-1.5 bg-[#00c4cc]/5 rounded text-[#00c4cc] text-xs font-mono">
+                          招待URL（7日間有効）
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 送信ボタン */}
                   <button
                     type="submit"
                     disabled={isSubmitting || loading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-3 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 disabled:opacity-50 font-medium"
                   >
                     {isSubmitting ? (
                       <>

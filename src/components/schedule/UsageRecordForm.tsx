@@ -32,6 +32,7 @@ interface UsageRecordFormProps {
   initialData?: UsageRecord | Partial<UsageRecordFormData>;
   onSave: (data: UsageRecordFormData) => void;
   onDelete?: () => void;
+  onCopyPrevious?: () => Partial<UsageRecordFormData> | undefined;
 }
 
 // 実施加算の定義（詳細記録が必要なもの）
@@ -238,6 +239,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
   initialData,
   onSave,
   onDelete,
+  onCopyPrevious,
 }) => {
   const [formData, setFormData] = useState<ExtendedFormData>(() => ({
     scheduleId: scheduleItem.id,
@@ -273,6 +275,33 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
   const [showAddonSection, setShowAddonSection] = useState(false);
   const [expandedAdditions, setExpandedAdditions] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [activeStep, setActiveStep] = useState(1);
+
+  // ステップ定義
+  const steps = [
+    { id: 1, label: '出欠確認', icon: ClipboardCheck },
+    { id: 2, label: 'サービス内容', icon: Clock },
+    { id: 3, label: '加算記録', icon: Plus },
+    { id: 4, label: '備考', icon: FileText },
+  ];
+
+  // 前回のコピー
+  const handleCopyPrevious = () => {
+    if (onCopyPrevious) {
+      const previousData = onCopyPrevious();
+      if (previousData) {
+        setFormData((prev) => ({
+          ...prev,
+          ...previousData,
+          scheduleId: scheduleItem.id,
+          childId: scheduleItem.childId,
+          childName: scheduleItem.childName,
+          date: scheduleItem.date,
+        }));
+      }
+    }
+  };
 
   // initialDataが変更されたときにフォームデータを更新
   useEffect(() => {
@@ -395,385 +424,499 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* サービス提供の状況 */}
-      <div>
-        <label className="block text-sm font-bold text-gray-700 mb-3">
-          サービス提供の状況
-        </label>
-        <div className="flex gap-2">
-          {['利用', '欠席(加算なし)', '加算のみ'].map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setFormData((prev) => ({ ...prev, serviceStatus: status as any }))}
-              className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                formData.serviceStatus === status
-                  ? 'bg-[#00c4cc] text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {status}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 時間設定セクション */}
-      <div className="bg-gray-50 rounded-xl p-5 space-y-5">
-        <div className="flex items-center gap-2 text-gray-700">
-          <Clock className="w-5 h-5 text-[#00c4cc]" />
-          <span className="font-bold">時間設定</span>
-        </div>
-
-        {/* 計画時間 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-2">計画時間</label>
-          <div className="flex items-center gap-3">
-            <input
-              type="time"
-              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
-              value={formData.plannedStartTime || ''}
-              onChange={(e) => setFormData((prev) => ({ ...prev, plannedStartTime: e.target.value }))}
-            />
-            <span className="text-gray-400">〜</span>
-            <input
-              type="time"
-              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
-              value={formData.plannedEndTime || ''}
-              onChange={(e) => setFormData((prev) => ({ ...prev, plannedEndTime: e.target.value }))}
-            />
+    <div className="flex flex-col h-full">
+      {/* ヘッダー: 日付と児童名 */}
+      <div className="bg-gradient-to-r from-[#00c4cc]/10 to-white px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">{scheduleItem.childName}</h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {(() => {
+                const [y, m, d] = scheduleItem.date.split('-').map(Number);
+                const date = new Date(y, m - 1, d);
+                const days = ['日', '月', '火', '水', '木', '金', '土'];
+                return `${y}年${m}月${d}日(${days[date.getDay()]})`;
+              })()}
+              {' '}
+              {scheduleItem.slot === 'AM' ? '午前' : '午後'}
+            </p>
           </div>
-        </div>
-
-        {/* 実績時間 */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-600">実績時間</label>
+          {onCopyPrevious && !initialData && (
             <button
               type="button"
-              onClick={reflectPlannedTime}
-              className="text-xs text-[#00c4cc] hover:underline"
+              onClick={handleCopyPrevious}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#00c4cc] bg-[#00c4cc]/10 hover:bg-[#00c4cc]/20 rounded-lg transition-colors border border-[#00c4cc]/20"
             >
-              計画時間を反映
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              前回のコピー
             </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="time"
-              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
-              value={formData.actualStartTime || ''}
-              onChange={(e) => setFormData((prev) => ({ ...prev, actualStartTime: e.target.value }))}
-            />
-            <span className="text-gray-400">〜</span>
-            <input
-              type="time"
-              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
-              value={formData.actualEndTime || ''}
-              onChange={(e) => setFormData((prev) => ({ ...prev, actualEndTime: e.target.value }))}
-            />
-          </div>
-        </div>
-
-        {/* 時間区分 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-2">時間区分</label>
-          <div className="grid grid-cols-2 gap-2">
-            {timeCategoryOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, timeCategory: option.value }))}
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all text-left ${
-                  formData.timeCategory === option.value
-                    ? 'bg-[#00c4cc]/10 text-[#00c4cc] border border-[#00c4cc]'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 送迎セクション */}
-      <div className="bg-gray-50 rounded-xl p-5 space-y-4">
-        <div className="flex items-center gap-2 text-gray-700">
-          <Car className="w-5 h-5 text-[#00c4cc]" />
-          <span className="font-bold">送迎</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {/* 迎え */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">迎え</label>
-            <div className="flex gap-2">
-              {['あり', 'なし'].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, pickup: value as any }))}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    formData.pickup === value
-                      ? 'bg-[#00c4cc] text-white'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {value}
-                </button>
-              ))}
-            </div>
-            {formData.pickup === 'あり' && (
-              <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.pickupSamePremises}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, pickupSamePremises: e.target.checked }))}
-                  className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
-                />
-                <span className="text-xs text-gray-600">同一敷地内</span>
-              </label>
-            )}
-          </div>
-
-          {/* 送り */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">送り</label>
-            <div className="flex gap-2">
-              {['あり', 'なし'].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, dropoff: value as any }))}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    formData.dropoff === value
-                      ? 'bg-[#00c4cc] text-white'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {value}
-                </button>
-              ))}
-            </div>
-            {formData.dropoff === 'あり' && (
-              <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.dropoffSamePremises}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, dropoffSamePremises: e.target.checked }))}
-                  className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
-                />
-                <span className="text-xs text-gray-600">同一敷地内</span>
-              </label>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 提供形態・指導形態 */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">提供形態</label>
-          <select
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
-            value={formData.provisionForm || ''}
-            onChange={(e) => setFormData((prev) => ({ ...prev, provisionForm: e.target.value }))}
-          >
-            <option value="">選択してください</option>
-            <option value="個別">個別</option>
-            <option value="小集団">小集団</option>
-            <option value="集団">集団</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">指導形態</label>
-          <select
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm"
-            value={formData.instructionForm || ''}
-            onChange={(e) => setFormData((prev) => ({ ...prev, instructionForm: e.target.value }))}
-          >
-            <option value="小集団">小集団</option>
-            <option value="個別">個別</option>
-            <option value="集団">集団</option>
-          </select>
-        </div>
-      </div>
-
-      {/* 実施加算セクション */}
-      <div className="border border-gray-200 rounded-xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowAddonSection(!showAddonSection)}
-          className="w-full px-5 py-4 flex items-center justify-between bg-white hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <ClipboardCheck className="w-5 h-5 text-[#00c4cc]" />
-            <span className="font-bold text-gray-700">実施加算</span>
-            {formData.addonItems.length > 0 && (
-              <span className="px-2 py-0.5 bg-[#00c4cc]/10 text-[#00c4cc] text-xs rounded-full">
-                {formData.addonItems.length}件選択中
-              </span>
-            )}
-          </div>
-          {showAddonSection ? (
-            <ChevronUp className="w-5 h-5 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
           )}
-        </button>
+        </div>
+      </div>
 
-        {showAddonSection && (
-          <div className="border-t border-gray-200">
-            {formData.serviceStatus === '欠席(加算なし)' ? (
-              <p className="text-sm text-gray-500 text-center py-8">
-                サービス提供の状況が「欠席(加算なし)」のため、加算を選択できません
-              </p>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {IMPLEMENTATION_ADDITIONS.map((addition) => {
-                  const Icon = addition.icon;
-                  const isSelected = formData.addonItems.includes(addition.id);
-                  const isExpanded = expandedAdditions.has(addition.id);
-                  const detail = getAdditionDetail(addition.id);
+      {/* ステップナビゲーション */}
+      <div className="px-6 py-3 border-b border-gray-100 bg-white">
+        <div className="flex items-center gap-1">
+          {steps.map((step, index) => {
+            const Icon = step.icon;
+            return (
+              <React.Fragment key={step.id}>
+                {index > 0 && <div className="flex-shrink-0 w-4 h-px bg-gray-300 mx-0.5" />}
+                <button
+                  type="button"
+                  onClick={() => setActiveStep(step.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                    activeStep === step.id
+                      ? 'bg-[#00c4cc] text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{step.label}</span>
+                  <span className="sm:hidden">{step.id}</span>
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
 
-                  return (
-                    <div key={addition.id} className={isSelected ? 'bg-gray-50' : ''}>
-                      {/* 加算ヘッダー */}
-                      <div className="px-4 py-3 flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => toggleAddition(addition.id)}
-                          className={`w-5 h-5 rounded flex items-center justify-center transition-all ${
-                            isSelected ? 'bg-[#00c4cc] text-white' : 'border border-gray-300 hover:border-gray-400'
-                          }`}
-                        >
-                          {isSelected && <Check className="w-3 h-3" />}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => isSelected && toggleExpand(addition.id)}
-                          className="flex-1 flex items-center gap-3 text-left"
-                          disabled={!isSelected}
-                        >
-                          <div className={`p-1.5 rounded ${addition.color}`}>
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1">
-                            <div className={`font-medium text-sm ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>
-                              {addition.name}
-                            </div>
-                            <div className="text-xs text-gray-400">{addition.units}</div>
-                          </div>
-                          {isSelected && (
-                            isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* 詳細入力フォーム */}
-                      {isSelected && isExpanded && (
-                        <div className="px-4 pb-4 space-y-3">
-                          <div className="ml-8 p-4 bg-white rounded-lg border border-gray-200 space-y-3">
-                            <div className="text-xs text-amber-600 flex items-start gap-1.5 pb-3 border-b border-gray-100">
-                              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                              <span>{addition.notes}</span>
-                            </div>
-
-                            {addition.requiredFields.map((field) => (
-                              <div key={field.id}>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  {field.label}
-                                  {field.required && <span className="text-red-500 ml-0.5">*</span>}
-                                </label>
-                                {field.type === 'textarea' ? (
-                                  <textarea
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] resize-none"
-                                    rows={2}
-                                    placeholder={field.placeholder}
-                                    value={detail[field.id] || ''}
-                                    onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
-                                  />
-                                ) : field.type === 'select' ? (
-                                  <select
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
-                                    value={detail[field.id] || ''}
-                                    onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
-                                  >
-                                    <option value="">選択してください</option>
-                                    {field.options?.map((opt) => (
-                                      <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <input
-                                    type={field.type}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
-                                    placeholder={field.placeholder}
-                                    value={detail[field.id] || ''}
-                                    onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
-                                  />
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+      {/* ステップコンテンツ */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+        {/* ステップ1: 出欠確認 */}
+        {activeStep === 1 && (
+          <>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-3">
+                サービス提供の状況
+              </label>
+              <div className="flex gap-2">
+                {['利用', '欠席(加算なし)', '加算のみ'].map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, serviceStatus: status as any }))}
+                    className={`flex-1 h-12 px-4 rounded-xl text-sm font-medium transition-all ${
+                      formData.serviceStatus === status
+                        ? 'bg-[#00c4cc] text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+
+            {/* 送迎セクション */}
+            <div className="bg-gray-50 rounded-xl p-5 space-y-4 border border-gray-100">
+              <div className="flex items-center gap-2 text-gray-700">
+                <Car className="w-5 h-5 text-[#00c4cc]" />
+                <span className="font-bold">送迎</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">迎え</label>
+                  <div className="flex gap-2">
+                    {['あり', 'なし'].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, pickup: value as any }))}
+                        className={`flex-1 h-12 rounded-xl text-sm font-medium transition-all ${
+                          formData.pickup === value
+                            ? 'bg-[#00c4cc] text-white'
+                            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                  {formData.pickup === 'あり' && (
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.pickupSamePremises}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, pickupSamePremises: e.target.checked }))}
+                        className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
+                      />
+                      <span className="text-xs text-gray-600">同一敷地内</span>
+                    </label>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">送り</label>
+                  <div className="flex gap-2">
+                    {['あり', 'なし'].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, dropoff: value as any }))}
+                        className={`flex-1 h-12 rounded-xl text-sm font-medium transition-all ${
+                          formData.dropoff === value
+                            ? 'bg-[#00c4cc] text-white'
+                            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                  {formData.dropoff === 'あり' && (
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.dropoffSamePremises}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, dropoffSamePremises: e.target.checked }))}
+                        className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
+                      />
+                      <span className="text-xs text-gray-600">同一敷地内</span>
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setActiveStep(2)} className="px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
+            </div>
+          </>
+        )}
+
+        {/* ステップ2: サービス内容 */}
+        {activeStep === 2 && (
+          <>
+            <div className="bg-gray-50 rounded-xl p-5 space-y-5 border border-gray-100">
+              <div className="flex items-center gap-2 text-gray-700">
+                <Clock className="w-5 h-5 text-[#00c4cc]" />
+                <span className="font-bold">時間設定</span>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">計画時間</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="time"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    value={formData.plannedStartTime || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, plannedStartTime: e.target.value }))}
+                  />
+                  <span className="text-gray-400 text-lg">〜</span>
+                  <input
+                    type="time"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    value={formData.plannedEndTime || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, plannedEndTime: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-600">実績時間</label>
+                  <button type="button" onClick={reflectPlannedTime} className="text-xs text-[#00c4cc] hover:underline font-medium">計画時間を反映</button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="time"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    value={formData.actualStartTime || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, actualStartTime: e.target.value }))}
+                  />
+                  <span className="text-gray-400 text-lg">〜</span>
+                  <input
+                    type="time"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    value={formData.actualEndTime || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, actualEndTime: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">時間区分</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {timeCategoryOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, timeCategory: option.value }))}
+                      className={`h-12 px-3 rounded-xl text-xs font-medium transition-all text-left ${
+                        formData.timeCategory === option.value
+                          ? 'bg-[#00c4cc]/10 text-[#00c4cc] border-2 border-[#00c4cc]'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 提供形態・指導形態 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">提供形態</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['個別', '小集団', '集団'].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, provisionForm: value }))}
+                      className={`h-12 rounded-xl text-sm font-medium transition-all ${
+                        formData.provisionForm === value
+                          ? 'bg-[#00c4cc]/10 text-[#00c4cc] border-2 border-[#00c4cc]'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">指導形態</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['個別', '小集団', '集団'].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, instructionForm: value }))}
+                      className={`h-12 rounded-xl text-sm font-medium transition-all ${
+                        formData.instructionForm === value
+                          ? 'bg-[#00c4cc]/10 text-[#00c4cc] border-2 border-[#00c4cc]'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <button type="button" onClick={() => setActiveStep(1)} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-bold rounded-lg transition-colors">← 戻る</button>
+              <button type="button" onClick={() => setActiveStep(3)} className="px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
+            </div>
+          </>
+        )}
+
+        {/* ステップ3: 加算記録 */}
+        {activeStep === 3 && (
+          <>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-5 py-4 flex items-center justify-between bg-white">
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="w-5 h-5 text-[#00c4cc]" />
+                  <span className="font-bold text-gray-700">実施加算</span>
+                  {formData.addonItems.length > 0 && (
+                    <span className="px-2 py-0.5 bg-[#00c4cc]/10 text-[#00c4cc] text-xs rounded-full font-bold">
+                      {formData.addonItems.length}件選択中
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200">
+                {formData.serviceStatus === '欠席(加算なし)' ? (
+                  <p className="text-sm text-gray-500 text-center py-8">
+                    サービス提供の状況が「欠席(加算なし)」のため、加算を選択できません
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {IMPLEMENTATION_ADDITIONS.map((addition) => {
+                      const Icon = addition.icon;
+                      const isSelected = formData.addonItems.includes(addition.id);
+                      const isExpanded = expandedAdditions.has(addition.id);
+                      const detail = getAdditionDetail(addition.id);
+
+                      return (
+                        <div key={addition.id} className={isSelected ? 'bg-gray-50' : ''}>
+                          <div className="px-4 py-3 flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleAddition(addition.id)}
+                              className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
+                                isSelected ? 'bg-[#00c4cc] text-white' : 'border-2 border-gray-300 hover:border-gray-400'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3.5 h-3.5" />}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => isSelected && toggleExpand(addition.id)}
+                              className="flex-1 flex items-center gap-3 text-left"
+                              disabled={!isSelected}
+                            >
+                              <div className={`p-1.5 rounded-lg ${addition.color}`}>
+                                <Icon className="w-4 h-4" />
+                              </div>
+                              <div className="flex-1">
+                                <div className={`font-medium text-sm ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>
+                                  {addition.name}
+                                </div>
+                                <div className="text-xs text-gray-400">{addition.units}</div>
+                              </div>
+                              {isSelected && (
+                                isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />
+                              )}
+                            </button>
+                          </div>
+
+                          {isSelected && isExpanded && (
+                            <div className="px-4 pb-4 space-y-3">
+                              <div className="ml-9 p-4 bg-white rounded-xl border border-gray-200 space-y-3">
+                                <div className="text-xs text-amber-600 flex items-start gap-1.5 pb-3 border-b border-gray-100">
+                                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                  <span>{addition.notes}</span>
+                                </div>
+                                {addition.requiredFields.map((field) => (
+                                  <div key={field.id}>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                      {field.label}
+                                      {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                                    </label>
+                                    {field.type === 'textarea' ? (
+                                      <textarea
+                                        className="w-full h-12 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] resize-none"
+                                        rows={2}
+                                        placeholder={field.placeholder}
+                                        value={detail[field.id] || ''}
+                                        onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                      />
+                                    ) : field.type === 'select' ? (
+                                      <select
+                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                                        value={detail[field.id] || ''}
+                                        onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                      >
+                                        <option value="">選択してください</option>
+                                        {field.options?.map((opt) => (
+                                          <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type={field.type}
+                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                                        placeholder={field.placeholder}
+                                        value={detail[field.id] || ''}
+                                        onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <button type="button" onClick={() => setActiveStep(2)} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-bold rounded-lg transition-colors">← 戻る</button>
+              <button type="button" onClick={() => setActiveStep(4)} className="px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
+            </div>
+          </>
+        )}
+
+        {/* ステップ4: 備考 */}
+        {activeStep === 4 && (
+          <>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">メモ</label>
+              <textarea
+                className="w-full h-24 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                placeholder="自由にメモを記録できます"
+                value={formData.memo || ''}
+                onChange={(e) => setFormData((prev) => ({ ...prev, memo: e.target.value }))}
+                maxLength={2000}
+              />
+              <div className="text-xs text-gray-400 text-right mt-1">
+                {(formData.memo || '').length}/2000
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">請求対象</label>
+              <div className="flex gap-2">
+                {['請求する', '請求しない'].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, billingTarget: value as any }))}
+                    className={`flex-1 h-12 rounded-xl text-sm font-medium transition-all ${
+                      formData.billingTarget === value
+                        ? value === '請求する' ? 'bg-[#00c4cc] text-white' : 'bg-orange-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+              {formData.billingTarget === '請求しない' && (
+                <p className="text-xs text-orange-600 mt-2">
+                  ※実績を残したまま国保連・市町村への請求の対象から外します
+                </p>
+              )}
+            </div>
+
+            {/* 確認サマリー */}
+            <div className="bg-gray-50 rounded-xl p-5 space-y-3 border border-gray-100">
+              <h4 className="font-bold text-gray-700 text-sm flex items-center gap-2">
+                <Check className="w-4 h-4 text-[#00c4cc]" />
+                入力内容の確認
+              </h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500 text-xs">サービス状況</span>
+                  <p className="font-medium text-gray-800">{formData.serviceStatus}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 text-xs">時間区分</span>
+                  <p className="font-medium text-gray-800">{formData.timeCategory || '未設定'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 text-xs">実績時間</span>
+                  <p className="font-medium text-gray-800">
+                    {formData.actualStartTime && formData.actualEndTime
+                      ? `${formData.actualStartTime} 〜 ${formData.actualEndTime}`
+                      : '未入力'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-500 text-xs">送迎</span>
+                  <p className="font-medium text-gray-800">迎え:{formData.pickup} / 送り:{formData.dropoff}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 text-xs">提供形態</span>
+                  <p className="font-medium text-gray-800">{formData.provisionForm || '未設定'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 text-xs">加算</span>
+                  <p className="font-medium text-gray-800">{formData.addonItems.length > 0 ? `${formData.addonItems.length}件` : 'なし'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <button type="button" onClick={() => setActiveStep(3)} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-bold rounded-lg transition-colors">← 戻る</button>
+            </div>
+          </>
         )}
       </div>
 
-      {/* メモ */}
-      <div>
-        <label className="block text-sm font-bold text-gray-700 mb-2">メモ</label>
-        <textarea
-          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
-          rows={3}
-          placeholder="自由にメモを記録できます"
-          value={formData.memo || ''}
-          onChange={(e) => setFormData((prev) => ({ ...prev, memo: e.target.value }))}
-          maxLength={2000}
-        />
-        <div className="text-xs text-gray-400 text-right mt-1">
-          {(formData.memo || '').length}/2000
-        </div>
-      </div>
-
-      {/* 請求対象 */}
-      <div>
-        <label className="block text-sm font-bold text-gray-700 mb-2">請求対象</label>
-        <div className="flex gap-2">
-          {['請求する', '請求しない'].map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFormData((prev) => ({ ...prev, billingTarget: value as any }))}
-              className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                formData.billingTarget === value
-                  ? value === '請求する' ? 'bg-[#00c4cc] text-white' : 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
-        {formData.billingTarget === '請求しない' && (
-          <p className="text-xs text-orange-600 mt-2">
-            ※実績を残したまま国保連・市町村への請求の対象から外します
-          </p>
-        )}
-      </div>
-
-      {/* アクションボタン */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+      {/* スティッキー保存ボタン */}
+      <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between shadow-lg">
         {onDelete && initialData && (
           <button
             type="button"
@@ -789,7 +932,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
           type="button"
           onClick={handleSubmit}
           disabled={isSaving}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-8 py-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-xl transition-colors disabled:opacity-50 shadow-md active:shadow-sm"
         >
           {isSaving ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

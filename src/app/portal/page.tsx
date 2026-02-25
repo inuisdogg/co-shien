@@ -129,23 +129,23 @@ export default function PortalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#00c4cc]/90 to-[#00b0b8] p-4">
       <div className="max-w-2xl mx-auto">
         {/* ヘッダー */}
         <div className="flex justify-between items-center mb-8 pt-4">
-          <div className="bg-white rounded-lg px-4 py-2">
+          <div className="bg-white/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-sm">
             <Image
               src="/logo.svg"
               alt="Roots"
-              width={200}
-              height={64}
-              className="h-12 w-auto"
+              width={160}
+              height={50}
+              className="h-10 w-auto"
               priority
             />
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 text-white/80 hover:text-white text-sm"
+            className="flex items-center gap-2 text-white/80 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-white/10 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             ログアウト
@@ -153,12 +153,12 @@ export default function PortalPage() {
         </div>
 
         {/* メインカード */}
-        <div className="bg-white rounded-lg shadow-2xl p-8">
+        <div className="bg-white rounded-xl shadow-2xl p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
               ようこそ、{user?.name}さん
             </h1>
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-500 text-sm">
               施設を選択するか、新しく登録してください
             </p>
           </div>
@@ -199,18 +199,18 @@ export default function PortalPage() {
                       {(facility.role === '管理者' || facility.role === 'admin') && (
                         <button
                           onClick={() => selectFacility(facility, 'biz')}
-                          className="flex-1 flex items-center justify-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm"
+                          className="flex-1 flex items-center justify-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold h-10 px-4 rounded-lg transition-colors text-sm min-w-[120px]"
                         >
                           <Briefcase className="w-4 h-4" />
-                          Bizモード（管理）
+                          施設管理
                         </button>
                       )}
                       <button
                         onClick={() => selectFacility(facility, 'personal')}
-                        className="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors text-sm"
+                        className="flex-1 flex items-center justify-center gap-2 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold h-10 px-4 rounded-lg transition-colors text-sm min-w-[120px]"
                       >
                         <User className="w-4 h-4" />
-                        Personalモード
+                        キャリア
                       </button>
                     </div>
                   </div>

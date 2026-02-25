@@ -324,10 +324,20 @@ function AcceptInvitationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#F6AD55] mx-auto mb-4" />
-          <p className="text-gray-600">読み込み中...</p>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg max-w-2xl w-full p-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-24 bg-gray-100 rounded-xl" />
+            <div className="h-6 bg-gray-200 rounded w-1/2" />
+            <div className="space-y-3">
+              <div className="h-16 bg-gray-100 rounded-lg" />
+              <div className="h-16 bg-gray-100 rounded-lg" />
+            </div>
+            <div className="flex gap-3">
+              <div className="h-12 bg-gray-200 rounded-lg flex-1" />
+              <div className="h-12 bg-gray-200 rounded-lg flex-1" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -335,14 +345,16 @@ function AcceptInvitationContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-800 mb-2">エラー</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">お知らせ</h1>
+          <p className="text-gray-600 text-sm mb-6">{error}</p>
           <button
             onClick={() => router.push('/parent')}
-            className="bg-[#ED8936] hover:bg-[#D97706] text-white font-bold py-2 px-6 rounded-md transition-colors"
+            className="bg-[#ED8936] hover:bg-[#D97706] text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-md"
           >
             ダッシュボードへ
           </button>
@@ -354,15 +366,15 @@ function AcceptInvitationContent() {
   if (!invitation) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         {/* ヘッダー */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
           <div className="bg-gradient-to-r from-[#F6AD55] to-[#ED8936] p-6 text-white">
-            <Building2 className="w-12 h-12 mb-3" />
-            <h1 className="text-2xl font-bold mb-1">施設からの招待</h1>
+            <p className="text-white/80 text-sm mb-2">保護者の方へ</p>
+            <h1 className="text-2xl font-bold mb-1">お子様の通所施設からの招待です</h1>
             <p className="text-white/90">
-              {invitation.facility?.name || '施設'}から招待が届いています
+              {invitation.facility?.name || '施設'}からお子様の利用に関する招待が届いています
             </p>
           </div>
 

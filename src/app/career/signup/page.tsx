@@ -399,7 +399,7 @@ export default function PersonalSignupPage() {
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
                 placeholder="姓を入力"
                 disabled={loading}
               />
@@ -414,7 +414,7 @@ export default function PersonalSignupPage() {
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
                 placeholder="名を入力"
                 disabled={loading}
               />
@@ -432,7 +432,7 @@ export default function PersonalSignupPage() {
                 value={formData.lastNameKana}
                 onChange={(e) => setFormData({ ...formData, lastNameKana: e.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
                 placeholder="セイを入力"
                 disabled={loading}
               />
@@ -447,7 +447,7 @@ export default function PersonalSignupPage() {
                 value={formData.firstNameKana}
                 onChange={(e) => setFormData({ ...formData, firstNameKana: e.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
                 placeholder="メイを入力"
                 disabled={loading}
               />
@@ -464,7 +464,7 @@ export default function PersonalSignupPage() {
               value={formData.birthDate}
               onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+              className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
               disabled={loading}
             />
           </div>
@@ -478,7 +478,7 @@ export default function PersonalSignupPage() {
               value={formData.gender}
               onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'male' | 'female' | 'other' })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+              className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
               disabled={loading}
             >
               <option value="">選択してください</option>
@@ -498,7 +498,7 @@ export default function PersonalSignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+              className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
               placeholder="メールアドレスを入力"
               disabled={loading}
             />
@@ -519,7 +519,7 @@ export default function PersonalSignupPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 minLength={6}
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+                className="w-full h-12 px-4 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
                 placeholder="6文字以上で入力"
                 disabled={loading}
               />
@@ -555,7 +555,7 @@ export default function PersonalSignupPage() {
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
                 minLength={6}
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
+                className="w-full h-12 px-4 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
                 placeholder="パスワードを再入力"
                 disabled={loading}
               />

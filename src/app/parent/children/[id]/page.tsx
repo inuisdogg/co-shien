@@ -404,10 +404,28 @@ export default function ChildDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
-          <p className="text-gray-600">読み込み中...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white shadow-sm border-b border-gray-200 px-4 py-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-4" />
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gray-200 rounded-full animate-pulse" />
+              <div className="space-y-2">
+                <div className="h-6 w-40 bg-gray-200 rounded animate-pulse" />
+                <div className="h-4 w-60 bg-gray-200 rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4" />
+              <div className="h-4 bg-gray-100 rounded animate-pulse w-1/2" />
+              <div className="h-4 bg-gray-100 rounded animate-pulse w-2/3" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -476,9 +494,9 @@ export default function ChildDetailPage() {
           <div className="flex border-b border-gray-200 overflow-x-auto">
             {[
               { id: 'info', label: '基本情報', icon: FileText },
-              { id: 'facilities', label: '利用施設', icon: Building2 },
-              { id: 'records', label: '利用実績', icon: Calendar },
-              { id: 'calendar', label: '予定表', icon: Calendar },
+              { id: 'calendar', label: '予定', icon: Calendar },
+              { id: 'records', label: '記録', icon: FileText },
+              { id: 'facilities', label: '連絡帳', icon: MessageSquare },
             ].map((tab) => {
               const Icon = tab.icon;
               return (

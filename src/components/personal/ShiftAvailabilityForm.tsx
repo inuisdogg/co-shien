@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Send,
   Save,
+  Check,
 } from 'lucide-react';
 import {
   ShiftAvailabilitySubmission,
@@ -454,17 +455,17 @@ export default function ShiftAvailabilityForm({
                         key={dateStr}
                         onClick={() => canEdit && toggleDate(date)}
                         disabled={!canEdit}
-                        className={`h-12 rounded-lg border-2 transition-all flex flex-col items-center justify-center ${
-                          canEdit ? 'hover:border-[#00c4cc] cursor-pointer' : 'cursor-not-allowed opacity-70'
+                        className={`min-h-12 h-12 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center ${
+                          canEdit ? 'hover:border-[#00c4cc] hover:shadow-sm cursor-pointer active:scale-95' : 'cursor-not-allowed opacity-70'
                         } ${
                           isSelected
-                            ? 'bg-[#00c4cc] border-[#00c4cc] text-white'
+                            ? 'bg-[#00c4cc] border-[#00c4cc] text-white shadow-sm'
                             : isWeekend
                             ? 'bg-red-50 border-gray-200'
                             : 'bg-white border-gray-200'
                         }`}
                       >
-                        <span className={`text-sm font-medium ${
+                        <span className={`text-sm font-bold ${
                           isSelected
                             ? 'text-white'
                             : dayOfWeek === 0
@@ -476,7 +477,7 @@ export default function ShiftAvailabilityForm({
                           {date.getDate()}
                         </span>
                         {isSelected && (
-                          <span className="text-xs">○</span>
+                          <Check className="w-3 h-3 text-white" />
                         )}
                       </button>
                     );

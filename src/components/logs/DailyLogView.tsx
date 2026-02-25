@@ -352,121 +352,216 @@ export default function DailyLogView() {
     ? getContactLogByScheduleId(selectedScheduleItem.id)
     : undefined;
 
+  // 今日の概要データ
+  const todayInfo = dayStatusMap[todayStr];
+  const todayTotal = todayInfo?.total || 0;
+  const todayRecordCompleted = todayInfo?.recordCompleted || 0;
+  const todayContactCompleted = todayInfo?.contactCompleted || 0;
+
+  // 折りたたみ状態
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
+
+  const isSectionCollapsed = (sectionId: string) => collapsedSections.has(sectionId);
+
+  // セクションヘッダーコンポーネント
+  const SectionHeader = ({ id, title, icon: Icon, badge }: { id: string; title: string; icon: React.ElementType; badge?: React.ReactNode }) => (
+    <button
+      onClick={() => toggleSection(id)}
+      className="w-full flex items-center justify-between px-5 py-3 bg-gray-50 hover:bg-gray-100 rounded-t-xl transition-colors border-b border-gray-100"
+    >
+      <div className="flex items-center gap-2">
+        <Icon className="w-5 h-5 text-[#00c4cc]" />
+        <span className="font-bold text-gray-800 text-sm">{title}</span>
+        {badge}
+      </div>
+      {isSectionCollapsed(id) ? (
+        <ChevronRight className="w-4 h-4 text-gray-400" />
+      ) : (
+        <ChevronLeft className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
+      )}
+    </button>
+  );
+
   return (
     <div className="space-y-6">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <BookOpen className="w-7 h-7 text-[#00c4cc]" />
-            実績記録と連絡帳
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            カレンダーの日付をクリックして、児童の記録を入力してください
-          </p>
+      {/* ヘッダー: 日付ナビゲーション */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-[#00c4cc] to-[#00b0b8] px-6 py-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                <BookOpen className="w-6 h-6" />
+                実績記録と連絡帳
+              </h1>
+              <p className="text-white/80 text-sm mt-1">
+                日々の記録を管理します
+              </p>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={goToToday}
-          className="px-4 py-2 text-sm font-medium text-[#00c4cc] border border-[#00c4cc] rounded-lg hover:bg-[#00c4cc]/5 transition-colors"
-        >
-          今日
-        </button>
-      </div>
 
-      {/* カレンダー */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {/* 月ナビゲーション */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+        {/* 日付ナビゲーション */}
+        <div className="flex items-center justify-center gap-3 px-6 py-4 bg-white">
           <button
             onClick={() => navigateMonth('prev')}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="前月"
           >
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <h2 className="text-lg font-bold text-gray-800">
+          <h2 className="text-lg font-bold text-gray-800 min-w-[160px] text-center">
             {currentDate.getFullYear()}年{currentDate.getMonth() + 1}月
           </h2>
           <button
             onClick={() => navigateMonth('next')}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="次月"
           >
             <ChevronRight className="w-5 h-5 text-gray-600" />
           </button>
+          <button
+            onClick={goToToday}
+            className="ml-2 px-4 py-2 text-sm font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors shadow-sm"
+          >
+            本日
+          </button>
         </div>
+      </div>
 
-        {/* 曜日ヘッダー */}
-        <div className="grid grid-cols-7 border-b border-gray-200">
-          {weekDays.map((day, index) => (
-            <div
-              key={day}
-              className={`py-2 text-center text-sm font-medium ${
-                index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-600'
-              }`}
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* カレンダー本体 */}
-        <div className="grid grid-cols-7">
-          {calendarDays.map(({ date, day, isCurrentMonth }, index) => {
-            const dayStatus = dayStatusMap[date];
-            const isToday = date === todayStr;
-            const dayOfWeek = index % 7;
-            const hasSchedules = dayStatus && dayStatus.total > 0;
-            const allRecordCompleted = hasSchedules && dayStatus.recordCompleted === dayStatus.total;
-            const allContactCompleted = hasSchedules && dayStatus.contactCompleted === dayStatus.total;
-
-            return (
+      {/* 本日の概要 */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <SectionHeader
+          id="overview"
+          title="本日の概要"
+          icon={CircleDot}
+          badge={
+            <span className="text-xs bg-[#00c4cc]/10 text-[#00c4cc] px-2 py-0.5 rounded-full font-medium">
+              {todayTotal}名利用
+            </span>
+          }
+        />
+        {!isSectionCollapsed('overview') && (
+          <div className="p-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <div className="text-xs text-blue-600 font-medium mb-1">本日の利用者</div>
+                <div className="text-2xl font-bold text-blue-800">{todayTotal}<span className="text-sm font-normal ml-1">名</span></div>
+              </div>
+              <div className={`rounded-xl p-4 border ${todayRecordCompleted === todayTotal && todayTotal > 0 ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'}`}>
+                <div className={`text-xs font-medium mb-1 ${todayRecordCompleted === todayTotal && todayTotal > 0 ? 'text-green-600' : 'text-amber-600'}`}>実績記録</div>
+                <div className={`text-2xl font-bold ${todayRecordCompleted === todayTotal && todayTotal > 0 ? 'text-green-800' : 'text-amber-800'}`}>
+                  {todayRecordCompleted}/{todayTotal}
+                </div>
+              </div>
+              <div className={`rounded-xl p-4 border ${todayContactCompleted === todayTotal && todayTotal > 0 ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'}`}>
+                <div className={`text-xs font-medium mb-1 ${todayContactCompleted === todayTotal && todayTotal > 0 ? 'text-green-600' : 'text-orange-600'}`}>連絡帳</div>
+                <div className={`text-2xl font-bold ${todayContactCompleted === todayTotal && todayTotal > 0 ? 'text-green-800' : 'text-orange-800'}`}>
+                  {todayContactCompleted}/{todayTotal}
+                </div>
+              </div>
               <button
-                key={date}
-                onClick={() => handleDateClick(date)}
-                className={`
-                  relative min-h-[90px] p-2 border-b border-r border-gray-100 text-left transition-all
-                  ${!isCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
-                  ${isToday ? 'bg-yellow-50' : ''}
-                  hover:bg-gray-100
-                `}
+                onClick={goToToday}
+                className="bg-[#00c4cc]/5 rounded-xl p-4 border border-[#00c4cc]/20 hover:bg-[#00c4cc]/10 transition-colors text-left"
               >
-                {/* 日付 */}
-                <span className={`
-                  inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium
-                  ${isToday ? 'bg-[#00c4cc] text-white' : ''}
-                  ${dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : ''}
-                  ${!isCurrentMonth ? 'text-gray-400' : ''}
-                `}>
-                  {day}
-                </span>
-
-                {/* 予約人数とステータスインジケーター */}
-                {hasSchedules && isCurrentMonth && (
-                  <div className="mt-1 space-y-1">
-                    <div className="text-xs text-gray-600 font-medium">
-                      {dayStatus.total}名
-                    </div>
-                    {/* 実績記録ステータス */}
-                    <div className={`
-                      text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1
-                      ${allRecordCompleted ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}
-                    `}>
-                      <FileText className="w-3 h-3" />
-                      <span>実績 {dayStatus.recordCompleted}/{dayStatus.total}</span>
-                    </div>
-                    {/* 連絡帳ステータス */}
-                    <div className={`
-                      text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1
-                      ${allContactCompleted ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}
-                    `}>
-                      <MessageSquare className="w-3 h-3" />
-                      <span>連絡 {dayStatus.contactCompleted}/{dayStatus.total}</span>
-                    </div>
-                  </div>
-                )}
+                <div className="text-xs text-[#00c4cc] font-medium mb-1">クイックアクセス</div>
+                <div className="text-sm font-bold text-gray-700">本日の記録を開く →</div>
               </button>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* カレンダー */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <SectionHeader
+          id="calendar"
+          title="月間カレンダー"
+          icon={Calendar}
+        />
+        {!isSectionCollapsed('calendar') && (
+          <>
+            {/* 曜日ヘッダー */}
+            <div className="grid grid-cols-7 border-b border-gray-200">
+              {weekDays.map((day, index) => (
+                <div
+                  key={day}
+                  className={`py-2.5 text-center text-sm font-bold ${
+                    index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-600'
+                  }`}
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* カレンダー本体 */}
+            <div className="grid grid-cols-7">
+              {calendarDays.map(({ date, day, isCurrentMonth }, index) => {
+                const dayStatus = dayStatusMap[date];
+                const isToday = date === todayStr;
+                const dayOfWeek = index % 7;
+                const hasSchedules = dayStatus && dayStatus.total > 0;
+                const allRecordCompleted = hasSchedules && dayStatus.recordCompleted === dayStatus.total;
+                const allContactCompleted = hasSchedules && dayStatus.contactCompleted === dayStatus.total;
+
+                return (
+                  <button
+                    key={date}
+                    onClick={() => handleDateClick(date)}
+                    className={`
+                      relative min-h-[90px] p-2 border-b border-r border-gray-100 text-left transition-all
+                      ${!isCurrentMonth ? 'bg-gray-50/50 text-gray-400' : 'bg-white hover:bg-gray-50'}
+                      ${isToday ? 'bg-[#00c4cc]/5 ring-2 ring-inset ring-[#00c4cc]/30' : ''}
+                    `}
+                  >
+                    <span className={`
+                      inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium
+                      ${isToday ? 'bg-[#00c4cc] text-white' : ''}
+                      ${dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : ''}
+                      ${!isCurrentMonth ? 'text-gray-400' : ''}
+                    `}>
+                      {day}
+                    </span>
+
+                    {hasSchedules && isCurrentMonth && (
+                      <div className="mt-1 space-y-1">
+                        <div className="text-xs text-gray-600 font-medium">
+                          {dayStatus.total}名
+                        </div>
+                        <div className={`
+                          text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1
+                          ${allRecordCompleted ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}
+                        `}>
+                          <FileText className="w-3 h-3" />
+                          <span>実績 {dayStatus.recordCompleted}/{dayStatus.total}</span>
+                        </div>
+                        <div className={`
+                          text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1
+                          ${allContactCompleted ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}
+                        `}>
+                          <MessageSquare className="w-3 h-3" />
+                          <span>連絡 {dayStatus.contactCompleted}/{dayStatus.total}</span>
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* 日付選択モーダル（児童一覧） */}

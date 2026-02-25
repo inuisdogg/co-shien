@@ -186,7 +186,7 @@ export default function ClientSignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FBBF6A] to-[#F6AD55] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F472B6]/80 to-[#EC4899] p-4">
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -255,7 +255,7 @@ export default function ClientSignupPage() {
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowTermsModal(false)}
-                className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-2 px-4 rounded-md transition-colors"
               >
                 閉じる
               </button>
@@ -264,101 +264,112 @@ export default function ClientSignupPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
             src="/logo.svg"
             alt="Roots"
-            width={200}
-            height={64}
-            className="h-16 w-auto mx-auto mb-4"
+            width={160}
+            height={52}
+            className="h-12 w-auto mx-auto mb-6"
             priority
           />
-          <div className="mb-2">
-            <span className="inline-block bg-[#F6AD55] text-white text-xs font-bold px-3 py-1 rounded-full">
-              利用者（保護者）向け
+          <div className="mb-3">
+            <span className="inline-block bg-[#F472B6] text-white text-xs font-bold px-3 py-1.5 rounded-full">
+              保護者の方はこちら
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">新規登録</h1>
-          <p className="text-gray-600 text-sm mt-2">保護者アカウントを作成してお子様の情報を登録</p>
+          <h1 className="text-2xl font-bold text-gray-800">アカウント作成</h1>
+          <p className="text-gray-500 text-sm mt-2">
+            お子様の通所施設との連携のため、<br className="sm:hidden" />保護者アカウントを作成します
+          </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm mb-6 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            {error}
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">入力内容をご確認ください</p>
+                <p className="text-xs text-red-600 mt-0.5">{error}</p>
+              </div>
+            </div>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-bold text-gray-700 mb-2">
-                姓 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="lastName"
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
-                placeholder="山田"
-                disabled={loading}
-              />
+          {/* お名前セクション */}
+          <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100">
+            <p className="text-xs font-bold text-gray-500 mb-3">お名前</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="lastName" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  姓 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  placeholder="山田"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label htmlFor="firstName" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  placeholder="太郎"
+                  disabled={loading}
+                />
+              </div>
             </div>
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-bold text-gray-700 mb-2">
-                名 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="firstName"
-                type="text"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
-                placeholder="太郎"
-                disabled={loading}
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="lastNameKana" className="block text-sm font-bold text-gray-700 mb-2">
-                セイ <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="lastNameKana"
-                type="text"
-                value={formData.lastNameKana}
-                onChange={(e) => setFormData({ ...formData, lastNameKana: e.target.value })}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
-                placeholder="ヤマダ"
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label htmlFor="firstNameKana" className="block text-sm font-bold text-gray-700 mb-2">
-                メイ <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="firstNameKana"
-                type="text"
-                value={formData.firstNameKana}
-                onChange={(e) => setFormData({ ...formData, firstNameKana: e.target.value })}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
-                placeholder="タロウ"
-                disabled={loading}
-              />
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label htmlFor="lastNameKana" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  セイ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="lastNameKana"
+                  type="text"
+                  value={formData.lastNameKana}
+                  onChange={(e) => setFormData({ ...formData, lastNameKana: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  placeholder="ヤマダ"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label htmlFor="firstNameKana" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  メイ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="firstNameKana"
+                  type="text"
+                  value={formData.firstNameKana}
+                  onChange={(e) => setFormData({ ...formData, firstNameKana: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  placeholder="タロウ"
+                  disabled={loading}
+                />
+              </div>
             </div>
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-bold text-gray-700 mb-2">
+            <label htmlFor="phone" className="block text-sm font-semibold text-gray-700 mb-1.5">
               電話番号 <span className="text-red-500">*</span>
             </label>
             <input
@@ -367,14 +378,14 @@ export default function ClientSignupPage() {
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
               placeholder="090-1234-5678"
               disabled={loading}
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
+            <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1.5">
               メールアドレス <span className="text-red-500">*</span>
             </label>
             <input
@@ -383,17 +394,17 @@ export default function ClientSignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
               placeholder="example@email.com"
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              このメールアドレスがログインIDとして使用されます
+            <p className="text-xs text-gray-400 mt-1.5">
+              このメールアドレスがログインIDになります
             </p>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
               パスワード <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -404,8 +415,8 @@ export default function ClientSignupPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 minLength={6}
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
-                placeholder="6文字以上"
+                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                placeholder="6文字以上のパスワード"
                 disabled={loading}
               />
               <button
@@ -429,7 +440,7 @@ export default function ClientSignupPage() {
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-bold text-gray-700 mb-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700 mb-1.5">
               パスワード（確認） <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -440,8 +451,8 @@ export default function ClientSignupPage() {
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
                 minLength={6}
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
-                placeholder="パスワードを再入力"
+                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                placeholder="もう一度パスワードを入力"
                 disabled={loading}
               />
               <button
@@ -464,20 +475,20 @@ export default function ClientSignupPage() {
             </div>
           </div>
 
-          <div className="flex items-start">
+          <div className="flex items-start bg-gray-50 rounded-lg p-3 border border-gray-100">
             <input
               type="checkbox"
               id="terms"
               checked={formData.agreedToTerms}
               onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
-              className="mt-1 mr-2"
+              className="mt-0.5 mr-3 w-5 h-5 accent-[#F6AD55]"
               disabled={loading}
             />
             <label htmlFor="terms" className="text-sm text-gray-700">
               <button
                 type="button"
                 onClick={() => setShowTermsModal(true)}
-                className="text-[#F6AD55] hover:underline"
+                className="text-[#F472B6] hover:underline font-medium"
               >
                 利用規約
               </button>
@@ -488,9 +499,9 @@ export default function ClientSignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg text-base"
           >
-            {loading ? '登録中...' : 'アカウントを作成'}
+            {loading ? '登録中...' : 'アカウントを作成する'}
           </button>
         </form>
 
@@ -499,7 +510,7 @@ export default function ClientSignupPage() {
             既にアカウントをお持ちの方は{' '}
             <button
               onClick={() => router.push('/parent/login')}
-              className="text-[#F6AD55] hover:underline font-bold"
+              className="text-[#F472B6] hover:underline font-bold"
             >
               ログイン
             </button>

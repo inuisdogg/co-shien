@@ -50,7 +50,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
   onEditLeave,
   onEditPersonnel,
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'personnel' | 'leave'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'qualifications' | 'personnel' | 'leave' | 'settings'>('info');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!isOpen || !staff) return null;
@@ -85,15 +85,83 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
     return (staff.personnelSettings.contractedWeeklyHours / 40).toFixed(2);
   };
 
+  // 資格タブ
+  const renderQualificationsTab = () => (
+    <div className="space-y-6">
+      <section>
+        <h4 className="text-sm font-medium text-gray-500 mb-3">保有資格</h4>
+        {getQualificationLabels().length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {getQualificationLabels().map((label, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#00c4cc]/5 text-[#00c4cc] rounded-lg text-sm font-medium border border-[#00c4cc]/10"
+              >
+                <Award size={14} />
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">資格が登録されていません</p>
+        )}
+      </section>
+
+      <section>
+        <h4 className="text-sm font-medium text-gray-500 mb-3">実務経験</h4>
+        {staff.personnelSettings?.yearsOfExperience !== undefined && staff.personnelSettings.yearsOfExperience > 0 ? (
+          <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+            <Clock size={16} className="text-gray-400" />
+            <span className="font-medium text-gray-700">実務経験 {staff.personnelSettings.yearsOfExperience}年</span>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">経験年数が登録されていません</p>
+        )}
+      </section>
+    </div>
+  );
+
+  // 設定タブ
+  const renderSettingsTab = () => (
+    <div className="space-y-6">
+      <section>
+        <h4 className="text-sm font-medium text-gray-500 mb-3">アカウント情報</h4>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
+            <span className="text-gray-600">雇用形態</span>
+            <span className="font-medium text-gray-800">{staff.type || '未設定'}</span>
+          </div>
+          <div className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
+            <span className="text-gray-600">権限</span>
+            <span className="font-medium text-gray-800">{staff.role || '未設定'}</span>
+          </div>
+        </div>
+      </section>
+
+      {staff.personnelSettings?.notes && (
+        <section>
+          <h4 className="text-sm font-medium text-gray-500 mb-3">メモ</h4>
+          <div className="p-3 bg-gray-50 rounded-lg text-gray-700 text-sm whitespace-pre-wrap">
+            {staff.personnelSettings.notes}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+
   // タブコンテンツ
   const renderTabContent = () => {
     switch (activeTab) {
       case 'info':
         return renderInfoTab();
+      case 'qualifications':
+        return renderQualificationsTab();
       case 'personnel':
         return renderPersonnelTab();
       case 'leave':
         return renderLeaveTab();
+      case 'settings':
+        return renderSettingsTab();
       default:
         return null;
     }
@@ -415,8 +483,10 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
           <div className="flex gap-6">
             {[
               { id: 'info', label: '基本情報' },
-              { id: 'personnel', label: '人員配置' },
-              { id: 'leave', label: '有給管理' },
+              { id: 'qualifications', label: '資格' },
+              { id: 'personnel', label: '勤怠' },
+              { id: 'leave', label: '休暇' },
+              { id: 'settings', label: '設定' },
             ].map((tab) => (
               <button
                 key={tab.id}

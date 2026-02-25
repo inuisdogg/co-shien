@@ -1144,82 +1144,98 @@ export default function AttendanceCalendar({
 
         {/* ヒント */}
         <p className="text-xs text-gray-500 text-center">
-          日付をタップして休暇申請ができます
+          日付をタップして勤怠登録・休暇申請ができます
         </p>
 
         {/* 凡例 */}
-        <div className="flex flex-wrap gap-3 text-xs text-gray-600 justify-center">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-[#00c4cc]/20 border border-[#00c4cc]" />
-            <span>今日</span>
+        <div className="flex flex-wrap gap-3 text-xs text-gray-600 justify-center py-2 px-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+            <span>出勤</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+            <span>休み</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+            <span>有給</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+            <span>遅刻</span>
           </div>
           {shiftPatterns.slice(0, 3).map(pattern => (
-            <div key={pattern.id} className="flex items-center gap-1">
+            <div key={pattern.id} className="flex items-center gap-1.5">
               <div
-                className="w-3 h-3 rounded"
+                className="w-2.5 h-2.5 rounded-full"
                 style={{ backgroundColor: pattern.color }}
               />
               <span>{pattern.name}</span>
             </div>
           ))}
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-green-100 border border-green-200" />
-            <span>有給</span>
-          </div>
         </div>
 
-        {/* 月間実績テーブル */}
-        <div className="border-t border-gray-200 pt-3 mt-2">
-          <table className="w-full text-xs border-collapse">
-            <tbody>
-              <tr>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">所定出勤日数</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
-                  {shiftStats.hasShifts ? `${shiftStats.scheduledShiftDays}日` : `${shiftStats.prescribedWorkDays}日`}
-                </td>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">実出勤日数</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
-                  {monthlyStats.workedDays}日
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">所定労働時間</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
-                  {shiftStats.scheduledWorkHours}:{String(shiftStats.scheduledWorkMinutesRemainder).padStart(2, '0')}
-                </td>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">総労働時間</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
-                  {monthlyStats.totalWorkHours}:{String(monthlyStats.totalWorkMinutesRemainder).padStart(2, '0')}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">過不足時間</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
-                  {(() => {
-                    const actualMinutes = monthlyStats.totalWorkHours * 60 + monthlyStats.totalWorkMinutesRemainder;
-                    const scheduledMinutes = shiftStats.totalScheduledMinutes;
-                    const diff = actualMinutes - scheduledMinutes;
-                    const sign = diff >= 0 ? '+' : '-';
-                    const absDiff = Math.abs(diff);
-                    return `${sign}${Math.floor(absDiff / 60)}:${String(absDiff % 60).padStart(2, '0')}`;
-                  })()}
-                </td>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">法定休日労働</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">0:00</td>
-              </tr>
-              <tr>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">法定時間内残業</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">0:00</td>
-                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">法定時間外残業</td>
-                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
-                  {(() => {
-                    const overtimeMinutes = Math.max(0, (monthlyStats.totalWorkHours * 60 + monthlyStats.totalWorkMinutesRemainder) - shiftStats.totalScheduledMinutes);
-                    return `${Math.floor(overtimeMinutes / 60)}:${String(overtimeMinutes % 60).padStart(2, '0')}`;
-                  })()}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        {/* 月間実績サマリー */}
+        <div className="border-t border-gray-200 pt-3 mt-2 space-y-3">
+          {/* メインサマリーカード */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="p-3 bg-gray-50 rounded-lg text-center">
+              <div className="text-xs text-gray-500 mb-1">出勤日数</div>
+              <div className="text-lg font-bold text-gray-800">{monthlyStats.workedDays}<span className="text-xs font-normal text-gray-400">/{shiftStats.hasShifts ? shiftStats.scheduledShiftDays : shiftStats.prescribedWorkDays}</span></div>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg text-center">
+              <div className="text-xs text-gray-500 mb-1">総労働時間</div>
+              <div className="text-lg font-bold text-gray-800">{monthlyStats.totalWorkHours}<span className="text-xs font-normal text-gray-400">:{String(monthlyStats.totalWorkMinutesRemainder).padStart(2, '0')}</span></div>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg text-center">
+              <div className="text-xs text-gray-500 mb-1">残業</div>
+              <div className="text-lg font-bold text-orange-600">
+                {(() => {
+                  const overtimeMinutes = Math.max(0, (monthlyStats.totalWorkHours * 60 + monthlyStats.totalWorkMinutesRemainder) - shiftStats.totalScheduledMinutes);
+                  return `${Math.floor(overtimeMinutes / 60)}:${String(overtimeMinutes % 60).padStart(2, '0')}`;
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* 詳細テーブル */}
+          <div className="bg-gray-50 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <tbody>
+                <tr className="border-b border-gray-200">
+                  <td className="px-3 py-2 text-gray-500">所定出勤日数</td>
+                  <td className="px-3 py-2 text-right font-medium text-gray-800">
+                    {shiftStats.hasShifts ? `${shiftStats.scheduledShiftDays}日` : `${shiftStats.prescribedWorkDays}日`}
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">所定労働時間</td>
+                  <td className="px-3 py-2 text-right font-medium text-gray-800">
+                    {shiftStats.scheduledWorkHours}:{String(shiftStats.scheduledWorkMinutesRemainder).padStart(2, '0')}
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-200">
+                  <td className="px-3 py-2 text-gray-500">過不足時間</td>
+                  <td className="px-3 py-2 text-right font-medium text-gray-800">
+                    {(() => {
+                      const actualMinutes = monthlyStats.totalWorkHours * 60 + monthlyStats.totalWorkMinutesRemainder;
+                      const scheduledMinutes = shiftStats.totalScheduledMinutes;
+                      const diff = actualMinutes - scheduledMinutes;
+                      const sign = diff >= 0 ? '+' : '-';
+                      const absDiff = Math.abs(diff);
+                      return `${sign}${Math.floor(absDiff / 60)}:${String(absDiff % 60).padStart(2, '0')}`;
+                    })()}
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">法定時間外残業</td>
+                  <td className="px-3 py-2 text-right font-medium text-gray-800">
+                    {(() => {
+                      const overtimeMinutes = Math.max(0, (monthlyStats.totalWorkHours * 60 + monthlyStats.totalWorkMinutesRemainder) - shiftStats.totalScheduledMinutes);
+                      return `${Math.floor(overtimeMinutes / 60)}:${String(overtimeMinutes % 60).padStart(2, '0')}`;
+                    })()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

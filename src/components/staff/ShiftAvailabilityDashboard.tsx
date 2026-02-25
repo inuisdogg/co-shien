@@ -365,22 +365,29 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
 
       {/* サマリーカード */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <div className="flex items-center gap-2 text-gray-600 mb-1">
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-2 text-gray-600 mb-2">
             <Users className="w-4 h-4" />
             <span className="text-sm">対象スタッフ</span>
           </div>
           <p className="text-2xl font-bold">{summary.total}名</p>
+          {/* プログレスバー */}
+          <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#00c4cc] rounded-full transition-all duration-500"
+              style={{ width: `${summary.total > 0 ? (summary.submitted / summary.total) * 100 : 0}%` }}
+            />
+          </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <div className="flex items-center gap-2 text-green-600 mb-1">
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-2 text-green-600 mb-2">
             <CheckCircle className="w-4 h-4" />
             <span className="text-sm">提出済み</span>
           </div>
           <p className="text-2xl font-bold text-green-600">{summary.submitted}名</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <div className="flex items-center gap-2 text-orange-600 mb-1">
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-2 text-orange-600 mb-2">
             <AlertCircle className="w-4 h-4" />
             <span className="text-sm">未提出</span>
           </div>

@@ -120,77 +120,86 @@ export default function ClientLoginPage() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FBBF6A] to-[#F6AD55]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F472B6]/80 to-[#EC4899]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FBBF6A] to-[#F6AD55] p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F472B6]/80 to-[#EC4899] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
             src="/logo.svg"
             alt="Roots"
-            width={200}
-            height={64}
-            className="h-16 w-auto mx-auto mb-4"
+            width={180}
+            height={56}
+            className="h-14 w-auto mx-auto mb-4"
             priority
           />
-          <div className="mb-2">
-            <span className="inline-block bg-[#F6AD55] text-white text-xs font-bold px-3 py-1 rounded-full">
-              利用者（保護者）向け
+          <div className="mb-3">
+            <span className="inline-block bg-[#F472B6]/10 text-[#F472B6] text-xs font-bold px-3 py-1 rounded-lg">
+              保護者
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">ログイン</h1>
-          <p className="text-gray-600 text-sm mt-2">
+          <h1 className="text-2xl font-bold text-gray-900">ログイン</h1>
+          <p className="text-gray-500 text-sm mt-1">
             ログインIDとパスワードを入力してください
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm mb-6">
-            {error}
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6 flex items-start gap-2">
+            <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
+            <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-1.5">
               ログインID（メールアドレス）
             </label>
-            <input
-              id="email"
-              type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
-              placeholder="ログインID（メールアドレス）を入力"
-              disabled={loading}
-            />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              </div>
+              <input
+                id="email"
+                type="text"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] transition-all"
+                placeholder="example@email.com"
+                disabled={loading}
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-1.5">
               パスワード
             </label>
             <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              </div>
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-transparent"
+                className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] transition-all"
                 placeholder="パスワードを入力"
                 disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
                 disabled={loading}
               >
                 {showPassword ? (
@@ -207,68 +216,70 @@ export default function ClientLoginPage() {
             </div>
           </div>
 
-          <div className="flex items-center">
-            <input
-              id="rememberMe"
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 text-[#F6AD55] border-gray-300 rounded focus:ring-[#F6AD55]"
-              disabled={loading}
-            />
-            <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
-              ログイン情報を保存する
-            </label>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-[#F472B6] border-gray-300 rounded focus:ring-[#F472B6]"
+                disabled={loading}
+              />
+              <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
+                ログイン情報を保存
+              </label>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/login/forgot-password')}
+              className="text-xs text-[#F472B6] hover:underline"
+            >
+              パスワードを忘れた場合
+            </button>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-12 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
           >
-            {loading ? 'ログイン中...' : 'ログイン'}
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ログイン中...
+              </>
+            ) : 'ログイン'}
           </button>
         </form>
 
-        <div className="mt-4 flex flex-col items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => router.push('/login/forgot-login-id')}
-            className="text-xs text-[#F6AD55] hover:underline"
-          >
-            ログインIDを忘れた場合
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/login/forgot-password')}
-            className="text-xs text-[#F6AD55] hover:underline"
-          >
-            パスワードを忘れた場合
-          </button>
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-center text-sm text-gray-600 mb-3">
+        <div className="mt-6 pt-6 border-t border-gray-100">
+          <p className="text-center text-sm text-gray-500 mb-3">
             アカウントをお持ちでない方
           </p>
           <button
             type="button"
             onClick={() => router.push('/parent/signup')}
-            className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm"
+            className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-[#F472B6] hover:text-[#F472B6] font-bold rounded-lg transition-colors text-sm min-w-[120px]"
           >
             保護者として新規登録
           </button>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-center text-xs text-gray-400">
-            <button
-              onClick={() => router.push('/career/login')}
-              className="hover:underline"
-            >
-              スタッフとしてログインする場合はこちら
-            </button>
-          </p>
+        <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-4">
+          <button
+            onClick={() => router.push('/login/forgot-login-id')}
+            className="text-xs text-gray-400 hover:text-[#F472B6] hover:underline"
+          >
+            ログインIDを忘れた場合
+          </button>
+          <span className="text-xs text-gray-300">|</span>
+          <button
+            onClick={() => router.push('/career/login')}
+            className="text-xs text-gray-400 hover:text-[#818CF8] hover:underline"
+          >
+            スタッフの方はこちら
+          </button>
         </div>
       </div>
     </div>
