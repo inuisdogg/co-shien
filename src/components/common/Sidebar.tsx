@@ -18,18 +18,13 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
-  Calculator,
   FileText,
   FolderOpen,
   Shield,
-  ClipboardList,
   ListChecks,
   AlertTriangle,
   DollarSign,
   GraduationCap,
-  Gavel,
-  Package,
-  FileCheck,
   CalendarMinus,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,41 +41,30 @@ type FeaturePhase = 1 | 2 | 3;
 // 各メニュー項目のフェーズ設定
 const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   // Phase 1: 実務必須
-  'schedule': 1,      // 利用予約
-  'children': 1,      // 児童管理
-  'daily-log': 1,     // 業務日誌
-  'support-plan': 1,  // 個別支援計画
-  'staff': 1,         // スタッフ管理（旧）
-  'staff-master': 1,  // スタッフマスタ（新）
-  'shift': 1,         // シフト管理
-  'dashboard': 1,     // ダッシュボード
-  'facility': 1,      // 施設情報
-  'documents': 1,     // 書類管理
-  'addition-settings': 1, // 加算体制設定
-  'knowledge': 1,     // ナレッジベース
-  'addition-simulation': 1, // 加算シミュレーション
-  'addition-simulator': 1,  // 加算シミュレーター
-  'staff-planning': 1,      // 採用計画シミュレーター
-  'staffing': 1,            // 人員配置管理
-  'work-schedule': 1,       // 勤務体制一覧表
-  'leave-approval': 1,      // 休暇申請管理
-  'service-records': 1,     // サービス提供記録
+  'schedule': 1,        // 利用予約
+  'children': 1,        // 児童管理
+  'daily-log': 1,       // 業務日誌
+  'support-plan': 1,    // 個別支援計画
+  'staff-master': 1,    // スタッフ管理
+  'shift': 1,           // シフト管理
+  'staffing': 1,        // 勤務・配置（人員配置＋勤務体制一覧を統合）
+  'leave-approval': 1,  // 休暇管理
+  'dashboard': 1,       // ダッシュボード
+  'addition-settings': 1, // 加算・収益（加算体制設定＋シミュレーターを統合）
+  'finance': 1,         // 財務管理
+  'training': 1,        // 研修・委員会（研修記録＋委員会を統合）
+  'incident': 1,        // 事故・苦情報告
+  'documents': 1,       // 書類・監査（書類管理＋監査エクスポート＋サービス提供記録を統合）
+  'facility': 1,        // 施設情報
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
   'management': 2,        // 経営設定
-  'addition-catalog': 1,  // 加算一覧（Phase 1で表示）
-  'training': 1,          // 研修記録
-  'committee': 1,         // 委員会管理
-  'finance': 1,           // 財務管理（損益・CF・経費を統合）
-  'incident': 1,          // 苦情・事故報告
-  'audit-export': 1,      // 監査書類エクスポート
+  'government': 2,        // 行政連携
 
   // Phase 3: 外部連携・SaaS化
-  'transport': 1,         // 送迎ルート（Phase 1で表示）
   'chat': 3,              // チャット
   'lead': 3,              // リード管理
-  'government': 2,        // 行政連携
 };
 
 // 現在のフェーズを取得
@@ -144,20 +128,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'children', label: '児童管理', icon: Users, permission: 'children' as const },
         { id: 'daily-log', label: '実績と連絡帳', icon: BookOpen, permission: 'dailyLog' as const },
         { id: 'support-plan', label: '個別支援計画', icon: FileText, permission: 'children' as const },
-        { id: 'documents', label: '書類管理', icon: FolderOpen, permission: 'children' as const },
-        { id: 'service-records', label: 'サービス提供記録', icon: FileCheck, permission: 'children' as const },
       ],
     },
     {
       category: 'スタッフ',
       icon: CalendarCheck,
       items: [
-        { id: 'staff-master', label: 'スタッフマスタ', icon: Users, permission: 'staff' as const },
+        { id: 'staff-master', label: 'スタッフ管理', icon: Users, permission: 'staff' as const },
         { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'shift' as const },
-        { id: 'staffing', label: '人員配置管理', icon: Shield, permission: 'staff' as const },
-        { id: 'work-schedule', label: '勤務体制一覧表', icon: ClipboardList, permission: 'staff' as const },
-        { id: 'training', label: '研修記録', icon: GraduationCap, permission: 'staff' as const },
-        { id: 'leave-approval', label: '休暇申請管理', icon: CalendarMinus, permission: 'staff' as const },
+        { id: 'staffing', label: '勤務・配置', icon: Shield, permission: 'staff' as const },
+        { id: 'leave-approval', label: '休暇管理', icon: CalendarMinus, permission: 'staff' as const },
       ],
     },
     {
@@ -165,19 +145,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       icon: BarChart3,
       items: [
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
-        { id: 'addition-settings', label: '加算体制設定', icon: ListChecks, permission: 'dashboard' as const },
-        { id: 'addition-simulator', label: '加算シミュレーター', icon: Calculator, permission: 'dashboard' as const },
-        { id: 'staff-planning', label: '採用計画シミュレーター', icon: Users, permission: 'dashboard' as const },
+        { id: 'addition-settings', label: '加算・収益', icon: ListChecks, permission: 'dashboard' as const },
         { id: 'finance', label: '財務管理', icon: DollarSign, permission: 'dashboard' as const },
       ],
     },
     {
-      category: '監査・コンプライアンス',
+      category: '記録・コンプライアンス',
       icon: Shield,
       items: [
-        { id: 'committee', label: '委員会管理', icon: Gavel, permission: 'dashboard' as const },
-        { id: 'incident', label: '苦情・事故報告', icon: AlertTriangle, permission: 'dashboard' as const },
-        { id: 'audit-export', label: '監査書類エクスポート', icon: Package, permission: 'dashboard' as const },
+        { id: 'training', label: '研修・委員会', icon: GraduationCap, permission: 'staff' as const },
+        { id: 'incident', label: '事故・苦情報告', icon: AlertTriangle, permission: 'dashboard' as const },
+        { id: 'documents', label: '書類・監査', icon: FolderOpen, permission: 'children' as const },
       ],
     },
     {

@@ -22,9 +22,9 @@ import { useFacilityData } from '@/hooks/useFacilityData';
 import { SupportPlanFile, SupportPlanFileStatus, SupportPlanType } from '@/types';
 
 const STATUS_CONFIG: Record<SupportPlanFileStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  draft: { label: '下書き', color: 'text-gray-600', bg: 'bg-gray-100', icon: Edit3 },
-  active: { label: '有効', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
-  completed: { label: '完了', color: 'text-blue-600', bg: 'bg-blue-100', icon: CheckCircle },
+  draft: { label: '下書き', color: 'text-gray-500', bg: 'bg-gray-100', icon: Edit3 },
+  active: { label: '有効', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
+  completed: { label: '完了', color: 'text-gray-600', bg: 'bg-gray-100', icon: CheckCircle },
   archived: { label: 'アーカイブ', color: 'text-gray-400', bg: 'bg-gray-50', icon: Archive },
 };
 
@@ -147,9 +147,9 @@ export default function SupportPlanView() {
     const today = new Date();
     const end = new Date(plan.periodEnd);
     const daysUntil = Math.ceil((end.getTime() - today.getTime()) / 86400000);
-    if (daysUntil < 0) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">期限切れ</span>;
-    if (daysUntil <= 7) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">残り{daysUntil}日</span>;
-    if (daysUntil <= 30) return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">残り{daysUntil}日</span>;
+    if (daysUntil < 0) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 font-medium">期限切れ</span>;
+    if (daysUntil <= 7) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 font-medium">残り{daysUntil}日</span>;
+    if (daysUntil <= 30) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">残り{daysUntil}日</span>;
     return null;
   };
 
@@ -248,7 +248,7 @@ export default function SupportPlanView() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg"><CheckCircle className="w-5 h-5 text-green-600" /></div>
+            <div className="p-2 bg-gray-100 rounded-lg"><CheckCircle className="w-5 h-5 text-gray-500" /></div>
             <div>
               <p className="text-sm text-gray-500">有効な計画</p>
               <p className="text-2xl font-bold text-gray-800">{stats.activePlans}</p>
@@ -257,7 +257,7 @@ export default function SupportPlanView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg"><Clock className="w-5 h-5 text-amber-600" /></div>
+            <div className="p-2 bg-gray-100 rounded-lg"><Clock className="w-5 h-5 text-gray-500" /></div>
             <div>
               <p className="text-sm text-gray-500">更新が必要</p>
               <p className="text-2xl font-bold text-gray-800">{stats.expiringPlans}</p>
@@ -266,7 +266,7 @@ export default function SupportPlanView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-600" /></div>
+            <div className="p-2 bg-gray-100 rounded-lg"><AlertTriangle className="w-5 h-5 text-gray-500" /></div>
             <div>
               <p className="text-sm text-gray-500">計画未作成の児童</p>
               <p className="text-2xl font-bold text-gray-800">{stats.childrenWithoutPlan}</p>
@@ -348,10 +348,10 @@ export default function SupportPlanView() {
                             </div>
                             <div className="flex gap-2">
                               {plan.status === 'draft' && (
-                                <button onClick={() => handleStatusChange(plan.id, 'active')} className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">有効にする</button>
+                                <button onClick={() => handleStatusChange(plan.id, 'active')} className="text-xs px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600">有効にする</button>
                               )}
                               {plan.status === 'active' && (
-                                <button onClick={() => handleStatusChange(plan.id, 'completed')} className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200">完了にする</button>
+                                <button onClick={() => handleStatusChange(plan.id, 'completed')} className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">完了にする</button>
                               )}
                               {(plan.status === 'completed') && (
                                 <button onClick={() => handleStatusChange(plan.id, 'archived')} className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">アーカイブ</button>

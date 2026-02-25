@@ -27,9 +27,7 @@ import SupportPlanView from '@/components/support-plan/SupportPlanView';
 import DocumentManagementView from '@/components/documents/DocumentManagementView';
 import AdditionSettingsView from '@/components/addition/AdditionSettingsView';
 import StaffingView from '@/components/staffing/StaffingView';
-import WorkScheduleView from '@/components/staffing/WorkScheduleView';
 import TrainingRecordView from '@/components/training/TrainingRecordView';
-import CommitteeView from '@/components/committee/CommitteeView';
 import IncidentReportView from '@/components/incident/IncidentReportView';
 import LeaveApprovalView from '@/components/staff/LeaveApprovalView';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,28 +41,8 @@ const DynamicLoadingSpinner = () => (
   </div>
 );
 
-const AdditionSimulatorView = dynamicImport(
-  () => import('@/components/simulation/AdditionSimulatorView'),
-  { ssr: false, loading: DynamicLoadingSpinner }
-);
-
-const StaffPlanningSimulator = dynamicImport(
-  () => import('@/components/simulation/StaffPlanningSimulator'),
-  { ssr: false, loading: DynamicLoadingSpinner }
-);
-
 const FinanceView = dynamicImport(
   () => import('@/components/finance/FinanceView'),
-  { ssr: false, loading: DynamicLoadingSpinner }
-);
-
-const AuditExportView = dynamicImport(
-  () => import('@/components/audit/AuditExportView'),
-  { ssr: false, loading: DynamicLoadingSpinner }
-);
-
-const ServiceRecordView = dynamicImport(
-  () => import('@/components/records/ServiceRecordView'),
   { ssr: false, loading: DynamicLoadingSpinner }
 );
 
@@ -348,10 +326,6 @@ export default function BusinessPage() {
         return <FacilitySettingsView />;
       case 'daily-log':
         return <DailyLogView />;
-      case 'addition-simulator':
-        return <AdditionSimulatorView />;
-      case 'staff-planning':
-        return <StaffPlanningSimulator />;
       case 'support-plan':
         return <SupportPlanView />;
       case 'documents':
@@ -360,20 +334,12 @@ export default function BusinessPage() {
         return <AdditionSettingsView />;
       case 'staffing':
         return <StaffingView />;
-      case 'work-schedule':
-        return <WorkScheduleView />;
       case 'training':
         return <TrainingRecordView />;
-      case 'committee':
-        return <CommitteeView />;
       case 'incident':
         return <IncidentReportView />;
       case 'finance':
         return <FinanceView />;
-      case 'audit-export':
-        return <AuditExportView />;
-      case 'service-records':
-        return <ServiceRecordView />;
       case 'leave-approval':
         return <LeaveApprovalView />;
       default:

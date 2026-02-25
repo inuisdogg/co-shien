@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  Minus,
   MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,12 +53,12 @@ interface LeaveRequestRow {
 
 const STATUS_CONFIG: Record<
   LeaveStatus,
-  { label: string; color: string; bgColor: string; icon: React.ElementType }
+  { label: string; color: string; bgColor: string; icon: React.ElementType; borderStyle: string; fontWeight: string }
 > = {
-  pending: { label: '承認待ち', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: Clock },
-  approved: { label: '承認済み', color: 'text-green-700', bgColor: 'bg-green-100', icon: CheckCircle },
-  rejected: { label: '却下', color: 'text-red-700', bgColor: 'bg-red-100', icon: XCircle },
-  cancelled: { label: 'キャンセル', color: 'text-gray-500', bgColor: 'bg-gray-100', icon: X },
+  pending: { label: '申請中', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: Clock, borderStyle: 'border-l-2 border-l-gray-300', fontWeight: 'font-normal' },
+  approved: { label: '承認済', color: 'text-gray-700', bgColor: 'bg-gray-100', icon: CheckCircle, borderStyle: 'border-l-2 border-l-gray-500', fontWeight: 'font-semibold' },
+  rejected: { label: '却下', color: 'text-gray-500', bgColor: 'bg-gray-100', icon: XCircle, borderStyle: 'border-l-2 border-l-gray-300 border-dashed', fontWeight: 'font-normal' },
+  cancelled: { label: '取消', color: 'text-gray-400', bgColor: 'bg-gray-50', icon: Minus, borderStyle: 'border-l-2 border-l-gray-200', fontWeight: 'font-normal' },
 };
 
 // --- ヘルパー ---
@@ -297,15 +298,15 @@ export default function LeaveApprovalView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">承認待ち</p>
-          <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.pending}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">承認済み</p>
-          <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.approved}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">却下</p>
-          <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.rejected}</p>
         </div>
       </div>
 
@@ -357,7 +358,7 @@ export default function LeaveApprovalView() {
             return (
               <div
                 key={request.id}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+                className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden ${statusConf.borderStyle}`}
               >
                 {/* メイン行 */}
                 <button
@@ -365,9 +366,9 @@ export default function LeaveApprovalView() {
                   className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-colors"
                 >
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${statusConf.bgColor}`}
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gray-100"
                   >
-                    <StatusIcon size={16} className={statusConf.color} />
+                    <StatusIcon size={16} className="text-gray-500" />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -380,8 +381,9 @@ export default function LeaveApprovalView() {
                         {LEAVE_REQUEST_TYPE_LABELS[request.request_type]}
                       </span>
                       <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${statusConf.bgColor} ${statusConf.color}`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${statusConf.fontWeight} bg-gray-100 ${statusConf.color}`}
                       >
+                        <StatusIcon size={10} />
                         {statusConf.label}
                       </span>
                     </div>
@@ -403,7 +405,7 @@ export default function LeaveApprovalView() {
                           handleApprove(request.id);
                         }}
                         disabled={isProcessing}
-                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
                         title="承認"
                       >
                         <CheckCircle size={20} />
@@ -414,7 +416,7 @@ export default function LeaveApprovalView() {
                           setRejectModalId(request.id);
                         }}
                         disabled={isProcessing}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
                         title="却下"
                       >
                         <XCircle size={20} />
@@ -475,9 +477,9 @@ export default function LeaveApprovalView() {
                     )}
 
                     {request.rejection_reason && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
-                        <span className="text-red-600 font-medium">却下理由:</span>
-                        <p className="text-red-700 mt-0.5">{request.rejection_reason}</p>
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                        <span className="text-gray-600 font-medium">却下理由:</span>
+                        <p className="text-gray-700 mt-0.5">{request.rejection_reason}</p>
                       </div>
                     )}
 
@@ -493,7 +495,7 @@ export default function LeaveApprovalView() {
                         <button
                           onClick={() => handleApprove(request.id)}
                           disabled={isProcessing}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors text-sm font-medium disabled:opacity-50"
                         >
                           {isProcessing ? (
                             <Loader2 size={16} className="animate-spin" />
@@ -505,7 +507,7 @@ export default function LeaveApprovalView() {
                         <button
                           onClick={() => setRejectModalId(request.id)}
                           disabled={isProcessing}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium disabled:opacity-50"
                         >
                           <XCircle size={16} />
                           却下する
@@ -532,7 +534,7 @@ export default function LeaveApprovalView() {
           />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 z-50 w-full max-w-md">
             <div className="flex items-center gap-2 mb-4">
-              <MessageSquare size={20} className="text-red-600" />
+              <MessageSquare size={20} className="text-gray-500" />
               <h3 className="text-lg font-bold text-gray-800">却下理由</h3>
             </div>
 
@@ -544,7 +546,7 @@ export default function LeaveApprovalView() {
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none text-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 resize-none text-sm"
               placeholder="却下理由を入力..."
               autoFocus
             />
@@ -562,7 +564,7 @@ export default function LeaveApprovalView() {
               <button
                 onClick={handleReject}
                 disabled={processing === rejectModalId}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50"
               >
                 {processing === rejectModalId ? (
                   <Loader2 size={16} className="animate-spin" />

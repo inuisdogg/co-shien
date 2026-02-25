@@ -37,6 +37,9 @@ import {
   Plus,
   X,
   MessageSquare,
+  Users,
+  ClipboardList,
+  Megaphone,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { User as UserType, EmploymentRecord, FacilitySettings, WorkToolId } from '@/types';
@@ -159,6 +162,13 @@ export default function PersonalDashboardPage() {
   const [showLeaveRequest, setShowLeaveRequest] = useState(false);
   const [leaveRequestFacility, setLeaveRequestFacility] = useState<{ id: string; name: string } | null>(null);
   const [facilitySettings, setFacilitySettings] = useState<Partial<FacilitySettings> | null>(null);
+
+  // 本日の利用予定児童（業務タブ用）
+  const [todaySchedules, setTodaySchedules] = useState<Record<string, { childId: string; childName: string; slot: string }[]>>({});
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
+
+  // 施設お知らせ（業務タブ用）
+  const [facilityAnnouncements, setFacilityAnnouncements] = useState<Record<string, { id: string; title: string; message: string; createdAt: string }[]>>({});
 
   // キャリアタブ用の状態
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -724,6 +734,70 @@ export default function PersonalDashboardPage() {
 
     fetchNotifications();
   }, [user?.id, activeEmployments]);
+
+  // 業務タブ：本日の利用予定児童とお知らせを取得
+  useEffect(() => {
+    if (activeTab !== 'work' || personalFacilities.length === 0) return;
+
+    const fetchTodaySchedulesAndAnnouncements = async () => {
+      setLoadingSchedules(true);
+      const today = new Date().toISOString().split('T')[0];
+      const facilityIds = personalFacilities.map(f => f.facilityId);
+
+      try {
+        // 本日のスケジュールを取得
+        const { data: scheduleData, error: scheduleError } = await supabase
+          .from('schedules')
+          .select('child_id, child_name, slot, facility_id')
+          .in('facility_id', facilityIds)
+          .eq('date', today);
+
+        if (!scheduleError && scheduleData) {
+          const grouped: Record<string, { childId: string; childName: string; slot: string }[]> = {};
+          scheduleData.forEach((s: any) => {
+            if (!grouped[s.facility_id]) grouped[s.facility_id] = [];
+            grouped[s.facility_id].push({
+              childId: s.child_id,
+              childName: s.child_name,
+              slot: s.slot,
+            });
+          });
+          setTodaySchedules(grouped);
+        }
+
+        // 施設お知らせを取得（notificationsテーブルから施設全体向け）
+        if (facilityIds.length > 0) {
+          const { data: announcementData, error: announcementError } = await supabase
+            .from('notifications')
+            .select('id, title, message, created_at, facility_id')
+            .in('facility_id', facilityIds)
+            .is('user_id', null)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          if (!announcementError && announcementData) {
+            const grouped: Record<string, { id: string; title: string; message: string; createdAt: string }[]> = {};
+            announcementData.forEach((a: any) => {
+              if (!grouped[a.facility_id]) grouped[a.facility_id] = [];
+              grouped[a.facility_id].push({
+                id: a.id,
+                title: a.title,
+                message: a.message,
+                createdAt: a.created_at,
+              });
+            });
+            setFacilityAnnouncements(grouped);
+          }
+        }
+      } catch (err) {
+        console.error('業務データ取得エラー:', err);
+      } finally {
+        setLoadingSchedules(false);
+      }
+    };
+
+    fetchTodaySchedulesAndAnnouncements();
+  }, [activeTab, personalFacilities]);
 
   // ログアウト処理
   const handleLogout = () => {
@@ -2436,6 +2510,128 @@ export default function PersonalDashboardPage() {
                         </button>
                       )}
                     </div>
+
+                    {/* 区切り線 */}
+                    <div className="border-t border-gray-100 my-8"></div>
+
+                    {/* 本日の利用予定児童一覧 */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-5 h-5 text-gray-700" strokeWidth={1.5} />
+                          <h3 className="font-bold text-gray-900 text-sm">本日の利用予定児童</h3>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {new Date().toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}
+                        </span>
+                      </div>
+                      <div className="px-4 py-3">
+                        {loadingSchedules ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                          </div>
+                        ) : (todaySchedules[facility.facilityId] || []).length > 0 ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="text-2xl font-bold text-gray-900">
+                                {todaySchedules[facility.facilityId].length}
+                              </span>
+                              <span className="text-sm text-gray-500">名</span>
+                              <div className="flex items-center gap-2 ml-auto text-xs text-gray-500">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100">
+                                  AM {todaySchedules[facility.facilityId].filter(s => s.slot === 'AM').length}名
+                                </span>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100">
+                                  PM {todaySchedules[facility.facilityId].filter(s => s.slot === 'PM').length}名
+                                </span>
+                              </div>
+                            </div>
+                            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                              {todaySchedules[facility.facilityId].map((child, idx) => (
+                                <div key={`${child.childId}-${child.slot}-${idx}`} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50">
+                                  <span className="text-sm text-gray-800">{child.childName}</span>
+                                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                    child.slot === 'AM' ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {child.slot}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-sm text-gray-400">本日の利用予定はありません</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 連絡帳ショートカット */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { data: facilityData, error } = await supabase
+                            .from('facilities')
+                            .select('*')
+                            .eq('id', facility.facilityId)
+                            .single();
+                          if (!error && facilityData) {
+                            localStorage.setItem('selectedFacility', JSON.stringify({
+                              id: facility.facilityId,
+                              name: facility.facilityName,
+                              code: facility.facilityCode,
+                              role: facility.employmentRecord.role,
+                              facilityId: facility.facilityId,
+                              facilityName: facility.facilityName,
+                              facilityCode: facility.facilityCode,
+                              permissions: facility.employmentRecord.permissions || {},
+                            }));
+                            localStorage.setItem('facility', JSON.stringify({
+                              id: facilityData.id,
+                              name: facilityData.name,
+                              code: facilityData.code || '',
+                              createdAt: facilityData.created_at || new Date().toISOString(),
+                              updatedAt: facilityData.updated_at || new Date().toISOString(),
+                            }));
+                            window.location.href = '/business?tab=daily-log';
+                          }
+                        } catch (err) {
+                          console.error('施設情報の取得エラー:', err);
+                        }
+                      }}
+                      className="w-full mt-3 flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:border-gray-300 hover:bg-gray-50 transition-all active:scale-[0.98]"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <ClipboardList className="w-5 h-5 text-gray-700" strokeWidth={1.5} />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-bold text-gray-900">連絡帳</p>
+                        <p className="text-xs text-gray-500">本日の連絡帳を記入・確認する</p>
+                      </div>
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </button>
+
+                    {/* 施設お知らせ */}
+                    {(facilityAnnouncements[facility.facilityId] || []).length > 0 && (
+                      <div className="mt-3 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                          <Megaphone className="w-5 h-5 text-gray-700" strokeWidth={1.5} />
+                          <h3 className="font-bold text-gray-900 text-sm">お知らせ</h3>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {facilityAnnouncements[facility.facilityId].map((announcement) => (
+                            <div key={announcement.id} className="px-4 py-3">
+                              <p className="text-sm font-medium text-gray-900">{announcement.title}</p>
+                              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{announcement.message}</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {new Date(announcement.createdAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

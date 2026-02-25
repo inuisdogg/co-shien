@@ -54,7 +54,7 @@ export function useStaffMaster(): UseStaffMasterReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // スタッフ一覧を取得
+  // スタッフ一覧を取得（staffテーブル + employment_records/usersテーブルの両方から取得してマージ）
   const fetchStaffList = useCallback(async () => {
     if (!facility?.id) return;
 
@@ -62,14 +62,28 @@ export function useStaffMaster(): UseStaffMasterReturn {
     setError(null);
 
     try {
-      // スタッフ基本情報を取得
+      // 1. staffテーブルから取得（従来の方法）
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
         .select('*')
         .eq('facility_id', facility.id)
         .order('name');
 
-      if (staffError) throw staffError;
+      if (staffError) {
+        console.error('Error fetching staff:', staffError);
+      }
+
+      // 2. employment_recordsから取得（新規招待されたスタッフ）
+      const { data: employmentData, error: employmentError } = await supabase
+        .from('employment_records')
+        .select('id, user_id, facility_id, role, employment_type, start_date, end_date, permissions')
+        .eq('facility_id', facility.id)
+        .is('end_date', null)
+        .order('start_date', { ascending: false });
+
+      if (employmentError) {
+        console.error('Error fetching employment records:', employmentError);
+      }
 
       // 人員配置設定を取得
       const { data: personnelData } = await supabase
@@ -83,19 +97,89 @@ export function useStaffMaster(): UseStaffMasterReturn {
         .select('*')
         .eq('facility_id', facility.id);
 
-      // マージ
-      const mergedList: StaffWithRelations[] = (staffData || []).map((staff) => {
-        const personnel = personnelData?.find((p) => p.staff_id === staff.id);
-        const leave = leaveData?.find((l) => l.user_id === staff.user_id);
+      const allStaff: StaffWithRelations[] = [];
+      const existingUserIds = new Set<string>();
 
-        return {
-          ...mapStaffFromDb(staff),
-          personnelSettings: personnel ? mapPersonnelFromDb(personnel) : undefined,
-          leaveSettings: leave ? mapLeaveFromDb(leave) : undefined,
-        };
-      });
+      // 3. employment_recordsからスタッフを構築（パーソナルアカウントに紐づいているスタッフを優先）
+      if (employmentData && employmentData.length > 0) {
+        const userIds = employmentData
+          .map(emp => emp.user_id)
+          .filter((id): id is string => !!id);
 
-      setStaffList(mergedList);
+        if (userIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, name, email, phone, account_status')
+            .in('id', userIds);
+
+          if (usersData) {
+            const usersMap = new Map(usersData.map(u => [u.id, u]));
+
+            employmentData.forEach((emp) => {
+              const user = usersMap.get(emp.user_id || '');
+              if (user) {
+                // staffテーブルにも対応するレコードがあるか検索
+                const matchingStaffRecord = staffData?.find(s => s.user_id === user.id);
+
+                const personnel = matchingStaffRecord
+                  ? personnelData?.find((p) => p.staff_id === matchingStaffRecord.id)
+                  : undefined;
+                const leave = leaveData?.find((l) => l.user_id === user.id);
+
+                const staffFromEmployment: StaffWithRelations = {
+                  // staffテーブルのレコードがあればそのIDを使用、なければ生成
+                  id: matchingStaffRecord?.id || `emp-${emp.id}`,
+                  facilityId: emp.facility_id,
+                  user_id: user.id,
+                  name: user.name || '',
+                  nameKana: matchingStaffRecord?.name_kana || undefined,
+                  role: (emp.role as Staff['role']) || '一般スタッフ',
+                  type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as Staff['type'],
+                  phone: user.phone || matchingStaffRecord?.phone || undefined,
+                  email: user.email || matchingStaffRecord?.email || undefined,
+                  qualifications: matchingStaffRecord?.qualifications || undefined,
+                  yearsOfExperience: matchingStaffRecord?.years_of_experience || undefined,
+                  emergencyContact: matchingStaffRecord?.emergency_contact || undefined,
+                  memo: matchingStaffRecord?.memo || undefined,
+                  monthlySalary: matchingStaffRecord?.monthly_salary || undefined,
+                  hourlyWage: matchingStaffRecord?.hourly_wage || undefined,
+                  createdAt: emp.start_date || new Date().toISOString(),
+                  updatedAt: matchingStaffRecord?.updated_at || emp.start_date || new Date().toISOString(),
+                  personnelSettings: personnel ? mapPersonnelFromDb(personnel) : undefined,
+                  leaveSettings: leave ? mapLeaveFromDb(leave) : undefined,
+                };
+                allStaff.push(staffFromEmployment);
+                existingUserIds.add(user.id);
+              }
+            });
+          }
+        }
+      }
+
+      // 4. staffテーブルのデータを追加（employment_recordsに存在しないもののみ）
+      if (staffData) {
+        staffData.forEach((row) => {
+          // user_idがあり、すでにemployment_recordsから取得済みならスキップ
+          if (row.user_id && existingUserIds.has(row.user_id)) {
+            return;
+          }
+
+          const personnel = personnelData?.find((p) => p.staff_id === row.id);
+          const leave = row.user_id ? leaveData?.find((l) => l.user_id === row.user_id) : undefined;
+
+          allStaff.push({
+            ...mapStaffFromDb(row),
+            personnelSettings: personnel ? mapPersonnelFromDb(personnel) : undefined,
+            leaveSettings: leave ? mapLeaveFromDb(leave) : undefined,
+          });
+
+          if (row.user_id) {
+            existingUserIds.add(row.user_id);
+          }
+        });
+      }
+
+      setStaffList(allStaff);
     } catch (err) {
       console.error('Failed to fetch staff list:', err);
       setError('スタッフ一覧の取得に失敗しました');
@@ -149,7 +233,7 @@ export function useStaffMaster(): UseStaffMasterReturn {
     [facility?.id]
   );
 
-  // スタッフ作成
+  // スタッフ作成（staffテーブル + employment_recordsの両方に挿入）
   const createStaff = useCallback(
     async (data: Partial<Staff>): Promise<string | null> => {
       if (!facility?.id) return null;
@@ -159,23 +243,54 @@ export function useStaffMaster(): UseStaffMasterReturn {
 
       try {
         const newId = `staff-${Date.now()}`;
+        const userId = data.user_id || undefined;
 
-        const { error } = await supabase.from('staff').insert({
+        // 1. staffテーブルに挿入
+        const { error: staffError } = await supabase.from('staff').insert({
           id: newId,
           facility_id: facility.id,
+          user_id: userId,
           name: data.name,
           name_kana: data.nameKana,
-          type: data.type || 'other',
-          role: data.role || 'staff',
+          type: data.type || '常勤',
+          role: data.role || '一般スタッフ',
           qualifications: data.qualifications || [],
           years_of_experience: data.yearsOfExperience,
           emergency_contact: data.emergencyContact,
           memo: data.memo,
           monthly_salary: data.monthlySalary,
           hourly_wage: data.hourlyWage,
+          email: data.email,
+          phone: data.phone,
         });
 
-        if (error) throw error;
+        if (staffError) throw staffError;
+
+        // 2. user_idがある場合、employment_recordsにも挿入（重複チェック付き）
+        if (userId) {
+          const { data: existingEmp } = await supabase
+            .from('employment_records')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('facility_id', facility.id)
+            .is('end_date', null)
+            .maybeSingle();
+
+          if (!existingEmp) {
+            const { error: empError } = await supabase.from('employment_records').insert({
+              user_id: userId,
+              facility_id: facility.id,
+              role: data.role || '一般スタッフ',
+              employment_type: data.type || '常勤',
+              start_date: new Date().toISOString().split('T')[0],
+            });
+
+            if (empError) {
+              console.error('Failed to create employment record:', empError);
+              // staffは作成済みなのでエラーにはしない
+            }
+          }
+        }
 
         await fetchStaffList();
         return newId;

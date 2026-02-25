@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import WorkScheduleView from './WorkScheduleView';
 import {
   StaffPersonnelSettings,
   PersonnelType,
@@ -47,7 +48,7 @@ function calculateFTE(workStyle: WorkStyle, contractedHours: number | undefined,
   return Math.min(contractedHours / standardHours, 1.0);
 }
 
-export default function StaffingView() {
+function StaffingContent() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
 
@@ -201,18 +202,18 @@ export default function StaffingView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">常勤換算合計</p>
-          <p className="text-2xl font-bold text-cyan-600">{stats.totalFTE.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.totalFTE.toFixed(2)}</p>
           <p className="text-xs text-gray-400">基準{stats.standardCount} / 加算{stats.additionCount}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">管理者</p>
-          <p className={`text-2xl font-bold ${stats.hasManager ? 'text-green-600' : 'text-red-600'}`}>
+          <p className="text-2xl font-bold text-gray-800">
             {stats.hasManager ? '配置済' : '未配置'}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">児発管</p>
-          <p className={`text-2xl font-bold ${stats.hasServiceManager ? 'text-green-600' : 'text-red-600'}`}>
+          <p className="text-2xl font-bold text-gray-800">
             {stats.hasServiceManager ? '配置済' : '未配置'}
           </p>
         </div>
@@ -242,7 +243,7 @@ export default function StaffingView() {
                     className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${ps ? 'bg-green-400' : 'bg-gray-300'}`} />
+                      <div className={`w-2 h-2 rounded-full ${ps ? 'bg-gray-600' : 'bg-gray-300'}`} />
                       <div className="text-left">
                         <p className="font-medium text-gray-800">{staff.name}</p>
                         {ps ? (
@@ -252,7 +253,7 @@ export default function StaffingView() {
                             {ps.isServiceManager && ' / 児発管'}
                           </p>
                         ) : (
-                          <p className="text-xs text-amber-500">人員区分未設定</p>
+                          <p className="text-xs text-gray-400">人員区分未設定</p>
                         )}
                       </div>
                     </div>
@@ -325,9 +326,9 @@ export default function StaffingView() {
           <>
             {/* Summary bar */}
             <div className="px-4 py-3 flex gap-4 text-sm border-b border-gray-50">
-              <span className="text-green-600 font-medium">充足 {stats.compliantDays}日</span>
-              <span className="text-yellow-600 font-medium">注意 {stats.warningDays}日</span>
-              <span className="text-red-600 font-medium">不足 {stats.nonCompliantDays}日</span>
+              <span className="text-gray-700 font-medium">充足 {stats.compliantDays}日</span>
+              <span className="text-gray-500 font-medium">注意 {stats.warningDays}日</span>
+              <span className="text-gray-500 font-medium">不足 {stats.nonCompliantDays}日</span>
             </div>
 
             {/* Calendar grid */}
@@ -350,9 +351,9 @@ export default function StaffingView() {
                   const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                   const record = complianceRecords.find(c => c.date === dateStr);
                   const status = record?.overallStatus;
-                  const bgColor = status === 'compliant' ? 'bg-green-100 text-green-700'
-                    : status === 'warning' ? 'bg-yellow-100 text-yellow-700'
-                    : status === 'non_compliant' ? 'bg-red-100 text-red-700'
+                  const bgColor = status === 'compliant' ? 'bg-gray-100 text-gray-700'
+                    : status === 'warning' ? 'bg-gray-200 text-gray-600'
+                    : status === 'non_compliant' ? 'bg-gray-300 text-gray-800 font-medium'
                     : 'bg-gray-50 text-gray-400';
 
                   cells.push(
@@ -368,6 +369,41 @@ export default function StaffingView() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+const STAFFING_TABS = [
+  { id: 'staffing', label: '人員配置' },
+  { id: 'work-schedule', label: '勤務体制一覧表' },
+] as const;
+
+export default function StaffingView() {
+  const [activeTab, setActiveTab] = useState<string>('staffing');
+
+  return (
+    <div className="space-y-6">
+      {/* Tab Switcher */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-6" aria-label="Tabs">
+          {STAFFING_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-gray-800 text-gray-800'
+                  : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'staffing' ? <StaffingContent /> : <WorkScheduleView />}
     </div>
   );
 }

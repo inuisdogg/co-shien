@@ -58,25 +58,25 @@ const REPORT_TYPE_LABELS: Record<ReportType, string> = {
 };
 
 const REPORT_TYPE_COLORS: Record<ReportType, { color: string; bg: string }> = {
-  complaint: { color: 'text-orange-600', bg: 'bg-orange-100' },
-  accident: { color: 'text-red-600', bg: 'bg-red-100' },
-  near_miss: { color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  injury: { color: 'text-pink-600', bg: 'bg-pink-100' },
+  complaint: { color: 'text-gray-600', bg: 'bg-gray-100' },
+  accident: { color: 'text-gray-600', bg: 'bg-gray-100' },
+  near_miss: { color: 'text-gray-600', bg: 'bg-gray-100' },
+  injury: { color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
 const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string }> = {
-  low: { label: '軽微', color: 'text-gray-600', bg: 'bg-gray-100' },
-  medium: { label: '中程度', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  high: { label: '重大', color: 'text-orange-600', bg: 'bg-orange-100' },
-  critical: { label: '緊急', color: 'text-red-600', bg: 'bg-red-100' },
+  low: { label: '軽微', color: 'text-gray-500', bg: 'bg-gray-50' },
+  medium: { label: '中程度', color: 'text-gray-600', bg: 'bg-gray-100' },
+  high: { label: '重大', color: 'text-gray-700', bg: 'bg-gray-100' },
+  critical: { label: '緊急', color: 'text-gray-800', bg: 'bg-gray-200' },
 };
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  draft: { label: '下書き', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
-  submitted: { label: '報告済', color: 'text-blue-600', bg: 'bg-blue-100', icon: AlertCircle },
-  reviewing: { label: '確認中', color: 'text-purple-600', bg: 'bg-purple-100', icon: Eye },
-  resolved: { label: '対応完了', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
-  closed: { label: '完了', color: 'text-gray-500', bg: 'bg-gray-50', icon: Shield },
+  draft: { label: '下書き', color: 'text-gray-500', bg: 'bg-gray-100', icon: Clock },
+  submitted: { label: '報告済', color: 'text-gray-600', bg: 'bg-gray-100', icon: AlertCircle },
+  reviewing: { label: '確認中', color: 'text-gray-600', bg: 'bg-gray-100', icon: Eye },
+  resolved: { label: '対応完了', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
+  closed: { label: '完了', color: 'text-gray-400', bg: 'bg-gray-50', icon: Shield },
 };
 
 function mapRow(row: any): IncidentReport {
@@ -187,15 +187,15 @@ export default function IncidentReportView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">未対応</p>
-          <p className={`text-2xl font-bold ${stats.open > 0 ? 'text-amber-600' : 'text-green-600'}`}>{stats.open}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.open}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">重大/緊急</p>
-          <p className={`text-2xl font-bold ${stats.critical > 0 ? 'text-red-600' : 'text-green-600'}`}>{stats.critical}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.critical}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">行政報告待ち</p>
-          <p className={`text-2xl font-bold ${stats.needsAdminReport > 0 ? 'text-red-600' : 'text-green-600'}`}>{stats.needsAdminReport}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.needsAdminReport}</p>
         </div>
       </div>
 
@@ -259,7 +259,7 @@ export default function IncidentReportView() {
                       </div>
                       <div className="flex items-center gap-2">
                         {report.adminReportRequired && !report.adminReported && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600">行政報告要</span>
+                          <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700 font-medium">行政報告要</span>
                         )}
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${sc.bg} ${sc.color}`}>
                           <StatusIcon className="w-3 h-3" />

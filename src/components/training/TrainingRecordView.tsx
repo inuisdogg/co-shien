@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import CommitteeView from '@/components/committee/CommitteeView';
 
 type TrainingType = 'internal' | 'external' | 'online' | 'oj_training';
 type TrainingCategory = 'mandatory' | 'skill_improvement' | 'safety' | 'welfare' | 'medical' | 'communication';
@@ -59,9 +60,9 @@ const CATEGORY_LABELS: Record<TrainingCategory, string> = {
 };
 
 const STATUS_CONFIG: Record<TrainingStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  scheduled: { label: '予定', color: 'text-blue-600', bg: 'bg-blue-100', icon: Clock },
-  completed: { label: '完了', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
-  cancelled: { label: '中止', color: 'text-red-600', bg: 'bg-red-100', icon: XCircle },
+  scheduled: { label: '予定', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
+  completed: { label: '完了', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
+  cancelled: { label: '中止', color: 'text-gray-400', bg: 'bg-gray-50', icon: XCircle },
 };
 
 function mapRow(row: any): TrainingRecord {
@@ -88,7 +89,7 @@ function mapRow(row: any): TrainingRecord {
   };
 }
 
-export default function TrainingRecordView() {
+function TrainingRecordContent() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
 
@@ -162,15 +163,15 @@ export default function TrainingRecordView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">完了済み</p>
-          <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.completed}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">予定</p>
-          <p className="text-2xl font-bold text-blue-600">{stats.scheduled}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.scheduled}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">総研修時間</p>
-          <p className="text-2xl font-bold text-cyan-600">{stats.totalHours}h</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.totalHours}h</p>
         </div>
       </div>
 
@@ -240,6 +241,41 @@ export default function TrainingRecordView() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+const TRAINING_TABS = [
+  { id: 'training', label: '研修記録' },
+  { id: 'committee', label: '委員会' },
+] as const;
+
+export default function TrainingRecordView() {
+  const [activeTab, setActiveTab] = useState<string>('training');
+
+  return (
+    <div className="space-y-6">
+      {/* Tab Switcher */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-6" aria-label="Tabs">
+          {TRAINING_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-gray-800 text-gray-800'
+                  : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'training' ? <TrainingRecordContent /> : <CommitteeView />}
     </div>
   );
 }

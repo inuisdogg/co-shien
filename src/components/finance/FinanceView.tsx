@@ -17,9 +17,9 @@ import { supabase } from '@/lib/supabase';
 import { Expense, ExpenseStatus, MonthlyFinancial } from '@/types/expense';
 
 const EXPENSE_STATUS_CONFIG: Record<ExpenseStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  pending: { label: '申請中', color: 'text-yellow-600', bg: 'bg-yellow-100', icon: Clock },
-  approved: { label: '承認済', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
-  rejected: { label: '却下', color: 'text-red-600', bg: 'bg-red-100', icon: XCircle },
+  pending: { label: '申請中', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
+  approved: { label: '承認済', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
+  rejected: { label: '却下', color: 'text-gray-500', bg: 'bg-gray-100', icon: XCircle },
 };
 
 const DEFAULT_CATEGORIES = ['交通費', '消耗品費', '食費', '通信費', '水道光熱費', '修繕費', '研修費', 'その他'];
@@ -168,7 +168,7 @@ export default function FinanceView() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-cyan-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
           >
             {tab.label}
           </button>
@@ -186,15 +186,15 @@ export default function FinanceView() {
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <p className="text-sm text-gray-500">承認済み</p>
-              <p className="text-xl font-bold text-green-600">{formatCurrency(expenseStats.approved)}</p>
+              <p className="text-xl font-bold text-gray-800">{formatCurrency(expenseStats.approved)}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <p className="text-sm text-gray-500">申請中</p>
-              <p className="text-2xl font-bold text-amber-600">{expenseStats.pending}</p>
+              <p className="text-2xl font-bold text-gray-800">{expenseStats.pending}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <p className="text-sm text-gray-500">カテゴリ数</p>
-              <p className="text-2xl font-bold text-purple-600">{expenseStats.byCategory.size}</p>
+              <p className="text-2xl font-bold text-gray-800">{expenseStats.byCategory.size}</p>
             </div>
           </div>
 
@@ -241,7 +241,7 @@ export default function FinanceView() {
                             {sc.label}
                           </span>
                           {exp.status === 'pending' && (
-                            <button onClick={() => handleApprove(exp.id)} className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">承認</button>
+                            <button onClick={() => handleApprove(exp.id)} className="text-xs px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600">承認</button>
                           )}
                         </div>
                       </div>
@@ -286,14 +286,14 @@ export default function FinanceView() {
                         <td className="p-3 text-right text-gray-600">{formatCurrency(f.expenseFixed)}</td>
                         <td className="p-3 text-right text-gray-600">{formatCurrency(f.expenseVariable)}</td>
                         <td className="p-3 text-right text-gray-800">{formatCurrency(f.grossProfit)}</td>
-                        <td className={`p-3 text-right font-medium ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
+                        <td className="p-3 text-right font-medium text-gray-800">
                           <span className="inline-flex items-center gap-1">
-                            {isProfit ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                            {isProfit ? <TrendingUp className="w-3.5 h-3.5 text-gray-500" /> : <TrendingDown className="w-3.5 h-3.5 text-gray-500" />}
                             {formatCurrency(f.operatingProfit)}
                           </span>
                         </td>
                         <td className="p-3 text-center">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${f.isFinalized ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${f.isFinalized ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>
                             {f.isFinalized ? '確定' : '未確定'}
                           </span>
                         </td>
@@ -341,12 +341,12 @@ export default function FinanceView() {
                         return (
                           <tr key={f.id} className="hover:bg-gray-50">
                             <td className="p-3 font-medium text-gray-800">{f.year}年{f.month}月</td>
-                            <td className="p-3 text-right text-green-600">{formatCurrency(totalRevenue)}</td>
-                            <td className="p-3 text-right text-red-600">{formatCurrency(totalExpense)}</td>
-                            <td className={`p-3 text-right font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                            <td className="p-3 text-right text-gray-800">{formatCurrency(totalRevenue)}</td>
+                            <td className="p-3 text-right text-gray-600">{formatCurrency(totalExpense)}</td>
+                            <td className="p-3 text-right font-medium text-gray-800">
                               {formatCurrency(cashFlow)}
                             </td>
-                            <td className={`p-3 text-right font-medium ${cumulative >= 0 ? 'text-cyan-600' : 'text-red-600'}`}>
+                            <td className="p-3 text-right font-medium text-gray-800">
                               {formatCurrency(cumulative)}
                             </td>
                           </tr>

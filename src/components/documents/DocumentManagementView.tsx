@@ -13,17 +13,28 @@ import {
   Filter,
   RefreshCw,
 } from 'lucide-react';
+import dynamicImport from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { ChildDocument, DocumentStatus } from '@/types';
 
+const AuditExportView = dynamicImport(
+  () => import('@/components/audit/AuditExportView'),
+  { ssr: false, loading: () => <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-t-transparent border-gray-400 rounded-full animate-spin" /></div> }
+);
+
+const ServiceRecordView = dynamicImport(
+  () => import('@/components/records/ServiceRecordView'),
+  { ssr: false, loading: () => <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-t-transparent border-gray-400 rounded-full animate-spin" /></div> }
+);
+
 const STATUS_CONFIG: Record<DocumentStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  required: { label: '未提出', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
-  submitted: { label: '提出済', color: 'text-blue-600', bg: 'bg-blue-100', icon: FileText },
-  approved: { label: '承認済', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
-  expired: { label: '期限切れ', color: 'text-red-600', bg: 'bg-red-100', icon: AlertTriangle },
-  rejected: { label: '差戻し', color: 'text-orange-600', bg: 'bg-orange-100', icon: XCircle },
+  required: { label: '未提出', color: 'text-gray-500', bg: 'bg-gray-100', icon: Clock },
+  submitted: { label: '提出済', color: 'text-gray-600', bg: 'bg-gray-100', icon: FileText },
+  approved: { label: '承認済', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
+  expired: { label: '期限切れ', color: 'text-gray-700', bg: 'bg-gray-200', icon: AlertTriangle },
+  rejected: { label: '差戻し', color: 'text-gray-600', bg: 'bg-gray-100', icon: XCircle },
 };
 
 const DOCUMENT_CATEGORIES = [
@@ -74,7 +85,7 @@ function mapRowToDocument(row: any): ChildDocument {
   };
 }
 
-export default function DocumentManagementView() {
+function DocumentManagementContent() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
   const { children } = useFacilityData();
@@ -187,15 +198,15 @@ export default function DocumentManagementView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">提出率</p>
-          <p className="text-2xl font-bold text-cyan-600">{stats.rate}%</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.rate}%</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">期限間近</p>
-          <p className="text-2xl font-bold text-amber-600">{stats.expiring}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.expiring}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">期限切れ</p>
-          <p className="text-2xl font-bold text-red-600">{stats.expired}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.expired}</p>
         </div>
       </div>
 
@@ -254,7 +265,7 @@ export default function DocumentManagementView() {
                         {statusConf.label}
                       </span>
                       {doc.status === 'submitted' && (
-                        <button onClick={() => handleStatusUpdate(doc.id, 'approved')} className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">承認</button>
+                        <button onClick={() => handleStatusUpdate(doc.id, 'approved')} className="text-xs px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600">承認</button>
                       )}
                     </div>
                   </div>
@@ -264,6 +275,44 @@ export default function DocumentManagementView() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+const DOCUMENT_TABS = [
+  { id: 'documents', label: '書類管理' },
+  { id: 'audit-export', label: '監査エクスポート' },
+  { id: 'service-records', label: 'サービス提供記録' },
+] as const;
+
+export default function DocumentManagementView() {
+  const [activeTab, setActiveTab] = useState<string>('documents');
+
+  return (
+    <div className="space-y-6">
+      {/* Tab Switcher */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-6" aria-label="Tabs">
+          {DOCUMENT_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-gray-800 text-gray-800'
+                  : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'documents' && <DocumentManagementContent />}
+      {activeTab === 'audit-export' && <AuditExportView />}
+      {activeTab === 'service-records' && <ServiceRecordView />}
     </div>
   );
 }

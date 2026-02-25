@@ -50,9 +50,9 @@ const COMMITTEE_TYPE_LABELS: Record<CommitteeType, string> = {
 };
 
 const STATUS_CONFIG: Record<MeetingStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  draft: { label: '下書き', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
-  finalized: { label: '確定', color: 'text-blue-600', bg: 'bg-blue-100', icon: FileText },
-  approved: { label: '承認済', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
+  draft: { label: '下書き', color: 'text-gray-500', bg: 'bg-gray-100', icon: Clock },
+  finalized: { label: '確定', color: 'text-gray-600', bg: 'bg-gray-100', icon: FileText },
+  approved: { label: '承認済', color: 'text-gray-700', bg: 'bg-gray-100', icon: CheckCircle },
 };
 
 function mapRow(row: any): CommitteeMeeting {
@@ -146,15 +146,15 @@ export default function CommitteeView() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">今年度</p>
-          <p className="text-2xl font-bold text-cyan-600">{stats.thisYear}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.thisYear}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">承認済み</p>
-          <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.approved}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-sm text-gray-500">委員会種別</p>
-          <p className="text-2xl font-bold text-purple-600">{stats.types}</p>
+          <p className="text-2xl font-bold text-gray-800">{stats.types}</p>
         </div>
       </div>
 
