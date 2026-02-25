@@ -166,7 +166,7 @@ export default function IncidentReportView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -175,7 +175,7 @@ export default function IncidentReportView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <AlertTriangle className="w-6 h-6 text-cyan-500" />
+        <AlertTriangle className="w-6 h-6 text-[#00c4cc]" />
         <h1 className="text-xl font-bold text-gray-800">苦情・事故報告</h1>
       </div>
 

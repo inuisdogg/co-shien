@@ -248,7 +248,7 @@ export default function WorkScheduleView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -258,7 +258,7 @@ export default function WorkScheduleView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <ClipboardList className="w-6 h-6 text-cyan-500" />
+          <ClipboardList className="w-6 h-6 text-[#00c4cc]" />
           <h1 className="text-xl font-bold text-gray-800">勤務体制一覧表</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -285,7 +285,7 @@ export default function WorkScheduleView() {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors disabled:opacity-50 text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50 text-sm"
           >
             {generating ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -333,7 +333,7 @@ export default function WorkScheduleView() {
                   <div
                     key={r.id}
                     onClick={() => setSelectedReport(r)}
-                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-cyan-50' : ''}`}
+                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-[#00c4cc]/5' : ''}`}
                   >
                     <p className="font-medium text-gray-800 text-sm">{r.year}年{r.month}月</p>
                     <div className="flex items-center gap-2 mt-1">

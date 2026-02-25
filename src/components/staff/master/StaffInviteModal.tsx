@@ -162,7 +162,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <UserPlus size={20} className="text-teal-600" />
+            <UserPlus size={20} className="text-[#00c4cc]" />
             <h2 className="text-lg font-bold text-gray-800">スタッフを招待</h2>
           </div>
           <button
@@ -179,7 +179,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
             onClick={() => setActiveTab('invite')}
             className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'invite'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-[#00c4cc] text-[#00c4cc]'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -189,7 +189,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
             onClick={() => setActiveTab('pending')}
             className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'pending'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-[#00c4cc] text-[#00c4cc]'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -238,7 +238,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                         className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
                           copied
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-teal-600 text-white hover:bg-teal-700'
+                            : 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
                         }`}
                       >
                         {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -253,7 +253,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                       setEmail('');
                       setName('');
                     }}
-                    className="text-sm text-teal-600 hover:text-teal-700"
+                    className="text-sm text-[#00c4cc] hover:text-[#00b0b8]"
                   >
                     別のスタッフを招待する
                   </button>
@@ -275,7 +275,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] ${
                         errors.name ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder="山田 太郎"
@@ -302,7 +302,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] ${
                           errors.email ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="example@email.com"
@@ -320,7 +320,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                   <button
                     type="submit"
                     disabled={isSubmitting || loading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <>
@@ -379,7 +379,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                               {onResendInvitation && (
                                 <button
                                   onClick={() => onResendInvitation(invitation)}
-                                  className="flex items-center gap-1 px-2 py-1 text-xs text-teal-600 hover:bg-teal-50 rounded"
+                                  className="flex items-center gap-1 px-2 py-1 text-xs text-[#00c4cc] hover:bg-[#00c4cc]/5 rounded"
                                 >
                                   <RefreshCw size={12} />
                                   再送信

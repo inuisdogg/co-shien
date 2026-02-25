@@ -26,6 +26,7 @@ import {
   DollarSign,
   GraduationCap,
   CalendarMinus,
+  Award,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -49,6 +50,7 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'shift': 1,           // シフト管理
   'staffing': 1,        // 勤務・配置（人員配置＋勤務体制一覧を統合）
   'leave-approval': 1,  // 休暇管理
+  'talent-management': 1, // タレントマネジメント
   'dashboard': 1,       // ダッシュボード
   'addition-settings': 1, // 加算・収益（加算体制設定＋シミュレーターを統合）
   'finance': 1,         // 財務管理
@@ -138,6 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'shift' as const },
         { id: 'staffing', label: '勤務・配置', icon: Shield, permission: 'staff' as const },
         { id: 'leave-approval', label: '休暇管理', icon: CalendarMinus, permission: 'staff' as const },
+        { id: 'talent-management', label: 'タレントマネジメント', icon: Award, permission: 'staff' as const },
       ],
     },
     {
@@ -262,7 +265,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                 onClick={() => toggleCategory(category.category)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
                   hasActiveItem
-                    ? `${isCareer ? 'bg-purple-50 text-purple-700' : 'bg-teal-50 text-teal-700'}`
+                    ? `${isCareer ? 'bg-purple-50 text-purple-700' : 'bg-[#00c4cc]/5 text-[#00c4cc]'}`
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >

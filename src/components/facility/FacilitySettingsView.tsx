@@ -310,7 +310,7 @@ const FacilitySettingsView: React.FC = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 py-3 px-4 text-sm font-bold transition-colors ${
                 activeTab === tab.id
-                  ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-cyan-50/30'
+                  ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -869,7 +869,7 @@ const FacilitySettingsView: React.FC = () => {
               <div
                 key={dayValue}
                 className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                  isClosed ? 'bg-gray-50 border-gray-200' : 'bg-cyan-50/50 border-[#00c4cc]/20'
+                  isClosed ? 'bg-gray-50 border-gray-200' : 'bg-[#00c4cc]/5 border-[#00c4cc]/20'
                 }`}
               >
                 {/* 曜日 */}
@@ -1086,7 +1086,7 @@ const FacilitySettingsView: React.FC = () => {
 
         {/* 新規追加フォーム */}
         {isAddingTimeSlot ? (
-          <div className="border border-[#00c4cc] rounded-lg p-4 bg-cyan-50">
+          <div className="border border-[#00c4cc] rounded-lg p-4 bg-[#00c4cc]/5">
             <h4 className="font-bold text-sm text-gray-700 mb-3">新しい時間枠を追加</h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>

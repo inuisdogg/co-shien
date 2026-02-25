@@ -175,7 +175,7 @@ function DocumentManagementContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -185,7 +185,7 @@ function DocumentManagementContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <FolderOpen className="w-6 h-6 text-cyan-500" />
+          <FolderOpen className="w-6 h-6 text-[#00c4cc]" />
           <h1 className="text-xl font-bold text-gray-800">書類管理</h1>
         </div>
       </div>
@@ -225,9 +225,9 @@ function DocumentManagementContent() {
 
         {/* Category Tabs */}
         <div className="flex flex-wrap gap-2 mt-3">
-          <button onClick={() => setActiveCategory('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeCategory === 'all' ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全カテゴリ</button>
+          <button onClick={() => setActiveCategory('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeCategory === 'all' ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全カテゴリ</button>
           {DOCUMENT_CATEGORIES.map(cat => (
-            <button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeCategory === cat.key ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeCategory === cat.key ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {cat.label}
             </button>
           ))}
@@ -265,7 +265,7 @@ function DocumentManagementContent() {
                         {statusConf.label}
                       </span>
                       {doc.status === 'submitted' && (
-                        <button onClick={() => handleStatusUpdate(doc.id, 'approved')} className="text-xs px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600">承認</button>
+                        <button onClick={() => handleStatusUpdate(doc.id, 'approved')} className="text-xs px-3 py-1 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8]">承認</button>
                       )}
                     </div>
                   </div>

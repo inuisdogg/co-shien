@@ -145,7 +145,7 @@ export default function FinanceView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -154,7 +154,7 @@ export default function FinanceView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <BarChart3 className="w-6 h-6 text-cyan-500" />
+        <BarChart3 className="w-6 h-6 text-[#00c4cc]" />
         <h1 className="text-xl font-bold text-gray-800">財務管理</h1>
       </div>
 
@@ -241,7 +241,7 @@ export default function FinanceView() {
                             {sc.label}
                           </span>
                           {exp.status === 'pending' && (
-                            <button onClick={() => handleApprove(exp.id)} className="text-xs px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600">承認</button>
+                            <button onClick={() => handleApprove(exp.id)} className="text-xs px-3 py-1 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8]">承認</button>
                           )}
                         </div>
                       </div>

@@ -85,7 +85,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
       case 'draft':
         return { label: '下書き', color: 'bg-gray-100 text-gray-600' };
       case 'published':
-        return { label: '公開中', color: 'bg-teal-100 text-teal-700' };
+        return { label: '公開中', color: 'bg-[#00c4cc]/10 text-[#00c4cc]' };
       case 'confirmed':
         return { label: '確定済', color: 'bg-green-100 text-green-700' };
       default:
@@ -101,8 +101,8 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
       <div className="px-5 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
-              <CheckCircle size={20} className="text-teal-600" />
+            <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
+              <CheckCircle size={20} className="text-[#00c4cc]" />
             </div>
             <div>
               <h3 className="font-bold text-gray-800">シフト確認状況</h3>
@@ -146,7 +146,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
           </div>
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-teal-500 to-green-500 transition-all duration-300"
+              className="h-full bg-gradient-to-r from-[#00c4cc] to-green-500 transition-all duration-300"
               style={{ width: `${confirmationRate}%` }}
             />
           </div>
@@ -159,7 +159,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
           <button
             onClick={onPublish}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
           >
             {loading ? (
               <RefreshCw size={16} className="animate-spin" />
@@ -208,7 +208,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
                   className="px-5 py-3 flex items-center justify-between hover:bg-gray-50"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center">
                       <span className="text-white text-xs font-bold">
                         {confirmation.staff.name?.charAt(0) || '?'}
                       </span>

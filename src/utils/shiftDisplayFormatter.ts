@@ -133,14 +133,14 @@ export function getShiftDisplayBgColor(shift: ShiftWithPattern): string {
     // カスタムカラーの場合は透明度を追加
     return ''; // インラインスタイルで対応
   }
-  return 'bg-teal-50';
+  return 'bg-[#00c4cc]/5';
 }
 
 /**
  * パターンカラーをRGBA形式に変換（背景用）
  */
 export function patternColorToRgba(hexColor: string | undefined, alpha: number = 0.15): string {
-  if (!hexColor) return 'rgba(0, 128, 128, 0.15)'; // デフォルト: teal
+  if (!hexColor) return 'rgba(0, 196, 204, 0.15)'; // デフォルト: #00c4cc
 
   // #RRGGBB -> rgba
   const hex = hexColor.replace('#', '');

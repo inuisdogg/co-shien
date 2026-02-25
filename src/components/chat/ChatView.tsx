@@ -170,7 +170,7 @@ export default function ChatView({
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">
@@ -198,7 +198,7 @@ export default function ChatView({
                     <div
                       className={`max-w-[75%] px-3 py-2 rounded-2xl ${
                         isMine
-                          ? 'bg-teal-500 text-white rounded-br-md'
+                          ? 'bg-[#00c4cc] text-white rounded-br-md'
                           : 'bg-white text-gray-900 border rounded-bl-md'
                       }`}
                     >
@@ -208,7 +208,7 @@ export default function ChatView({
                       <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                       <p
                         className={`text-[10px] mt-1 text-right ${
-                          isMine ? 'text-teal-100' : 'text-gray-400'
+                          isMine ? 'text-white/60' : 'text-gray-400'
                         }`}
                       >
                         {formatTime(msg.created_at)}
@@ -232,13 +232,13 @@ export default function ChatView({
             onKeyDown={handleKeyDown}
             placeholder="メッセージを入力..."
             rows={1}
-            className="flex-1 resize-none border rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="flex-1 resize-none border rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
             style={{ maxHeight: '120px' }}
           />
           <button
             onClick={sendMessage}
             disabled={!newMessage.trim()}
-            className="p-2 bg-teal-500 text-white rounded-full hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="p-2 bg-[#00c4cc] text-white rounded-full hover:bg-[#00b0b8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             aria-label="送信"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -51,7 +51,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
       badges.push({ label: '管理者', color: 'bg-blue-100 text-blue-700' });
     }
     if (personnelSettings?.personnelType === 'standard') {
-      badges.push({ label: '基準', color: 'bg-teal-100 text-teal-700' });
+      badges.push({ label: '基準', color: 'bg-[#00c4cc]/10 text-[#00c4cc]' });
     }
     if (personnelSettings?.personnelType === 'addition') {
       badges.push({ label: '加算', color: 'bg-orange-100 text-orange-700' });
@@ -79,7 +79,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
       <div
         className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
           selected
-            ? 'bg-teal-50 border border-teal-200'
+            ? 'bg-[#00c4cc]/5 border border-[#00c4cc]/20'
             : 'hover:bg-gray-50 border border-transparent'
         }`}
         onClick={onClick}
@@ -108,14 +108,14 @@ const StaffCard: React.FC<StaffCardProps> = ({
       <div
         className={`bg-white rounded-xl border p-4 transition-all ${
           selected
-            ? 'border-teal-300 shadow-md'
+            ? 'border-[#00c4cc]/30 shadow-md'
             : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
         } ${onClick ? 'cursor-pointer' : ''}`}
         onClick={onClick}
       >
         <div className="flex items-start gap-3">
           {/* アバター */}
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-lg">
               {staff.name?.charAt(0) || '?'}
             </span>
@@ -175,12 +175,12 @@ const StaffCard: React.FC<StaffCardProps> = ({
   return (
     <div
       className={`bg-white rounded-xl border p-5 ${
-        selected ? 'border-teal-300 shadow-md' : 'border-gray-200'
+        selected ? 'border-[#00c4cc]/30 shadow-md' : 'border-gray-200'
       }`}
     >
       <div className="flex items-start gap-4">
         {/* アバター */}
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0">
           <span className="text-white font-bold text-2xl">
             {staff.name?.charAt(0) || '?'}
           </span>

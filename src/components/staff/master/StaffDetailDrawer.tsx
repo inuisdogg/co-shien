@@ -133,7 +133,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
               {getQualificationLabels().map((label, idx) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-teal-50 text-teal-700 rounded-full text-sm"
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-[#00c4cc]/5 text-[#00c4cc] rounded-full text-sm"
                 >
                   <Award size={14} />
                   {label}
@@ -175,7 +175,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
           {onEditPersonnel && (
             <button
               onClick={() => onEditPersonnel(staff)}
-              className="text-sm text-teal-600 hover:text-teal-700"
+              className="text-sm text-[#00c4cc] hover:text-[#00c4cc]"
             >
               編集
             </button>
@@ -192,7 +192,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
             <span
               className={`px-3 py-1 rounded-full text-sm font-medium ${
                 staff.personnelSettings?.personnelType === 'standard'
-                  ? 'bg-teal-100 text-teal-700'
+                  ? 'bg-[#00c4cc]/10 text-[#00c4cc]'
                   : staff.personnelSettings?.personnelType === 'addition'
                   ? 'bg-orange-100 text-orange-700'
                   : 'bg-gray-200 text-gray-600'
@@ -280,7 +280,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
             {onEditLeave && (
               <button
                 onClick={() => onEditLeave(staff)}
-                className="text-sm text-teal-600 hover:text-teal-700"
+                className="text-sm text-[#00c4cc] hover:text-[#00c4cc]"
               >
                 編集
               </button>
@@ -289,14 +289,14 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
 
           {leave?.paidLeaveEnabled ? (
             <div className="space-y-3">
-              <div className="p-4 bg-teal-50 rounded-xl">
+              <div className="p-4 bg-[#00c4cc]/5 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-teal-700 font-medium">有給残日数</span>
-                  <span className="text-2xl font-bold text-teal-700">
+                  <span className="text-[#00c4cc] font-medium">有給残日数</span>
+                  <span className="text-2xl font-bold text-[#00c4cc]">
                     {leave.paidLeaveDays}日
                   </span>
                 </div>
-                <div className="text-sm text-teal-600">
+                <div className="text-sm text-[#00c4cc]">
                   有給休暇管理が有効です
                 </div>
               </div>
@@ -319,7 +319,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
               {onEditLeave && (
                 <button
                   onClick={() => onEditLeave(staff)}
-                  className="mt-2 text-sm text-teal-600 hover:text-teal-700"
+                  className="mt-2 text-sm text-[#00c4cc] hover:text-[#00c4cc]"
                 >
                   有効にする
                 </button>
@@ -353,7 +353,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onEdit(staff)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors text-sm font-medium"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[#00c4cc] hover:bg-[#00c4cc]/5 rounded-lg transition-colors text-sm font-medium"
               >
                 <Edit2 size={16} />
                 編集
@@ -370,9 +370,9 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
         </div>
 
         {/* プロフィールヘッダー */}
-        <div className="flex-shrink-0 px-6 py-6 bg-gradient-to-br from-teal-50 to-white">
+        <div className="flex-shrink-0 px-6 py-6 bg-gradient-to-br from-[#00c4cc]/5 to-white">
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-3xl">
                 {staff.name?.charAt(0) || '?'}
               </span>
@@ -396,7 +396,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
                   </span>
                 )}
                 {staff.personnelSettings?.personnelType === 'standard' && (
-                  <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">
+                  <span className="px-2 py-0.5 bg-[#00c4cc]/10 text-[#00c4cc] rounded-full text-xs font-medium">
                     基準
                   </span>
                 )}
@@ -423,7 +423,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
-                    ? 'border-teal-600 text-teal-600'
+                    ? 'border-[#00c4cc] text-[#00c4cc]'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >

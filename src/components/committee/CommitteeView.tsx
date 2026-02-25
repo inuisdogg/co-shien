@@ -265,7 +265,7 @@ export default function CommitteeView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -275,12 +275,12 @@ export default function CommitteeView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Users className="w-6 h-6 text-cyan-500" />
+          <Users className="w-6 h-6 text-[#00c4cc]" />
           <h1 className="text-xl font-bold text-gray-800">委員会管理</h1>
         </div>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
         >
           {showCreateForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {showCreateForm ? '閉じる' : '新規会議を作成'}
@@ -297,7 +297,7 @@ export default function CommitteeView() {
               <select
                 value={newMeeting.committeeType}
                 onChange={e => setNewMeeting(prev => ({ ...prev, committeeType: e.target.value as CommitteeType }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
               >
                 <option value="abuse_prevention">虐待防止委員会</option>
                 <option value="restraint_review">身体拘束適正化委員会</option>
@@ -313,7 +313,7 @@ export default function CommitteeView() {
                 type="date"
                 value={newMeeting.meetingDate}
                 onChange={e => setNewMeeting(prev => ({ ...prev, meetingDate: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
               />
             </div>
             <div className="md:col-span-2">
@@ -323,7 +323,7 @@ export default function CommitteeView() {
                 value={newMeeting.location}
                 onChange={e => setNewMeeting(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="例: 2F会議室"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
               />
             </div>
             <div>
@@ -333,7 +333,7 @@ export default function CommitteeView() {
                 onChange={e => setNewMeeting(prev => ({ ...prev, attendeesText: e.target.value }))}
                 placeholder={"山田太郎\n佐藤花子\n田中一郎"}
                 rows={4}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
               />
             </div>
             <div>
@@ -343,7 +343,7 @@ export default function CommitteeView() {
                 onChange={e => setNewMeeting(prev => ({ ...prev, agendaText: e.target.value }))}
                 placeholder={"前回議事録の確認\n事故報告の検討\n次回の日程調整"}
                 rows={4}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
               />
             </div>
             <div className="md:col-span-2">
@@ -353,7 +353,7 @@ export default function CommitteeView() {
                 onChange={e => setNewMeeting(prev => ({ ...prev, decisions: e.target.value }))}
                 placeholder="会議で決定した事項を記入"
                 rows={3}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
               />
             </div>
           </div>
@@ -367,7 +367,7 @@ export default function CommitteeView() {
             <button
               onClick={handleCreateMeeting}
               disabled={submitting || !newMeeting.meetingDate}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-5 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               下書きとして保存
@@ -448,9 +448,9 @@ export default function CommitteeView() {
       {/* Type Filter */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setSelectedType('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedType === 'all' ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全て</button>
+          <button onClick={() => setSelectedType('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedType === 'all' ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全て</button>
           {Object.entries(COMMITTEE_TYPE_LABELS).map(([k, v]) => (
-            <button key={k} onClick={() => setSelectedType(k as CommitteeType)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedType === k ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{v}</button>
+            <button key={k} onClick={() => setSelectedType(k as CommitteeType)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedType === k ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{v}</button>
           ))}
         </div>
       </div>

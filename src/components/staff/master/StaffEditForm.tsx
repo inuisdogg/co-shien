@@ -164,7 +164,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] ${
                       errors.name ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="山田 太郎"
@@ -186,7 +186,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                     type="text"
                     value={formData.nameKana}
                     onChange={(e) => setFormData({ ...formData, nameKana: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                     placeholder="やまだ たろう"
                   />
                 </div>
@@ -202,7 +202,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                       onChange={(e) =>
                         setFormData({ ...formData, type: e.target.value as Staff['type'] })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                     >
                       <option value="常勤">常勤</option>
                       <option value="非常勤">非常勤</option>
@@ -218,7 +218,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                       onChange={(e) =>
                         setFormData({ ...formData, role: e.target.value as Staff['role'] })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                     >
                       <option value="管理者">管理者</option>
                       <option value="マネージャー">マネージャー</option>
@@ -243,7 +243,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                             },
                           })
                         }
-                        className="w-4 h-4 text-teal-500 border-gray-300 rounded focus:ring-teal-500"
+                        className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
                       />
                       <div>
                         <span className="text-sm font-medium text-gray-700">施設管理画面へのアクセス</span>
@@ -273,7 +273,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                     onChange={(e) =>
                       setFormData({ ...formData, phone: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                     placeholder="090-1234-5678"
                   />
                 </div>
@@ -289,7 +289,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
                     }
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] ${
                       errors.email ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="yamada@example.com"
@@ -325,7 +325,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
             >
               {loading ? (
                 <>

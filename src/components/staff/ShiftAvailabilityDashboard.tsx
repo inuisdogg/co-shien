@@ -276,7 +276,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-500 border-t-transparent" />
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#00c4cc] border-t-transparent" />
       </div>
     );
   }
@@ -325,7 +325,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
           ) : null}
           <button
             onClick={() => setShowDeadlineModal(true)}
-            className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors flex items-center gap-2"
           >
             <Settings className="w-4 h-4" />
             締切設定
@@ -392,7 +392,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
       <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
         <div className="p-4 border-b bg-gray-50">
           <h3 className="font-semibold flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-teal-500" />
+            <Calendar className="w-5 h-5 text-[#00c4cc]" />
             希望状況カレンダー
           </h3>
           <p className="text-sm text-gray-500 mt-1">
@@ -429,10 +429,10 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
 
           {/* 集計行 */}
           <div
-            className="grid gap-1 border-b-2 border-teal-200 pb-2 mb-2"
+            className="grid gap-1 border-b-2 border-[#00c4cc]/20 pb-2 mb-2"
             style={{ gridTemplateColumns: `120px repeat(${daysInMonth.length}, minmax(36px, 1fr))` }}
           >
-            <div className="text-sm font-medium text-teal-600 p-2">
+            <div className="text-sm font-medium text-[#00c4cc] p-2">
               希望者数
             </div>
             {daysInMonth.map((date) => {
@@ -490,7 +490,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
                     }`}
                   >
                     {isAvailable && (
-                      <div className="w-6 h-6 rounded-full bg-teal-500 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full bg-[#00c4cc] flex items-center justify-center">
                         <span className="text-white text-xs font-bold">○</span>
                       </div>
                     )}
@@ -512,7 +512,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
       <div className="bg-white rounded-lg border shadow-sm">
         <div className="p-4 border-b bg-gray-50">
           <h3 className="font-semibold flex items-center gap-2">
-            <Users className="w-5 h-5 text-teal-500" />
+            <Users className="w-5 h-5 text-[#00c4cc]" />
             スタッフ別提出状況
           </h3>
         </div>
@@ -570,7 +570,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
                 type="date"
                 value={deadlineInput}
                 onChange={(e) => setDeadlineInput(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-[#00c4cc]"
               />
             </div>
 
@@ -584,7 +584,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
               <button
                 onClick={handleSaveDeadline}
                 disabled={isSaving || !deadlineInput}
-                className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
               >
                 {isSaving ? '保存中...' : '保存'}
               </button>

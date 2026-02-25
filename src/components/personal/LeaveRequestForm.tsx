@@ -320,7 +320,7 @@ export default function LeaveRequestForm({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -330,7 +330,7 @@ export default function LeaveRequestForm({
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Calendar className="w-6 h-6 text-teal-500" />
+          <Calendar className="w-6 h-6 text-[#00c4cc]" />
           <div>
             <h2 className="text-xl font-bold text-gray-800">休暇申請</h2>
             <p className="text-sm text-gray-500">{facilityName}</p>
@@ -340,7 +340,7 @@ export default function LeaveRequestForm({
           {!showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors text-sm font-medium"
             >
               <Plus size={16} />
               新規申請
@@ -359,24 +359,24 @@ export default function LeaveRequestForm({
 
       {/* 有給残日数カード */}
       {balance && (
-        <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl p-5 border border-teal-200">
+        <div className="bg-gradient-to-br from-[#00c4cc]/5 to-[#00c4cc]/10 rounded-xl p-5 border border-[#00c4cc]/20">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-teal-700">
+            <span className="text-sm font-medium text-[#00c4cc]">
               {balance.fiscal_year}年度 有給休暇残日数
             </span>
           </div>
           <div className="flex items-end gap-6">
             <div>
-              <span className="text-4xl font-bold text-teal-700">{balance.remaining_days}</span>
-              <span className="text-teal-600 ml-1">日</span>
+              <span className="text-4xl font-bold text-[#00c4cc]">{balance.remaining_days}</span>
+              <span className="text-[#00c4cc] ml-1">日</span>
             </div>
-            <div className="flex gap-4 text-sm text-teal-600 pb-1">
+            <div className="flex gap-4 text-sm text-[#00c4cc] pb-1">
               <span>付与: {balance.total_days}日</span>
               <span>使用: {balance.used_days}日</span>
             </div>
           </div>
           {balance.expires_date && (
-            <p className="text-xs text-teal-500 mt-2">
+            <p className="text-xs text-[#00c4cc] mt-2">
               有効期限: {formatDate(balance.expires_date)}
             </p>
           )}
@@ -404,7 +404,7 @@ export default function LeaveRequestForm({
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-800 flex items-center gap-2">
-              <FileText size={18} className="text-teal-600" />
+              <FileText size={18} className="text-[#00c4cc]" />
               新規休暇申請
             </h3>
             <button
@@ -435,7 +435,7 @@ export default function LeaveRequestForm({
                         : formData.end_date,
                   })
                 }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
               >
                 {Object.entries(LEAVE_REQUEST_TYPE_LABELS).map(([key, label]) => (
                   <option key={key} value={key}>
@@ -465,7 +465,7 @@ export default function LeaveRequestForm({
                             : formData.end_date,
                     })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
                 />
               </div>
               <div>
@@ -479,7 +479,7 @@ export default function LeaveRequestForm({
                     formData.request_type === 'half_day_pm'
                   }
                   onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm disabled:bg-gray-100 disabled:text-gray-400"
                 />
               </div>
             </div>
@@ -509,7 +509,7 @@ export default function LeaveRequestForm({
                 value={formData.reason}
                 onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                 rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm resize-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm resize-none"
                 placeholder="理由があれば入力してください..."
               />
             </div>
@@ -536,7 +536,7 @@ export default function LeaveRequestForm({
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors text-sm font-medium disabled:opacity-50"
               >
                 {submitting ? (
                   <>
@@ -571,7 +571,7 @@ export default function LeaveRequestForm({
             onClick={() => setStatusFilter(item.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
               statusFilter === item.key
-                ? 'bg-teal-600 text-white'
+                ? 'bg-[#00c4cc] text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -598,7 +598,7 @@ export default function LeaveRequestForm({
             {requests.length === 0 && (
               <button
                 onClick={() => setShowForm(true)}
-                className="mt-3 text-teal-600 hover:text-teal-700 text-sm font-medium"
+                className="mt-3 text-[#00c4cc] hover:text-[#00c4cc] text-sm font-medium"
               >
                 最初の申請を作成する
               </button>

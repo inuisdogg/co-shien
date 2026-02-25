@@ -319,10 +319,10 @@ export default function ShiftAvailabilityForm({
           exit={{ scale: 0.95, opacity: 0 }}
         >
           {/* ヘッダー */}
-          <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-teal-500 to-teal-600 text-white">
+          <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-[#00c4cc] to-[#00b0b8] text-white">
             <div>
               <h2 className="text-lg font-bold">希望シフト提出</h2>
-              <p className="text-sm text-teal-100">{facilityName}</p>
+              <p className="text-sm text-[#00c4cc]/30">{facilityName}</p>
             </div>
             <button
               onClick={onClose}
@@ -334,7 +334,7 @@ export default function ShiftAvailabilityForm({
 
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-500 border-t-transparent" />
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#00c4cc] border-t-transparent" />
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto">
@@ -455,10 +455,10 @@ export default function ShiftAvailabilityForm({
                         onClick={() => canEdit && toggleDate(date)}
                         disabled={!canEdit}
                         className={`h-12 rounded-lg border-2 transition-all flex flex-col items-center justify-center ${
-                          canEdit ? 'hover:border-teal-400 cursor-pointer' : 'cursor-not-allowed opacity-70'
+                          canEdit ? 'hover:border-[#00c4cc] cursor-pointer' : 'cursor-not-allowed opacity-70'
                         } ${
                           isSelected
-                            ? 'bg-teal-500 border-teal-500 text-white'
+                            ? 'bg-[#00c4cc] border-[#00c4cc] text-white'
                             : isWeekend
                             ? 'bg-red-50 border-gray-200'
                             : 'bg-white border-gray-200'
@@ -494,7 +494,7 @@ export default function ShiftAvailabilityForm({
                   onChange={(e) => setNotes(e.target.value)}
                   disabled={!canEdit}
                   placeholder="希望事項があれば記入してください"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-[#00c4cc] resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   rows={2}
                 />
               </div>
@@ -518,7 +518,7 @@ export default function ShiftAvailabilityForm({
               <button
                 onClick={handleSubmit}
                 disabled={isSaving || !canEdit || selectedDates.size === 0}
-                className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
                 {isSubmitted ? '再提出' : '提出'}

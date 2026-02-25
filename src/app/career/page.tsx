@@ -45,13 +45,15 @@ import { supabase } from '@/lib/supabase';
 import { User as UserType, EmploymentRecord, FacilitySettings, WorkToolId } from '@/types';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import { getBizBaseUrl } from '@/utils/domain';
-import { Shield, Download, Loader2, Eye } from 'lucide-react';
+import { Shield, Download, Loader2, Eye, TrendingUp, GraduationCap, Hash, ChevronDown, ChevronUp } from 'lucide-react';
 import WorkExperienceForm from '@/components/personal/WorkExperienceForm';
 import AttendanceCalendar from '@/components/personal/AttendanceCalendar';
 import ShiftConfirmationView from '@/components/personal/ShiftConfirmationView';
 import ShiftAvailabilityForm from '@/components/personal/ShiftAvailabilityForm';
 import LeaveRequestForm from '@/components/personal/LeaveRequestForm';
 import { usePersonalData } from '@/hooks/usePersonalData';
+import { useCareerAccumulation } from '@/hooks/useCareerAccumulation';
+import type { CareerTimelineEvent } from '@/hooks/useCareerAccumulation';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -154,6 +156,18 @@ export default function PersonalDashboardPage() {
     endBreak,
     refresh: refreshPersonalData,
   } = usePersonalData();
+
+  // キャリア自動蓄積フック
+  const {
+    tenureList,
+    totalAttendanceDays,
+    totalTrainingHours,
+    qualificationsCount,
+    timelineEvents,
+    annualSummaries,
+    isLoading: careerAccumulationLoading,
+  } = useCareerAccumulation(user?.id || '');
+
   const [showAttendanceCalendar, setShowAttendanceCalendar] = useState(false);
   const [showShiftConfirmation, setShowShiftConfirmation] = useState(false);
   const [shiftConfirmationFacilityId, setShiftConfirmationFacilityId] = useState<string | null>(null);
@@ -252,6 +266,13 @@ export default function PersonalDashboardPage() {
   const resumeRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const enrollmentCertRef = useRef<HTMLDivElement>(null);
+  const trainingHistoryRef = useRef<HTMLDivElement>(null);
+
+  // キャリア自動蓄積データ
+  const [showAnnualDetails, setShowAnnualDetails] = useState(false);
+  const [showFullTimeline, setShowFullTimeline] = useState(false);
+  const [generatingExport, setGeneratingExport] = useState<string | null>(null);
 
   // 日付を和暦に変換
   const toJapaneseDate = (dateStr: string): string => {
@@ -411,6 +432,70 @@ export default function PersonalDashboardPage() {
       alert('PDF生成に失敗しました');
     } finally {
       setGeneratingPDF(null);
+    }
+  };
+
+  // 在籍証明書PDF生成
+  const generateEnrollmentCertPDF = async () => {
+    setGeneratingExport('enrollment');
+    try {
+      if (!enrollmentCertRef.current) throw new Error('PDF生成に失敗しました');
+      enrollmentCertRef.current.style.display = 'block';
+      const canvas = await html2canvas(enrollmentCertRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      enrollmentCertRef.current.style.display = 'none';
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
+      const fileName = `在籍証明書_${profileData.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('PDF生成エラー:', error);
+      alert('PDF生成に失敗しました');
+    } finally {
+      setGeneratingExport(null);
+    }
+  };
+
+  // 研修受講履歴PDF生成
+  const generateTrainingHistoryPDF = async () => {
+    setGeneratingExport('training');
+    try {
+      if (!trainingHistoryRef.current) throw new Error('PDF生成に失敗しました');
+      trainingHistoryRef.current.style.display = 'block';
+      const canvas = await html2canvas(trainingHistoryRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      trainingHistoryRef.current.style.display = 'none';
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
+      const fileName = `研修受講履歴_${profileData.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('PDF生成エラー:', error);
+      alert('PDF生成に失敗しました');
+    } finally {
+      setGeneratingExport(null);
     }
   };
 
@@ -1159,43 +1244,313 @@ export default function PersonalDashboardPage() {
 
       {activeTab === 'career' && (
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-          {/* 履歴書・職務経歴書出力ボタン */}
+
+          {/* ===== キャリアサマリー ===== */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-[#818CF8] to-[#6366F1] rounded-lg shadow-sm p-4"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="text-white">
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  履歴書・職務経歴書
-                </h2>
-                <p className="text-sm text-white/80 mt-1">
-                  下記の情報を元にワンクリックでPDFを生成
-                </p>
+            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#818CF8]" />
+              キャリアサマリー
+            </h2>
+            <p className="text-xs text-gray-500 mb-4">出勤・研修・資格データから自動で集計されます</p>
+
+            {careerAccumulationLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowResumePreview(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#818CF8] font-bold rounded-lg hover:bg-white/90 transition-colors"
-                >
-                  <FileText className="w-5 h-5" />
-                  履歴書を作成
-                </button>
-                <button
-                  onClick={generateCVPDF}
-                  disabled={generatingPDF !== null}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/20 text-white font-bold rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50"
-                >
+            ) : (
+              <>
+                {/* 統計カード */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  {/* 在籍日数 */}
+                  <div className="bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-xl p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <Calendar className="w-5 h-5 text-[#818CF8]" />
+                    </div>
+                    <p className="text-2xl font-bold text-[#818CF8]">
+                      {tenureList.length > 0 ? tenureList[0].totalDays.toLocaleString() : 0}
+                    </p>
+                    <p className="text-xs text-gray-600 font-bold mt-1">在籍日数</p>
+                    {tenureList.length > 0 && tenureList[0].totalDays > 0 && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {tenureList[0].years > 0 && `${tenureList[0].years}年`}
+                        {tenureList[0].months > 0 && `${tenureList[0].months}ヶ月`}
+                        {tenureList[0].days > 0 && `${tenureList[0].days}日`}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 総出勤日数 */}
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-green-600">
+                      {totalAttendanceDays.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-600 font-bold mt-1">総出勤日数</p>
+                    <p className="text-xs text-gray-400 mt-0.5">自動カウント</p>
+                  </div>
+
+                  {/* 総研修時間 */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <GraduationCap className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {totalTrainingHours.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-600 font-bold mt-1">総研修時間</p>
+                    <p className="text-xs text-gray-400 mt-0.5">時間</p>
+                  </div>
+
+                  {/* 保有資格数 */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <Award className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-amber-600">
+                      {qualificationsCount + qualifications.length}
+                    </p>
+                    <p className="text-xs text-gray-600 font-bold mt-1">保有資格数</p>
+                    <p className="text-xs text-gray-400 mt-0.5">件</p>
+                  </div>
+                </div>
+
+                {/* キャリアタイムライン */}
+                {timelineEvents.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-[#818CF8]" />
+                      キャリアタイムライン
+                    </h3>
+                    <div className="relative pl-6 border-l-2 border-[#818CF8]/30">
+                      {(showFullTimeline ? timelineEvents : timelineEvents.slice(0, 5)).map((event: CareerTimelineEvent) => {
+                        const getEventStyle = () => {
+                          switch (event.type) {
+                            case 'employment_start':
+                              return { dotColor: 'bg-[#818CF8]', icon: Building2, label: '入社' };
+                            case 'employment_end':
+                              return { dotColor: 'bg-gray-400', icon: Building2, label: '退社' };
+                            case 'qualification':
+                              return { dotColor: 'bg-amber-500', icon: Award, label: '資格' };
+                            case 'training':
+                              return { dotColor: 'bg-blue-500', icon: GraduationCap, label: '研修' };
+                            case 'certificate_issued':
+                              return { dotColor: 'bg-green-500', icon: FileCheck, label: '証明書' };
+                            case 'role_change':
+                              return { dotColor: 'bg-purple-500', icon: TrendingUp, label: '昇進' };
+                            default:
+                              return { dotColor: 'bg-gray-400', icon: Clock, label: '' };
+                          }
+                        };
+                        const style = getEventStyle();
+                        const EventIcon = style.icon;
+
+                        return (
+                          <div key={event.id} className="relative mb-4 last:mb-0">
+                            <div className={`absolute -left-[25px] w-3 h-3 rounded-full ${style.dotColor} border-2 border-white`} />
+                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                              <div className="flex items-center gap-2 mb-1">
+                                <EventIcon className="w-3.5 h-3.5 text-gray-500" />
+                                <span className="text-xs text-gray-400">
+                                  {new Date(event.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                </span>
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                                  event.type === 'employment_start' ? 'bg-[#818CF8]/10 text-[#818CF8]' :
+                                  event.type === 'qualification' ? 'bg-amber-100 text-amber-700' :
+                                  event.type === 'training' ? 'bg-blue-100 text-blue-700' :
+                                  event.type === 'certificate_issued' ? 'bg-green-100 text-green-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {style.label}
+                                </span>
+                              </div>
+                              <p className="text-sm font-bold text-gray-800">{event.title}</p>
+                              <p className="text-xs text-gray-500">{event.description}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {timelineEvents.length > 5 && (
+                      <button
+                        onClick={() => setShowFullTimeline(!showFullTimeline)}
+                        className="mt-3 flex items-center gap-1 text-sm text-[#818CF8] hover:text-[#6366F1] font-bold mx-auto"
+                      >
+                        {showFullTimeline ? (
+                          <>
+                            <ChevronUp className="w-4 h-4" />
+                            閉じる
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            すべて表示（{timelineEvents.length}件）
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 年度別サマリー */}
+                {annualSummaries.length > 0 && (
+                  <div>
+                    <button
+                      onClick={() => setShowAnnualDetails(!showAnnualDetails)}
+                      className="w-full flex items-center justify-between text-sm font-bold text-gray-700 mb-3 hover:text-[#818CF8] transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Hash className="w-4 h-4 text-[#818CF8]" />
+                        年度別キャリアサマリー
+                      </span>
+                      {showAnnualDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                    {showAnnualDetails && (
+                      <div className="space-y-2">
+                        {annualSummaries.map((summary) => (
+                          <div key={summary.year} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-bold text-gray-800">{summary.year}年</span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                              <div className="flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-gray-600">出勤:</span>
+                                <span className="font-bold text-gray-800">{summary.attendanceDays}日</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <GraduationCap className="w-3 h-3 text-blue-500" />
+                                <span className="text-gray-600">研修:</span>
+                                <span className="font-bold text-gray-800">{summary.trainingHours}時間</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Award className="w-3 h-3 text-amber-500" />
+                                <span className="text-gray-600">新規資格:</span>
+                                <span className="font-bold text-gray-800">{summary.newQualifications}件</span>
+                              </div>
+                              {summary.roleChanges.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <TrendingUp className="w-3 h-3 text-[#818CF8]" />
+                                  <span className="text-gray-600">役職:</span>
+                                  <span className="font-bold text-gray-800 truncate">{summary.roleChanges[0]}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+
+          {/* ===== 書類ワンクリック出力 ===== */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+          >
+            <h2 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <Download className="w-5 h-5 text-[#818CF8]" />
+              書類ワンクリック出力
+            </h2>
+            <p className="text-xs text-gray-500 mb-4">蓄積されたキャリアデータから各種書類をPDFで出力できます</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* 履歴書 */}
+              <button
+                onClick={() => setShowResumePreview(true)}
+                className="flex items-center gap-3 p-4 bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-xl hover:bg-[#818CF8]/10 transition-colors text-left group"
+              >
+                <div className="w-10 h-10 bg-[#818CF8] rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-[#818CF8]">履歴書</p>
+                  <p className="text-xs text-gray-500">プレビュー・編集してPDF出力</p>
+                </div>
+              </button>
+
+              {/* 職務経歴書 */}
+              <button
+                onClick={generateCVPDF}
+                disabled={generatingPDF !== null}
+                className="flex items-center gap-3 p-4 bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-xl hover:bg-[#818CF8]/10 transition-colors text-left group disabled:opacity-50"
+              >
+                <div className="w-10 h-10 bg-[#818CF8] rounded-lg flex items-center justify-center flex-shrink-0">
                   {generatingPDF === 'cv' ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
                   ) : (
-                    <Download className="w-5 h-5" />
+                    <Briefcase className="w-5 h-5 text-white" />
                   )}
-                  職務経歴書
-                </button>
-              </div>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-[#818CF8]">職務経歴書</p>
+                  <p className="text-xs text-gray-500">職歴・資格から自動生成</p>
+                </div>
+              </button>
+
+              {/* 実務経験証明書 */}
+              <button
+                onClick={() => {
+                  const workExpSection = document.getElementById('work-experience-section');
+                  if (workExpSection) workExpSection.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition-colors text-left group"
+              >
+                <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-700">実務経験証明書</p>
+                  <p className="text-xs text-gray-500">下部の職歴セクションから依頼</p>
+                </div>
+              </button>
+
+              {/* 在籍証明書 */}
+              <button
+                onClick={generateEnrollmentCertPDF}
+                disabled={generatingExport !== null}
+                className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors text-left group disabled:opacity-50"
+              >
+                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  {generatingExport === 'enrollment' ? (
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  ) : (
+                    <Building2 className="w-5 h-5 text-white" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-blue-700">在籍証明書</p>
+                  <p className="text-xs text-gray-500">現在の所属情報をPDF出力</p>
+                </div>
+              </button>
+
+              {/* 研修受講履歴 */}
+              <button
+                onClick={generateTrainingHistoryPDF}
+                disabled={generatingExport !== null}
+                className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors text-left group disabled:opacity-50"
+              >
+                <div className="w-10 h-10 bg-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  {generatingExport === 'training' ? (
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  ) : (
+                    <GraduationCap className="w-5 h-5 text-white" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-amber-700">研修受講履歴</p>
+                  <p className="text-xs text-gray-500">研修記録の一覧をPDF出力</p>
+                </div>
+              </button>
             </div>
           </motion.div>
 
@@ -2161,6 +2516,7 @@ export default function PersonalDashboardPage() {
 
           {/* C. 職歴（実務経験証明書） */}
           <motion.div
+            id="work-experience-section"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
@@ -3196,6 +3552,124 @@ export default function PersonalDashboardPage() {
             </ul>
           </div>
         )}
+      </div>
+
+      {/* 在籍証明書PDFテンプレート（非表示） */}
+      <div ref={enrollmentCertRef} style={{ display: 'none', width: '794px', padding: '60px', fontFamily: 'sans-serif', backgroundColor: '#fff' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', letterSpacing: '8px' }}>在 籍 証 明 書</h1>
+          <p style={{ fontSize: '12px', color: '#666' }}>
+            {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}発行
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '40px', lineHeight: '2' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <p style={{ fontSize: '14px', marginBottom: '10px' }}>下記の者が当施設に在籍していることを証明します。</p>
+          </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
+            <tbody>
+              <tr>
+                <td style={{ border: '1px solid #333', padding: '12px', backgroundColor: '#f5f5f5', width: '120px', fontSize: '13px', fontWeight: 'bold' }}>氏名</td>
+                <td style={{ border: '1px solid #333', padding: '12px', fontSize: '16px', fontWeight: 'bold' }}>{profileData.name}</td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #333', padding: '12px', backgroundColor: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>生年月日</td>
+                <td style={{ border: '1px solid #333', padding: '12px', fontSize: '13px' }}>
+                  {profileData.birthDate ? toJapaneseDate(profileData.birthDate) : '-'}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #333', padding: '12px', backgroundColor: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>現住所</td>
+                <td style={{ border: '1px solid #333', padding: '12px', fontSize: '13px' }}>{profileData.address || '-'}</td>
+              </tr>
+              {personalFacilities.length > 0 && (
+                <>
+                  <tr>
+                    <td style={{ border: '1px solid #333', padding: '12px', backgroundColor: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>所属施設</td>
+                    <td style={{ border: '1px solid #333', padding: '12px', fontSize: '13px' }}>{personalFacilities[0].facilityName}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #333', padding: '12px', backgroundColor: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>役職</td>
+                    <td style={{ border: '1px solid #333', padding: '12px', fontSize: '13px' }}>{personalFacilities[0].employmentRecord.role || 'スタッフ'}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #333', padding: '12px', backgroundColor: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>雇用形態</td>
+                    <td style={{ border: '1px solid #333', padding: '12px', fontSize: '13px' }}>{personalFacilities[0].employmentRecord.employmentType || '常勤'}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #333', padding: '12px', backgroundColor: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>在籍開始日</td>
+                    <td style={{ border: '1px solid #333', padding: '12px', fontSize: '13px' }}>{personalFacilities[0].employmentRecord.startDate ? toJapaneseDate(personalFacilities[0].employmentRecord.startDate) : '-'}</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+
+          <p style={{ fontSize: '13px', textAlign: 'center', marginBottom: '40px' }}>
+            上記の通り証明いたします。
+          </p>
+
+          <div style={{ textAlign: 'right', marginTop: '60px' }}>
+            {personalFacilities.length > 0 && (
+              <p style={{ fontSize: '13px', marginBottom: '5px' }}>{personalFacilities[0].facilityName}</p>
+            )}
+            <p style={{ fontSize: '11px', color: '#666' }}>※ 本証明書はRootsキャリアシステムにより自動発行されたものです</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 研修受講履歴PDFテンプレート（非表示） */}
+      <div ref={trainingHistoryRef} style={{ display: 'none', width: '794px', padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#fff' }}>
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '5px', letterSpacing: '4px' }}>研修受講履歴</h1>
+          <p style={{ fontSize: '12px', color: '#666' }}>
+            {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}現在
+          </p>
+        </div>
+
+        <div style={{ textAlign: 'right', marginBottom: '20px', fontSize: '14px' }}>
+          <p>氏名: {profileData.name}</p>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', padding: '10px', backgroundColor: '#f0f0ff', borderRadius: '4px' }}>
+            <span style={{ fontSize: '13px' }}>総研修時間: <strong>{totalTrainingHours}時間</strong></span>
+            <span style={{ fontSize: '13px' }}>研修数: <strong>{timelineEvents.filter(e => e.type === 'training').length}件</strong></span>
+          </div>
+        </div>
+
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px', width: '100px' }}>受講日</th>
+              <th style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px' }}>研修名</th>
+              <th style={{ border: '1px solid #333', padding: '8px', backgroundColor: '#f5f5f5', fontSize: '12px', width: '80px' }}>詳細</th>
+            </tr>
+          </thead>
+          <tbody>
+            {timelineEvents.filter(e => e.type === 'training').length === 0 ? (
+              <tr>
+                <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center', fontSize: '12px' }} colSpan={3}>研修受講記録はありません</td>
+              </tr>
+            ) : (
+              timelineEvents.filter(e => e.type === 'training').map((event) => (
+                <tr key={event.id}>
+                  <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px', textAlign: 'center' }}>
+                    {new Date(event.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </td>
+                  <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{event.title.replace('研修完了: ', '')}</td>
+                  <td style={{ border: '1px solid #333', padding: '8px', fontSize: '12px' }}>{event.description}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        <div style={{ marginTop: '30px', textAlign: 'right', fontSize: '11px', color: '#666' }}>
+          <p>※ 本書はRootsキャリアシステムに登録された研修記録に基づき自動生成されたものです</p>
+        </div>
       </div>
     </div>
   );

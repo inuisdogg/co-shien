@@ -500,7 +500,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
             onClick={() => setShowAvailabilityOverlay(!showAvailabilityOverlay)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               showAvailabilityOverlay
-                ? 'bg-teal-50 border-teal-300 text-teal-700'
+                ? 'bg-[#00c4cc]/5 border-[#00c4cc]/30 text-[#00c4cc]'
                 : 'bg-gray-50 border-gray-300 text-gray-600'
             }`}
           >
@@ -593,11 +593,11 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
                       {/* 希望マーカー */}
                       {hasAvailability && !pattern && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-5 h-5 rounded-full border-2 border-teal-400 border-dashed opacity-60" />
+                          <div className="w-5 h-5 rounded-full border-2 border-[#00c4cc] border-dashed opacity-60" />
                         </div>
                       )}
                       {hasAvailability && pattern && (
-                        <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-teal-400" />
+                        <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-[#00c4cc]" />
                       )}
                       {pattern && (
                         <div

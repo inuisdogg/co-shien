@@ -119,7 +119,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
       <div className="px-4 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Users size={20} className="text-teal-600" />
+            <Users size={20} className="text-[#00c4cc]" />
             <h2 className="text-lg font-bold text-gray-800">スタッフ一覧</h2>
             <span className="text-sm text-gray-500">({stats.total}名)</span>
           </div>
@@ -148,7 +148,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
           <button
             data-tour="add-staff-button"
             onClick={onInviteStaff}
-            className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors text-sm font-medium"
           >
             <UserPlus size={16} />
             スタッフを追加
@@ -166,12 +166,12 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
             placeholder="名前・かな・資格で検索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm"
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent text-sm"
           />
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md transition-colors ${
-              showFilters ? 'bg-teal-100 text-teal-600' : 'text-gray-400 hover:text-gray-600'
+              showFilters ? 'bg-[#00c4cc]/10 text-[#00c4cc]' : 'text-gray-400 hover:text-gray-600'
             }`}
           >
             <SlidersHorizontal size={16} />
@@ -193,7 +193,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
                     onClick={() => setFilterType(option.value)}
                     className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
                       filterType === option.value
-                        ? 'bg-teal-600 text-white'
+                        ? 'bg-[#00c4cc] text-white'
                         : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -218,7 +218,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
                     onClick={() => setWorkStyleFilter(option.value)}
                     className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
                       workStyleFilter === option.value
-                        ? 'bg-teal-600 text-white'
+                        ? 'bg-[#00c4cc] text-white'
                         : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -240,7 +240,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
                 <select
                   value={sortField}
                   onChange={(e) => setSortField(e.target.value as StaffSortField)}
-                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                 >
                   {sortOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -264,7 +264,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
       <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-4 text-xs">
         <div className="flex items-center gap-1">
           <span className="text-gray-500">常勤換算:</span>
-          <span className="font-bold text-teal-600">{stats.totalFte.toFixed(2)}</span>
+          <span className="font-bold text-[#00c4cc]">{stats.totalFte.toFixed(2)}</span>
         </div>
         <div className="flex items-center gap-1">
           <span className="text-gray-500">基準:</span>
@@ -294,7 +294,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
             {!searchQuery && filterType === 'all' && (
               <button
                 onClick={onInviteStaff}
-                className="mt-2 text-sm text-teal-600 hover:text-teal-700"
+                className="mt-2 text-sm text-[#00c4cc] hover:text-[#00b0b8]"
               >
                 スタッフを追加する
               </button>

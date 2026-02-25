@@ -116,7 +116,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
           onClick={() => setMode('pattern')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             mode === 'pattern'
-              ? 'text-teal-600 border-b-2 border-teal-600'
+              ? 'text-[#00c4cc] border-b-2 border-[#00c4cc]'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -126,7 +126,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
           onClick={() => setMode('custom')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             mode === 'custom'
-              ? 'text-teal-600 border-b-2 border-teal-600'
+              ? 'text-[#00c4cc] border-b-2 border-[#00c4cc]'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -149,7 +149,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
                   onClick={() => handleSelectPattern(pattern)}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors text-left ${
                     isSelected
-                      ? 'bg-teal-50 border border-teal-200'
+                      ? 'bg-[#00c4cc]/5 border border-[#00c4cc]/20'
                       : 'hover:bg-gray-50'
                   }`}
                 >
@@ -213,21 +213,21 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
                 type="time"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
               />
               <span className="text-gray-400">〜</span>
               <input
                 type="time"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-sm"
               />
             </div>
 
             {/* プレビュー */}
             <div className="p-3 bg-gray-50 rounded-lg text-center">
               <span className="text-sm text-gray-500">表示: </span>
-              <span className="text-lg font-bold text-teal-600">
+              <span className="text-lg font-bold text-[#00c4cc]">
                 {customStart.replace(':', '').replace(/^0/, '').slice(0, -2) ||
                   customStart.split(':')[0].replace(/^0/, '')}
                 -
@@ -239,7 +239,7 @@ const ShiftCellEditor: React.FC<ShiftCellEditorProps> = ({
             {/* 確定ボタン */}
             <button
               onClick={handleConfirmCustom}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
             >
               <Check size={16} />
               確定

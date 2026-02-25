@@ -141,8 +141,8 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
-              <Calendar size={20} className="text-teal-600" />
+            <div className="w-10 h-10 rounded-full bg-[#00c4cc]/10 flex items-center justify-center">
+              <Calendar size={20} className="text-[#00c4cc]" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-gray-800">有給管理</h2>
@@ -163,7 +163,7 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <CheckCircle size={18} className="text-teal-600" />
+                <CheckCircle size={18} className="text-[#00c4cc]" />
                 <h3 className="font-medium text-gray-800">有給休暇</h3>
               </div>
               <button
@@ -172,8 +172,8 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
               >
                 {settings.paidLeaveEnabled ? (
                   <>
-                    <ToggleRight size={24} className="text-teal-600" />
-                    <span className="text-teal-600">有効</span>
+                    <ToggleRight size={24} className="text-[#00c4cc]" />
+                    <span className="text-[#00c4cc]">有効</span>
                   </>
                 ) : (
                   <>
@@ -187,14 +187,14 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
             {settings.paidLeaveEnabled && (
               <div className="space-y-4">
                 {/* 残日数表示 */}
-                <div className="p-4 bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl">
+                <div className="p-4 bg-gradient-to-br from-[#00c4cc]/5 to-[#00c4cc]/10 rounded-xl">
                   <div className="flex items-center justify-between">
-                    <span className="text-teal-700">残日数</span>
+                    <span className="text-[#00c4cc]">残日数</span>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-teal-700">
+                      <span className="text-4xl font-bold text-[#00c4cc]">
                         {settings.paidLeaveDays}
                       </span>
-                      <span className="text-teal-600">日</span>
+                      <span className="text-[#00c4cc]">日</span>
                     </div>
                   </div>
                 </div>
@@ -308,7 +308,7 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
               value={settings.notes}
               onChange={(e) => updateSetting('notes', e.target.value)}
               rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
               placeholder="メモを入力..."
             />
           </section>
@@ -378,7 +378,7 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
               <button
                 onClick={handleSave}
                 disabled={!hasChanges || isSaving || loading}
-                className="flex items-center gap-2 px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
               >
                 {isSaving ? (
                   <>
@@ -420,7 +420,7 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
                     type="number"
                     value={adjustDays}
                     onChange={(e) => setAdjustDays(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                     placeholder="0"
                     min="0"
                     step="0.5"
@@ -437,7 +437,7 @@ const StaffLeavePanel: React.FC<StaffLeavePanelProps> = ({
                   type="text"
                   value={adjustReason}
                   onChange={(e) => setAdjustReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                   placeholder="年次付与、取得など"
                 />
               </div>

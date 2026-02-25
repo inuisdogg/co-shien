@@ -30,6 +30,7 @@ import StaffingView from '@/components/staffing/StaffingView';
 import TrainingRecordView from '@/components/training/TrainingRecordView';
 import IncidentReportView from '@/components/incident/IncidentReportView';
 import LeaveApprovalView from '@/components/staff/LeaveApprovalView';
+import TalentManagementView from '@/components/talent/TalentManagementView';
 import { useAuth } from '@/contexts/AuthContext';
 import { SetupGuideProvider, useSetupGuide, SETUP_STEPS } from '@/contexts/SetupGuideContext';
 import { UserPermissions } from '@/types';
@@ -426,6 +427,8 @@ export default function BusinessPage() {
         return <FinanceView />;
       case 'leave-approval':
         return <LeaveApprovalView />;
+      case 'talent-management':
+        return <TalentManagementView />;
       default:
         return <DashboardView />;
     }

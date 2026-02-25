@@ -277,7 +277,7 @@ export default function LeaveApprovalView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -286,7 +286,7 @@ export default function LeaveApprovalView() {
     <div className="space-y-6">
       {/* ヘッダー */}
       <div className="flex items-center gap-3">
-        <Calendar className="w-6 h-6 text-teal-500" />
+        <Calendar className="w-6 h-6 text-[#00c4cc]" />
         <h1 className="text-xl font-bold text-gray-800">休暇申請管理</h1>
       </div>
 
@@ -320,13 +320,13 @@ export default function LeaveApprovalView() {
               placeholder="スタッフ名・申請種別・理由で検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as LeaveStatus | 'all')}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
           >
             <option value="all">全ステータス</option>
             <option value="pending">承認待ち</option>
@@ -495,7 +495,7 @@ export default function LeaveApprovalView() {
                         <button
                           onClick={() => handleApprove(request.id)}
                           disabled={isProcessing}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors text-sm font-medium disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors text-sm font-medium disabled:opacity-50"
                         >
                           {isProcessing ? (
                             <Loader2 size={16} className="animate-spin" />

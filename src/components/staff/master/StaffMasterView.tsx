@@ -172,8 +172,8 @@ const StaffMasterView: React.FC = () => {
       <div className="flex-shrink-0 px-6 py-4 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
-              <Users size={20} className="text-teal-600" />
+            <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
+              <Users size={20} className="text-[#00c4cc]" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">スタッフマスタ</h1>

@@ -228,7 +228,7 @@ export default function AdditionSettingsView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -237,7 +237,7 @@ export default function AdditionSettingsView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <ListChecks className="w-6 h-6 text-cyan-500" />
+        <ListChecks className="w-6 h-6 text-[#00c4cc]" />
         <h1 className="text-xl font-bold text-gray-800">加算体制設定</h1>
       </div>
 
@@ -245,7 +245,7 @@ export default function AdditionSettingsView() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-100 rounded-lg"><CheckCircle className="w-5 h-5 text-cyan-600" /></div>
+            <div className="p-2 bg-[#00c4cc]/10 rounded-lg"><CheckCircle className="w-5 h-5 text-[#00c4cc]" /></div>
             <div>
               <p className="text-sm text-gray-500">有効な加算</p>
               <p className="text-2xl font-bold text-gray-800">{stats.enabledCount}</p>
@@ -275,9 +275,9 @@ export default function AdditionSettingsView() {
       {/* Type Filter */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setActiveTypeFilter('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === 'all' ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全て</button>
+          <button onClick={() => setActiveTypeFilter('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === 'all' ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全て</button>
           {Object.entries(ADDITION_TYPE_LABELS).map(([k, v]) => (
-            <button key={k} onClick={() => setActiveTypeFilter(k)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === k ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{v}</button>
+            <button key={k} onClick={() => setActiveTypeFilter(k)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === k ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{v}</button>
           ))}
         </div>
       </div>
@@ -297,7 +297,7 @@ export default function AdditionSettingsView() {
                 className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-1 h-8 bg-cyan-400 rounded-full" />
+                  <div className="w-1 h-8 bg-[#00c4cc] rounded-full" />
                   <div className="text-left">
                     <p className="font-medium text-gray-800">{cat.name}</p>
                     <p className="text-xs text-gray-500">{catAdditions.length}種類 / {enabledInCat}件有効</p>
@@ -311,7 +311,7 @@ export default function AdditionSettingsView() {
                     const enabled = isEnabled(addition.code);
                     const req = requirements.find(r => r.additionCode === addition.code);
                     return (
-                      <div key={addition.code} className={`p-4 ${enabled ? 'bg-cyan-50/30' : ''}`}>
+                      <div key={addition.code} className={`p-4 ${enabled ? 'bg-[#00c4cc]/5' : ''}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
@@ -327,7 +327,7 @@ export default function AdditionSettingsView() {
                           </div>
                           <button onClick={() => handleToggle(addition.code)} className="flex-shrink-0">
                             {enabled
-                              ? <ToggleRight className="w-10 h-6 text-cyan-500" />
+                              ? <ToggleRight className="w-10 h-6 text-[#00c4cc]" />
                               : <ToggleLeft className="w-10 h-6 text-gray-300" />
                             }
                           </button>

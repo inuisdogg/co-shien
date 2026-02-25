@@ -419,9 +419,9 @@ function FacilityJoinContent() {
   // ローディング
   if (step === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">招待を確認中...</h2>
           <p className="text-gray-600">しばらくお待ちください</p>
         </div>
@@ -432,7 +432,7 @@ function FacilityJoinContent() {
   // 無効なトークン
   if (step === 'invalid') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-red-600" />
@@ -455,7 +455,7 @@ function FacilityJoinContent() {
   // 登録完了
   if (step === 'complete') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
@@ -472,7 +472,7 @@ function FacilityJoinContent() {
           )}
           <button
             onClick={() => router.push('/career')}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
           >
             キャリアアプリへ
             <ArrowRight className="w-5 h-5" />
@@ -485,17 +485,17 @@ function FacilityJoinContent() {
   // ログインまたはサインアップ選択
   if (step === 'login_or_signup') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
           <div className="text-center mb-6">
-            <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-7 h-7 text-teal-600" />
+            <div className="w-14 h-14 bg-[#00c4cc]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Building2 className="w-7 h-7 text-[#00c4cc]" />
             </div>
             <h1 className="text-2xl font-bold text-gray-800">施設への招待</h1>
             {invitation && (
-              <div className="mt-3 bg-teal-50 rounded-lg px-4 py-2">
-                <p className="text-teal-700 font-bold">{invitation.facilityName}</p>
-                <p className="text-teal-600 text-sm">{invitation.name}さんとして招待されています</p>
+              <div className="mt-3 bg-[#00c4cc]/5 rounded-lg px-4 py-2">
+                <p className="text-[#00c4cc] font-bold">{invitation.facilityName}</p>
+                <p className="text-[#00c4cc] text-sm">{invitation.name}さんとして招待されています</p>
               </div>
             )}
           </div>
@@ -523,7 +523,7 @@ function FacilityJoinContent() {
                   }
                 }}
                 disabled={loading}
-                className="mt-3 w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:opacity-50"
+                className="mt-3 w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors disabled:opacity-50"
               >
                 {loading ? '参加処理中...' : 'このアカウントで参加する'}
               </button>
@@ -533,7 +533,7 @@ function FacilityJoinContent() {
           <div className="space-y-4">
             <button
               onClick={() => setStep('signup_form')}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-md transition-colors"
+              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
             >
               新規アカウントを作成して参加
             </button>
@@ -549,7 +549,7 @@ function FacilityJoinContent() {
 
             <button
               onClick={() => router.push(`/career/login?redirect=/facility/join?token=${token}`)}
-              className="w-full bg-white border-2 border-teal-600 text-teal-600 font-bold py-3 px-4 rounded-md transition-colors hover:bg-teal-50"
+              className="w-full bg-white border-2 border-[#00c4cc] text-[#00c4cc] font-bold py-3 px-4 rounded-md transition-colors hover:bg-[#00c4cc]/5"
             >
               既存アカウントでログイン
             </button>
@@ -562,7 +562,7 @@ function FacilityJoinContent() {
   // サインアップフォーム
   if (step === 'signup_form') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
           <div className="text-center mb-6">
             <Image
@@ -597,7 +597,7 @@ function FacilityJoinContent() {
                 type="text"
                 value={signupForm.name}
                 onChange={(e) => setSignupForm({ ...signupForm, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                 placeholder="山田 太郎"
                 disabled={loading}
               />
@@ -612,7 +612,7 @@ function FacilityJoinContent() {
                 type="email"
                 value={signupForm.email}
                 onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                 placeholder="yamada@example.com"
                 disabled={loading}
               />
@@ -627,7 +627,7 @@ function FacilityJoinContent() {
                 type="password"
                 value={signupForm.password}
                 onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                 placeholder="6文字以上"
                 disabled={loading}
               />
@@ -642,7 +642,7 @@ function FacilityJoinContent() {
                 type="password"
                 value={signupForm.confirmPassword}
                 onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
                 placeholder="パスワードを再入力"
                 disabled={loading}
               />
@@ -651,7 +651,7 @@ function FacilityJoinContent() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50"
+              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50"
             >
               {loading ? 'アカウント作成中...' : 'アカウントを作成して参加'}
             </button>
@@ -671,7 +671,7 @@ function FacilityJoinContent() {
   // 手動検索モード（成功時）
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
@@ -688,7 +688,7 @@ function FacilityJoinContent() {
 
   // 手動検索モード
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
       <div className="max-w-lg mx-auto">
         {/* ヘッダー */}
         <div className="flex items-center justify-between mb-6 pt-4">
@@ -711,8 +711,8 @@ function FacilityJoinContent() {
         {/* メインカード */}
         <div className="bg-white rounded-lg shadow-2xl p-8">
           <div className="text-center mb-6">
-            <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <UserPlus className="w-7 h-7 text-teal-600" />
+            <div className="w-14 h-14 bg-[#00c4cc]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <UserPlus className="w-7 h-7 text-[#00c4cc]" />
             </div>
             <h1 className="text-2xl font-bold text-gray-800">施設へ参加申請</h1>
             <p className="text-gray-600 text-sm mt-2">
@@ -742,7 +742,7 @@ function FacilityJoinContent() {
                     setFacilityCode(e.target.value);
                     setFoundFacility(null);
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
                   placeholder="施設IDを入力"
                   disabled={loading}
                 />
@@ -783,7 +783,7 @@ function FacilityJoinContent() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
                   placeholder="管理者へのメッセージ（任意）"
                   disabled={loading}
                 />
@@ -793,7 +793,7 @@ function FacilityJoinContent() {
             <button
               type="submit"
               disabled={loading || !foundFacility}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '送信中...' : '参加申請を送信'}
             </button>
@@ -818,9 +818,9 @@ function FacilityJoinContent() {
 export default function FacilityJoinPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>

@@ -222,7 +222,7 @@ export default function SupportPlanView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -232,12 +232,12 @@ export default function SupportPlanView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <FileText className="w-6 h-6 text-cyan-500" />
+          <FileText className="w-6 h-6 text-[#00c4cc]" />
           <h1 className="text-xl font-bold text-gray-800">個別支援計画</h1>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
         >
           <Plus className="w-4 h-4" />
           新規作成
@@ -294,7 +294,7 @@ export default function SupportPlanView() {
                 key={status}
                 onClick={() => setStatusFilter(status)}
                 className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  statusFilter === status ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  statusFilter === status ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {status === 'all' ? '全て' : STATUS_CONFIG[status].label}
@@ -348,7 +348,7 @@ export default function SupportPlanView() {
                             </div>
                             <div className="flex gap-2">
                               {plan.status === 'draft' && (
-                                <button onClick={() => handleStatusChange(plan.id, 'active')} className="text-xs px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600">有効にする</button>
+                                <button onClick={() => handleStatusChange(plan.id, 'active')} className="text-xs px-3 py-1 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8]">有効にする</button>
                               )}
                               {plan.status === 'active' && (
                                 <button onClick={() => handleStatusChange(plan.id, 'completed')} className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">完了にする</button>
@@ -389,7 +389,7 @@ export default function SupportPlanView() {
                                     const note = prompt('中間評価メモ');
                                     if (date) handleSaveEvaluation(plan.id, 'mid', date, note || '');
                                   }}
-                                  className="text-xs text-cyan-600 hover:underline"
+                                  className="text-xs text-[#00c4cc] hover:underline"
                                 >
                                   + 中間評価を記録
                                 </button>
@@ -406,7 +406,7 @@ export default function SupportPlanView() {
                                     const note = prompt('最終評価メモ');
                                     if (date) handleSaveEvaluation(plan.id, 'final', date, note || '');
                                   }}
-                                  className="text-xs text-cyan-600 hover:underline"
+                                  className="text-xs text-[#00c4cc] hover:underline"
                                 >
                                   + 最終評価を記録
                                 </button>
@@ -468,7 +468,7 @@ export default function SupportPlanView() {
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
-              <button onClick={handleCreatePlan} disabled={!formData.childId || !formData.periodStart || !formData.periodEnd} className="px-4 py-2 text-sm bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed">作成</button>
+              <button onClick={handleCreatePlan} disabled={!formData.childId || !formData.periodStart || !formData.periodEnd} className="px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed">作成</button>
             </div>
           </div>
         </div>

@@ -184,7 +184,7 @@ function StaffingContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -193,7 +193,7 @@ function StaffingContent() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Shield className="w-6 h-6 text-cyan-500" />
+        <Shield className="w-6 h-6 text-[#00c4cc]" />
         <h1 className="text-xl font-bold text-gray-800">人員配置管理</h1>
       </div>
 
@@ -503,7 +503,7 @@ function OrgChartContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
       </div>
     );
   }
@@ -520,7 +520,7 @@ function OrgChartContent() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Users className="w-6 h-6 text-cyan-500" />
+        <Users className="w-6 h-6 text-[#00c4cc]" />
         <h1 className="text-xl font-bold text-gray-800">組織図</h1>
         <span className="text-sm text-gray-400 ml-2">{staffList.length}名</span>
       </div>

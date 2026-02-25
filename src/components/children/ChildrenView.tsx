@@ -2014,7 +2014,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             'visit-scheduled': { label: '見学/面談予定', color: 'bg-yellow-100 text-yellow-700' },
                             'considering': { label: '検討中', color: 'bg-orange-100 text-orange-700' },
                             'waiting-benefit': { label: '受給者証待ち', color: 'bg-purple-100 text-purple-700' },
-                            'contract-progress': { label: '契約手続き中', color: 'bg-cyan-100 text-cyan-700' },
+                            'contract-progress': { label: '契約手続き中', color: 'bg-[#00c4cc]/10 text-[#00c4cc]' },
                             'contracted': { label: '契約済み', color: 'bg-green-100 text-green-700' },
                             'lost': { label: '失注', color: 'bg-red-100 text-red-700' },
                           };

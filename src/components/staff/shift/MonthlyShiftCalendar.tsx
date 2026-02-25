@@ -162,7 +162,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
       } else if (shift.shiftPattern?.color) {
         bgStyle = { backgroundColor: patternColorToRgba(shift.shiftPattern.color, 0.15) };
       } else {
-        bgColor = 'bg-teal-50';
+        bgColor = 'bg-[#00c4cc]/5';
       }
     }
 
@@ -177,8 +177,8 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
       <div
         key={`${staffRow.staff.id}-${dateStr}`}
         onClick={(e) => handleCellClick(staffRow.staff.id, dateStr, e)}
-        className={`relative h-10 flex items-center justify-center border-r border-b border-gray-200 cursor-pointer transition-all hover:ring-2 hover:ring-teal-400 hover:ring-inset ${
-          isEditing ? 'ring-2 ring-teal-500 ring-inset z-10' : ''
+        className={`relative h-10 flex items-center justify-center border-r border-b border-gray-200 cursor-pointer transition-all hover:ring-2 hover:ring-[#00c4cc] hover:ring-inset ${
+          isEditing ? 'ring-2 ring-[#00c4cc] ring-inset z-10' : ''
         } ${bgColor}`}
         style={bgStyle}
       >
@@ -219,7 +219,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
               <ChevronLeft size={20} />
             </button>
             <div className="flex items-center gap-2 min-w-[160px] justify-center">
-              <Calendar size={18} className="text-teal-600" />
+              <Calendar size={18} className="text-[#00c4cc]" />
               <span className="text-lg font-bold text-gray-800">
                 {year}年{month}月
               </span>
@@ -232,7 +232,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
             </button>
             <button
               onClick={handleToday}
-              className="ml-2 px-3 py-1.5 text-sm text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+              className="ml-2 px-3 py-1.5 text-sm text-[#00c4cc] hover:bg-[#00c4cc]/5 rounded-lg transition-colors"
             >
               今月
             </button>
@@ -302,7 +302,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
               <div key={staffRow.staff.id} className="flex">
                 {/* スタッフ名 */}
                 <div className="sticky left-0 z-10 w-32 min-w-[128px] flex items-center px-3 py-1 bg-white border-r border-b border-gray-200">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0 mr-2">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0 mr-2">
                     <span className="text-white text-xs font-bold">
                       {staffRow.staff.name?.charAt(0) || '?'}
                     </span>

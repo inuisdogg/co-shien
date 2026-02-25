@@ -125,7 +125,7 @@ export default function CertificatePdfGenerator({ data, onClose, showDownloadOnl
             <button
               onClick={handleDownload}
               disabled={generating}
-              className={`${data.signedAt ? 'bg-teal-600 hover:bg-teal-700' : 'bg-blue-500 hover:bg-blue-600'} text-white px-4 py-2 rounded-lg disabled:bg-gray-300 flex items-center gap-2`}
+              className={`${data.signedAt ? 'bg-[#00c4cc] hover:bg-[#00b0b8]' : 'bg-blue-500 hover:bg-blue-600'} text-white px-4 py-2 rounded-lg disabled:bg-gray-300 flex items-center gap-2`}
             >
               {generating ? (
                 <>

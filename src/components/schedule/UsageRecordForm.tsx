@@ -138,7 +138,7 @@ const IMPLEMENTATION_ADDITIONS: ImplementationAddition[] = [
     name: '家族支援加算(I)',
     units: '200-300単位',
     icon: MessageSquare,
-    color: 'text-teal-600 bg-teal-50 border-teal-200',
+    color: 'text-[#00c4cc] bg-[#00c4cc]/5 border-[#00c4cc]/20',
     requiredFields: [
       { id: 'support_type', label: '支援形態', type: 'select', options: ['居宅訪問(1h以上)', '居宅訪問(1h未満)', 'オンライン'], required: true },
       { id: 'content', label: '相談援助内容', type: 'textarea', placeholder: '実施した相談援助の内容', required: true },
@@ -151,7 +151,7 @@ const IMPLEMENTATION_ADDITIONS: ImplementationAddition[] = [
     name: '家族支援加算(II)',
     units: '60-80単位',
     icon: MessageSquare,
-    color: 'text-teal-600 bg-teal-50 border-teal-200',
+    color: 'text-[#00c4cc] bg-[#00c4cc]/5 border-[#00c4cc]/20',
     requiredFields: [
       { id: 'support_type', label: '実施形態', type: 'select', options: ['対面', 'オンライン'], required: true },
       { id: 'participant_count', label: '参加家族数', type: 'text', placeholder: '例: 5家族' },
@@ -200,7 +200,7 @@ const IMPLEMENTATION_ADDITIONS: ImplementationAddition[] = [
     name: '保育・教育等移行支援加算',
     units: '500単位/回',
     icon: Target,
-    color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
+    color: 'text-[#00c4cc] bg-[#00c4cc]/5 border-[#00c4cc]/20',
     requiredFields: [
       { id: 'type', label: '支援種別', type: 'select', options: ['退所前調整（2回まで）', '退所後訪問相談（1回）'], required: true },
       { id: 'destination', label: '移行先', type: 'text', placeholder: '保育所、学校名など', required: true },

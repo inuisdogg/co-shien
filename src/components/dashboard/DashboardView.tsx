@@ -600,7 +600,7 @@ const DashboardView: React.FC = () => {
                   </div>
                   <a
                     href="/business?tab=addition-settings"
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-[#00b8b8] hover:bg-[#009a9a] rounded transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded transition-colors"
                   >
                     確認する
                     <ExternalLink size={12} />
@@ -627,7 +627,7 @@ const DashboardView: React.FC = () => {
               </div>
               <a
                 href="/business?tab=addition-settings"
-                className="flex items-center gap-1 px-4 py-2 text-sm font-bold text-white bg-[#00b8b8] hover:bg-[#009a9a] rounded-lg transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors"
               >
                 詳細を見る
                 <ExternalLink size={14} />
