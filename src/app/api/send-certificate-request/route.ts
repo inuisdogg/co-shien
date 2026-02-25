@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
             </div>
           </div>
           <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
-            <p>co-shien - 児童発達支援管理システム</p>
+            <p>Roots - 児童発達支援管理システム</p>
           </div>
         </body>
       </html>

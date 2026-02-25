@@ -15,6 +15,7 @@ import {
   CheckCircle,
   AlertCircle,
   Printer,
+  Clock,
 } from 'lucide-react';
 import { useShiftManagement } from '@/hooks/useShiftManagement';
 import { useStaffMaster } from '@/hooks/useStaffMaster';
@@ -22,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Staff, ShiftWithPattern } from '@/types';
 import MonthlyShiftCalendar from './MonthlyShiftCalendar';
 import ShiftConfirmationPanel from './ShiftConfirmationPanel';
+import AttendanceRecordsPanel from './AttendanceRecordsPanel';
 import ShiftPatternSettings from '@/components/staff/ShiftPatternSettings';
 
 interface StaffShiftRow {
@@ -29,7 +31,7 @@ interface StaffShiftRow {
   shifts: Map<string, ShiftWithPattern>;
 }
 
-type ViewMode = 'calendar' | 'confirmation' | 'patterns';
+type ViewMode = 'calendar' | 'attendance' | 'confirmation' | 'patterns';
 
 const ShiftManagementView: React.FC = () => {
   const { facility } = useAuth();
@@ -207,6 +209,17 @@ const ShiftManagementView: React.FC = () => {
               カレンダー
             </button>
             <button
+              onClick={() => setViewMode('attendance')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'attendance'
+                  ? 'bg-white text-teal-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <Clock size={16} />
+              勤怠実績
+            </button>
+            <button
               onClick={() => setViewMode('confirmation')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'confirmation'
@@ -255,6 +268,14 @@ const ShiftManagementView: React.FC = () => {
             onExport={handleExport}
             loading={loading}
             editable={true}
+          />
+        )}
+
+        {viewMode === 'attendance' && (
+          <AttendanceRecordsPanel
+            staffList={staffList}
+            year={year}
+            month={month}
           />
         )}
 

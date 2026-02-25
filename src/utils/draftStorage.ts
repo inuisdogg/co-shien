@@ -5,7 +5,7 @@
 
 import { ChildFormData } from '@/types';
 
-const DRAFT_STORAGE_KEY = 'kidos_child_drafts';
+const DRAFT_STORAGE_KEY = 'roots_child_drafts';
 
 export const saveDraft = (draft: ChildFormData): void => {
   try {

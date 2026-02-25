@@ -330,7 +330,7 @@ export default function FacilityRecordsPage() {
       <header className="bg-white shadow-sm border-b border-gray-200 print:hidden">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <button
-            onClick={() => router.push(`/client/facilities/${facilityId}?child=${selectedChildId}`)}
+            onClick={() => router.push(`/parent/facilities/${facilityId}?child=${selectedChildId}`)}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-2"
           >
             <ArrowLeft className="w-5 h-5" />

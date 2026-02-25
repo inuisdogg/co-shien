@@ -2,7 +2,7 @@
  * ドメイン設定ユーティリティ
  *
  * シングルドメイン構成:
- * - co-shien.inu.co.jp (メインドメイン)
+ * - Roots.inu.co.jp (メインドメイン)
  *   - /business → 施設管理（Biz）
  *   - /career   → スタッフ向け
  *   - /parent   → 保護者向け
@@ -11,7 +11,7 @@
  */
 
 // メインドメイン
-const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || 'co-shien.inu.co.jp';
+const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || 'Roots.inu.co.jp';
 
 /**
  * 現在のパスからアプリケーションタイプを取得

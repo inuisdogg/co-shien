@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@resend.dev';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://biz.co-shien.inu.co.jp';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://biz.Roots.inu.co.jp';
 
     // メールタイプに応じた内容を生成
     let subject = '';
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     // 'facility_id' = 施設IDを記したお知らせ
     if (mailType === 'personal_account') {
       // 個人アカウント発行のお知らせ
-      subject = 'co-shien 個人アカウント発行完了のお知らせ';
+      subject = 'Roots 個人アカウント発行完了のお知らせ';
       htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
                 ${name} 様
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
-                この度は、co-shien（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
+                この度は、Roots（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
                 個人アカウントの発行が完了いたしました。
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
                 <li>メールアドレス: <strong>${email}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
-                <a href="https://my.co-shien.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                <a href="https://my.Roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                   ログインページへ
                 </a>
               </div>
@@ -82,14 +82,14 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
               <p>株式会社INU</p>
-              <p>co-shien 運営チーム</p>
+              <p>Roots 運営チーム</p>
             </div>
           </body>
         </html>
       `;
     } else if (mailType === 'facility_id' && facilityCode) {
       // 施設IDを記したお知らせ
-      subject = 'co-shien 施設ID発行のお知らせ';
+      subject = 'Roots 施設ID発行のお知らせ';
       htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -135,14 +135,14 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
               <p>株式会社INU</p>
-              <p>co-shien 運営チーム</p>
+              <p>Roots 運営チーム</p>
             </div>
           </body>
         </html>
       `;
     } else if (type === 'biz' && facilityCode) {
       // Biz側のウェルカムメール（施設IDを含む）- 後方互換性のため残す
-      subject = 'co-shien ご登録ありがとうございます';
+      subject = 'Roots ご登録ありがとうございます';
       htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -152,14 +152,14 @@ export async function POST(req: NextRequest) {
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background: linear-gradient(135deg, #00c4cc 0%, #00b0b8 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 24px;">co-shien へようこそ！</h1>
+              <h1 style="color: white; margin: 0; font-size: 24px;">Roots へようこそ！</h1>
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
               <p style="font-size: 16px; margin-bottom: 20px;">
                 ${name} 様
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
-                この度は、co-shien（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
+                この度は、Roots（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
               </p>
               <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #00c4cc;">
                 <p style="font-size: 14px; color: #666; margin: 0 0 10px 0; font-weight: bold;">あなたの施設ID</p>
@@ -188,14 +188,14 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
               <p>株式会社INU</p>
-              <p>co-shien 運営チーム</p>
+              <p>Roots 運営チーム</p>
             </div>
           </body>
         </html>
       `;
     } else {
       // Personal側のウェルカムメール
-      subject = 'co-shien ご登録ありがとうございます';
+      subject = 'Roots ご登録ありがとうございます';
       htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -205,14 +205,14 @@ export async function POST(req: NextRequest) {
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background: linear-gradient(135deg, #00c4cc 0%, #00b0b8 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 24px;">co-shien へようこそ！</h1>
+              <h1 style="color: white; margin: 0; font-size: 24px;">Roots へようこそ！</h1>
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
               <p style="font-size: 16px; margin-bottom: 20px;">
                 ${name} 様
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
-                この度は、co-shien（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
+                この度は、Roots（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
                 以下の情報でログインできます：
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
                 <li>メールアドレス: <strong>${email}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
-                <a href="https://my.co-shien.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                <a href="https://my.Roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                   ログインページへ
                 </a>
               </div>
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
               <p>株式会社INU</p>
-              <p>co-shien 運営チーム</p>
+              <p>Roots 運営チーム</p>
             </div>
           </body>
         </html>

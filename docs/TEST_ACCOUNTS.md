@@ -4,8 +4,8 @@
 
 | ドメイン | 用途 |
 |---------|------|
-| biz.co-shien.inu.co.jp | スタッフ用 |
-| my.co-shien.inu.co.jp | 利用者用 |
+| roots.inu.co.jp/business | スタッフ用 |
+| roots.inu.co.jp/career | 利用者用 |
 | localhost:3000 | 開発環境（すべてアクセス可） |
 
 ---
@@ -24,7 +24,7 @@
 |-----------|-----------|
 | staff-test-001 | test123 |
 
-**ログイン方法**: http://localhost:3000/ または https://biz.co-shien.inu.co.jp/
+**ログイン方法**: http://localhost:3000/ または https://roots.inu.co.jp/business/
 
 ---
 
@@ -34,7 +34,7 @@
 |-----------|-----------|------|
 | client-test-001 | test123 | テスト太郎 |
 
-**ログイン方法**: http://localhost:3000/client/login または https://my.co-shien.inu.co.jp/
+**ログイン方法**: http://localhost:3000/client/login または https://roots.inu.co.jp/career/
 
 ---
 

@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
     const rpID = (() => {
       const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
       const hostname = host.split(':')[0];
-      if (hostname.startsWith('biz.') || hostname.includes('biz.co-shien')) {
-        return 'biz.co-shien.inu.co.jp';
+      if (hostname.startsWith('biz.') || hostname.includes('biz.Roots')) {
+        return 'biz.Roots.inu.co.jp';
       }
-      return 'my.co-shien.inu.co.jp';
+      return 'my.Roots.inu.co.jp';
     })();
 
     const origin = request.headers.get('origin') || 

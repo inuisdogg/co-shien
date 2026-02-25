@@ -2,19 +2,19 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'jp.co.inu.coshien.facility',
-  appName: 'co-shien Biz',
+  appName: 'roots Biz',
   webDir: '../web-placeholder',
   // ライブWEB方式: WEBサーバーから直接読み込む
   server: {
-    url: 'https://co-shien.inu.co.jp/biz',
+    url: 'https://roots.inu.co.jp/business',
     cleartext: false,
     allowNavigation: [
-      'co-shien.inu.co.jp',
+      'roots.inu.co.jp',
       '*.supabase.co',
     ],
   },
   ios: {
-    scheme: 'co-shien-facility',
+    scheme: 'roots-facility',
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
     backgroundColor: '#00c4cc',

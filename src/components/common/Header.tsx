@@ -144,7 +144,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
           onClick={onLogoClick}
           className="cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2"
         >
-          <Image src="/logo-cropped-center.png" alt="co-shien" width={150} height={40} className="h-10 w-auto object-contain" priority />
+          <Image src="/logo.svg" alt="Roots" width={150} height={40} className="h-10 w-auto object-contain" priority />
           <span
             className={`text-xs font-bold px-2 py-1 rounded ${
               isCareer
@@ -172,7 +172,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
           />
         </div>
         <div className="flex items-center gap-2">
-          <Image src="/logo-cropped-center.png" alt="co-shien" width={120} height={32} className="h-8 w-auto object-contain" priority />
+          <Image src="/logo.svg" alt="Roots" width={120} height={32} className="h-8 w-auto object-contain" priority />
           <span
             className={`text-xs font-bold px-2 py-1 rounded ${
               isCareer

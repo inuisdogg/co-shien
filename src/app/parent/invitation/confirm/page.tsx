@@ -67,7 +67,7 @@ function ConfirmInvitationContent() {
         const userId = localStorage.getItem('userId');
         if (!userId) {
           // ログインページにリダイレクト（招待トークンを保持）
-          router.push(`/login?redirect=/client/invitation/confirm&token=${token}`);
+          router.push(`/login?redirect=/parent/invitation/confirm&token=${token}`);
           return;
         }
 
@@ -79,7 +79,7 @@ function ConfirmInvitationContent() {
           .single();
 
         if (userError || !userData) {
-          router.push(`/login?redirect=/client/invitation/confirm&token=${token}`);
+          router.push(`/login?redirect=/parent/invitation/confirm&token=${token}`);
           return;
         }
 
@@ -150,7 +150,7 @@ function ConfirmInvitationContent() {
 
     // 児童がいない場合は新規登録ページにリダイレクト
     if (!childIdToLink && children.length === 0) {
-      router.push(`/client/invitation/accept?token=${token}`);
+      router.push(`/parent/invitation/accept?token=${token}`);
       return;
     }
 

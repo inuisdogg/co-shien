@@ -89,7 +89,7 @@ export default function InvitationAcceptPage() {
       const userStr = localStorage.getItem('user');
       if (!userStr) {
         // ログインが必要
-        router.push(`/client/login?redirect=/client/invitations/${token}`);
+        router.push(`/parent/login?redirect=/parent/invitations/${token}`);
         return;
       }
 
@@ -186,7 +186,7 @@ export default function InvitationAcceptPage() {
     try {
       const userStr = localStorage.getItem('user');
       if (!userStr) {
-        router.push(`/client/login?redirect=/client/invitations/${token}`);
+        router.push(`/parent/login?redirect=/parent/invitations/${token}`);
         return;
       }
 
@@ -243,8 +243,8 @@ export default function InvitationAcceptPage() {
       <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-8">
         <div className="text-center mb-6">
           <Image
-            src="/logo-cropped-center.png"
-            alt="co-shien"
+            src="/logo.svg"
+            alt="Roots"
             width={200}
             height={64}
             className="h-16 w-auto mx-auto mb-4"

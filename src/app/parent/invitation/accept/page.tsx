@@ -75,7 +75,7 @@ function AcceptInvitationContent() {
         const userId = localStorage.getItem('userId');
         if (!userId) {
           // ログインページにリダイレクト（招待トークンを保持）
-          router.push(`/client/login?redirect=/client/invitation/accept?token=${token}`);
+          router.push(`/parent/login?redirect=/parent/invitation/accept?token=${token}`);
           return;
         }
 
@@ -87,7 +87,7 @@ function AcceptInvitationContent() {
           .single();
 
         if (userError || !userData) {
-          router.push(`/client/login?redirect=/client/invitation/accept?token=${token}`);
+          router.push(`/parent/login?redirect=/parent/invitation/accept?token=${token}`);
           return;
         }
 

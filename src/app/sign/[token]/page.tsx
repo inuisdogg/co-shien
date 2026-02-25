@@ -606,7 +606,7 @@ export default function SignaturePage() {
 
         {/* フッター */}
         <div className="bg-gray-100 rounded-b-lg p-4 text-center text-sm text-gray-500">
-          <p>co-shien - 児童発達支援管理システム</p>
+          <p>Roots - 児童発達支援管理システム</p>
         </div>
       </div>
 

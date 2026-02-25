@@ -135,8 +135,8 @@ export default function PortalPage() {
         <div className="flex justify-between items-center mb-8 pt-4">
           <div className="bg-white rounded-lg px-4 py-2">
             <Image
-              src="/logo-cropped-center.png"
-              alt="co-shien"
+              src="/logo.svg"
+              alt="Roots"
               width={200}
               height={64}
               className="h-12 w-auto"

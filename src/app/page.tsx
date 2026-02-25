@@ -1,5 +1,5 @@
 /**
- * Root Page - co-shien トップページ
+ * Root Page - Roots トップページ
  *
  * サービス選択ハブとして機能
  * - キャリアアカウント（スタッフ・専門家）への動線
@@ -58,8 +58,8 @@ export default function RootPage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Image
-            src="/logo-cropped-center.png"
-            alt="co-shien"
+            src="/logo.svg"
+            alt="Roots"
             width={160}
             height={50}
             className="h-10 w-auto"
@@ -104,7 +104,7 @@ export default function RootPage() {
         {/* ヒーローセクション */}
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold text-gray-800 mb-4">
-            co-shienへようこそ
+            Rootsへようこそ
           </h1>
           <p className="text-gray-600">
             障害児通所支援事業所向け統合管理プラットフォーム

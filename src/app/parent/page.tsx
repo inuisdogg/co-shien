@@ -468,16 +468,16 @@ export default function ClientDashboardPage() {
   const executeAction = (childId: string, actionType: 'facilities' | 'calendar' | 'message') => {
     switch (actionType) {
       case 'facilities':
-        router.push(`/client/children/${childId}?tab=facilities`);
+        router.push(`/parent/children/${childId}?tab=facilities`);
         break;
       case 'calendar':
-        router.push(`/client/children/${childId}?tab=calendar`);
+        router.push(`/parent/children/${childId}?tab=calendar`);
         break;
       case 'message':
         // 契約中の施設があればチャット画面へ、なければメッセージタブへ
         const childContracts = contracts.filter(c => c.child_id === childId && c.status === 'active');
         if (childContracts.length > 0) {
-          router.push(`/client/facilities/${childContracts[0].facility_id}/chat`);
+          router.push(`/parent/facilities/${childContracts[0].facility_id}/chat`);
         } else {
           setActiveTab('messages');
         }
@@ -523,8 +523,8 @@ export default function ClientDashboardPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
-              src="/logo-cropped-center.png"
-              alt="co-shien"
+              src="/logo.svg"
+              alt="Roots"
               width={120}
               height={40}
               className="h-8 w-auto"
@@ -581,7 +581,7 @@ export default function ClientDashboardPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => router.push(`/client/invitations/${inv.invitation_token}`)}
+                    onClick={() => router.push(`/parent/invitations/${inv.invitation_token}`)}
                     className="bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
                   >
                     確認する
@@ -614,7 +614,7 @@ export default function ClientDashboardPage() {
               {isChatEnabled && unreadChats.map((chat) => (
                 <button
                   key={chat.facilityId}
-                  onClick={() => router.push(`/client/facilities/${chat.facilityId}/chat`)}
+                  onClick={() => router.push(`/parent/facilities/${chat.facilityId}/chat`)}
                   className="w-full flex items-center gap-4 p-4 hover:bg-blue-50 transition-colors text-left"
                 >
                   <div className="w-12 h-12 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
@@ -641,7 +641,7 @@ export default function ClientDashboardPage() {
               {signRequests.map((request) => (
                 <button
                   key={request.id}
-                  onClick={() => router.push(`/client/facilities/${request.facilityId}/records?sign=${request.id}`)}
+                  onClick={() => router.push(`/parent/facilities/${request.facilityId}/records?sign=${request.id}`)}
                   className="w-full flex items-center gap-4 p-4 hover:bg-[#FEF3E2] transition-colors text-left"
                 >
                   <div className="w-12 h-12 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
@@ -738,7 +738,7 @@ export default function ClientDashboardPage() {
                           <div
                             key={child.id}
                             className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
-                            onClick={() => router.push(`/client/children/${child.id}`)}
+                            onClick={() => router.push(`/parent/children/${child.id}`)}
                           >
                             <div className="flex items-center gap-4">
                               <div className="w-14 h-14 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
@@ -839,7 +839,7 @@ export default function ClientDashboardPage() {
                                 <div
                                   key={contract.id}
                                   className="bg-green-50 border border-green-200 rounded-lg p-4 hover:border-green-300 transition-colors cursor-pointer"
-                                  onClick={() => child && router.push(`/client/facilities/${contract.facility_id}?child=${child.id}`)}
+                                  onClick={() => child && router.push(`/parent/facilities/${contract.facility_id}?child=${child.id}`)}
                                 >
                                   <div className="flex items-start justify-between mb-3">
                                     <div className="flex items-center gap-3">
@@ -869,7 +869,7 @@ export default function ClientDashboardPage() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        router.push(`/client/facilities/${contract.facility_id}/records?child=${child?.id}`);
+                                        router.push(`/parent/facilities/${contract.facility_id}/records?child=${child?.id}`);
                                       }}
                                       className={`${isChatEnabled ? 'flex-1' : 'w-full'} text-sm bg-white hover:bg-gray-50 text-gray-700 py-2 px-3 rounded border border-gray-200 transition-colors flex items-center justify-center gap-1.5`}
                                     >
@@ -880,7 +880,7 @@ export default function ClientDashboardPage() {
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          router.push(`/client/facilities/${contract.facility_id}/chat`);
+                                          router.push(`/parent/facilities/${contract.facility_id}/chat`);
                                         }}
                                         className="flex-1 text-sm bg-[#F6AD55] hover:bg-[#ED8936] text-white py-2 px-3 rounded border border-[#ED8936] transition-colors font-bold flex items-center justify-center gap-1.5 shadow-md"
                                       >
@@ -1030,7 +1030,7 @@ export default function ClientDashboardPage() {
                             <div
                               key={contract.id}
                               className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#F6AD55] hover:shadow-lg transition-all cursor-pointer group"
-                              onClick={() => router.push(`/client/facilities/${contract.facility_id}/chat`)}
+                              onClick={() => router.push(`/parent/facilities/${contract.facility_id}/chat`)}
                             >
                               <div className="flex items-center gap-4">
                                 <div className="w-14 h-14 bg-gradient-to-br from-[#F6AD55] to-[#ED8936] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
@@ -1065,7 +1065,7 @@ export default function ClientDashboardPage() {
         {/* フッター */}
         <div className="mt-8 pt-6 border-t border-gray-200 text-center">
           <p className="text-xs text-gray-400">
-            co-shien 利用者向けサービス
+            Roots 利用者向けサービス
           </p>
         </div>
       </main>

@@ -13,8 +13,8 @@
 **必須設定**:
 - Supabaseダッシュボードで「Enable email confirmations」を有効化
 - リダイレクトURLに以下を追加：
-  - `https://biz.co-shien.inu.co.jp/auth/callback?type=biz`
-  - `https://my.co-shien.inu.co.jp/auth/callback?type=personal`
+  - `https://roots.inu.co.jp/business/auth/callback?type=biz`
+  - `https://roots.inu.co.jp/career/auth/callback?type=personal`
 
 ### 2. Resendのセットアップ
 
@@ -24,7 +24,7 @@
 ```env
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 RESEND_FROM_EMAIL=noreply@resend.dev  # 開発環境
-# RESEND_FROM_EMAIL=noreply@co-shien.inu.co.jp  # 本番環境
+# RESEND_FROM_EMAIL=noreply@roots.inu.co.jp  # 本番環境
 ```
 
 ### 3. 実装されたページと機能

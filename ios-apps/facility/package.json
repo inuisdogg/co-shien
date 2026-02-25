@@ -1,7 +1,7 @@
 {
-  "name": "co-shien-facility-ios",
+  "name": "roots-facility-ios",
   "version": "1.0.0",
-  "description": "co-shien 施設管理向けiOSアプリ",
+  "description": "roots 施設管理向けiOSアプリ",
   "scripts": {
     "add-ios": "npx cap add ios",
     "sync": "npx cap sync ios",

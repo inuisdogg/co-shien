@@ -122,12 +122,12 @@ facility_settings (施設設定)
 
 ### セットアップ完了後、管理者は：
 
-1. **Biz側（biz.co-shien.inu.co.jp）でログイン可能**
+1. **Biz側（roots.inu.co.jp/business）でログイン可能**
    - 施設ID + メールアドレス + パスワードでログイン
    - `users`テーブルと`employment_records`テーブルで認証
    - 施設の管理画面にアクセス可能
 
-2. **Personal側（my.co-shien.inu.co.jp）でログイン可能**
+2. **Personal側（roots.inu.co.jp/career）でログイン可能**
    - メールアドレス + パスワードでログイン（施設ID不要）
    - `users`テーブルで認証
    - 個人のキャリア管理画面にアクセス可能

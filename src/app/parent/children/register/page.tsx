@@ -259,8 +259,8 @@ export default function ChildRegisterPage() {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <Image
-            src="/logo-cropped-center.png"
-            alt="co-shien"
+            src="/logo.svg"
+            alt="Roots"
             width={120}
             height={40}
             className="h-8 w-auto"

@@ -80,8 +80,8 @@ export default function InvitationModal({
 
       // 招待メールを送信
       try {
-        const invitationUrl = `${window.location.origin}/client/invitation/accept?token=${invitationToken}`;
-        const loginUrl = `${window.location.origin}/login?redirect=/client/invitation/confirm&token=${invitationToken}`;
+        const invitationUrl = `${window.location.origin}/parent/invitation/accept?token=${invitationToken}`;
+        const loginUrl = `${window.location.origin}/login?redirect=/parent/invitation/confirm&token=${invitationToken}`;
         await fetch('/api/send-contract-invitation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -1,25 +1,23 @@
 /**
  * 認証コンテキスト
  * マルチテナント対応の認証・認可管理
- * スタッフ名とパスワードでログイン可能
+ * サーバーサイド認証API経由でログイン
  */
 
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Facility, UserPermissions, UserRole, UserType } from '@/types';
-import { supabase } from '@/lib/supabase';
-import { verifyPassword } from '@/utils/password';
+import { User, Facility, UserPermissions, UserRole, UserType, AccountStatus } from '@/types';
 
 interface AuthContextType {
   user: User | null;
   facility: Facility | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  isFacilityAdmin: boolean; // 施設管理者（employment_records.role === '管理者' or 'マネージャー'）
-  facilityRole: string | null; // 施設での役割
-  isMaster: boolean; // マスター管理者（施設オーナー）かどうか
-  isLoading: boolean; // 認証状態の読み込み中かどうか
+  isFacilityAdmin: boolean;
+  facilityRole: string | null;
+  isMaster: boolean;
+  isLoading: boolean;
   login: (facilityCode: string, loginId: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: keyof UserPermissions) => boolean;
@@ -27,21 +25,57 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function mapDbUserToUser(dbUser: Record<string, unknown>): User {
+  return {
+    id: dbUser.id as string,
+    email: (dbUser.email as string) || '',
+    name: (dbUser.name as string) || (
+      dbUser.last_name && dbUser.first_name
+        ? `${dbUser.last_name} ${dbUser.first_name}`
+        : ''
+    ),
+    lastName: dbUser.last_name as string | undefined,
+    firstName: dbUser.first_name as string | undefined,
+    lastNameKana: dbUser.last_name_kana as string | undefined,
+    firstNameKana: dbUser.first_name_kana as string | undefined,
+    birthDate: dbUser.birth_date as string | undefined,
+    gender: dbUser.gender as ('male' | 'female' | 'other') | undefined,
+    loginId: (dbUser.login_id as string) || (dbUser.name as string) || '',
+    userType: ((dbUser.user_type as UserType) || 'staff'),
+    role: (dbUser.role as UserRole),
+    facilityId: (dbUser.facility_id as string) || '',
+    permissions: (dbUser.permissions as UserPermissions) || {},
+    accountStatus: (dbUser.account_status as AccountStatus) || 'active',
+    createdAt: dbUser.created_at as string,
+    updatedAt: dbUser.updated_at as string,
+  };
+}
+
+function mapDbFacilityToFacility(dbFacility: Record<string, unknown>): Facility {
+  return {
+    id: dbFacility.id as string,
+    name: dbFacility.name as string,
+    code: (dbFacility.code as string) || (dbFacility.id as string),
+    ownerUserId: dbFacility.ownerUserId as string | undefined,
+    createdAt: dbFacility.createdAt as string,
+    updatedAt: dbFacility.updatedAt as string,
+  };
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [facility, setFacility] = useState<Facility | null>(null);
   const [facilityRole, setFacilityRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // セッション復元（ページリロード時など）
+  // セッション復元
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        // 開発モード: 環境変数で有効化
+        // 開発モード
         const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-        
+
         if (isDevMode) {
-          // 開発モード: テストユーザー情報を自動設定
           const testUser: User = {
             id: process.env.NEXT_PUBLIC_DEV_USER_ID || 'dev-user-id',
             email: process.env.NEXT_PUBLIC_DEV_USER_EMAIL || 'dev@example.com',
@@ -59,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          
+
           const testFacility: Facility = {
             id: process.env.NEXT_PUBLIC_DEV_FACILITY_ID || 'dev-facility-test',
             name: process.env.NEXT_PUBLIC_DEV_FACILITY_NAME || 'テスト施設',
@@ -67,17 +101,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          
+
           setUser(testUser);
           setFacility(testFacility);
           localStorage.setItem('user', JSON.stringify(testUser));
           localStorage.setItem('facility', JSON.stringify(testFacility));
-          
-          console.log('🔧 開発モード: テストユーザーで自動ログインしました');
           setLoading(false);
           return;
         }
-        
+
         // 通常モード: ローカルストレージから復元
         const storedUser = localStorage.getItem('user');
         const storedFacility = localStorage.getItem('facility');
@@ -85,26 +117,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (storedUser) {
           const userData = JSON.parse(storedUser);
-          // 古いデータにuserTypeがない場合はデフォルト値を設定
           if (!userData.userType) {
             userData.userType = 'staff';
           }
           setUser(userData);
 
           if (storedFacility) {
-            const facilityData = JSON.parse(storedFacility);
-            setFacility(facilityData);
+            setFacility(JSON.parse(storedFacility));
           } else {
-            // facilityが存在しない場合はnullに設定
             setFacility(null);
           }
 
-          // selectedFacilityから役割を取得
           if (storedSelectedFacility) {
             try {
               const selectedFacilityData = JSON.parse(storedSelectedFacility);
               setFacilityRole(selectedFacilityData.role || null);
-            } catch (e) {
+            } catch {
               setFacilityRole(null);
             }
           } else {
@@ -124,279 +152,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (facilityCode: string, loginIdOrEmail: string, password: string) => {
-    try {
-      // Personal側のログイン（施設IDが空文字列の場合）
-      if (!facilityCode || facilityCode.trim() === '') {
-        // メールアドレスかログインIDかを判定
-        const isEmail = loginIdOrEmail.includes('@');
-        
-        // usersテーブルから直接検索（施設IDなし）
-        let userData: any = null;
-        let userError: any = null;
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        facilityCode,
+        loginId: loginIdOrEmail,
+        password,
+      }),
+    });
 
-        if (isEmail) {
-          const result = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', loginIdOrEmail)
-            .eq('has_account', true)
-            .single();
-          userData = result.data;
-          userError = result.error;
-        } else {
-          const result = await supabase
-            .from('users')
-            .select('*')
-            .eq('login_id', loginIdOrEmail)
-            .eq('has_account', true)
-            .single();
-          userData = result.data;
-          userError = result.error;
-        }
+    const data = await response.json();
 
-        if (userError || !userData) {
-          throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
-        }
+    if (!response.ok) {
+      throw new Error(data.error || 'ログインに失敗しました');
+    }
 
-        if (!userData.password_hash) {
-          throw new Error('このアカウントにはパスワードが設定されていません');
-        }
+    const mappedUser = mapDbUserToUser(data.user);
+    setUser(mappedUser);
+    localStorage.setItem('user', JSON.stringify(mappedUser));
 
-        const isValid = await verifyPassword(password, userData.password_hash);
-        if (!isValid) {
-          throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
-        }
+    if (data.facility) {
+      const mappedFacility = mapDbFacilityToFacility(data.facility);
+      setFacility(mappedFacility);
+      localStorage.setItem('facility', JSON.stringify(mappedFacility));
+    } else {
+      setFacility(null);
+      localStorage.removeItem('facility');
+    }
 
-        // ユーザー情報を作成（Personal側では施設情報は不要）
-        const user: User = {
-          id: userData.id,
-          email: userData.email || '',
-          name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
-          lastName: userData.last_name,
-          firstName: userData.first_name,
-          lastNameKana: userData.last_name_kana,
-          firstNameKana: userData.first_name_kana,
-          birthDate: userData.birth_date,
-          gender: userData.gender,
-          loginId: userData.login_id || userData.name,
-          userType: (userData.user_type as UserType) || 'staff',
-          role: userData.role as UserRole,
-          facilityId: userData.facility_id || '',
-          permissions: userData.permissions || {},
-          accountStatus: userData.account_status || 'active',
-          createdAt: userData.created_at,
-          updatedAt: userData.updated_at,
-        };
-
-        setUser(user);
-        localStorage.setItem('user', JSON.stringify(user));
-
-        // Personal側では施設情報は設定しない
-        setFacility(null);
-        localStorage.removeItem('facility');
-        return;
-      }
-
-      // Biz側のログイン（施設IDがある場合）
-      // 施設コードで施設を検索
-      const { data: facilityData, error: facilityError } = await supabase
-        .from('facilities')
-        .select('*')
-        .eq('code', facilityCode)
-        .single();
-
-      if (facilityError || !facilityData) {
-        throw new Error('施設IDが正しくありません');
-      }
-
-      // メールアドレスかログインIDかを判定（@が含まれていればメールアドレス）
-      const isEmail = loginIdOrEmail.includes('@');
-
-      // まずusersテーブルから検索（施設IDとメールアドレスまたはログインIDで検索）
-      let userData: any = null;
-      let userError: any = null;
-
-      if (isEmail) {
-        // メールアドレスで検索
-        const result = await supabase
-          .from('users')
-          .select('*')
-          .eq('facility_id', facilityData.id)
-          .eq('email', loginIdOrEmail)
-          .eq('has_account', true)
-          .single();
-        userData = result.data;
-        userError = result.error;
-      } else {
-        // ログインIDで検索
-        const result = await supabase
-          .from('users')
-          .select('*')
-          .eq('facility_id', facilityData.id)
-          .eq('login_id', loginIdOrEmail)
-          .eq('has_account', true)
-          .single();
-        userData = result.data;
-        userError = result.error;
-      }
-
-      if (!userError && userData) {
-        // ユーザーテーブルにアカウントがある場合
-        if (!userData.password_hash) {
-          throw new Error('このアカウントにはパスワードが設定されていません');
-        }
-
-        const isValid = await verifyPassword(password, userData.password_hash);
-        if (!isValid) {
-          throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
-        }
-
-        // 施設情報を取得
-        const { data: facilityData } = await supabase
-          .from('facilities')
-          .select('*')
-          .eq('id', userData.facility_id)
-          .single();
-
-        if (!facilityData) {
-          throw new Error('施設情報が見つかりません');
-        }
-
-        // 施設設定から施設名を取得
-        const { data: facilitySettings } = await supabase
-          .from('facility_settings')
-          .select('facility_name')
-          .eq('facility_id', userData.facility_id)
-          .single();
-
-        const facility: Facility = {
-          id: facilityData.id,
-          name: facilitySettings?.facility_name || facilityData.name,
-          code: facilityData.code || facilityData.id,
-          ownerUserId: facilityData.owner_user_id,
-          createdAt: facilityData.created_at,
-          updatedAt: facilityData.updated_at,
-        };
-        setFacility(facility);
-        localStorage.setItem('facility', JSON.stringify(facility));
-
-        // ユーザー情報を作成
-        const user: User = {
-          id: userData.id,
-          email: userData.email || '',
-          name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
-          lastName: userData.last_name,
-          firstName: userData.first_name,
-          lastNameKana: userData.last_name_kana,
-          firstNameKana: userData.first_name_kana,
-          birthDate: userData.birth_date,
-          gender: userData.gender,
-          loginId: userData.login_id || userData.name,
-          userType: (userData.user_type as UserType) || 'staff',
-          role: userData.role as UserRole,
-          facilityId: userData.facility_id || '',
-          permissions: userData.permissions || {},
-          accountStatus: userData.account_status || 'active',
-          createdAt: userData.created_at,
-          updatedAt: userData.updated_at,
-        };
-
-        setUser(user);
-        localStorage.setItem('user', JSON.stringify(user));
-
-        // ログイン情報を保存（パスワードは保存しない）
-        localStorage.setItem('savedFacilityCode', facilityCode);
-        localStorage.setItem('savedLoginId', loginIdOrEmail);
-        return;
-      }
-
-      // usersテーブルにない場合、既存のstaffテーブルから検索（後方互換性）
-      // 施設IDとスタッフ名またはメールアドレスで検索
-      let staffData: any = null;
-      let staffError: any = null;
-
-      if (isEmail) {
-        // メールアドレスで検索
-        const result = await supabase
-          .from('staff')
-          .select('*')
-          .eq('facility_id', facilityData.id)
-          .eq('email', loginIdOrEmail)
-          .eq('has_account', true)
-          .single();
-        staffData = result.data;
-        staffError = result.error;
-      } else {
-        // スタッフ名で検索
-        const result = await supabase
-          .from('staff')
-          .select('*')
-          .eq('facility_id', facilityData.id)
-          .eq('name', loginIdOrEmail)
-          .eq('has_account', true)
-          .single();
-        staffData = result.data;
-        staffError = result.error;
-      }
-
-      if (staffError || !staffData) {
-        throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
-      }
-
-      if (!staffData.password_hash) {
-        throw new Error('このスタッフにはアカウントが設定されていません');
-      }
-
-      const isValid = await verifyPassword(password, staffData.password_hash);
-      if (!isValid) {
-        throw new Error('メールアドレス（またはログインID）またはパスワードが正しくありません');
-      }
-
-      // 施設情報を取得
-      const { data: facilitySettings } = await supabase
-        .from('facility_settings')
-        .select('facility_id, facility_name')
-        .eq('facility_id', staffData.facility_id)
-        .single();
-
-      const facility: Facility = {
-        id: staffData.facility_id,
-        name: facilitySettings?.facility_name || facilityData.name,
-        code: facilityData.code || staffData.facility_id,
-        ownerUserId: facilityData.owner_user_id,
-        createdAt: facilityData.created_at || new Date().toISOString(),
-        updatedAt: facilityData.updated_at || new Date().toISOString(),
-      };
-      setFacility(facility);
-      localStorage.setItem('facility', JSON.stringify(facility));
-
-      // スタッフ情報からユーザー情報を作成（後方互換性）
-      const isAdmin = staffData.role === 'マネージャー' || staffData.role === '管理者';
-      // staff.user_idがあればそれを使用（usersテーブルのID）、なければstaff.idを使用
-      const userId = staffData.user_id || staffData.id;
-      const user: User = {
-        id: userId,
-        email: staffData.email || '',
-        name: staffData.name,
-        loginId: staffData.login_id || staffData.name,
-        userType: 'staff', // 後方互換性のためstaffとして設定
-        role: isAdmin ? 'admin' : 'staff',
-        facilityId: staffData.facility_id,
-        permissions: {},
-        accountStatus: 'active',
-        createdAt: staffData.created_at,
-        updatedAt: staffData.updated_at,
-      };
-
-      setUser(user);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      // ログイン情報を保存（パスワードは保存しない）
+    // ログイン情報を保存（パスワードは保存しない）
+    if (facilityCode) {
       localStorage.setItem('savedFacilityCode', facilityCode);
       localStorage.setItem('savedLoginId', loginIdOrEmail);
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
     }
   };
 
@@ -409,15 +197,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isAuthenticated = user !== null;
   const isAdmin = user?.role === 'admin' || user?.role === 'owner';
-  // 施設管理者かどうか（employment_records.role が '管理者' or 'マネージャー'）
   const isFacilityAdmin = facilityRole === '管理者' || facilityRole === 'マネージャー';
-  // マスター管理者（施設オーナー）かどうか
   const isMaster = !!(user && facility?.ownerUserId && user.id === facility.ownerUserId);
 
-  // 権限チェック関数
   const hasPermission = (permission: keyof UserPermissions): boolean => {
     if (!user) return false;
-    // グローバル管理者、施設管理者、マスターは全権限
     if (isAdmin || isFacilityAdmin || isMaster) return true;
     if (user.role === 'manager' || user.role === 'staff') {
       return user.permissions?.[permission] === true;
@@ -425,7 +209,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
-  // ローディング中は何も表示しない
   if (loading) {
     return <div className="flex items-center justify-center h-screen">読み込み中...</div>;
   }
@@ -458,4 +241,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

@@ -172,8 +172,8 @@ export default function CareerLoginPage() {
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
-            src="/logo-cropped-center.png"
-            alt="co-shien"
+            src="/logo.svg"
+            alt="Roots"
             width={200}
             height={64}
             className="h-16 w-auto mx-auto mb-4"

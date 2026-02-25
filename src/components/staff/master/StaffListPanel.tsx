@@ -33,7 +33,6 @@ interface StaffListPanelProps {
   loading: boolean;
   selectedStaffId?: string;
   onSelectStaff: (staff: StaffWithSettings) => void;
-  onAddStaff: () => void;
   onInviteStaff: () => void;
   onRefresh: () => void;
   onExport?: () => void;
@@ -44,7 +43,6 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
   loading,
   selectedStaffId,
   onSelectStaff,
-  onAddStaff,
   onInviteStaff,
   onRefresh,
   onExport,
@@ -148,18 +146,12 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
         {/* アクションボタン */}
         <div className="flex gap-2 mb-3">
           <button
-            onClick={onAddStaff}
+            data-tour="add-staff-button"
+            onClick={onInviteStaff}
             className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
           >
-            <Plus size={16} />
-            新規追加
-          </button>
-          <button
-            onClick={onInviteStaff}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-          >
             <UserPlus size={16} />
-            招待
+            スタッフを追加
           </button>
         </div>
 
@@ -301,7 +293,7 @@ const StaffListPanel: React.FC<StaffListPanelProps> = ({
             </p>
             {!searchQuery && filterType === 'all' && (
               <button
-                onClick={onAddStaff}
+                onClick={onInviteStaff}
                 className="mt-2 text-sm text-teal-600 hover:text-teal-700"
               >
                 スタッフを追加する

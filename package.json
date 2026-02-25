@@ -1,5 +1,5 @@
 {
-  "name": "co-shien",
+  "name": "roots",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -38,6 +38,7 @@
     "@tiptap/pm": "^3.18.0",
     "@tiptap/react": "^3.18.0",
     "@tiptap/starter-kit": "^3.18.0",
+    "bcryptjs": "^3.0.3",
     "cbor-x": "^1.6.0",
     "framer-motion": "^12.23.26",
     "html2canvas": "^1.4.1",
@@ -48,6 +49,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-joyride": "^2.9.3",
     "react-markdown": "^10.1.0",
     "recharts": "^2.10.3",
     "remark-gfm": "^4.0.1",
@@ -56,6 +58,7 @@
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^4.39.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

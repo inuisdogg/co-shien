@@ -215,7 +215,7 @@ export default function OwnerSetupPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-800">プラットフォームオーナー登録</h1>
             <p className="text-gray-600 text-sm mt-2">
-              co-shienの最初の管理者として登録します
+              Rootsの最初の管理者として登録します
             </p>
           </div>
 
@@ -271,7 +271,7 @@ export default function OwnerSetupPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-800">プラットフォームオーナー登録</h1>
           <p className="text-gray-600 text-sm mt-2">
-            co-shienの最初の管理者として登録します
+            Rootsの最初の管理者として登録します
           </p>
         </div>
 

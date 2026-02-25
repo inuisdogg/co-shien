@@ -3,7 +3,7 @@
 // このファイルを編集するたびに、ブラウザは新しいService Workerとして認識する
 // バージョン番号を手動で更新するか、ビルド時に自動生成する
 const CACHE_VERSION = 'v5';
-const CACHE_NAME = `co-shien-${CACHE_VERSION}`;
+const CACHE_NAME = `roots-${CACHE_VERSION}`;
 // 重要: HTMLページ(/)はキャッシュしない - 常に最新を取得するため
 const urlsToCache = [
   '/manifest.json',

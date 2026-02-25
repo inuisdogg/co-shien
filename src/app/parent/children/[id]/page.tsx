@@ -638,7 +638,7 @@ export default function ChildDetailPage() {
                   <h3 className="font-bold text-gray-800">利用施設一覧</h3>
                   {activeContracts.length > 0 && (
                     <button
-                      onClick={() => router.push(`/client/children/${childId}/usage-request`)}
+                      onClick={() => router.push(`/parent/children/${childId}/usage-request`)}
                       className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
                     >
                       <Calendar className="w-4 h-4" />
@@ -664,7 +664,7 @@ export default function ChildDetailPage() {
                             <div
                               key={contract.id}
                               className="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:border-green-300"
-                              onClick={() => router.push(`/client/facilities/${contract.facility_id}?child=${child.id}`)}
+                              onClick={() => router.push(`/parent/facilities/${contract.facility_id}?child=${child.id}`)}
                             >
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
@@ -687,7 +687,7 @@ export default function ChildDetailPage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(`/client/facilities/${contract.facility_id}/records?child=${child.id}`);
+                                    router.push(`/parent/facilities/${contract.facility_id}/records?child=${child.id}`);
                                   }}
                                   className="flex-1 text-xs bg-white hover:bg-gray-50 text-gray-700 py-2 px-2 rounded border border-gray-200"
                                 >
@@ -696,7 +696,7 @@ export default function ChildDetailPage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(`/client/facilities/${contract.facility_id}/contact?child=${child.id}`);
+                                    router.push(`/parent/facilities/${contract.facility_id}/contact?child=${child.id}`);
                                   }}
                                   className="flex-1 text-xs bg-white hover:bg-gray-50 text-gray-700 py-2 px-2 rounded border border-gray-200"
                                 >
@@ -872,7 +872,7 @@ export default function ChildDetailPage() {
                       onMonthChange={setSelectedMonth}
                     />
                     <button
-                      onClick={() => router.push(`/client/children/${childId}/usage-request`)}
+                      onClick={() => router.push(`/parent/children/${childId}/usage-request`)}
                       className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
                     >
                       <Plus className="w-5 h-5" />

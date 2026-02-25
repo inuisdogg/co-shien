@@ -6,10 +6,10 @@ const nextConfig = {
     unoptimized: true, // Netlifyで画像最適化を無効化（publicフォルダの画像を直接使用）
   },
   // URL構成（パスベース）
-  // ドメイン: co-shien.inu.co.jp
-  // - /client   : 利用者向け
-  // - /personal : スタッフ向け
-  // - /biz      : 施設管理向け
+  // ドメイン: roots.inu.co.jp
+  // - /parent   : 保護者向け
+  // - /career   : スタッフ向け
+  // - /business : 施設管理向け
   async rewrites() {
     return [];
   },

@@ -1,6 +1,6 @@
 /**
  * 利用規約ページ
- * 株式会社INUが運営するco-shienの利用規約
+ * 株式会社INUが運営するRootsの利用規約
  */
 
 'use client';
@@ -34,7 +34,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-xl font-bold text-gray-800 mb-4">第1条（適用）</h2>
               <p className="text-gray-700 leading-relaxed">
-                本規約は、株式会社INU（以下「当社」といいます）が提供する「co-shien」サービス（以下「本サービス」といいます）の利用条件を定めるものです。
+                本規約は、株式会社INU（以下「当社」といいます）が提供する「Roots」サービス（以下「本サービス」といいます）の利用条件を定めるものです。
                 登録ユーザーの皆さま（以下「ユーザー」といいます）には、本規約に従って、本サービスをご利用いただきます。
               </p>
             </section>

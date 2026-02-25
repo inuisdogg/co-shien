@@ -709,7 +709,7 @@ export default function FacilityDetailPage() {
                 {/* 利用希望申請ボタン */}
                 <div className="mt-6">
                   <button
-                    onClick={() => router.push(`/client/children/${selectedChildId}/usage-request`)}
+                    onClick={() => router.push(`/parent/children/${selectedChildId}/usage-request`)}
                     className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
                   >
                     <Calendar className="w-5 h-5" />
@@ -725,7 +725,7 @@ export default function FacilityDetailPage() {
 
       {/* フローティングチャットボタン */}
       <button
-        onClick={() => router.push(`/client/facilities/${facilityId}/chat`)}
+        onClick={() => router.push(`/parent/facilities/${facilityId}/chat`)}
         className="fixed bottom-6 right-6 bg-[#ED8936] hover:bg-[#D97706] text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all active:scale-95 z-50 flex items-center gap-2"
       >
         <MessageSquare className="w-6 h-6" />

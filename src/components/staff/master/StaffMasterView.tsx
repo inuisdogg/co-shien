@@ -201,7 +201,6 @@ const StaffMasterView: React.FC = () => {
             loading={loading}
             selectedStaffId={selectedStaff?.id}
             onSelectStaff={handleSelectStaff}
-            onAddStaff={handleAddStaff}
             onInviteStaff={handleOpenInvite}
             onRefresh={fetchStaffList}
             onExport={handleExport}

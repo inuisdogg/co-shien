@@ -12,30 +12,29 @@ import {
   CalendarDays,
   Users,
   Settings,
-  Target,
   Building2,
   BarChart3,
-  DollarSign,
   CalendarCheck,
-  MessageSquare,
   BookOpen,
-  ClipboardList,
-  ClipboardCheck,
-  FileText,
-  AlertTriangle,
-  GraduationCap,
-  UsersRound,
-  Wallet,
-  Truck,
   ChevronDown,
   ChevronRight,
-  Zap,
-  Library,
   Calculator,
-  UserCheck,
+  FileText,
+  FolderOpen,
+  Shield,
+  ClipboardList,
+  ListChecks,
+  AlertTriangle,
+  DollarSign,
+  GraduationCap,
+  Gavel,
+  Package,
+  FileCheck,
+  CalendarMinus,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { useSetupGuide } from '@/contexts/SetupGuideContext';
 import { supabase } from '@/lib/supabase';
 
 // フェーズ定義
@@ -60,17 +59,22 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'addition-settings': 1, // 加算体制設定
   'knowledge': 1,     // ナレッジベース
   'addition-simulation': 1, // 加算シミュレーション
+  'addition-simulator': 1,  // 加算シミュレーター
+  'staff-planning': 1,      // 採用計画シミュレーター
   'staffing': 1,            // 人員配置管理
   'work-schedule': 1,       // 勤務体制一覧表
+  'leave-approval': 1,      // 休暇申請管理
+  'service-records': 1,     // サービス提供記録
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
   'management': 2,        // 経営設定
   'addition-catalog': 1,  // 加算一覧（Phase 1で表示）
-  'training': 2,          // 研修記録
-  'committee': 2,         // 委員会管理
-  'finance': 2,           // 財務管理（損益・CF・経費を統合）
-  'incident': 2,          // 苦情・事故報告
+  'training': 1,          // 研修記録
+  'committee': 1,         // 委員会管理
+  'finance': 1,           // 財務管理（損益・CF・経費を統合）
+  'incident': 1,          // 苦情・事故報告
+  'audit-export': 1,      // 監査書類エクスポート
 
   // Phase 3: 外部連携・SaaS化
   'transport': 1,         // 送迎ルート（Phase 1で表示）
@@ -97,6 +101,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = false, onClose, mode = 'business' }) => {
   const { facility } = useAuth();
   const { facilitySettings } = useFacilityData();
+  const { currentStepInfo, isSetupComplete, canAccessMenu, isLoading: isSetupLoading } = useSetupGuide();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
@@ -129,25 +134,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
     return () => clearInterval(interval);
   }, [facility?.id]);
 
-  // メニューを用途ごとに定義（整理・統合済み）
+  // メニュー定義
   const menuCategories = [
     {
-      category: '保護者',
+      category: '利用管理',
       icon: Users,
       items: [
         { id: 'schedule', label: '利用予約', icon: CalendarDays, permission: 'schedule' as const },
         { id: 'children', label: '児童管理', icon: Users, permission: 'children' as const },
-        { id: 'chat', label: 'チャット', icon: MessageSquare, permission: 'chat' as const },
-        { id: 'lead', label: 'リード管理', icon: Target, permission: 'lead' as const },
-      ],
-    },
-    {
-      category: '記録',
-      icon: BookOpen,
-      items: [
         { id: 'daily-log', label: '実績と連絡帳', icon: BookOpen, permission: 'dailyLog' as const },
-        { id: 'support-plan', label: '個別支援計画', icon: ClipboardList, permission: 'supportPlan' as const },
-        { id: 'incident', label: '苦情・事故報告', icon: AlertTriangle, permission: 'incident' as const },
+        { id: 'support-plan', label: '個別支援計画', icon: FileText, permission: 'children' as const },
+        { id: 'documents', label: '書類管理', icon: FolderOpen, permission: 'children' as const },
+        { id: 'service-records', label: 'サービス提供記録', icon: FileCheck, permission: 'children' as const },
       ],
     },
     {
@@ -155,21 +153,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       icon: CalendarCheck,
       items: [
         { id: 'staff-master', label: 'スタッフマスタ', icon: Users, permission: 'staff' as const },
-        { id: 'staffing', label: '人員配置管理', icon: UserCheck, permission: 'staff' as const },
         { id: 'shift', label: 'シフト管理', icon: CalendarCheck, permission: 'shift' as const },
-        { id: 'training', label: '研修記録', icon: GraduationCap, permission: 'training' as const },
-      ],
-    },
-    {
-      category: '運営',
-      icon: ClipboardCheck,
-      items: [
-        { id: 'transport', label: '送迎ルート', icon: Truck, permission: 'transport' as const },
-        { id: 'audit-preparation', label: '運営指導準備', icon: ClipboardCheck, permission: 'auditPreparation' as const },
-        { id: 'committee', label: '委員会管理', icon: UsersRound, permission: 'committee' as const },
-        { id: 'documents', label: '書類管理', icon: FileText, permission: 'documents' as const },
-        { id: 'knowledge', label: 'ナレッジ', icon: Library, permission: 'staff' as const },
-        { id: 'government', label: '行政連携', icon: Building2, permission: 'dashboard' as const },
+        { id: 'staffing', label: '人員配置管理', icon: Shield, permission: 'staff' as const },
+        { id: 'work-schedule', label: '勤務体制一覧表', icon: ClipboardList, permission: 'staff' as const },
+        { id: 'training', label: '研修記録', icon: GraduationCap, permission: 'staff' as const },
+        { id: 'leave-approval', label: '休暇申請管理', icon: CalendarMinus, permission: 'staff' as const },
       ],
     },
     {
@@ -177,10 +165,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       icon: BarChart3,
       items: [
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
-        { id: 'addition-simulation', label: '加算シミュレーション', icon: Calculator, permission: 'dashboard' as const },
-        { id: 'addition-catalog', label: '加算一覧', icon: Zap, permission: 'dashboard' as const },
-        { id: 'finance', label: '財務管理', icon: Wallet, permission: 'dashboard' as const },
-        { id: 'management', label: '経営設定', icon: DollarSign, permission: 'management' as const },
+        { id: 'addition-settings', label: '加算体制設定', icon: ListChecks, permission: 'dashboard' as const },
+        { id: 'addition-simulator', label: '加算シミュレーター', icon: Calculator, permission: 'dashboard' as const },
+        { id: 'staff-planning', label: '採用計画シミュレーター', icon: Users, permission: 'dashboard' as const },
+        { id: 'finance', label: '財務管理', icon: DollarSign, permission: 'dashboard' as const },
+      ],
+    },
+    {
+      category: '監査・コンプライアンス',
+      icon: Shield,
+      items: [
+        { id: 'committee', label: '委員会管理', icon: Gavel, permission: 'dashboard' as const },
+        { id: 'incident', label: '苦情・事故報告', icon: AlertTriangle, permission: 'dashboard' as const },
+        { id: 'audit-export', label: '監査書類エクスポート', icon: Package, permission: 'dashboard' as const },
       ],
     },
     {
@@ -188,7 +185,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
       icon: Settings,
       items: [
         { id: 'facility', label: '施設情報', icon: Settings, permission: 'facility' as const },
-        { id: 'addition-settings', label: '加算体制設定', icon: Zap, permission: 'facility' as const },
       ],
     },
   ];
@@ -267,7 +263,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
           }}
           className="cursor-pointer hover:opacity-80 transition-opacity"
         >
-          <Image src="/logo-cropped-center.png" alt="co-shien" width={150} height={48} className="h-12 w-auto object-contain" priority />
+          <Image src="/logo.svg" alt="Roots" width={150} height={48} className="h-12 w-auto object-contain" priority />
         </button>
       </div>
 
@@ -310,23 +306,45 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                 }`}
               >
                 <nav className="pl-3 pt-1 space-y-0.5">
-                  {category.items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setActiveTab(item.id);
-                        onClose?.();
-                      }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-[13px] ${
-                        activeTab === item.id
-                          ? `${isCareer ? 'bg-[#818CF8]' : 'bg-[#00c4cc]'} text-white font-bold shadow-sm`
-                          : 'text-gray-600 hover:bg-gray-100 font-medium'
-                      }`}
-                    >
-                      <item.icon size={15} strokeWidth={2} />
-                      <span>{item.label}</span>
-                    </button>
-                  ))}
+                  {category.items.map((item) => {
+                    const isCurrentSetupStep = !isSetupComplete && currentStepInfo?.menuId === item.id;
+                    const canAccess = isSetupComplete || canAccessMenu(item.id);
+
+                    return (
+                      <div key={item.id} className="relative" data-tour={`menu-${item.id}`}>
+                        <button
+                          onClick={() => {
+                            if (canAccess) {
+                              setActiveTab(item.id);
+                              onClose?.();
+                            }
+                          }}
+                          disabled={!canAccess}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-[13px] ${
+                            activeTab === item.id
+                              ? `${isCareer ? 'bg-[#818CF8]' : 'bg-[#00c4cc]'} text-white font-bold shadow-sm`
+                              : isCurrentSetupStep
+                              ? 'bg-amber-100 text-amber-800 font-bold ring-2 ring-amber-400 animate-pulse'
+                              : canAccess
+                              ? 'text-gray-600 hover:bg-gray-100 font-medium'
+                              : 'text-gray-400 cursor-not-allowed opacity-50 font-medium'
+                          }`}
+                        >
+                          <item.icon size={15} strokeWidth={2} />
+                          <span>{item.label}</span>
+                        </button>
+                        {/* セットアップガイドのツールチップ */}
+                        {isCurrentSetupStep && (
+                          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 pointer-events-none">
+                            <div className="relative bg-amber-500 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-lg whitespace-nowrap">
+                              <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-r-amber-500" />
+                              {currentStepInfo?.guideText}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </nav>
               </div>
             </div>

@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'co-shien キャリア',
+  title: 'Roots キャリア',
   description: '専門職のためのキャリア管理',
   manifest: '/career/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'co-shien キャリア',
+    title: 'Roots キャリア',
   },
 };
 

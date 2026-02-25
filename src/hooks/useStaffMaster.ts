@@ -218,6 +218,24 @@ export function useStaffMaster(): UseStaffMasterReturn {
           .eq('id', staffId)
           .eq('facility_id', facility.id);
 
+        // employment_recordsのpermissionsも更新
+        if ((data as any).permissions !== undefined) {
+          // まずstaffからuser_idを取得
+          const { data: staffData } = await supabase
+            .from('staff')
+            .select('user_id')
+            .eq('id', staffId)
+            .single();
+
+          if (staffData?.user_id) {
+            await supabase
+              .from('employment_records')
+              .update({ permissions: (data as any).permissions })
+              .eq('user_id', staffData.user_id)
+              .eq('facility_id', facility.id);
+          }
+        }
+
         if (error) throw error;
 
         await fetchStaffList();

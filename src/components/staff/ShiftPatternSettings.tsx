@@ -24,7 +24,7 @@ interface ShiftPatternSettingsProps {
 
 // カラーパレット
 const COLOR_PALETTE = [
-  '#00c4cc', // ティール（co-shienメイン）
+  '#00c4cc', // ティール（Rootsメイン）
   '#818CF8', // パープル
   '#f59e0b', // オレンジ
   '#10b981', // グリーン

@@ -104,6 +104,8 @@ export type FacilitySettings = {
     pickup: number; // お迎え可能人数（デフォルト: 4）
     dropoff: number; // お送り可能人数（デフォルト: 4）
   };
+  // 勤怠設定
+  prescribedWorkingHours?: number; // 1日の所定労働時間（分単位、例: 420 = 7時間）
   createdAt: string;
   updatedAt: string;
 };
@@ -149,6 +151,9 @@ export type UserPermissions = {
 
   // 設定
   facility?: boolean;         // 施設情報
+
+  // キャリアアプリからのアクセス権
+  facilityManagement?: boolean; // 施設管理画面へのアクセス
 };
 
 // 権限キーの型
@@ -162,6 +167,7 @@ export const PERMISSION_CATEGORIES = {
   '運営管理': ['auditPreparation', 'committee', 'documents'] as PermissionKey[],
   '売上・経営管理': ['dashboard', 'profitLoss', 'cashFlow', 'expenseManagement', 'management'] as PermissionKey[],
   '設定': ['facility'] as PermissionKey[],
+  'キャリアアプリ': ['facilityManagement'] as PermissionKey[],
 } as const;
 
 // 権限ラベル
@@ -188,6 +194,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   expenseManagement: '経費管理',
   management: '経営設定',
   facility: '施設情報',
+  facilityManagement: '施設管理画面アクセス',
 };
 
 // アカウントステータス

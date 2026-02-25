@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Calendar,
   Clock,
@@ -20,6 +20,10 @@ import {
   CalendarPlus,
   FileText,
   Briefcase,
+  ClipboardEdit,
+  Save,
+  Play,
+  Square,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
@@ -95,6 +99,22 @@ interface AttendanceCalendarProps {
   onClose?: () => void;
 }
 
+interface FetchedFacilitySettings {
+  regularHolidays: number[];
+  customHolidays: string[];
+  includeHolidays: boolean;
+  holidayPeriods: Array<{
+    startDate?: string;
+    start_date?: string;
+    endDate?: string;
+    end_date?: string;
+    regularHolidays?: number[];
+    regular_holidays?: number[];
+  }>;
+  prescribedWorkingHours?: number; // 1日の所定労働時間（分）
+  prescribedWorkingDays?: number; // 月の所定出勤日数
+}
+
 const REQUEST_TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   paid_leave: { label: '有給休暇', color: 'bg-green-100 text-green-700 border-green-200', icon: Calendar },
   half_day_am: { label: '午前半休', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Sun },
@@ -115,7 +135,7 @@ export default function AttendanceCalendar({
   userId,
   facilityId,
   facilityName,
-  facilitySettings,
+  facilitySettings: propFacilitySettings,
   onClose,
 }: AttendanceCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -124,16 +144,30 @@ export default function AttendanceCalendar({
   const [paidLeaveBalance, setPaidLeaveBalance] = useState<PaidLeaveBalance | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [isActionSelectOpen, setIsActionSelectOpen] = useState(false);
   const [leaveFormData, setLeaveFormData] = useState({
     request_type: 'absence' as LeaveRequest['request_type'],
     start_date: '',
     end_date: '',
     reason: '',
   });
+  const [attendanceFormData, setAttendanceFormData] = useState({
+    start_time: '',
+    end_time: '',
+    break_start_time: '',
+    break_end_time: '',
+    break2_start_time: '', // 中抜け1
+    break2_end_time: '',
+    memo: '',
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shifts, setShifts] = useState<Map<string, ShiftData>>(new Map());
   const [shiftPatterns, setShiftPatterns] = useState<ShiftPattern[]>([]);
   const [leaveSettings, setLeaveSettings] = useState<StaffLeaveSettings | null>(null);
+
+  // 施設設定を直接取得した状態
+  const [fetchedSettings, setFetchedSettings] = useState<FetchedFacilitySettings | null>(null);
 
   // 月変更
   const changeMonth = (delta: number) => {
@@ -142,6 +176,80 @@ export default function AttendanceCalendar({
       newDate.setMonth(newDate.getMonth() + delta);
       return newDate;
     });
+  };
+
+  // 施設設定を直接取得
+  useEffect(() => {
+    const fetchFacilitySettings = async () => {
+      if (!facilityId) return;
+
+      try {
+        // facility_settingsテーブルから取得
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('facility_settings')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .single();
+
+        if (settingsError) {
+          console.error('施設設定取得エラー:', settingsError);
+          // フォールバック: facilitiesテーブルから取得
+          const { data: facilityData } = await supabase
+            .from('facilities')
+            .select('regular_holidays, custom_holidays, include_holidays, holiday_periods')
+            .eq('id', facilityId)
+            .single();
+
+          if (facilityData) {
+            setFetchedSettings({
+              regularHolidays: facilityData.regular_holidays || [0],
+              customHolidays: facilityData.custom_holidays || [],
+              includeHolidays: facilityData.include_holidays || false,
+              holidayPeriods: facilityData.holiday_periods || [],
+            });
+          }
+          return;
+        }
+
+        if (settingsData) {
+          // holiday_periodsの形式を正規化
+          let holidayPeriods: FetchedFacilitySettings['holidayPeriods'] = [];
+          if (settingsData.holiday_periods) {
+            const rawPeriods = typeof settingsData.holiday_periods === 'string'
+              ? JSON.parse(settingsData.holiday_periods)
+              : settingsData.holiday_periods;
+            if (Array.isArray(rawPeriods)) {
+              holidayPeriods = rawPeriods.map((p: any) => ({
+                startDate: p.startDate || p.start_date,
+                endDate: p.endDate || p.end_date,
+                regularHolidays: p.regularHolidays || p.regular_holidays,
+              }));
+            }
+          }
+
+          setFetchedSettings({
+            regularHolidays: settingsData.regular_holidays || [0],
+            customHolidays: settingsData.custom_holidays || [],
+            includeHolidays: settingsData.include_holidays || false,
+            holidayPeriods,
+            prescribedWorkingHours: settingsData.prescribed_working_hours,
+            prescribedWorkingDays: settingsData.prescribed_working_days,
+          });
+        }
+      } catch (error) {
+        console.error('施設設定取得エラー:', error);
+      }
+    };
+
+    fetchFacilitySettings();
+  }, [facilityId]);
+
+  // 実際に使用する施設設定（直接取得した設定を優先）
+  const facilitySettings = fetchedSettings || {
+    regularHolidays: propFacilitySettings?.regularHolidays || [0],
+    customHolidays: propFacilitySettings?.customHolidays || [],
+    includeHolidays: propFacilitySettings?.includeHolidays || false,
+    holidayPeriods: propFacilitySettings?.holidayPeriods || [],
   };
 
   // データ取得
@@ -153,15 +261,26 @@ export default function AttendanceCalendar({
       const lastDay = new Date(year, month + 1, 0).getDate();
       const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
 
-      // LocalStorageから勤怠記録を取得（暫定）
-      const records = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-      const monthRecords = records.filter((r: AttendanceRecord) => {
-        return r.user_id === userId &&
-               r.facility_id === facilityId &&
-               r.date >= startDate &&
-               r.date <= endDate;
-      });
-      setAttendanceRecords(monthRecords);
+      // Supabaseから勤怠記録を取得
+      try {
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('facility_id', facilityId)
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .order('date', { ascending: true })
+          .order('time', { ascending: true });
+
+        if (attendanceError) {
+          console.error('勤怠記録取得エラー:', attendanceError);
+        } else if (attendanceData) {
+          setAttendanceRecords(attendanceData);
+        }
+      } catch (error) {
+        console.error('勤怠記録取得エラー:', error);
+      }
 
       // 休暇申請を取得
       try {
@@ -313,9 +432,18 @@ export default function AttendanceCalendar({
     return map;
   }, [leaveRequests]);
 
+  // 休業日関連の変数を先に定義
+  const regularHolidays = useMemo(() => facilitySettings.regularHolidays || [0], [facilitySettings.regularHolidays]);
+  const customHolidays = useMemo(() => facilitySettings.customHolidays || [], [facilitySettings.customHolidays]);
+  const includeHolidays = useMemo(() => facilitySettings.includeHolidays || false, [facilitySettings.includeHolidays]);
+  const japaneseHolidays = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    return includeHolidays ? getJapaneseHolidays(year) : [];
+  }, [currentMonth, includeHolidays]);
+
   // 定休日判定
-  const getRegularHolidaysForDate = (dateStr: string, dayOfWeek: number): number[] => {
-    const holidayPeriods = facilitySettings?.holidayPeriods;
+  const getRegularHolidaysForDate = useCallback((dateStr: string, dayOfWeek: number): number[] => {
+    const holidayPeriods = facilitySettings.holidayPeriods;
     if (holidayPeriods && Array.isArray(holidayPeriods) && holidayPeriods.length > 0) {
       for (const period of holidayPeriods) {
         if (period && typeof period === 'object') {
@@ -329,10 +457,10 @@ export default function AttendanceCalendar({
         }
       }
     }
-    return Array.isArray(facilitySettings?.regularHolidays) ? facilitySettings.regularHolidays : [0];
-  };
+    return Array.isArray(facilitySettings.regularHolidays) ? facilitySettings.regularHolidays : [0];
+  }, [facilitySettings.holidayPeriods, facilitySettings.regularHolidays]);
 
-  // シフト登録状況を確認
+  // シフト登録状況を確認（施設の休業日も考慮）
   const shiftStats = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -341,10 +469,25 @@ export default function AttendanceCalendar({
     // シフト登録日数をカウント
     let scheduledShiftDays = 0;
     let scheduledWorkMinutes = 0;
+    let prescribedWorkDays = 0; // 所定出勤日数（施設休業日を除いた営業日数）
 
     for (let day = 1; day <= lastDay; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const date = new Date(dateStr);
+      const dayOfWeek = date.getDay();
       const shift = shifts.get(dateStr);
+
+      // 施設の休業日判定
+      const applicableRegularHolidays = getRegularHolidaysForDate(dateStr, dayOfWeek);
+      const isRegularHoliday = applicableRegularHolidays.includes(dayOfWeek);
+      const isCustomHoliday = customHolidays && Array.isArray(customHolidays) && customHolidays.includes(dateStr);
+      const isJapaneseHoliday = includeHolidays && japaneseHolidays.includes(dateStr);
+      const isFacilityHoliday = isRegularHoliday || isCustomHoliday || isJapaneseHoliday;
+
+      // 施設休業日でなければ所定出勤日としてカウント
+      if (!isFacilityHoliday) {
+        prescribedWorkDays++;
+      }
 
       if (shift?.has_shift && !shift.pattern?.isDayOff) {
         scheduledShiftDays++;
@@ -365,21 +508,38 @@ export default function AttendanceCalendar({
           workMinutes -= 60; // デフォルト1時間休憩
           scheduledWorkMinutes += Math.max(0, workMinutes);
         } else {
-          // デフォルト7時間
-          scheduledWorkMinutes += 7 * 60;
+          // デフォルト8時間（所定労働時間が設定されている場合はそれを使用）
+          const defaultMinutes = fetchedSettings?.prescribedWorkingHours || (8 * 60);
+          scheduledWorkMinutes += defaultMinutes;
         }
       }
     }
 
+    // シフト未登録の場合は所定出勤日数から所定労働時間を計算
     const hasShifts = scheduledShiftDays > 0;
-    const scheduledWorkHours = Math.floor(scheduledWorkMinutes / 60);
+    let scheduledWorkHours: number;
+    let scheduledWorkMinutesRemainder = 0;
+
+    if (hasShifts) {
+      scheduledWorkHours = Math.floor(scheduledWorkMinutes / 60);
+      scheduledWorkMinutesRemainder = scheduledWorkMinutes % 60;
+    } else {
+      // シフト未登録の場合：所定出勤日数 × 1日の所定労働時間
+      const dailyPrescribedMinutes = fetchedSettings?.prescribedWorkingHours || (8 * 60);
+      const totalMinutes = prescribedWorkDays * dailyPrescribedMinutes;
+      scheduledWorkHours = Math.floor(totalMinutes / 60);
+      scheduledWorkMinutesRemainder = totalMinutes % 60;
+    }
 
     return {
       hasShifts,
-      scheduledShiftDays,
+      scheduledShiftDays: hasShifts ? scheduledShiftDays : prescribedWorkDays,
+      prescribedWorkDays, // 施設休業日を除いた営業日数
       scheduledWorkHours,
+      scheduledWorkMinutesRemainder,
+      totalScheduledMinutes: hasShifts ? scheduledWorkMinutes : (prescribedWorkDays * (fetchedSettings?.prescribedWorkingHours || 480)),
     };
-  }, [currentMonth, shifts, shiftPatterns]);
+  }, [currentMonth, shifts, shiftPatterns, customHolidays, includeHolidays, japaneseHolidays, fetchedSettings, getRegularHolidaysForDate]);
 
   // 月間統計を計算（シフトベース）
   const monthlyStats = useMemo(() => {
@@ -417,16 +577,21 @@ export default function AttendanceCalendar({
             const startTime = startRecord.time || startRecord.start_time;
             const endTime = endRecord.time || endRecord.end_time;
             if (startTime && endTime) {
-              const start = new Date(`${dateStr}T${startTime}:00`);
-              const end = new Date(`${dateStr}T${endTime}:00`);
+              // 時間形式を正規化（HH:MM:SS または HH:MM に対応）
+              const normalizedStartTime = startTime.length === 5 ? `${startTime}:00` : startTime;
+              const normalizedEndTime = endTime.length === 5 ? `${endTime}:00` : endTime;
+              const start = new Date(`${dateStr}T${normalizedStartTime}`);
+              const end = new Date(`${dateStr}T${normalizedEndTime}`);
               let workMinutes = Math.floor((end.getTime() - start.getTime()) / (1000 * 60));
 
               // 休憩時間を差し引く
               const breakStart = dayRecords.find(r => r.type === 'break_start');
               const breakEnd = dayRecords.find(r => r.type === 'break_end');
               if (breakStart?.time && breakEnd?.time) {
-                const breakStartTime = new Date(`${dateStr}T${breakStart.time}:00`);
-                const breakEndTime = new Date(`${dateStr}T${breakEnd.time}:00`);
+                const bsTime = breakStart.time.length === 5 ? `${breakStart.time}:00` : breakStart.time;
+                const beTime = breakEnd.time.length === 5 ? `${breakEnd.time}:00` : breakEnd.time;
+                const breakStartTime = new Date(`${dateStr}T${bsTime}`);
+                const breakEndTime = new Date(`${dateStr}T${beTime}`);
                 const breakMinutes = Math.floor((breakEndTime.getTime() - breakStartTime.getTime()) / (1000 * 60));
                 workMinutes = Math.max(0, workMinutes - breakMinutes);
               }
@@ -555,23 +720,194 @@ export default function AttendanceCalendar({
     }
   };
 
-  // 日付クリック処理
+  // 日付クリック処理 - アクション選択モーダルを表示
   const handleDateClick = (dateStr: string) => {
     setSelectedDate(dateStr);
+
+    // 既存の勤怠データがあれば読み込む
+    const dayRecords = attendanceRecords.filter(r => r.date === dateStr);
+    const startRecord = dayRecords.find(r => r.type === 'start' || r.type === 'manual');
+    const endRecord = dayRecords.find(r => r.type === 'end' || r.type === 'manual');
+    const breakStartRecord = dayRecords.find(r => r.type === 'break_start');
+    const breakEndRecord = dayRecords.find(r => r.type === 'break_end');
+
+    setAttendanceFormData({
+      start_time: (startRecord?.time || startRecord?.start_time || '').slice(0, 5),
+      end_time: (endRecord?.time || endRecord?.end_time || '').slice(0, 5),
+      break_start_time: (breakStartRecord?.time || '').slice(0, 5),
+      break_end_time: (breakEndRecord?.time || '').slice(0, 5),
+      break2_start_time: '',
+      break2_end_time: '',
+      memo: startRecord?.memo || '',
+    });
+
     setLeaveFormData(prev => ({
       ...prev,
       start_date: dateStr,
       end_date: dateStr,
     }));
+    setIsActionSelectOpen(true);
+  };
+
+  // 勤怠登録を開く
+  const openAttendanceModal = () => {
+    setIsActionSelectOpen(false);
+    setIsAttendanceModalOpen(true);
+  };
+
+  // 休暇申請を開く
+  const openLeaveModal = () => {
+    setIsActionSelectOpen(false);
     setIsLeaveModalOpen(true);
+  };
+
+  // 勤怠データ保存処理
+  const handleAttendanceSubmit = async () => {
+    if (!selectedDate) return;
+    if (!attendanceFormData.start_time) {
+      alert('勤務開始時間を入力してください');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 既存のレコードを削除
+      await supabase
+        .from('attendance_records')
+        .delete()
+        .eq('user_id', userId)
+        .eq('facility_id', facilityId)
+        .eq('date', selectedDate);
+
+      // 新しいレコードを追加
+      const records: Array<{
+        user_id: string;
+        facility_id: string;
+        date: string;
+        type: string;
+        time: string;
+        memo?: string;
+      }> = [];
+
+      // 出勤
+      if (attendanceFormData.start_time) {
+        records.push({
+          user_id: userId,
+          facility_id: facilityId,
+          date: selectedDate,
+          type: 'start',
+          time: attendanceFormData.start_time + ':00',
+          memo: attendanceFormData.memo || undefined,
+        });
+      }
+
+      // 退勤
+      if (attendanceFormData.end_time) {
+        records.push({
+          user_id: userId,
+          facility_id: facilityId,
+          date: selectedDate,
+          type: 'end',
+          time: attendanceFormData.end_time + ':00',
+        });
+      }
+
+      // 休憩開始
+      if (attendanceFormData.break_start_time) {
+        records.push({
+          user_id: userId,
+          facility_id: facilityId,
+          date: selectedDate,
+          type: 'break_start',
+          time: attendanceFormData.break_start_time + ':00',
+        });
+      }
+
+      // 休憩終了
+      if (attendanceFormData.break_end_time) {
+        records.push({
+          user_id: userId,
+          facility_id: facilityId,
+          date: selectedDate,
+          type: 'break_end',
+          time: attendanceFormData.break_end_time + ':00',
+        });
+      }
+
+      // 中抜け開始（break2_start）
+      if (attendanceFormData.break2_start_time) {
+        records.push({
+          user_id: userId,
+          facility_id: facilityId,
+          date: selectedDate,
+          type: 'break_start',
+          time: attendanceFormData.break2_start_time + ':00',
+        });
+      }
+
+      // 中抜け終了（break2_end）
+      if (attendanceFormData.break2_end_time) {
+        records.push({
+          user_id: userId,
+          facility_id: facilityId,
+          date: selectedDate,
+          type: 'break_end',
+          time: attendanceFormData.break2_end_time + ':00',
+        });
+      }
+
+      if (records.length > 0) {
+        const { error } = await supabase
+          .from('attendance_records')
+          .insert(records);
+
+        if (error) throw error;
+      }
+
+      alert('勤怠を保存しました');
+      setIsAttendanceModalOpen(false);
+
+      // データを再取得
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
+
+      const { data: attendanceData } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('facility_id', facilityId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+        .order('time', { ascending: true });
+
+      if (attendanceData) {
+        setAttendanceRecords(attendanceData);
+      }
+    } catch (error) {
+      console.error('勤怠保存エラー:', error);
+      alert('勤怠の保存に失敗しました');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
-  const regularHolidays = facilitySettings?.regularHolidays || [0];
-  const customHolidays = facilitySettings?.customHolidays || [];
-  const includeHolidays = facilitySettings?.includeHolidays || false;
-  const japaneseHolidays = includeHolidays ? getJapaneseHolidays(year) : [];
+
+  // デバッグ用：施設設定を確認
+  useEffect(() => {
+    console.log('勤怠カレンダー 施設設定:', {
+      regularHolidays,
+      customHolidays,
+      includeHolidays,
+      japaneseHolidays,
+      fetchedSettings,
+    });
+  }, [regularHolidays, customHolidays, includeHolidays, japaneseHolidays, fetchedSettings]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -611,27 +947,33 @@ export default function AttendanceCalendar({
 
         {/* シフト未登録の注意表示 */}
         {!shiftStats.hasShifts && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-sm text-yellow-700 flex items-center gap-2">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 flex items-center gap-2">
             <AlertCircle className="w-4 h-4" />
-            今月のシフトが未登録です
+            今月のシフトは未確定です
           </div>
         )}
 
-        {/* シフト登録済みの場合のサマリー */}
-        {shiftStats.hasShifts && (
-          <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-            <span className="text-gray-600">
-              シフト予定: <span className="font-bold text-[#00c4cc]">{shiftStats.scheduledShiftDays}</span>日
-              <span className="text-gray-400 mx-1">|</span>
-              予定労働: <span className="font-bold text-[#00c4cc]">{shiftStats.scheduledWorkHours}</span>h
-            </span>
-            {leaveSettings?.paidLeaveEnabled && (
-              <span className="text-gray-500">
-                有給残 <span className="font-bold text-green-600">{leaveSettings.paidLeaveDays}</span>日
-              </span>
+        {/* シフト・所定出勤のサマリー */}
+        <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+          <span className="text-gray-600">
+            {shiftStats.hasShifts ? (
+              <>
+                シフト予定: <span className="font-bold text-[#00c4cc]">{shiftStats.scheduledShiftDays}</span>日
+              </>
+            ) : (
+              <>
+                所定出勤: <span className="font-bold text-[#00c4cc]">{shiftStats.prescribedWorkDays}</span>日
+              </>
             )}
-          </div>
-        )}
+            <span className="text-gray-400 mx-1">|</span>
+            所定労働: <span className="font-bold text-[#00c4cc]">{shiftStats.scheduledWorkHours}:{String(shiftStats.scheduledWorkMinutesRemainder).padStart(2, '0')}</span>
+          </span>
+          {leaveSettings?.paidLeaveEnabled && (
+            <span className="text-gray-500">
+              有給残 <span className="font-bold text-green-600">{leaveSettings.paidLeaveDays}</span>日
+            </span>
+          )}
+        </div>
 
         {/* カレンダー（メイン） */}
         <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -674,7 +1016,9 @@ export default function AttendanceCalendar({
               const dayRecords = attendanceRecords.filter(r => r.date === dateStr);
               const startRecord = dayRecords.find(r => r.type === 'start' || r.type === 'manual');
               const endRecord = dayRecords.find(r => r.type === 'end' || r.type === 'manual');
-              const hasAttendance = startRecord && endRecord;
+              const hasStartOnly = startRecord && !endRecord;
+              const hasFullAttendance = startRecord && endRecord;
+              const hasAnyAttendance = startRecord !== undefined;
               const leaveReqs = leaveRequestsByDate[dateStr] || [];
               const approvedLeave = leaveReqs.find(r => r.status === 'approved');
               const pendingLeave = leaveReqs.find(r => r.status === 'pending');
@@ -686,17 +1030,18 @@ export default function AttendanceCalendar({
                 : null;
 
               // 勤務時間を計算
-              let workHours = '';
-              if (hasAttendance) {
+              let startTimeDisplay = '';
+              let endTimeDisplay = '';
+              if (startRecord) {
                 const startTime = startRecord.time || startRecord.start_time;
+                if (startTime) {
+                  startTimeDisplay = startTime.slice(0, 5); // HH:MM形式
+                }
+              }
+              if (endRecord) {
                 const endTime = endRecord.time || endRecord.end_time;
-                if (startTime && endTime) {
-                  const start = new Date(`${dateStr}T${startTime}:00`);
-                  const end = new Date(`${dateStr}T${endTime}:00`);
-                  const diff = end.getTime() - start.getTime();
-                  const hours = Math.floor(diff / (1000 * 60 * 60));
-                  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                  workHours = `${hours}:${String(minutes).padStart(2, '0')}`;
+                if (endTime) {
+                  endTimeDisplay = endTime.slice(0, 5); // HH:MM形式
                 }
               }
 
@@ -723,8 +1068,8 @@ export default function AttendanceCalendar({
                     {day}
                   </div>
 
-                  {/* シフト表示 */}
-                  {shiftPattern && !approvedLeave && (
+                  {/* シフト表示（打刻がない場合のみ） */}
+                  {shiftPattern && !approvedLeave && !hasAnyAttendance && (
                     <div
                       className="text-[8px] px-1 rounded font-bold truncate"
                       style={{
@@ -736,12 +1081,39 @@ export default function AttendanceCalendar({
                     </div>
                   )}
 
-                  {/* 勤務情報（シフトがない場合） */}
-                  {hasAttendance && !shiftPattern && (
-                    <div className="text-[9px] text-[#00c4cc] font-bold truncate">
-                      {workHours}
+                  {/* 打刻情報表示 */}
+                  {hasFullAttendance ? (
+                    <div className="text-[8px] text-gray-700 leading-snug">
+                      <div className="truncate">{startTimeDisplay}-{endTimeDisplay}</div>
+                      {(() => {
+                        // 日毎の残業時間を計算
+                        const shift = shifts.get(dateStr);
+                        const pattern = shift?.shift_pattern_id ? shiftPatterns.find(p => p.id === shift.shift_pattern_id) : null;
+                        const scheduledMinutes = pattern ?
+                          ((() => {
+                            const ps = new Date(`${dateStr}T${pattern.startTime}:00`);
+                            const pe = new Date(`${dateStr}T${pattern.endTime}:00`);
+                            return Math.floor((pe.getTime() - ps.getTime()) / (1000 * 60)) - (pattern.breakMinutes || 60);
+                          })()) : 0;
+                        const st = startRecord.time || startRecord.start_time || '';
+                        const et = endRecord.time || endRecord.end_time || '';
+                        const nst = st.length === 5 ? `${st}:00` : st;
+                        const net = et.length === 5 ? `${et}:00` : et;
+                        const actualMinutes = Math.floor((new Date(`${dateStr}T${net}`).getTime() - new Date(`${dateStr}T${nst}`).getTime()) / (1000 * 60)) - 60;
+                        const overtimeMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+                        const otHours = Math.floor(overtimeMinutes / 60);
+                        const otMins = overtimeMinutes % 60;
+                        return overtimeMinutes > 0 ? (
+                          <div className="text-[7px] text-orange-500">+{otHours}:{String(otMins).padStart(2, '0')}</div>
+                        ) : null;
+                      })()}
                     </div>
-                  )}
+                  ) : hasStartOnly ? (
+                    <div className="text-[8px]">
+                      <div className="text-gray-700">{startTimeDisplay}~</div>
+                      <div className="text-green-600 font-medium">勤務中</div>
+                    </div>
+                  ) : null}
 
                   {/* 休暇マーク */}
                   {approvedLeave && (
@@ -796,33 +1168,58 @@ export default function AttendanceCalendar({
           </div>
         </div>
 
-        {/* 月間実績（シンプル表示） */}
+        {/* 月間実績テーブル */}
         <div className="border-t border-gray-200 pt-3 mt-2">
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <div className="flex items-center gap-4">
-              <span>
-                労働 <span className="font-bold text-gray-700">{monthlyStats.totalWorkHours}h{monthlyStats.totalWorkMinutesRemainder > 0 ? `${monthlyStats.totalWorkMinutesRemainder}m` : ''}</span>
-                {shiftStats.hasShifts && <span className="text-gray-400">/{shiftStats.scheduledWorkHours}h</span>}
-              </span>
-              <span>
-                出勤 <span className="font-bold text-gray-700">{monthlyStats.workedDays}</span>
-                {shiftStats.hasShifts && <span className="text-gray-400">/{shiftStats.scheduledShiftDays}日</span>}
-              </span>
-              {monthlyStats.overtimeHours > 0 && (
-                <span>
-                  残業 <span className="font-bold text-orange-600">{monthlyStats.overtimeHours}h</span>
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              {monthlyStats.paidLeaveDays > 0 && (
-                <span>有給 <span className="font-bold text-purple-600">{monthlyStats.paidLeaveDays}</span></span>
-              )}
-              {monthlyStats.absentDays > 0 && (
-                <span>欠勤 <span className="font-bold text-red-600">{monthlyStats.absentDays}</span></span>
-              )}
-            </div>
-          </div>
+          <table className="w-full text-xs border-collapse">
+            <tbody>
+              <tr>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">所定出勤日数</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
+                  {shiftStats.hasShifts ? `${shiftStats.scheduledShiftDays}日` : `${shiftStats.prescribedWorkDays}日`}
+                </td>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">実出勤日数</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
+                  {monthlyStats.workedDays}日
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">所定労働時間</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
+                  {shiftStats.scheduledWorkHours}:{String(shiftStats.scheduledWorkMinutesRemainder).padStart(2, '0')}
+                </td>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">総労働時間</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
+                  {monthlyStats.totalWorkHours}:{String(monthlyStats.totalWorkMinutesRemainder).padStart(2, '0')}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">過不足時間</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
+                  {(() => {
+                    const actualMinutes = monthlyStats.totalWorkHours * 60 + monthlyStats.totalWorkMinutesRemainder;
+                    const scheduledMinutes = shiftStats.totalScheduledMinutes;
+                    const diff = actualMinutes - scheduledMinutes;
+                    const sign = diff >= 0 ? '+' : '-';
+                    const absDiff = Math.abs(diff);
+                    return `${sign}${Math.floor(absDiff / 60)}:${String(absDiff % 60).padStart(2, '0')}`;
+                  })()}
+                </td>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">法定休日労働</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">0:00</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">法定時間内残業</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">0:00</td>
+                <td className="border border-gray-200 px-2 py-1 bg-gray-50 text-gray-600">法定時間外残業</td>
+                <td className="border border-gray-200 px-2 py-1 text-right text-gray-800">
+                  {(() => {
+                    const overtimeMinutes = Math.max(0, (monthlyStats.totalWorkHours * 60 + monthlyStats.totalWorkMinutesRemainder) - shiftStats.totalScheduledMinutes);
+                    return `${Math.floor(overtimeMinutes / 60)}:${String(overtimeMinutes % 60).padStart(2, '0')}`;
+                  })()}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -926,6 +1323,208 @@ export default function AttendanceCalendar({
                   className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50"
                 >
                   {isSubmitting ? '送信中...' : '申請する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* アクション選択モーダル */}
+      {isActionSelectOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="font-bold text-gray-800">
+                {selectedDate && new Date(selectedDate).toLocaleDateString('ja-JP', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </h3>
+              <button
+                onClick={() => setIsActionSelectOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <button
+                onClick={openAttendanceModal}
+                className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-[#00c4cc]/5 hover:border-[#00c4cc] transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#00c4cc]/10 flex items-center justify-center">
+                  <ClipboardEdit className="w-5 h-5 text-[#00c4cc]" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-gray-800">勤怠登録</div>
+                  <div className="text-xs text-gray-500">出退勤時間を入力する</div>
+                </div>
+              </button>
+              <button
+                onClick={openLeaveModal}
+                className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <CalendarPlus className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-gray-800">休暇申請</div>
+                  <div className="text-xs text-gray-500">有給・欠勤などを申請する</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 勤怠登録モーダル */}
+      {isAttendanceModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <ClipboardEdit className="w-5 h-5 text-[#00c4cc]" />
+                勤怠登録
+              </h3>
+              <button
+                onClick={() => setIsAttendanceModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* 日付表示 */}
+              <div className="text-center py-2 bg-gray-50 rounded-lg">
+                <span className="text-lg font-bold text-gray-800">
+                  {selectedDate && new Date(selectedDate).toLocaleDateString('ja-JP', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'short',
+                  })}
+                </span>
+              </div>
+
+              {/* 出退勤時間 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                  <Clock className="w-4 h-4 text-[#00c4cc]" />
+                  勤務時間
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      <Play className="w-3 h-3 inline mr-1" />
+                      出勤
+                    </label>
+                    <input
+                      type="time"
+                      value={attendanceFormData.start_time}
+                      onChange={(e) => setAttendanceFormData({ ...attendanceFormData, start_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-lg font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      <Square className="w-3 h-3 inline mr-1" />
+                      退勤
+                    </label>
+                    <input
+                      type="time"
+                      value={attendanceFormData.end_time}
+                      onChange={(e) => setAttendanceFormData({ ...attendanceFormData, end_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-lg font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 休憩時間 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                  <Coffee className="w-4 h-4 text-orange-500" />
+                  休憩時間
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">開始</label>
+                    <input
+                      type="time"
+                      value={attendanceFormData.break_start_time}
+                      onChange={(e) => setAttendanceFormData({ ...attendanceFormData, break_start_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">終了</label>
+                    <input
+                      type="time"
+                      value={attendanceFormData.break_end_time}
+                      onChange={(e) => setAttendanceFormData({ ...attendanceFormData, break_end_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 中抜け時間 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                  <Coffee className="w-4 h-4 text-purple-500" />
+                  中抜け時間（任意）
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">開始</label>
+                    <input
+                      type="time"
+                      value={attendanceFormData.break2_start_time}
+                      onChange={(e) => setAttendanceFormData({ ...attendanceFormData, break2_start_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">終了</label>
+                    <input
+                      type="time"
+                      value={attendanceFormData.break2_end_time}
+                      onChange={(e) => setAttendanceFormData({ ...attendanceFormData, break2_end_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* メモ */}
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-gray-700">メモ（任意）</label>
+                <textarea
+                  value={attendanceFormData.memo}
+                  onChange={(e) => setAttendanceFormData({ ...attendanceFormData, memo: e.target.value })}
+                  placeholder="備考があれば入力してください"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                />
+              </div>
+
+              {/* ボタン */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setIsAttendanceModalOpen(false)}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleAttendanceSubmit}
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSubmitting ? '保存中...' : '保存する'}
                 </button>
               </div>
             </div>

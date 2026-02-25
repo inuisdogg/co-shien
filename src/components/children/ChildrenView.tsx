@@ -670,6 +670,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             利用者招待
           </button>
           <button
+            data-tour="add-child-button"
             onClick={handleOpenWizard}
             className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-bold flex items-center shadow-sm transition-all flex-1 sm:flex-none justify-center"
           >

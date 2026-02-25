@@ -1,4 +1,4 @@
-co-shien Expert 構築用追加仕様書
+Roots Expert 構築用追加仕様書
 
 1. 概要
 

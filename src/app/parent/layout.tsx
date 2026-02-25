@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'co-shien 保護者',
+  title: 'Roots 保護者',
   description: '児童発達支援 - 保護者向け',
   manifest: '/parent/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'co-shien 保護者',
+    title: 'Roots 保護者',
   },
 };
 

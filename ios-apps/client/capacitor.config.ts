@@ -2,21 +2,21 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'jp.co.inu.coshien.client',
-  appName: 'co-shien',
+  appName: 'roots',
   webDir: '../web-placeholder',
   // ライブWEB方式: WEBサーバーから直接読み込む
   // WEBを更新すればアプリも自動的に更新される
   server: {
-    url: 'https://co-shien.inu.co.jp/client',
+    url: 'https://roots.inu.co.jp/client',
     cleartext: false,
     // アプリ内でのナビゲーションを許可
     allowNavigation: [
-      'co-shien.inu.co.jp',
+      'roots.inu.co.jp',
       '*.supabase.co',
     ],
   },
   ios: {
-    scheme: 'co-shien-client',
+    scheme: 'roots-client',
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
     // ステータスバーの設定

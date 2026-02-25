@@ -214,7 +214,7 @@ export default function FacilityContactPage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push(`/client/facilities/${facilityId}?child=${selectedChildId}`);
+        router.push(`/parent/facilities/${facilityId}?child=${selectedChildId}`);
       }, 2000);
     } catch (err: any) {
       setError(err.message || '送信に失敗しました');
@@ -284,7 +284,7 @@ export default function FacilityContactPage() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <button
-            onClick={() => router.push(`/client/facilities/${facilityId}?child=${selectedChildId}`)}
+            onClick={() => router.push(`/parent/facilities/${facilityId}?child=${selectedChildId}`)}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-2"
           >
             <ArrowLeft className="w-5 h-5" />

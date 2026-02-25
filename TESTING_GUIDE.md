@@ -15,7 +15,7 @@ RESEND_API_KEY=your_resend_api_key
 RESEND_FROM_EMAIL=noreply@your-domain.com
 
 # アプリケーションURL
-NEXT_PUBLIC_APP_URL=https://biz.co-shien.inu.co.jp
+NEXT_PUBLIC_APP_URL=https://roots.inu.co.jp/business
 ```
 
 ### 2. テスト用メールアドレスの準備
@@ -27,7 +27,7 @@ NEXT_PUBLIC_APP_URL=https://biz.co-shien.inu.co.jp
 ### シナリオ1: Biz（事業所向け）新規登録フロー
 
 #### ステップ1: メールアドレス入力
-1. `https://biz.co-shien.inu.co.jp/signup` にアクセス
+1. `https://roots.inu.co.jp/business/signup` にアクセス
 2. テスト用メールアドレスを入力
 3. 利用規約に同意
 4. 「アカウントを作成」をクリック
@@ -64,10 +64,10 @@ NEXT_PUBLIC_APP_URL=https://biz.co-shien.inu.co.jp
 
 **確認ポイント:**
 - ✅ **個人アカウント発行のお知らせ**メールが届いているか
-  - 件名: "co-shien 個人アカウント発行完了のお知らせ"
+  - 件名: "Roots 個人アカウント発行完了のお知らせ"
   - 内容: 個人アカウント発行完了の通知
 - ✅ **施設IDを記したお知らせ**メールが届いているか
-  - 件名: "co-shien 施設ID発行のお知らせ"
+  - 件名: "Roots 施設ID発行のお知らせ"
   - 内容: 施設IDが記載されている
 - ✅ 2通のメールが届いているか
 
@@ -76,7 +76,7 @@ NEXT_PUBLIC_APP_URL=https://biz.co-shien.inu.co.jp
 ### シナリオ2: パーソナル（スタッフ向け）新規登録フロー
 
 #### ステップ1: メールアドレス入力
-1. `https://my.co-shien.inu.co.jp/personal/signup` にアクセス
+1. `https://roots.inu.co.jp/career/personal/signup` にアクセス
 2. 以下を入力：
    - 氏名
    - メールアドレス
@@ -111,7 +111,7 @@ NEXT_PUBLIC_APP_URL=https://biz.co-shien.inu.co.jp
 
 **確認ポイント:**
 - ✅ **個人アカウント発行のお知らせ**メールが1通だけ届いているか
-  - 件名: "co-shien ご登録ありがとうございます" または "co-shien 個人アカウント発行完了のお知らせ"
+  - 件名: "Roots ご登録ありがとうございます" または "Roots 個人アカウント発行完了のお知らせ"
   - 内容: 個人アカウント発行完了の通知
 - ✅ 施設IDメールは届いていないか
 

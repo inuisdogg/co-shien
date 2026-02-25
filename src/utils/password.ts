@@ -1,40 +1,45 @@
 /**
  * パスワードハッシュ化ユーティリティ
- * ブラウザのSubtleCrypto APIを使用してパスワードをハッシュ化します
+ * bcryptjs を使用したセキュアなパスワードハッシュ化
+ * レガシー SHA-256 ハッシュとの後方互換性を維持
  */
 
+import bcrypt from 'bcryptjs';
+
+const BCRYPT_ROUNDS = 12;
+
 /**
- * パスワードをハッシュ化
- * @param password 平文のパスワード
- * @returns ハッシュ化されたパスワード（Base64形式）
+ * パスワードをbcryptでハッシュ化
  */
 export async function hashPassword(password: string): Promise<string> {
-  console.log('[hashPassword] Input length:', password.length);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  console.log('[hashPassword] Encoded data length:', data.length);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  console.log('[hashPassword] Result hash:', hashHex.substring(0, 16) + '...');
-  return hashHex;
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 /**
- * パスワードを検証
- * @param password 平文のパスワード
- * @param hash ハッシュ化されたパスワード
- * @returns 一致するかどうか
+ * パスワードを検証（bcrypt + レガシーSHA-256対応）
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
+  // bcryptハッシュは $2a$ or $2b$ で始まる
+  if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
+    return bcrypt.compare(password, hash);
+  }
+
+  // レガシー SHA-256 ハッシュ（64文字hex）
+  if (hash.length === 64 && /^[0-9a-f]+$/.test(hash)) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex === hash;
+  }
+
+  return false;
 }
 
-
-
-
-
-
-
-
+/**
+ * レガシーSHA-256ハッシュかどうかを判定
+ */
+export function isLegacyHash(hash: string): boolean {
+  return hash.length === 64 && /^[0-9a-f]+$/.test(hash);
+}

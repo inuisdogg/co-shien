@@ -16,8 +16,8 @@
 1. **Authentication** → **URL Configuration** に移動
 2. **Redirect URLs** に以下を追加：
    - `http://localhost:3000/auth/callback`
-   - `https://my.co-shien.inu.co.jp/auth/callback`
-   - `https://biz.co-shien.inu.co.jp/auth/callback`
+   - `https://roots.inu.co.jp/career/auth/callback`
+   - `https://roots.inu.co.jp/business/auth/callback`
    - 開発環境のURL（例: `https://your-project.supabase.co/auth/callback`）
 
 ### 3. メール送信の設定

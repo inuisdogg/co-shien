@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { runDeductionCheck, type DeductionCheckResult } from '@/lib/deductionEngine';
+import { checkQualificationExpiry, type QualificationCheckResult } from '@/lib/qualificationTracker';
+import { checkCommitteeMeetings, type CommitteeCheckResult } from '@/lib/committeeTracker';
 import {
   FileText,
   AlertTriangle,
@@ -123,7 +126,7 @@ function getDaysUntilDeadline(deadlineStr: string): number {
 }
 
 export default function ComplianceManagement({ facilityId }: ComplianceManagementProps) {
-  const [activeTab, setActiveTab] = useState<'lifecycle' | 'alerts' | 'documents' | 'history'>('lifecycle');
+  const [activeTab, setActiveTab] = useState<'lifecycle' | 'alerts' | 'documents' | 'history' | 'deduction'>('lifecycle');
   const [additionSettings, setAdditionSettings] = useState<FacilityAdditionSetting[]>([]);
   const [allAdditions, setAllAdditions] = useState<Addition[]>([]);
   const [deadlineAlerts, setDeadlineAlerts] = useState<DeadlineAlert[]>([]);
@@ -132,6 +135,10 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
   const [loading, setLoading] = useState(true);
   const [selectedAddition, setSelectedAddition] = useState<FacilityAdditionSetting | null>(null);
   const [historyDate, setHistoryDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [deductionResult, setDeductionResult] = useState<DeductionCheckResult | null>(null);
+  const [qualificationResult, setQualificationResult] = useState<QualificationCheckResult | null>(null);
+  const [committeeResult, setCommitteeResult] = useState<CommitteeCheckResult | null>(null);
+  const [deductionLoading, setDeductionLoading] = useState(false);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -198,6 +205,37 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Fetch deduction/compliance risk data
+  const fetchDeductionRisks = useCallback(async () => {
+    setDeductionLoading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: facilityData } = await supabase
+        .from('facility_settings')
+        .select('capacity')
+        .eq('facility_id', facilityId)
+        .single();
+      const capacity = facilityData?.capacity || 10;
+
+      const [deduction, qualification, committee] = await Promise.all([
+        runDeductionCheck(facilityId, today, capacity),
+        checkQualificationExpiry(facilityId),
+        checkCommitteeMeetings(facilityId),
+      ]);
+      setDeductionResult(deduction);
+      setQualificationResult(qualification);
+      setCommitteeResult(committee);
+    } catch (error) {
+      console.error('Error fetching deduction risks:', error);
+    } finally {
+      setDeductionLoading(false);
+    }
+  }, [facilityId]);
+
+  useEffect(() => {
+    fetchDeductionRisks();
+  }, [fetchDeductionRisks]);
 
   // Update addition status
   const updateAdditionStatus = async (settingId: string, newStatus: string, additionalData?: Partial<FacilityAdditionSetting>) => {
@@ -768,6 +806,144 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
     );
   };
 
+  // Render deduction risk tab
+  const renderDeductionTab = () => {
+    if (deductionLoading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+        </div>
+      );
+    }
+
+    const totalRisks = (deductionResult?.risks.length || 0) +
+      (qualificationResult?.summary.expired || 0) + (qualificationResult?.summary.urgentCount || 0) +
+      (committeeResult?.summary.overdueCount || 0);
+
+    return (
+      <div className="space-y-6">
+        {/* Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`p-4 rounded-lg border ${deductionResult && deductionResult.risks.length > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className={`w-5 h-5 ${deductionResult && deductionResult.risks.length > 0 ? 'text-red-600' : 'text-green-600'}`} />
+              <span className="font-bold text-gray-800">減算リスク</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">{deductionResult?.risks.length || 0}件</p>
+            {deductionResult && deductionResult.summary.criticalCount > 0 && (
+              <p className="text-xs text-red-600 mt-1">{deductionResult.summary.estimatedImpact}</p>
+            )}
+          </div>
+          <div className={`p-4 rounded-lg border ${qualificationResult && (qualificationResult.summary.expired > 0 || qualificationResult.summary.urgentCount > 0) ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+            <div className="flex items-center gap-2">
+              <Clock className={`w-5 h-5 ${qualificationResult && qualificationResult.summary.expired > 0 ? 'text-red-600' : 'text-amber-600'}`} />
+              <span className="font-bold text-gray-800">資格期限</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">
+              {(qualificationResult?.summary.expired || 0) + (qualificationResult?.summary.urgentCount || 0) + (qualificationResult?.summary.warningCount || 0)}件
+            </p>
+            {qualificationResult && qualificationResult.summary.expired > 0 && (
+              <p className="text-xs text-red-600 mt-1">{qualificationResult.summary.expired}件期限切れ</p>
+            )}
+          </div>
+          <div className={`p-4 rounded-lg border ${committeeResult && committeeResult.summary.overdueCount > 0 ? 'bg-orange-50 border-orange-200' : 'bg-green-50 border-green-200'}`}>
+            <div className="flex items-center gap-2">
+              <Calendar className={`w-5 h-5 ${committeeResult && committeeResult.summary.overdueCount > 0 ? 'text-orange-600' : 'text-green-600'}`} />
+              <span className="font-bold text-gray-800">委員会開催</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">{committeeResult?.alerts.length || 0}件追跡中</p>
+            {committeeResult && committeeResult.summary.overdueCount > 0 && (
+              <p className="text-xs text-orange-600 mt-1">{committeeResult.summary.overdueCount}件開催遅延</p>
+            )}
+          </div>
+        </div>
+
+        {/* Deduction Risks */}
+        {deductionResult && deductionResult.risks.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-100 bg-red-50">
+              <h3 className="font-bold text-red-800 flex items-center gap-2"><AlertTriangle className="w-4 h-4" />減算リスク検出</h3>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {deductionResult.risks.map(risk => (
+                <div key={risk.code} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${risk.level === 'critical' ? 'bg-red-100 text-red-700' : risk.level === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {risk.level === 'critical' ? '重大' : risk.level === 'warning' ? '注意' : '情報'}
+                        </span>
+                        <span className="font-bold text-gray-800">{risk.name}</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{risk.details}</p>
+                      <p className="text-xs text-gray-400 mt-1">推奨: {risk.recommendation}</p>
+                    </div>
+                    <span className="text-sm font-bold text-red-600 whitespace-nowrap">{Math.round(risk.impactRate * 100)}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Qualification Alerts */}
+        {qualificationResult && qualificationResult.alerts.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-100 bg-amber-50">
+              <h3 className="font-bold text-amber-800 flex items-center gap-2"><Clock className="w-4 h-4" />資格期限アラート</h3>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {qualificationResult.alerts.map((alert, i) => (
+                <div key={i} className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-800">{alert.staffName} - {alert.qualificationName}</p>
+                    <p className="text-sm text-gray-500">期限: {alert.expiryDate}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-bold ${alert.level === 'expired' ? 'bg-red-100 text-red-700' : alert.level === 'urgent' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    {alert.level === 'expired' ? '期限切れ' : `残${alert.daysUntilExpiry}日`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Committee Status */}
+        {committeeResult && committeeResult.alerts.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-100 bg-blue-50">
+              <h3 className="font-bold text-blue-800 flex items-center gap-2"><Calendar className="w-4 h-4" />委員会開催状況</h3>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {committeeResult.alerts.map(alert => (
+                <div key={alert.committeeType} className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-800">{alert.committeeName}</p>
+                    <p className="text-sm text-gray-500">
+                      今期: {alert.meetingsInPeriod}/{alert.requiredInPeriod}回開催
+                      {alert.lastMeetingDate && ` (最終: ${alert.lastMeetingDate})`}
+                    </p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-bold ${alert.level === 'overdue' ? 'bg-red-100 text-red-700' : alert.level === 'upcoming' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                    {alert.level === 'overdue' ? '開催遅延' : alert.level === 'upcoming' ? `残${alert.daysUntilDue}日` : '充足'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {totalRisks === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-400" />
+            <p className="font-bold text-green-600">リスクは検出されませんでした</p>
+            <p className="text-sm mt-1">全てのコンプライアンスチェックに合格しています</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -793,6 +969,7 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
           { id: 'alerts', label: '締切アラート', icon: Bell, badge: deadlineAlerts.length },
           { id: 'documents', label: '書類生成', icon: FileText },
           { id: 'history', label: '履歴確認', icon: History },
+          { id: 'deduction', label: '減算リスク', icon: AlertTriangle, badge: deductionResult?.summary.criticalCount },
         ].map(tab => (
           <button
             key={tab.id}
@@ -820,6 +997,7 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
         {activeTab === 'alerts' && renderAlertsTab()}
         {activeTab === 'documents' && renderDocumentsTab()}
         {activeTab === 'history' && renderHistoryTab()}
+        {activeTab === 'deduction' && renderDeductionTab()}
       </div>
     </div>
   );

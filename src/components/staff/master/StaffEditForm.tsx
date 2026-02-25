@@ -41,6 +41,9 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
     role: '一般スタッフ' as Staff['role'],
     phone: '',
     email: '',
+    permissions: {
+      facilityManagement: false,
+    },
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -55,6 +58,9 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
         role: staff.role || '一般スタッフ',
         phone: staff.phone || '',
         email: staff.email || '',
+        permissions: {
+          facilityManagement: (staff as any).permissions?.facilityManagement || false,
+        },
       });
     } else {
       // 新規作成時はリセット
@@ -65,6 +71,9 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
         role: '一般スタッフ',
         phone: '',
         email: '',
+        permissions: {
+          facilityManagement: false,
+        },
       });
     }
     setErrors({});
@@ -92,13 +101,16 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
 
     if (!validate()) return;
 
-    const data: Partial<Staff> = {
+    const data: Partial<Staff> & { permissions?: Record<string, boolean> } = {
       name: formData.name.trim(),
       nameKana: formData.nameKana.trim() || undefined,
       type: formData.type,
       role: formData.role,
       phone: formData.phone.trim() || undefined,
       email: formData.email.trim() || undefined,
+      permissions: formData.role === '管理者'
+        ? { facilityManagement: true } // 管理者は自動的に有効
+        : formData.permissions,
     };
 
     const success = await onSave(data);
@@ -214,6 +226,32 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
                     </select>
                   </div>
                 </div>
+
+                {/* 施設管理アクセス権（管理者以外に表示） */}
+                {formData.role !== '管理者' && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.permissions.facilityManagement}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            permissions: {
+                              ...formData.permissions,
+                              facilityManagement: e.target.checked,
+                            },
+                          })
+                        }
+                        className="w-4 h-4 text-teal-500 border-gray-300 rounded focus:ring-teal-500"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">施設管理画面へのアクセス</span>
+                        <p className="text-xs text-gray-500">有効にすると、キャリアアプリから施設管理画面にアクセスできます</p>
+                      </div>
+                    </label>
+                  </div>
+                )}
               </div>
             </section>
 

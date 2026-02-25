@@ -300,7 +300,7 @@ export default function CertificatePdfGenerator({ data, onClose, showDownloadOnl
             <div className="mt-16 text-xs text-gray-500 text-center">
               {data.signedAt ? (
                 <>
-                  <p>この証明書は co-shien 電子署名システムにより発行されました</p>
+                  <p>この証明書は Roots 電子署名システムにより発行されました</p>
                   <p className="mt-1">Document ID: {data.id}</p>
                 </>
               ) : (

@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { validateGeofence, getCurrentPosition } from '@/lib/geoFence';
 import {
   EmploymentRecord,
   FacilityWorkToolSettings,
@@ -311,28 +312,84 @@ export function usePersonalData(): UsePersonalDataReturn {
     }
   }, [user?.id, authLoading]);
 
+  // GPS座標情報の型
+  type GpsData = {
+    latitude: number;
+    longitude: number;
+    geoValidated: boolean;
+    geoDistanceMeters: number;
+  };
+
   // 打刻処理の共通関数（ローカルステートを即座に更新、リロードなし）
-  const recordAttendance = async (facilityId: string, type: AttendanceType) => {
-    if (!user?.id) throw new Error('ログインが必要です');
+  const recordAttendance = async (facilityId: string, type: AttendanceType, gpsData?: GpsData) => {
+    console.log('recordAttendance called:', { facilityId, type, userId: user?.id });
+
+    if (!user?.id) {
+      console.error('ユーザーIDがありません');
+      throw new Error('ログインが必要です');
+    }
 
     const now = new Date();
     const date = now.toISOString().split('T')[0];
     const time = now.toTimeString().slice(0, 5); // HH:mm
 
-    const { error } = await supabase
+    console.log('打刻データ:', { user_id: user.id, facility_id: facilityId, date, type, time });
+
+    // まず既存のレコードを確認
+    const { data: existing } = await supabase
       .from('attendance_records')
-      .upsert({
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('facility_id', facilityId)
+      .eq('date', date)
+      .eq('type', type)
+      .single();
+
+    let error;
+    if (existing) {
+      // 既存レコードがあれば更新
+      const updateData: Record<string, unknown> = {
+        time,
+        updated_at: now.toISOString(),
+      };
+      if (gpsData) {
+        updateData.location_lat = gpsData.latitude;
+        updateData.location_lng = gpsData.longitude;
+        updateData.geo_validated = gpsData.geoValidated;
+        updateData.geo_distance_meters = gpsData.geoDistanceMeters;
+      }
+      const result = await supabase
+        .from('attendance_records')
+        .update(updateData)
+        .eq('id', existing.id);
+      error = result.error;
+    } else {
+      // 新規レコードを挿入
+      const insertData: Record<string, unknown> = {
         user_id: user.id,
         facility_id: facilityId,
         date,
         type,
         time,
-        recorded_at: now.toISOString(),
-      }, {
-        onConflict: 'user_id,facility_id,date,type',
-      });
+      };
+      if (gpsData) {
+        insertData.location_lat = gpsData.latitude;
+        insertData.location_lng = gpsData.longitude;
+        insertData.geo_validated = gpsData.geoValidated;
+        insertData.geo_distance_meters = gpsData.geoDistanceMeters;
+      }
+      const result = await supabase
+        .from('attendance_records')
+        .insert(insertData);
+      error = result.error;
+    }
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase insert/update error:', error);
+      throw error;
+    }
+
+    console.log('打刻成功');
 
     // ローカルステートを即座に更新（リロードなし）
     setFacilities(prev => prev.map(facility => {
@@ -379,24 +436,84 @@ export function usePersonalData(): UsePersonalDataReturn {
     }
   };
 
-  // 始業打刻
+  // 始業打刻（ジオフェンス検証付き）
   const clockIn = async (facilityId: string) => {
-    await recordAttendance(facilityId, 'start');
+    try {
+      // ジオフェンス検証を実行
+      const geoResult = await validateGeofence(facilityId);
+
+      if (!geoResult.isValid) {
+        // 位置情報エラーの場合はユーザーに通知して中止
+        const errorMessage = geoResult.error || '施設の範囲外です。';
+        alert(`出勤打刻できません:\n${errorMessage}`);
+        console.warn('ジオフェンス検証失敗:', geoResult);
+        return;
+      }
+
+      // GPS座標データを作成（位置情報が取得できた場合）
+      const gpsData: GpsData | undefined =
+        geoResult.userLocation.lat !== 0 || geoResult.userLocation.lng !== 0
+          ? {
+              latitude: geoResult.userLocation.lat,
+              longitude: geoResult.userLocation.lng,
+              geoValidated: geoResult.isValid,
+              geoDistanceMeters: geoResult.distance >= 0 ? geoResult.distance : 0,
+            }
+          : undefined;
+
+      await recordAttendance(facilityId, 'start', gpsData);
+      console.log('出勤打刻成功:', facilityId, geoResult.distance >= 0 ? `(距離: ${geoResult.distance}m)` : '');
+    } catch (error) {
+      console.error('出勤打刻エラー:', error);
+      alert('出勤の記録に失敗しました。ページを再読み込みしてください。');
+    }
   };
 
-  // 退勤打刻
+  // 退勤打刻（ジオフェンスはブロックしない、GPS座標のみ記録）
   const clockOut = async (facilityId: string) => {
-    await recordAttendance(facilityId, 'end');
+    try {
+      // GPS座標の記録を試みるが、失敗しても打刻は続行
+      let gpsData: GpsData | undefined;
+      try {
+        const position = await getCurrentPosition();
+        gpsData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          geoValidated: false, // 退勤時はジオフェンス検証しない
+          geoDistanceMeters: 0,
+        };
+      } catch (gpsError) {
+        console.warn('退勤時のGPS取得失敗（打刻は続行）:', gpsError);
+      }
+
+      await recordAttendance(facilityId, 'end', gpsData);
+      console.log('退勤打刻成功:', facilityId);
+    } catch (error) {
+      console.error('退勤打刻エラー:', error);
+      alert('退勤の記録に失敗しました。ページを再読み込みしてください。');
+    }
   };
 
   // 休憩開始
   const startBreak = async (facilityId: string) => {
-    await recordAttendance(facilityId, 'break_start');
+    try {
+      await recordAttendance(facilityId, 'break_start');
+      console.log('休憩開始打刻成功:', facilityId);
+    } catch (error) {
+      console.error('休憩開始打刻エラー:', error);
+      alert('休憩開始の記録に失敗しました。ページを再読み込みしてください。');
+    }
   };
 
   // 休憩終了
   const endBreak = async (facilityId: string) => {
-    await recordAttendance(facilityId, 'break_end');
+    try {
+      await recordAttendance(facilityId, 'break_end');
+      console.log('休憩終了打刻成功:', facilityId);
+    } catch (error) {
+      console.error('休憩終了打刻エラー:', error);
+      alert('休憩終了の記録に失敗しました。ページを再読み込みしてください。');
+    }
   };
 
   // 勤怠履歴取得

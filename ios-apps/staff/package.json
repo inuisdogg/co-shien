@@ -1,7 +1,7 @@
 {
-  "name": "co-shien-staff-ios",
+  "name": "roots-staff-ios",
   "version": "1.0.0",
-  "description": "co-shien スタッフ向けiOSアプリ",
+  "description": "roots スタッフ向けiOSアプリ",
   "scripts": {
     "add-ios": "npx cap add ios",
     "sync": "npx cap sync ios",

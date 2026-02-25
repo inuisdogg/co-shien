@@ -15,18 +15,18 @@
 
 #### メールテンプレートのカスタマイズ（オプション）
 - 「Email Templates」セクションで確認メールのテンプレートをカスタマイズ可能
-- リダイレクトURLを設定：`https://biz.co-shien.inu.co.jp/setup?type=confirm`（Biz側）
-- リダイレクトURLを設定：`https://my.co-shien.inu.co.jp/setup?type=confirm`（Personal側）
+- リダイレクトURLを設定：`https://roots.inu.co.jp/business/setup?type=confirm`（Biz側）
+- リダイレクトURLを設定：`https://roots.inu.co.jp/career/setup?type=confirm`（Personal側）
 
 ### リダイレクトURLの設定
 
 1. 「Authentication」→「URL Configuration」に移動
 2. 「Redirect URLs」に以下を追加：
    ```
-   https://biz.co-shien.inu.co.jp/setup
-   https://my.co-shien.inu.co.jp/setup
-   https://biz.co-shien.inu.co.jp/setup?type=confirm
-   https://my.co-shien.inu.co.jp/setup?type=confirm
+   https://roots.inu.co.jp/business/setup
+   https://roots.inu.co.jp/career/setup
+   https://roots.inu.co.jp/business/setup?type=confirm
+   https://roots.inu.co.jp/career/setup?type=confirm
    ```
 
 ### メール送信設定

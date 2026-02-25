@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'co-shien ビジネス',
+  title: 'Roots ビジネス',
   description: '児童発達支援 - 施設管理向け',
   manifest: '/business/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'co-shien ビジネス',
+    title: 'Roots ビジネス',
   },
 };
 

@@ -14,8 +14,8 @@ const inter = Inter({ subsets: ['latin'] });
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'co-shien - 児童発達支援管理システム',
-  description: '児童発達支援事業所向けの管理システム',
+  title: 'Roots - 児童福祉施設向けSaaS',
+  description: '施設運営・スタッフキャリア・保護者連携を一元管理',
   icons: {
     icon: '/favicon.png',
   },
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'co-shien',
+    title: 'Roots',
   },
 };
 

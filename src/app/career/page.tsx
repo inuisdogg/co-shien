@@ -43,18 +43,11 @@ import { User as UserType, EmploymentRecord, FacilitySettings, WorkToolId } from
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import { getBizBaseUrl } from '@/utils/domain';
 import { Shield, Download, Loader2, Eye } from 'lucide-react';
-import ExpenseReportView from '@/components/staff/ExpenseReportView';
-import FacilityWorkTools from '@/components/personal/FacilityWorkTools';
 import WorkExperienceForm from '@/components/personal/WorkExperienceForm';
 import AttendanceCalendar from '@/components/personal/AttendanceCalendar';
 import ShiftConfirmationView from '@/components/personal/ShiftConfirmationView';
 import ShiftAvailabilityForm from '@/components/personal/ShiftAvailabilityForm';
-import PayslipView from '@/components/personal/PayslipView';
-import DailyReportView from '@/components/personal/DailyReportView';
-import KnowledgeBaseView from '@/components/knowledge/KnowledgeBaseView';
-import TrainingRecordView from '@/components/personal/TrainingRecordView';
-import TaskManagementView from '@/components/personal/TaskManagementView';
-import DocumentOutputView from '@/components/personal/DocumentOutputView';
+import LeaveRequestForm from '@/components/personal/LeaveRequestForm';
 import { usePersonalData } from '@/hooks/usePersonalData';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -128,11 +121,8 @@ export default function PersonalDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [currentFacility, setCurrentFacility] = useState<EmploymentRecord | null>(null);
-  const [timeTrackingStatus, setTimeTrackingStatus] = useState<'idle' | 'working' | 'break'>('idle');
   const [activeTab, setActiveTab] = useState<'home' | 'career' | 'work' | 'settings'>('home');
 
-  // 業務タブ用：経費表示フラグと選択中の施設ID
-  const [showExpenseForFacility, setShowExpenseForFacility] = useState<string | null>(null);
 
   // 通知・アクション用の状態
   interface PersonalNotification {
@@ -166,23 +156,10 @@ export default function PersonalDashboardPage() {
   const [shiftConfirmationFacilityId, setShiftConfirmationFacilityId] = useState<string | null>(null);
   const [showShiftAvailabilityForm, setShowShiftAvailabilityForm] = useState(false);
   const [shiftAvailabilityFacility, setShiftAvailabilityFacility] = useState<{ id: string; name: string } | null>(null);
+  const [showLeaveRequest, setShowLeaveRequest] = useState(false);
+  const [leaveRequestFacility, setLeaveRequestFacility] = useState<{ id: string; name: string } | null>(null);
   const [facilitySettings, setFacilitySettings] = useState<Partial<FacilitySettings> | null>(null);
 
-  // 業務ツール表示用の状態
-  const [showPayslipForFacility, setShowPayslipForFacility] = useState<{ id: string; name: string } | null>(null);
-  const [showKnowledgeBaseForFacility, setShowKnowledgeBaseForFacility] = useState<{ id: string; name: string } | null>(null);
-  const [showDailyReportForFacility, setShowDailyReportForFacility] = useState<{ id: string; name: string } | null>(null);
-  const [showTrainingRecordForFacility, setShowTrainingRecordForFacility] = useState<{ id: string; name: string } | null>(null);
-  const [showTaskManagementForFacility, setShowTaskManagementForFacility] = useState<{ id: string; name: string } | null>(null);
-  const [showDocumentOutputForFacility, setShowDocumentOutputForFacility] = useState<{ id: string; name: string } | null>(null);
-  const [todayAttendance, setTodayAttendance] = useState<{
-    startTime?: string;
-    endTime?: string;
-    breakStartTime?: string;
-    breakEndTime?: string;
-    totalWorkMinutes: number;
-  }>({ totalWorkMinutes: 0 });
-  
   // キャリアタブ用の状態
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -748,183 +725,10 @@ export default function PersonalDashboardPage() {
     fetchNotifications();
   }, [user?.id, activeEmployments]);
 
-  // 本日の勤怠データを読み込む
-  useEffect(() => {
-    if (!user || !currentFacility) return;
-
-    const loadTodayAttendance = () => {
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const records = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-        const todayRecords = records.filter((r: any) => 
-          r.user_id === user.id && 
-          r.facility_id === currentFacility?.facilityId &&
-          r.date === today
-        );
-
-        let startTime: string | undefined;
-        let endTime: string | undefined;
-        let breakStartTime: string | undefined;
-        let breakEndTime: string | undefined;
-        let currentStatus: 'idle' | 'working' | 'break' = 'idle';
-
-        // 最新の打刻記録からステータスを判定
-        const sortedRecords = todayRecords.sort((a: any, b: any) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-
-        for (const record of sortedRecords) {
-          if (record.type === 'start' && !startTime) {
-            startTime = record.time;
-            currentStatus = 'working';
-          } else if (record.type === 'end' && !endTime) {
-            endTime = record.time;
-            currentStatus = 'idle';
-          } else if (record.type === 'break_start' && !breakStartTime) {
-            breakStartTime = record.time;
-            currentStatus = 'break';
-          } else if (record.type === 'break_end' && !breakEndTime) {
-            breakEndTime = record.time;
-            currentStatus = 'working';
-          }
-        }
-
-        // 勤務時間を計算
-        let totalMinutes = 0;
-        if (startTime) {
-          const start = new Date(`${today}T${startTime}:00`);
-          const end = endTime ? new Date(`${today}T${endTime}:00`) : new Date();
-          const workMinutes = Math.floor((end.getTime() - start.getTime()) / (1000 * 60));
-          
-          // 休憩時間を差し引く
-          if (breakStartTime && breakEndTime) {
-            const breakStart = new Date(`${today}T${breakStartTime}:00`);
-            const breakEnd = new Date(`${today}T${breakEndTime}:00`);
-            const breakMinutes = Math.floor((breakEnd.getTime() - breakStart.getTime()) / (1000 * 60));
-            totalMinutes = Math.max(0, workMinutes - breakMinutes);
-          } else if (breakStartTime && !breakEndTime) {
-            // 休憩中の場合、休憩開始時刻までを計算
-            const breakStart = new Date(`${today}T${breakStartTime}:00`);
-            const workMinutesBeforeBreak = Math.floor((breakStart.getTime() - start.getTime()) / (1000 * 60));
-            totalMinutes = workMinutesBeforeBreak;
-          } else {
-            totalMinutes = workMinutes;
-          }
-        }
-
-        setTodayAttendance({
-          startTime,
-          endTime,
-          breakStartTime,
-          breakEndTime,
-          totalWorkMinutes: totalMinutes,
-        });
-        setTimeTrackingStatus(currentStatus);
-      } catch (err) {
-        console.error('勤怠データ読み込みエラー:', err);
-      }
-    };
-
-    loadTodayAttendance();
-    // 定期的に更新（1分ごと）
-    const interval = setInterval(loadTodayAttendance, 60000);
-    return () => clearInterval(interval);
-  }, [user, currentFacility]);
-
   // ログアウト処理
   const handleLogout = () => {
     localStorage.removeItem('user');
     router.push('/career/login');
-  };
-
-  // 打刻処理
-  const handleTimeTracking = async (type: 'start' | 'end' | 'break_start' | 'break_end') => {
-    if (!user || !currentFacility) return;
-    
-    try {
-      const now = new Date();
-      const timeString = now.toTimeString().slice(0, 5);
-      
-      // 打刻データを保存（暫定：後でattendance_recordsテーブルを作成）
-      // 現時点ではlocalStorageに保存（後でDBに移行）
-      const attendanceData = {
-        user_id: user.id,
-        facility_id: currentFacility.facilityId,
-        date: now.toISOString().split('T')[0],
-        type,
-        time: timeString,
-        timestamp: now.toISOString(),
-      };
-      
-      const existingRecords = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-      existingRecords.push(attendanceData);
-      localStorage.setItem('attendance_records', JSON.stringify(existingRecords));
-      
-      // ステータス更新
-      if (type === 'start') {
-        setTimeTrackingStatus('working');
-      } else if (type === 'end') {
-        setTimeTrackingStatus('idle');
-      } else if (type === 'break_start') {
-        setTimeTrackingStatus('break');
-      } else if (type === 'break_end') {
-        setTimeTrackingStatus('working');
-      }
-
-      // 本日の勤怠データを再読み込み
-      const today = now.toISOString().split('T')[0];
-      const records = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-      const todayRecords = records.filter((r: any) => 
-        r.user_id === user.id && 
-        r.facility_id === currentFacility.facilityId &&
-        r.date === today
-      );
-
-      let startTime: string | undefined;
-      let endTime: string | undefined;
-      let breakStartTime: string | undefined;
-      let breakEndTime: string | undefined;
-
-      for (const record of todayRecords) {
-        if (record.type === 'start') startTime = record.time;
-        if (record.type === 'end') endTime = record.time;
-        if (record.type === 'break_start') breakStartTime = record.time;
-        if (record.type === 'break_end') breakEndTime = record.time;
-      }
-
-      // 勤務時間を計算
-      let totalMinutes = 0;
-      if (startTime) {
-        const start = new Date(`${today}T${startTime}:00`);
-        const end = endTime ? new Date(`${today}T${endTime}:00`) : new Date();
-        const workMinutes = Math.floor((end.getTime() - start.getTime()) / (1000 * 60));
-        
-        if (breakStartTime && breakEndTime) {
-          const breakStart = new Date(`${today}T${breakStartTime}:00`);
-          const breakEnd = new Date(`${today}T${breakEndTime}:00`);
-          const breakMinutes = Math.floor((breakEnd.getTime() - breakStart.getTime()) / (1000 * 60));
-          totalMinutes = Math.max(0, workMinutes - breakMinutes);
-        } else if (breakStartTime && !breakEndTime) {
-          const breakStart = new Date(`${today}T${breakStartTime}:00`);
-          const workMinutesBeforeBreak = Math.floor((breakStart.getTime() - start.getTime()) / (1000 * 60));
-          totalMinutes = workMinutesBeforeBreak;
-        } else {
-          totalMinutes = workMinutes;
-        }
-      }
-
-      setTodayAttendance({
-        startTime,
-        endTime,
-        breakStartTime,
-        breakEndTime,
-        totalWorkMinutes: totalMinutes,
-      });
-      
-      // TODO: 後でattendance_recordsテーブルに保存する処理を追加
-    } catch (err) {
-      console.error('打刻エラー:', err);
-    }
   };
 
   // リダイレクト中は何も表示しない
@@ -951,7 +755,7 @@ export default function PersonalDashboardPage() {
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Image src="/logo-cropped-center.png" alt="co-shien" width={120} height={32} className="h-8 w-auto object-contain" priority />
+              <Image src="/logo.svg" alt="Roots" width={120} height={32} className="h-8 w-auto object-contain" priority />
               <span className="text-xs font-bold px-2 py-1 rounded bg-[#818CF8] text-white">
                 キャリア
               </span>
@@ -1039,7 +843,7 @@ export default function PersonalDashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="font-bold">プラットフォームオーナー</p>
-                <p className="text-sm text-white/70">co-shienの全体管理権限を持っています</p>
+                <p className="text-sm text-white/70">Rootsの全体管理権限を持っています</p>
               </div>
               <button
                 onClick={() => router.push('/admin')}
@@ -1093,9 +897,9 @@ export default function PersonalDashboardPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-6 text-gray-500">
+            <div className="text-center py-6">
               <Building2 className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-              <p className="text-sm">所属施設がありません</p>
+              <p className="text-sm text-gray-500">所属施設がありません</p>
               <p className="text-xs text-gray-400 mt-1">施設から招待を受けると、ここに表示されます</p>
             </div>
           )}
@@ -1260,6 +1064,23 @@ export default function PersonalDashboardPage() {
             setShiftAvailabilityFacility(null);
           }}
         />
+      )}
+
+      {/* 休暇申請モーダル */}
+      {showLeaveRequest && leaveRequestFacility && user && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full max-h-[95vh] overflow-y-auto bg-white rounded-xl">
+            <LeaveRequestForm
+              userId={user.id}
+              facilityId={leaveRequestFacility.id}
+              facilityName={leaveRequestFacility.name}
+              onClose={() => {
+                setShowLeaveRequest(false);
+                setLeaveRequestFacility(null);
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {activeTab === 'career' && (
@@ -2394,197 +2215,236 @@ export default function PersonalDashboardPage() {
       )}
 
       {activeTab === 'work' && (
-        <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
-          {showExpenseForFacility ? (
-            // 経費精算ビュー
-            <div>
-              <button
-                onClick={() => setShowExpenseForFacility(null)}
-                className="flex items-center gap-2 text-[#818CF8] font-bold mb-4 hover:underline"
-              >
-                <span>&#8592;</span> 業務ツールに戻る
-              </button>
-              <ExpenseReportView
-                userId={user?.id || ''}
-                staffId={currentFacility?.id || ''}
-                facilityId={showExpenseForFacility}
-                staffName={user?.name || ''}
-              />
+        <div className="max-w-lg mx-auto px-4 py-6 pb-24">
+          {personalFacilities.length > 0 ? (
+            <div className="space-y-8">
+              {/* 勤怠打刻エリア */}
+              {personalFacilities.map((facility) => {
+                const attendance = facility.todayAttendance;
+                const status = attendance?.status || 'not_started';
+
+                return (
+                  <div key={facility.facilityId}>
+                    {/* 施設名とステータス */}
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-900">{facility.facilityName}</h2>
+                        <p className="text-sm text-gray-500">{facility.employmentRecord.role}</p>
+                      </div>
+                      <span className={`text-sm font-medium ${
+                        status === 'completed' ? 'text-gray-500' :
+                        status === 'working' ? 'text-[#818CF8]' :
+                        status === 'on_break' ? 'text-amber-600' :
+                        'text-gray-400'
+                      }`}>
+                        {status === 'completed' ? '退勤済' :
+                         status === 'working' ? '勤務中' :
+                         status === 'on_break' ? '休憩中' :
+                         '未出勤'}
+                      </span>
+                    </div>
+
+                    {/* 打刻時間表示 */}
+                    {attendance?.startTime && (
+                      <div className="flex items-center gap-6 mb-6 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#818CF8]"></div>
+                          <span className="text-gray-600">出勤</span>
+                          <span className="font-mono font-medium text-gray-900">{attendance.startTime}</span>
+                        </div>
+                        {attendance.breakStartTime && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                            <span className="text-gray-600">休憩</span>
+                            <span className="font-mono font-medium text-gray-900">
+                              {attendance.breakStartTime}{attendance.breakEndTime && `〜${attendance.breakEndTime}`}
+                            </span>
+                          </div>
+                        )}
+                        {attendance.endTime && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                            <span className="text-gray-600">退勤</span>
+                            <span className="font-mono font-medium text-gray-900">{attendance.endTime}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 勤怠ボタン */}
+                    <div className="grid grid-cols-4 gap-3">
+                      {/* 出勤 */}
+                      <button
+                        type="button"
+                        onClick={() => clockIn(facility.facilityId)}
+                        disabled={status !== 'not_started'}
+                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
+                          status !== 'not_started'
+                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
+                            : 'bg-white border-[#818CF8] text-[#818CF8] hover:bg-[#818CF8] hover:text-white active:scale-95'
+                        } ${status === 'working' || status === 'on_break' || status === 'completed' ? 'bg-[#818CF8]/10 border-[#818CF8] text-[#818CF8]' : ''}`}
+                      >
+                        <PlayCircle className="w-8 h-8" strokeWidth={1.5} />
+                        <span className="text-xs font-bold">出勤</span>
+                      </button>
+
+                      {/* 休憩開始 */}
+                      <button
+                        type="button"
+                        onClick={() => startBreak(facility.facilityId)}
+                        disabled={status !== 'working'}
+                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
+                          status !== 'working'
+                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
+                            : 'bg-white border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white active:scale-95'
+                        } ${status === 'on_break' ? 'bg-amber-500/10 border-amber-500 text-amber-500' : ''}`}
+                      >
+                        <Coffee className="w-8 h-8" strokeWidth={1.5} />
+                        <span className="text-xs font-bold">休憩</span>
+                      </button>
+
+                      {/* 休憩終了 */}
+                      <button
+                        type="button"
+                        onClick={() => endBreak(facility.facilityId)}
+                        disabled={status !== 'on_break'}
+                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
+                          status !== 'on_break'
+                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
+                            : 'bg-white border-green-500 text-green-500 hover:bg-green-500 hover:text-white active:scale-95'
+                        }`}
+                      >
+                        <PlayCircle className="w-8 h-8" strokeWidth={1.5} />
+                        <span className="text-xs font-bold">再開</span>
+                      </button>
+
+                      {/* 退勤 */}
+                      <button
+                        type="button"
+                        onClick={() => clockOut(facility.facilityId)}
+                        disabled={status !== 'working' && status !== 'on_break'}
+                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
+                          status !== 'working' && status !== 'on_break'
+                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
+                            : 'bg-white border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white active:scale-95'
+                        } ${status === 'completed' ? 'bg-gray-100 border-gray-400 text-gray-400' : ''}`}
+                      >
+                        <PauseCircle className="w-8 h-8" strokeWidth={1.5} />
+                        <span className="text-xs font-bold">退勤</span>
+                      </button>
+                    </div>
+
+                    {/* 区切り線 */}
+                    <div className="border-t border-gray-100 my-8"></div>
+
+                    {/* クイックアクセス */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* シフト */}
+                      <button
+                        onClick={() => {
+                          setShiftConfirmationFacilityId(facility.facilityId);
+                          setShowShiftConfirmation(true);
+                        }}
+                        className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
+                      >
+                        <Calendar className="w-6 h-6" strokeWidth={1.5} />
+                        <span className="text-xs font-medium">シフト</span>
+                      </button>
+
+                      {/* 勤怠カレンダー */}
+                      <button
+                        onClick={async () => {
+                          const employmentWithFacility = {
+                            ...facility.employmentRecord,
+                            facilityName: facility.facilityName,
+                            facilityCode: facility.facilityCode,
+                          };
+                          setCurrentFacility(employmentWithFacility);
+                          const { data: settings } = await supabase
+                            .from('facilities')
+                            .select('*')
+                            .eq('id', facility.facilityId)
+                            .single();
+                          if (settings) {
+                            setFacilitySettings({
+                              regularHolidays: settings.regular_holidays || [0],
+                              customHolidays: settings.custom_holidays || [],
+                              includeHolidays: settings.include_holidays || false,
+                              holidayPeriods: settings.holiday_periods || [],
+                            });
+                          }
+                          setShowAttendanceCalendar(true);
+                        }}
+                        className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
+                      >
+                        <Calendar className="w-6 h-6" strokeWidth={1.5} />
+                        <span className="text-xs font-medium">勤怠カレンダー</span>
+                      </button>
+
+                      {/* 休暇申請 */}
+                      <button
+                        onClick={() => {
+                          setLeaveRequestFacility({ id: facility.facilityId, name: facility.facilityName });
+                          setShowLeaveRequest(true);
+                        }}
+                        className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
+                      >
+                        <FileText className="w-6 h-6" strokeWidth={1.5} />
+                        <span className="text-xs font-medium">休暇申請</span>
+                      </button>
+
+                      {/* 施設管理（権限を持つスタッフのみ） */}
+                      {(facility.employmentRecord.role === '管理者' ||
+                        facility.employmentRecord.permissions?.facilityManagement === true
+                      ) && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { data: facilityData, error } = await supabase
+                                .from('facilities')
+                                .select('*')
+                                .eq('id', facility.facilityId)
+                                .single();
+                              if (!error && facilityData) {
+                                localStorage.setItem('selectedFacility', JSON.stringify({
+                                  id: facility.facilityId,
+                                  name: facility.facilityName,
+                                  code: facility.facilityCode,
+                                  role: facility.employmentRecord.role,
+                                  facilityId: facility.facilityId,
+                                  facilityName: facility.facilityName,
+                                  facilityCode: facility.facilityCode,
+                                  permissions: facility.employmentRecord.permissions || {},
+                                }));
+                                localStorage.setItem('facility', JSON.stringify({
+                                  id: facilityData.id,
+                                  name: facilityData.name,
+                                  code: facilityData.code || '',
+                                  createdAt: facilityData.created_at || new Date().toISOString(),
+                                  updatedAt: facilityData.updated_at || new Date().toISOString(),
+                                }));
+                                window.location.href = '/business';
+                              }
+                            } catch (err) {
+                              console.error('施設情報の取得エラー:', err);
+                            }
+                          }}
+                          className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
+                        >
+                          <Building2 className="w-6 h-6" strokeWidth={1.5} />
+                          <span className="text-xs font-medium">管理</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ) : showPayslipForFacility ? (
-            // 給与明細ビュー
-            <PayslipView
-              userId={user?.id || ''}
-              facilityId={showPayslipForFacility.id}
-              facilityName={showPayslipForFacility.name}
-              onBack={() => setShowPayslipForFacility(null)}
-            />
-          ) : showKnowledgeBaseForFacility ? (
-            // ナレッジベースビュー
-            <KnowledgeBaseView
-              facilityId={showKnowledgeBaseForFacility.id}
-              facilityName={showKnowledgeBaseForFacility.name}
-              userId={user?.id || ''}
-              userName={user?.name || ''}
-              isAdmin={personalFacilities.find(f => f.facilityId === showKnowledgeBaseForFacility.id)?.employmentRecord.role === '管理者'}
-              onClose={() => setShowKnowledgeBaseForFacility(null)}
-            />
-          ) : showDailyReportForFacility ? (
-            // 日報ビュー
-            <DailyReportView
-              userId={user?.id || ''}
-              facilityId={showDailyReportForFacility.id}
-              facilityName={showDailyReportForFacility.name}
-              onBack={() => setShowDailyReportForFacility(null)}
-            />
-          ) : showTrainingRecordForFacility ? (
-            // 研修記録ビュー
-            <TrainingRecordView
-              userId={user?.id || ''}
-              facilityId={showTrainingRecordForFacility.id}
-              facilityName={showTrainingRecordForFacility.name}
-              onBack={() => setShowTrainingRecordForFacility(null)}
-            />
-          ) : showTaskManagementForFacility ? (
-            // タスク管理ビュー
-            <TaskManagementView
-              userId={user?.id || ''}
-              facilityId={showTaskManagementForFacility.id}
-              facilityName={showTaskManagementForFacility.name}
-              onBack={() => setShowTaskManagementForFacility(null)}
-            />
-          ) : showDocumentOutputForFacility ? (
-            // 書類出力ビュー
-            <DocumentOutputView
-              userId={user?.id || ''}
-              facilityId={showDocumentOutputForFacility.id}
-              facilityName={showDocumentOutputForFacility.name}
-              userName={user?.name || ''}
-              onBack={() => setShowDocumentOutputForFacility(null)}
-            />
           ) : (
-            // 施設別業務ツール
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-800">業務</h2>
-              <FacilityWorkTools
-                facilities={personalFacilities}
-                onClockIn={clockIn}
-                onClockOut={clockOut}
-                onStartBreak={startBreak}
-                onEndBreak={endBreak}
-                onToolClick={async (facilityId, toolId) => {
-                  const facilityData = personalFacilities.find(f => f.facilityId === facilityId);
-
-                  if (toolId === 'expense') {
-                    setShowExpenseForFacility(facilityId);
-                  } else if (toolId === 'attendance_calendar') {
-                    // 勤怠カレンダーを開く（休暇申請もここから）
-                    if (facilityData) {
-                      const employmentWithFacility = {
-                        ...facilityData.employmentRecord,
-                        facilityName: facilityData.facilityName,
-                        facilityCode: facilityData.facilityCode,
-                      };
-                      setCurrentFacility(employmentWithFacility);
-                      const { data: settings } = await supabase
-                        .from('facilities')
-                        .select('*')
-                        .eq('id', facilityId)
-                        .single();
-                      if (settings) {
-                        setFacilitySettings({
-                          regularHolidays: settings.regular_holidays || [0],
-                          customHolidays: settings.custom_holidays || [],
-                          includeHolidays: settings.include_holidays || false,
-                          holidayPeriods: settings.holiday_periods || [],
-                        });
-                      }
-                      setShowAttendanceCalendar(true);
-                    }
-                  } else if (toolId === 'shift_view') {
-                    // シフト確認画面を開く
-                    setShiftConfirmationFacilityId(facilityId);
-                    setShowShiftConfirmation(true);
-                  } else if (toolId === 'biz_dashboard') {
-                    // Bizダッシュボードへ遷移
-                    if (!facilityData) return;
-
-                    // 権限チェック：管理者または何らかの権限がある場合のみアクセス可能
-                    const hasBizAccess =
-                      facilityData.employmentRecord.role === '管理者' ||
-                      Boolean(facilityData.employmentRecord.permissions &&
-                        Object.values(facilityData.employmentRecord.permissions).some(v => v === true));
-
-                    if (!hasBizAccess) {
-                      alert('閲覧権限がありません。\n施設管理者にダッシュボードへのアクセス権限を依頼してください。');
-                      return;
-                    }
-
-                    try {
-                      const { data: facility, error } = await supabase
-                        .from('facilities')
-                        .select('*')
-                        .eq('id', facilityId)
-                        .single();
-                      if (!error && facility) {
-                        localStorage.setItem('selectedFacility', JSON.stringify({
-                          id: facilityId,
-                          name: facilityData.facilityName,
-                          code: facilityData.facilityCode,
-                          role: facilityData.employmentRecord.role,
-                          facilityId: facilityId,
-                          facilityName: facilityData.facilityName,
-                          facilityCode: facilityData.facilityCode,
-                          permissions: facilityData.employmentRecord.permissions || {},
-                        }));
-                        localStorage.setItem('facility', JSON.stringify({
-                          id: facility.id,
-                          name: facility.name,
-                          code: facility.code || '',
-                          createdAt: facility.created_at || new Date().toISOString(),
-                          updatedAt: facility.updated_at || new Date().toISOString(),
-                        }));
-                      } else {
-                        localStorage.setItem('selectedFacility', JSON.stringify({
-                          id: facilityId,
-                          name: facilityData.facilityName,
-                          code: facilityData.facilityCode,
-                          role: facilityData.employmentRecord.role,
-                          facilityId: facilityId,
-                          facilityName: facilityData.facilityName,
-                          facilityCode: facilityData.facilityCode,
-                          permissions: facilityData.employmentRecord.permissions || {},
-                        }));
-                      }
-                    } catch (err) {
-                      console.error('施設情報の取得エラー:', err);
-                      localStorage.setItem('selectedFacility', JSON.stringify({
-                        id: facilityId,
-                        name: facilityData.facilityName,
-                        code: facilityData.facilityCode,
-                        role: facilityData.employmentRecord.role,
-                        facilityId: facilityId,
-                        facilityName: facilityData.facilityName,
-                        facilityCode: facilityData.facilityCode,
-                        permissions: facilityData.employmentRecord.permissions || {},
-                      }));
-                    }
-                    const bizBaseUrl = getBizBaseUrl();
-                    window.location.href = `${bizBaseUrl}/business?facilityId=${facilityId}`;
-                  } else if (toolId === 'payslip') {
-                    // 給与明細
-                    if (facilityData) {
-                      setShowPayslipForFacility({ id: facilityId, name: facilityData.facilityName });
-                    }
-                  } else if (toolId === 'knowledge_base') {
-                    // ナレッジベース
-                    if (facilityData) {
-                      setShowKnowledgeBaseForFacility({ id: facilityId, name: facilityData.facilityName });
-                    }
-                  }
-                }}
-                isLoading={personalDataLoading}
-              />
+            <div className="text-center py-16">
+              <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" strokeWidth={1.5} />
+              <h3 className="text-base font-medium text-gray-800 mb-2">所属施設がありません</h3>
+              <p className="text-gray-400 text-sm">施設から招待を受けると表示されます</p>
             </div>
           )}
         </div>

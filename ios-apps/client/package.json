@@ -1,7 +1,7 @@
 {
-  "name": "co-shien-client-ios",
+  "name": "roots-client-ios",
   "version": "1.0.0",
-  "description": "co-shien 利用者向けiOSアプリ",
+  "description": "roots 利用者向けiOSアプリ",
   "scripts": {
     "add-ios": "npx cap add ios",
     "sync": "npx cap sync ios",

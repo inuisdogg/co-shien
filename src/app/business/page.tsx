@@ -12,36 +12,61 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dynamicImport from 'next/dynamic';
 import Sidebar from '@/components/common/Sidebar';
 import Header from '@/components/common/Header';
+// Lightweight/commonly-used components - static imports
 import DashboardView from '@/components/dashboard/DashboardView';
-import ManagementSettingsView from '@/components/management/ManagementSettingsView';
-import LeadView from '@/components/lead/LeadView';
 import ScheduleView from '@/components/schedule/ScheduleView';
 import ChildrenView from '@/components/children/ChildrenView';
-import TransportRouteView from '@/components/transport/TransportRouteView';
 import { StaffMasterView } from '@/components/staff/master';
 import { ShiftManagementView } from '@/components/staff/shift';
-import { StaffingView } from '@/components/staff/staffing';
 import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
-import ChatManagementView from '@/components/chat/ChatManagementView';
 import DailyLogView from '@/components/logs/DailyLogView';
-import ServicePlanView from '@/components/logs/ServicePlanView';
-import IncidentReportView from '@/components/logs/IncidentReportView';
-import TrainingRecordView from '@/components/staff/TrainingRecordView';
-import CommitteeView from '@/components/management/CommitteeView';
-import AuditPreparationView from '@/components/management/AuditPreparationView';
-import DocumentManagementView from '@/components/management/DocumentManagementView';
-import FinanceView from '@/components/management/FinanceView';
-import FacilityAdditionSettings from '@/components/settings/FacilityAdditionSettings';
-import AdditionCatalogView from '@/components/management/AdditionCatalogView';
-import StaffInfoManagementView from '@/components/management/StaffInfoManagementView';
-import GovernmentPortalView from '@/components/government/GovernmentPortalView';
-import KnowledgeBaseView from '@/components/knowledge/KnowledgeBaseView';
-import AdditionSimulationView from '@/components/simulation/AdditionSimulationView';
+import SupportPlanView from '@/components/support-plan/SupportPlanView';
+import DocumentManagementView from '@/components/documents/DocumentManagementView';
+import AdditionSettingsView from '@/components/addition/AdditionSettingsView';
+import StaffingView from '@/components/staffing/StaffingView';
+import WorkScheduleView from '@/components/staffing/WorkScheduleView';
+import TrainingRecordView from '@/components/training/TrainingRecordView';
+import CommitteeView from '@/components/committee/CommitteeView';
+import IncidentReportView from '@/components/incident/IncidentReportView';
+import LeaveApprovalView from '@/components/staff/LeaveApprovalView';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types';
 import { supabase } from '@/lib/supabase';
+
+// Heavy components - dynamic imports for performance optimization
+const DynamicLoadingSpinner = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full animate-spin" />
+  </div>
+);
+
+const AdditionSimulatorView = dynamicImport(
+  () => import('@/components/simulation/AdditionSimulatorView'),
+  { ssr: false, loading: DynamicLoadingSpinner }
+);
+
+const StaffPlanningSimulator = dynamicImport(
+  () => import('@/components/simulation/StaffPlanningSimulator'),
+  { ssr: false, loading: DynamicLoadingSpinner }
+);
+
+const FinanceView = dynamicImport(
+  () => import('@/components/finance/FinanceView'),
+  { ssr: false, loading: DynamicLoadingSpinner }
+);
+
+const AuditExportView = dynamicImport(
+  () => import('@/components/audit/AuditExportView'),
+  { ssr: false, loading: DynamicLoadingSpinner }
+);
+
+const ServiceRecordView = dynamicImport(
+  () => import('@/components/records/ServiceRecordView'),
+  { ssr: false, loading: DynamicLoadingSpinner }
+);
 
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
@@ -207,21 +232,15 @@ export default function BusinessPage() {
   // 認証後に初期タブを設定
   useEffect(() => {
     if (isAuthenticated && !initialTabSet) {
+      // MVP用パーミッションマップ
       const permissionMap: Record<string, keyof UserPermissions> = {
         dashboard: 'dashboard',
-        management: 'management',
-        lead: 'lead',
         schedule: 'schedule',
         children: 'children',
-        staff: 'staff',
         'staff-master': 'staff',
-        staffing: 'staff',
         shift: 'shift',
         facility: 'facility',
-        'addition-settings': 'facility',
-        'addition-simulation': 'dashboard',
-        'addition-catalog': 'dashboard',
-        finance: 'dashboard',
+        'daily-log': 'dailyLog',
       };
 
       let defaultTab: string;
@@ -265,17 +284,15 @@ export default function BusinessPage() {
   // 権限に基づいてアクセス制御
   useEffect(() => {
     if (isAuthenticated && initialTabSet && activeTab) {
+      // MVP用パーミッションマップ
       const permissionMap: Record<string, keyof UserPermissions> = {
         dashboard: 'dashboard',
-        management: 'management',
-        lead: 'lead',
         schedule: 'schedule',
         children: 'children',
-        staff: 'staff',
         'staff-master': 'staff',
-        staffing: 'staff',
-        shift: 'staff',
+        shift: 'shift',
         facility: 'facility',
+        'daily-log': 'dailyLog',
       };
 
       const requiredPermission = permissionMap[activeTab];
@@ -319,71 +336,48 @@ export default function BusinessPage() {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardView />;
-      case 'management':
-        return <ManagementSettingsView />;
-      case 'lead':
-        return <LeadView setActiveTab={setActiveTab} />;
       case 'schedule':
         return <ScheduleView />;
-      case 'transport':
-        return <TransportRouteView />;
       case 'children':
         return <ChildrenView setActiveTab={setActiveTab} />;
-      case 'chat':
-        return <ChatManagementView />;
       case 'staff-master':
         return <StaffMasterView />;
-      case 'staff-info':
-        return <StaffInfoManagementView facilityId={facility?.id || ''} facilityName={facility?.name} />;
       case 'shift':
         return <ShiftManagementView />;
       case 'facility':
         return <FacilitySettingsView />;
-      case 'addition-settings':
-        return facility?.id ? <FacilityAdditionSettings facilityId={facility.id} /> : null;
-      case 'addition-catalog':
-        return <AdditionCatalogView />;
-      case 'addition-simulation':
-        return <AdditionSimulationView />;
       case 'daily-log':
         return <DailyLogView />;
+      case 'addition-simulator':
+        return <AdditionSimulatorView />;
+      case 'staff-planning':
+        return <StaffPlanningSimulator />;
       case 'support-plan':
-        return <ServicePlanView />;
-      case 'incident':
-        return <IncidentReportView />;
-      case 'training':
-        return <TrainingRecordView />;
-      case 'audit-preparation':
-        return <AuditPreparationView setActiveTab={setActiveTab} />;
-      case 'committee':
-        return <CommitteeView />;
+        return <SupportPlanView />;
       case 'documents':
         return <DocumentManagementView />;
-      case 'finance':
-        return facility?.id && user?.id ? (
-          <FinanceView
-            facilityId={facility.id}
-            userId={user.id}
-            userName={user.name || ''}
-          />
-        ) : null;
-      case 'government':
-        return <GovernmentPortalView />;
-      case 'knowledge':
-        return facility?.id && user?.id ? (
-          <KnowledgeBaseView
-            facilityId={facility.id}
-            facilityName={facility.name}
-            userId={user.id}
-            userName={user.name || ''}
-            isAdmin={hasFullAccess}
-            onClose={() => setActiveTab('dashboard')}
-          />
-        ) : null;
+      case 'addition-settings':
+        return <AdditionSettingsView />;
       case 'staffing':
         return <StaffingView />;
+      case 'work-schedule':
+        return <WorkScheduleView />;
+      case 'training':
+        return <TrainingRecordView />;
+      case 'committee':
+        return <CommitteeView />;
+      case 'incident':
+        return <IncidentReportView />;
+      case 'finance':
+        return <FinanceView />;
+      case 'audit-export':
+        return <AuditExportView />;
+      case 'service-records':
+        return <ServiceRecordView />;
+      case 'leave-approval':
+        return <LeaveApprovalView />;
       default:
-        return null;
+        return <DashboardView />;
     }
   };
 

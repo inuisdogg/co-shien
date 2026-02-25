@@ -316,8 +316,8 @@ export default function FacilityInvitePage() {
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-6">
           <Image
-            src="/logo-cropped-center.png"
-            alt="co-shien"
+            src="/logo.svg"
+            alt="Roots"
             width={160}
             height={50}
             className="h-12 w-auto mx-auto mb-4"

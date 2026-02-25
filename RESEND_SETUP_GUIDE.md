@@ -11,7 +11,7 @@
 1. Resendダッシュボードにログイン
 2. 「API Keys」セクションに移動
 3. 「Create API Key」をクリック
-4. APIキー名を入力（例: `co-shien-production`）
+4. APIキー名を入力（例: `Roots-production`）
 5. 権限を選択（`Sending access`を選択）
 6. APIキーをコピー（**このキーは一度しか表示されません**）
 
@@ -24,7 +24,7 @@
 ### 本番環境
 1. Resendダッシュボードで「Domains」セクションに移動
 2. 「Add Domain」をクリック
-3. ドメインを入力（例: `co-shien.inu.co.jp`）
+3. ドメインを入力（例: `roots.inu.co.jp`）
 4. DNSレコードを追加：
    - SPFレコード
    - DKIMレコード
@@ -40,7 +40,7 @@
 RESEND_API_KEY=re_aLVRb3dN_MqCRib9e9G7BGMLSHVxaf9Ym
 
 # 送信元メールアドレス（本番環境）
-RESEND_FROM_EMAIL=noreply@co-shien.inu.co.jp
+RESEND_FROM_EMAIL=noreply@roots.inu.co.jp
 
 # 送信元メールアドレス（開発環境）
 # RESEND_FROM_EMAIL=noreply@resend.dev

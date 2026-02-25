@@ -483,7 +483,7 @@ export default function FacilityRegisterPage() {
           </button>
           <Image
             src="/logo-white.svg"
-            alt="co-shien"
+            alt="Roots"
             width={100}
             height={32}
             className="h-6 w-auto"

@@ -5,25 +5,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase } from 'lucide-react';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck } from 'lucide-react';
 import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
-import DocumentConfigView from './DocumentConfigView';
-import WorkToolSettingsPanel from '../staff/WorkToolSettingsPanel';
-import CompanyDocumentsSettings from './CompanyDocumentsSettings';
-import StaffingComplianceSettings from './StaffingComplianceSettings';
-
 // タブの種類
-type SettingsTab = 'basic' | 'operation' | 'documents' | 'staff';
+type SettingsTab = 'basic' | 'operation';
 
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: 'basic', label: '基本情報' },
   { id: 'operation', label: '営業・休日' },
-  { id: 'documents', label: '書類設定' },
-  { id: 'staff', label: 'スタッフ設定' },
 ];
 
 const FacilitySettingsView: React.FC = () => {
@@ -313,6 +306,7 @@ const FacilitySettingsView: React.FC = () => {
           {SETTINGS_TABS.map((tab) => (
             <button
               key={tab.id}
+              data-tour={tab.id === 'operation' ? 'operation-tab' : undefined}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 py-3 px-4 text-sm font-bold transition-colors ${
                 activeTab === tab.id
@@ -355,6 +349,7 @@ const FacilitySettingsView: React.FC = () => {
             </label>
             <input
               type="text"
+              data-tour="facility-name"
               value={settings.facilityName || ''}
               onChange={(e) =>
                 setSettings({
@@ -502,7 +497,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 事業区分設定 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div data-tour="service-categories" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <Building2 size={20} className="mr-2 text-[#00c4cc]" />
           事業区分
@@ -606,10 +601,50 @@ const FacilitySettingsView: React.FC = () => {
         </div>
       </div>
 
+            {/* 勤怠設定 */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <UserCheck size={20} className="mr-2 text-[#00c4cc]" />
+                勤怠設定
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                スタッフの勤怠管理に使用する設定です。
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-2">
+                    1日の所定労働時間
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      step={0.5}
+                      value={(settings.prescribedWorkingHours ?? 480) / 60}
+                      onChange={(e) => {
+                        const hours = parseFloat(e.target.value) || 8;
+                        setSettings({
+                          ...settings,
+                          prescribedWorkingHours: Math.round(hours * 60),
+                        });
+                      }}
+                      className="w-24 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                    />
+                    <span className="text-sm text-gray-600">時間</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    勤怠カレンダーで月間の所定労働時間を計算する際に使用されます（例: 7時間の場合、22日勤務で154時間）
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* 基本情報の保存ボタン */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
               <div className="flex justify-end">
                 <button
+                  data-tour="save-basic-button"
                   onClick={handleSave}
                   className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
                 >
@@ -625,7 +660,7 @@ const FacilitySettingsView: React.FC = () => {
         {activeTab === 'operation' && (
           <>
             {/* 定休日設定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <div data-tour="regular-holidays" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-lg text-gray-800 flex items-center">
                   <Calendar size={20} className="mr-2 text-[#00c4cc]" />
@@ -806,7 +841,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 営業時間・サービス提供時間設定 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div data-tour="business-hours" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg text-gray-800 flex items-center">
             <Clock size={20} className="mr-2 text-[#00c4cc]" />
@@ -946,7 +981,7 @@ const FacilitySettingsView: React.FC = () => {
       </div>
 
       {/* 時間枠設定 */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div data-tour="timeslot-section" className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
           <Clock size={20} className="mr-2 text-[#00c4cc]" />
           利用時間枠設定
@@ -1144,6 +1179,7 @@ const FacilitySettingsView: React.FC = () => {
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
               <div className="flex justify-end">
                 <button
+                  data-tour="save-operation-button"
                   onClick={handleSave}
                   className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2 rounded-md text-sm font-bold flex items-center shadow-sm transition-all"
                 >
@@ -1155,45 +1191,6 @@ const FacilitySettingsView: React.FC = () => {
           </>
         )}
 
-        {/* ========== 書類設定タブ ========== */}
-        {activeTab === 'documents' && (
-          <>
-            {/* 書類管理設定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <DocumentConfigView />
-            </div>
-          </>
-        )}
-
-        {/* ========== スタッフ設定タブ ========== */}
-        {activeTab === 'staff' && (
-          <>
-            {/* 人員配置基準設定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              {facility?.id && (
-                <StaffingComplianceSettings facilityId={facility.id} />
-              )}
-            </div>
-
-            {/* スタッフ向け業務ツール設定 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
-                <Briefcase size={20} className="mr-2 text-[#00c4cc]" />
-                スタッフ向け業務ツール設定
-              </h3>
-              {facility?.id && (
-                <WorkToolSettingsPanel facilityId={facility.id} />
-              )}
-            </div>
-
-            {/* 会社書類・規則管理 */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              {facility?.id && (
-                <CompanyDocumentsSettings facilityId={facility.id} />
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       {/* 履歴モーダル */}

@@ -2,17 +2,30 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * シングルドメイン構成: co-shien.inu.co.jp
+ * シングルドメイン構成: Roots.inu.co.jp
  *
  * 現在有効な機能:
  * - /business → ビジネス（施設管理）
  * - /career → キャリア（スタッフ向け）
  * - /parent → 保護者
  *
- * 一時的に無効化（将来リリース予定）:
- * - /babysitter → ベビーシッター
- * - /consultation → 発達相談
+ * セキュリティ:
+ * - 保護ルートへのセキュリティヘッダー付与
+ * - Supabase Auth セッション対応準備
  */
+
+// 保護が必要なパスプレフィックス
+const PROTECTED_PATHS = ['/business', '/career', '/parent'];
+
+// 認証不要な公開パス
+const PUBLIC_PATHS = [
+  '/business/login',
+  '/career/login',
+  '/parent/login',
+  '/parent/signup',
+  '/signup',
+  '/login',
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -49,6 +62,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 署名ページ
+  if (pathname.startsWith('/sign/')) {
+    return NextResponse.next();
+  }
+
   // PWA関連ファイル
   if (pathname === '/favicon.ico' || pathname === '/sw.js' || pathname === '/manifest.json') {
     const response = NextResponse.next();
@@ -67,18 +85,26 @@ export function middleware(req: NextRequest) {
   // 一時的に無効化された機能へのリダイレクト
   // ========================================
   if (pathname.startsWith('/consultation') || pathname.startsWith('/babysitter')) {
-    // 発達相談・ベビーシッターは一時的に無効化 → /business へリダイレクト
     return NextResponse.redirect(new URL('/business', req.url), 302);
   }
 
-  // 各領域パス（そのまま通す）
-  if (pathname.startsWith('/business') ||
-      pathname.startsWith('/career') ||
-      pathname.startsWith('/parent')) {
+  // ========================================
+  // 保護ルートへのセキュリティヘッダー
+  // ========================================
+  const isProtectedPath = PROTECTED_PATHS.some(p => pathname.startsWith(p));
+  const isPublicPath = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
+
+  if (isProtectedPath) {
     const response = NextResponse.next();
+
+    // セキュリティヘッダー
     if (isHtmlRequest) {
       response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('X-Content-Type-Options', 'nosniff');
+      response.headers.set('X-Frame-Options', 'DENY');
+      response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     }
+
     return response;
   }
 
@@ -97,7 +123,6 @@ export function middleware(req: NextRequest) {
     const newPath = pathname.replace('/client', '/parent');
     return NextResponse.redirect(new URL(newPath, req.url), 301);
   }
-  // 旧パス /sitter, /expert も一時的に /business へリダイレクト
   if (pathname.startsWith('/sitter') || pathname.startsWith('/expert')) {
     return NextResponse.redirect(new URL('/business', req.url), 302);
   }
@@ -106,7 +131,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(newPath, req.url), 301);
   }
 
-  // ルート（/）はそのまま通す（トップページ用）
+  // ルート（/）はそのまま通す
   const response = NextResponse.next();
   if (isHtmlRequest) {
     response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');

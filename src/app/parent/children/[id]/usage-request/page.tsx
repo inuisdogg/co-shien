@@ -158,7 +158,7 @@ export default function UsageRequestPage() {
       }
 
       alert('利用曜日の申請を送信しました');
-      router.push(`/client/children/${childId}`);
+      router.push(`/parent/children/${childId}`);
     } catch (err: any) {
       setError(err.message || '申請の送信に失敗しました');
     } finally {
@@ -184,7 +184,7 @@ export default function UsageRequestPage() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <button
-            onClick={() => router.push(`/client/children/${childId}`)}
+            onClick={() => router.push(`/parent/children/${childId}`)}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4"
           >
             <ArrowLeft className="w-5 h-5" />

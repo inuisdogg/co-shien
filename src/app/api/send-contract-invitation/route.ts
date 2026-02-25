@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     // メール送信
     const resend = getResend();
     const { data, error } = await resend.emails.send({
-      from: 'co-shien <noreply@co-shien.inu.co.jp>',
+      from: 'Roots <noreply@Roots.inu.co.jp>',
       to: email,
       subject: `${facilityName}からの利用招待`,
       html: `
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         <body>
           <div class="container">
             <div class="header">
-              <h1>co-shien</h1>
+              <h1>Roots</h1>
             </div>
             <div class="content">
               <h2>施設からの利用招待</h2>
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
               </p>
             </div>
             <div class="footer">
-              <p>co-shien - 児童発達支援管理システム</p>
+              <p>Roots - 児童発達支援管理システム</p>
             </div>
           </div>
         </body>

@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
           </div>
           <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
             <p>株式会社INU</p>
-            <p>co-shien 運営チーム</p>
+            <p>Roots 運営チーム</p>
           </div>
         </body>
       </html>
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
     const { error: emailError } = await getResend().emails.send({
       from: fromEmail,
       to: userData.email,
-      subject: 'co-shien ログインID確認用 認証コード',
+      subject: 'Roots ログインID確認用 認証コード',
       html: htmlContent,
     });
 

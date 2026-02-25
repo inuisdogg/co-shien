@@ -10,7 +10,6 @@ import { TimeSlot, ScheduleItem, Child, FacilityTimeSlot } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import SlotAssignmentPanel from './SlotAssignmentPanel';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
-import DailyProgramPlanningView from '@/components/planning/DailyProgramPlanningView';
 
 const ScheduleView: React.FC = () => {
   const {
@@ -1239,17 +1238,6 @@ const ScheduleView: React.FC = () => {
         </div>
       )}
 
-      {/* 日別計画モーダル */}
-      {selectedDateForPlanning && (
-        <DailyProgramPlanningView
-          isOpen={isPlanningModalOpen}
-          initialDate={selectedDateForPlanning}
-          onClose={() => {
-            setIsPlanningModalOpen(false);
-            setSelectedDateForPlanning(null);
-          }}
-        />
-      )}
     </div>
   );
 };

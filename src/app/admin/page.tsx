@@ -260,8 +260,8 @@ export default function AdminPage() {
               </button>
               <div className="flex items-center gap-3">
                 <Image
-                  src="/logo-cropped-center.png"
-                  alt="co-shien"
+                  src="/logo.svg"
+                  alt="Roots"
                   width={120}
                   height={40}
                   className="h-8 w-auto"

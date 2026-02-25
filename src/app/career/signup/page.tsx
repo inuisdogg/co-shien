@@ -158,7 +158,7 @@ export default function PersonalSignupPage() {
       // redirectToがある場合はURLパラメータにも含める（localStorage非共有環境への対策）
       const baseCallback = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=career`
-        : 'https://co-shien.inu.co.jp/auth/callback?type=career';
+        : 'https://Roots.inu.co.jp/auth/callback?type=career';
       const redirectUrl = redirectTo
         ? `${baseCallback}&redirect=${encodeURIComponent(redirectTo)}`
         : baseCallback;
@@ -286,7 +286,7 @@ export default function PersonalSignupPage() {
                 <section>
                   <h3 className="text-lg font-bold text-gray-800 mb-2">第1条（適用）</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    本規約は、株式会社INU（以下「当社」といいます）が提供する「co-shien」サービス（以下「本サービス」といいます）の利用条件を定めるものです。
+                    本規約は、株式会社INU（以下「当社」といいます）が提供する「Roots」サービス（以下「本サービス」といいます）の利用条件を定めるものです。
                     登録ユーザーの皆さま（以下「ユーザー」といいます）には、本規約に従って、本サービスをご利用いただきます。
                   </p>
                 </section>
@@ -364,8 +364,8 @@ export default function PersonalSignupPage() {
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
-            src="/logo-cropped-center.png"
-            alt="co-shien"
+            src="/logo.svg"
+            alt="Roots"
             width={200}
             height={64}
             className="h-16 w-auto mx-auto mb-4"
