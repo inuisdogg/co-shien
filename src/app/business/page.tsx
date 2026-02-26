@@ -15,46 +15,38 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import dynamicImport from 'next/dynamic';
 import Sidebar from '@/components/common/Sidebar';
 import Header from '@/components/common/Header';
-// Lightweight/commonly-used components - static imports
-import DashboardView from '@/components/dashboard/DashboardView';
-import ScheduleView from '@/components/schedule/ScheduleView';
-import ChildrenView from '@/components/children/ChildrenView';
-import { StaffMasterView } from '@/components/staff/master';
-import { ShiftManagementView } from '@/components/staff/shift';
-import FacilitySettingsView from '@/components/facility/FacilitySettingsView';
-import DailyLogView from '@/components/logs/DailyLogView';
-import SupportPlanView from '@/components/support-plan/SupportPlanView';
-import DocumentManagementView from '@/components/documents/DocumentManagementView';
-import RevenueManagementView from '@/components/addition/RevenueManagementView';
-import StaffingView from '@/components/staffing/StaffingView';
-import TrainingRecordView from '@/components/training/TrainingRecordView';
-import IncidentReportView from '@/components/incident/IncidentReportView';
-import LeaveApprovalView from '@/components/staff/LeaveApprovalView';
-import TalentManagementView from '@/components/talent/TalentManagementView';
-import RegulationsManagementView from '@/components/regulations/RegulationsManagementView';
-import ComplianceView from '@/components/compliance/ComplianceView';
-import ConnectMeetingView from '@/components/connect/ConnectMeetingView';
 import { useAuth } from '@/contexts/AuthContext';
 import { SetupGuideProvider, useSetupGuide, SETUP_STEPS } from '@/contexts/SetupGuideContext';
 import { UserPermissions } from '@/types';
 import { supabase } from '@/lib/supabase';
 
-// Heavy components - dynamic imports for performance optimization
+// All view components loaded dynamically to reduce initial bundle size
 const DynamicLoadingSpinner = () => (
   <div className="flex items-center justify-center py-20">
     <div className="w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full animate-spin" />
   </div>
 );
 
-const FinanceView = dynamicImport(
-  () => import('@/components/finance/FinanceView'),
-  { ssr: false, loading: DynamicLoadingSpinner }
-);
-
-const TransportManagementView = dynamicImport(
-  () => import('@/components/transport/TransportManagementView'),
-  { ssr: false, loading: DynamicLoadingSpinner }
-);
+const DashboardView = dynamicImport(() => import('@/components/dashboard/DashboardView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const ScheduleView = dynamicImport(() => import('@/components/schedule/ScheduleView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const ChildrenView = dynamicImport(() => import('@/components/children/ChildrenView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const StaffMasterView = dynamicImport(() => import('@/components/staff/master').then(m => ({ default: m.StaffMasterView })), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const ShiftManagementView = dynamicImport(() => import('@/components/staff/shift').then(m => ({ default: m.ShiftManagementView })), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const FacilitySettingsView = dynamicImport(() => import('@/components/facility/FacilitySettingsView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const DailyLogView = dynamicImport(() => import('@/components/logs/DailyLogView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const SupportPlanView = dynamicImport(() => import('@/components/support-plan/SupportPlanView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const DocumentManagementView = dynamicImport(() => import('@/components/documents/DocumentManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const RevenueManagementView = dynamicImport(() => import('@/components/addition/RevenueManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const StaffingView = dynamicImport(() => import('@/components/staffing/StaffingView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const TrainingRecordView = dynamicImport(() => import('@/components/training/TrainingRecordView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const IncidentReportView = dynamicImport(() => import('@/components/incident/IncidentReportView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const LeaveApprovalView = dynamicImport(() => import('@/components/staff/LeaveApprovalView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const TalentManagementView = dynamicImport(() => import('@/components/talent/TalentManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const RegulationsManagementView = dynamicImport(() => import('@/components/regulations/RegulationsManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const ComplianceView = dynamicImport(() => import('@/components/compliance/ComplianceView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const ConnectMeetingView = dynamicImport(() => import('@/components/connect/ConnectMeetingView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const FinanceView = dynamicImport(() => import('@/components/finance/FinanceView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const TransportManagementView = dynamicImport(() => import('@/components/transport/TransportManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 
 /**
  * Onboarding welcome screen shown when setup is incomplete.
