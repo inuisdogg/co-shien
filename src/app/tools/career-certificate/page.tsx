@@ -1,1089 +1,487 @@
-'use client';
+/**
+ * 実務経験証明書デジタル発行 — プレミアム機能紹介ページ
+ *
+ * キャリアアカウント登録を促すランディングページ。
+ * デジタル証明書ワークフローの説明 + CTAでキャリア登録へ誘導。
+ */
 
-import { useRef, useState, useCallback } from 'react';
+import type { Metadata } from 'next';
+import Link from 'next/link';
 import {
   FileText,
-  Download,
-  Loader2,
-  ChevronRight,
-  AlertCircle,
-  CheckCircle2,
-  User,
+  ArrowRight,
+  CheckCircle,
+  Mail,
+  PenTool,
+  CloudLightning,
   Building2,
-  Briefcase,
-  Stamp,
+  User,
+  Send,
+  Shield,
+  Clock,
+  Smartphone,
+  ChevronRight,
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
-// ============================================================
-// Types
-// ============================================================
-
-type FormData = {
-  // Section 1 - 証明対象者
-  name: string;
-  name_kana: string;
-  birth_date: string;
-  address: string;
-  // Section 2 - 勤務先
-  facility_name: string;
-  facility_type: string;
-  facility_address: string;
-  facility_phone: string;
-  // Section 3 - 勤務期間・内容
-  start_date: string;
-  end_date: string;
-  job_title: string;
-  employment_type: string;
-  duties: string;
-  total_days: string;
-  // Section 4 - 証明者
-  certifier_name: string;
-  certifier_title: string;
-  certification_date: string;
+export const metadata: Metadata = {
+  title: '実務経験証明書デジタル発行 | Roots',
+  description:
+    'キャリア情報から実務経験証明書を自動作成。メールで先方に送付し、クラウドサインで完結。印刷・郵送不要のデジタルワークフロー。',
+  openGraph: {
+    title: '実務経験証明書デジタル発行 | Roots',
+    description:
+      '実務経験証明書の作成・送付・署名をすべてオンラインで完結。保育・福祉専門職のためのデジタルツール。',
+    type: 'website',
+    locale: 'ja_JP',
+    siteName: 'Roots',
+  },
 };
 
-// ============================================================
-// Constants
-// ============================================================
-
-const FACILITY_TYPES = [
-  '児童発達支援',
-  '放課後等デイサービス',
-  '保育所',
-  '認定こども園',
-  '障害者支援施設',
-  'その他',
+const steps = [
+  {
+    number: '01',
+    icon: <User className="h-6 w-6" />,
+    title: 'キャリア情報を登録',
+    description:
+      'Rootsキャリアアカウントに、過去の勤務先・在籍期間・職種・業務内容を入力。一度登録すれば何度でも使えます。',
+    color: 'bg-blue-500',
+  },
+  {
+    number: '02',
+    icon: <FileText className="h-6 w-6" />,
+    title: '証明書を自動生成',
+    description:
+      '登録したキャリア情報から、施設ごと・法人ごとに実務経験証明書を自動作成。プレビューで内容を確認できます。',
+    color: 'bg-indigo-500',
+  },
+  {
+    number: '03',
+    icon: <Mail className="h-6 w-6" />,
+    title: 'あなたのアドレスから送信',
+    description:
+      '内容に問題がなければ、ツール上からあなた自身のメールアドレスで先方（元勤務先の担当者）にメール送付。テンプレート文言付き。',
+    color: 'bg-purple-500',
+  },
+  {
+    number: '04',
+    icon: <PenTool className="h-6 w-6" />,
+    title: 'クラウドサインで署名',
+    description:
+      '先方がメールを受信し、内容を確認。問題なければクラウドサインで法人印に相当するデジタル署名を付与して完了。',
+    color: 'bg-emerald-500',
+  },
 ];
 
-const JOB_TITLES = [
-  '保育士',
-  '児童発達支援管理責任者',
-  '児童指導員',
-  '指導員',
-  'サービス管理責任者',
-  '相談支援専門員',
-  '看護師',
-  '理学療法士',
-  '作業療法士',
-  '言語聴覚士',
-  'その他',
+const benefits = [
+  {
+    icon: <CloudLightning className="h-5 w-5" />,
+    title: '印刷・郵送が不要',
+    description: 'すべてオンラインで完結。紙を印刷して送る手間がゼロに。',
+  },
+  {
+    icon: <Clock className="h-5 w-5" />,
+    title: '最短即日で完了',
+    description: '先方の確認・署名もデジタルなので、最短でその日のうちに署名済み証明書を取得。',
+  },
+  {
+    icon: <Shield className="h-5 w-5" />,
+    title: '改ざん防止のデジタル証明',
+    description: 'クラウドサインによる電子署名で、証明書の真正性を担保。',
+  },
+  {
+    icon: <Smartphone className="h-5 w-5" />,
+    title: 'いつでもアクセス',
+    description: '署名済み証明書はクラウド上に保管。必要なときにいつでもダウンロード。',
+  },
 ];
-
-const EMPLOYMENT_TYPES = ['常勤', '非常勤', 'パート・アルバイト'];
-
-// ============================================================
-// Helpers
-// ============================================================
-
-/** Format a date string (YYYY-MM-DD) into Japanese era format (和暦) */
-const formatDateJp = (dateStr: string | undefined): string => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-
-  if (year > 2019 || (year === 2019 && (month > 5 || (month === 5 && day >= 1)))) {
-    const reiwaYear = year - 2018;
-    return `令和${reiwaYear === 1 ? '元' : reiwaYear}年${month}月${day}日`;
-  }
-  if (year >= 1989) {
-    const heiseiYear = year - 1988;
-    return `平成${heiseiYear === 1 ? '元' : heiseiYear}年${month}月${day}日`;
-  }
-  return `${year}年${month}月${day}日`;
-};
-
-/** Compute duration string between two dates, e.g. "3年2ヶ月" */
-const computeDuration = (startStr: string, endStr: string | undefined): string => {
-  if (!startStr) return '';
-  const start = new Date(startStr);
-  const end = endStr ? new Date(endStr) : new Date();
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
-
-  let years = end.getFullYear() - start.getFullYear();
-  let months = end.getMonth() - start.getMonth();
-  if (months < 0) {
-    years--;
-    months += 12;
-  }
-  const parts: string[] = [];
-  if (years > 0) parts.push(`${years}年`);
-  if (months > 0) parts.push(`${months}ヶ月`);
-  return parts.length > 0 ? parts.join('') : '1ヶ月未満';
-};
-
-/** Get today in YYYY-MM-DD format */
-const todayStr = (): string => {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-
-// ============================================================
-// Initial Form State
-// ============================================================
-
-const initialFormData: FormData = {
-  name: '',
-  name_kana: '',
-  birth_date: '',
-  address: '',
-  facility_name: '',
-  facility_type: '',
-  facility_address: '',
-  facility_phone: '',
-  start_date: '',
-  end_date: '',
-  job_title: '',
-  employment_type: '常勤',
-  duties: '',
-  total_days: '',
-  certifier_name: '',
-  certifier_title: '施設長',
-  certification_date: todayStr(),
-};
-
-// ============================================================
-// Main Page Component
-// ============================================================
 
 export default function CareerCertificatePage() {
-  const [form, setForm] = useState<FormData>(initialFormData);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
-  const certificateRef = useRef<HTMLDivElement>(null);
-
-  // ----------------------------------------------------------
-  // Form handlers
-  // ----------------------------------------------------------
-
-  const handleChange = useCallback(
-    (field: keyof FormData) =>
-      (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        setForm((prev) => ({ ...prev, [field]: e.target.value }));
-        // Clear the error for the field being edited
-        setErrors((prev) => {
-          if (prev[field]) {
-            const next = { ...prev };
-            delete next[field];
-            return next;
-          }
-          return prev;
-        });
-        setGenerated(false);
-      },
-    [],
-  );
-
-  const validate = useCallback((): boolean => {
-    const newErrors: Partial<Record<keyof FormData, string>> = {};
-    if (!form.name.trim()) newErrors.name = '氏名は必須です';
-    if (!form.facility_name.trim()) newErrors.facility_name = '施設・事業所名は必須です';
-    if (!form.start_date) newErrors.start_date = '在職期間（開始）は必須です';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [form]);
-
-  // ----------------------------------------------------------
-  // PDF generation
-  // ----------------------------------------------------------
-
-  const handleGeneratePdf = useCallback(async () => {
-    if (!validate()) {
-      // Scroll to first error
-      const firstErrorField = document.querySelector('[data-error="true"]');
-      firstErrorField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-
-    if (!certificateRef.current) return;
-    setGenerating(true);
-
-    try {
-      const canvas = await html2canvas(certificateRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 0;
-
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-
-      const fileName = `実務経験証明書_${form.name || '未入力'}_${form.facility_name || '未入力'}.pdf`;
-      pdf.save(fileName);
-      setGenerated(true);
-    } catch (err) {
-      console.error('PDF generation failed:', err);
-      alert('PDF生成に失敗しました。もう一度お試しください。');
-    } finally {
-      setGenerating(false);
-    }
-  }, [form, validate]);
-
-  // ----------------------------------------------------------
-  // Render helpers
-  // ----------------------------------------------------------
-
-  const inputClass = (field: keyof FormData) =>
-    `w-full rounded-lg border ${
-      errors[field] ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-300'
-    } px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-colors`;
-
-  const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
-
-  const requiredBadge = (
-    <span className="ml-1 text-xs text-red-500 font-medium">*必須</span>
-  );
-
-  // ----------------------------------------------------------
-  // Render
-  // ----------------------------------------------------------
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
-      {/* ====== Header ====== */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <a href="/tools" className="flex items-center gap-2 text-gray-800 hover:text-indigo-600 transition-colors">
-            <FileText className="w-5 h-5 text-indigo-600" />
-            <span className="font-semibold text-sm">Roots Tools</span>
-          </a>
-          <a
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/tools" className="flex items-center gap-2 group">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-lg transition-transform group-hover:scale-105">
+              R
+            </div>
+            <span className="text-xl font-bold text-gray-900">Roots Tools</span>
+          </Link>
+          <Link
             href="/career"
-            className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98]"
           >
-            Rootsに無料登録
-            <ChevronRight className="w-4 h-4" />
-          </a>
+            無料で登録
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </header>
 
-      {/* ====== Hero ====== */}
-      <section className="py-10 sm:py-14 text-center px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 text-xs font-medium px-3 py-1.5 rounded-full mb-4">
-            <FileText className="w-3.5 h-3.5" />
-            無料ツール
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute -top-24 right-0 h-[500px] w-[500px] rounded-full bg-indigo-50 opacity-60 blur-3xl" />
+          <div className="absolute -bottom-32 -left-20 h-[400px] w-[400px] rounded-full bg-purple-50 opacity-50 blur-3xl" />
+        </div>
+
+        <div className="mx-auto max-w-6xl px-4 pb-12 pt-16 sm:px-6 sm:pb-20 sm:pt-24 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-sm font-medium text-indigo-700">
+              <PenTool className="h-4 w-4" />
+              Rootsキャリア Premium
+            </div>
+
+            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
+              実務経験証明書を
+              <span className="mt-1 block bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                デジタルで発行・署名
+              </span>
+            </h1>
+
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-gray-600 sm:text-lg">
+              もう紙を印刷して郵送する必要はありません。
+              <br className="hidden sm:block" />
+              キャリア情報から証明書を自動作成し、メールで送付。
+              <br className="hidden sm:block" />
+              先方のクラウドサインで法人印の代わりにデジタル署名。すべてオンラインで完結します。
+            </p>
+
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <Link
+                href="/career"
+                className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-8 py-3.5 text-base font-bold text-white shadow-lg transition-all hover:bg-indigo-700 hover:shadow-xl active:scale-[0.98]"
+              >
+                Rootsキャリアに無料登録
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+              <a
+                href="#how-it-works"
+                className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-8 py-3.5 text-base font-semibold text-gray-700 transition-all hover:border-gray-400 hover:bg-gray-50"
+              >
+                仕組みを見る
+              </a>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-            実務経験証明書ジェネレーター
-          </h1>
-          <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
-            保育士・児童指導員など福祉専門職の方向け。
-            <br className="hidden sm:block" />
-            必要事項を入力するだけで、正式な実務経験証明書PDFを無料で作成できます。
+        </div>
+      </section>
+
+      {/* Before/After comparison */}
+      <section className="border-y border-gray-100 bg-gray-50/50 py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <h2 className="mb-12 text-center text-2xl font-bold text-gray-900 sm:text-3xl">
+            従来の方法 vs Roots
+          </h2>
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            {/* Before */}
+            <div className="rounded-2xl border border-red-200 bg-white p-6 sm:p-8">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-sm font-medium text-red-600">
+                従来の方法
+              </div>
+              <ul className="space-y-3 text-sm text-gray-600">
+                {[
+                  '証明書のテンプレートを探してWordで作成',
+                  '在籍期間・業務内容を手動で入力',
+                  '印刷して封筒に入れて郵送',
+                  '先方に届くまで数日〜1週間待ち',
+                  '先方が確認して法人印を押印',
+                  '署名済み証明書を返送してもらう',
+                  '合計: 2〜4週間',
+                ].map((text, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-red-500">
+                      {i + 1}
+                    </span>
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* After */}
+            <div className="rounded-2xl border-2 border-indigo-300 bg-white p-6 shadow-lg sm:p-8">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-600">
+                <CloudLightning className="h-3.5 w-3.5" />
+                Rootsなら
+              </div>
+              <ul className="space-y-3 text-sm text-gray-600">
+                {[
+                  'キャリア情報から証明書を自動生成',
+                  'プレビューで内容を確認',
+                  'ツール上からメールで先方に送信',
+                  '先方がクラウドサインでデジタル署名',
+                  '署名済み証明書をクラウドに保管',
+                ].map((text, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-indigo-500" />
+                    <span className="font-medium">{text}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 rounded-lg bg-indigo-50 p-3 text-center">
+                <span className="text-lg font-extrabold text-indigo-600">最短即日</span>
+                <span className="ml-1 text-sm text-indigo-500">で署名済み証明書を取得</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How it works - Step by step */}
+      <section id="how-it-works" className="py-16 sm:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-14 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+              4ステップで完了
+            </h2>
+            <p className="mt-3 text-gray-600">
+              すべてオンラインで、あなた自身の操作で完結します
+            </p>
+          </div>
+
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {steps.map((step, i) => (
+              <div key={step.number} className="relative">
+                {/* Connector line (hidden on last item and mobile) */}
+                {i < steps.length - 1 && (
+                  <div className="absolute right-0 top-10 hidden h-0.5 w-8 bg-gray-200 lg:block" style={{ right: '-1rem' }} />
+                )}
+                <div className="text-center">
+                  <div
+                    className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-lg ${step.color}`}
+                  >
+                    {step.icon}
+                  </div>
+                  <div className="mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Step {step.number}
+                  </div>
+                  <h3 className="text-base font-bold text-gray-900">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                    {step.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Certificate preview mockup */}
+      <section className="border-y border-gray-100 bg-gray-50/50 py-16 sm:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            {/* Left: Description */}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                正式な証明書フォーマット
+              </h2>
+              <p className="mt-4 text-gray-600 leading-relaxed">
+                Rootsで生成される実務経験証明書は、資格申請や転職に必要な正式フォーマットに準拠。
+                証明対象者情報、勤務先情報、在職期間・業務内容、証明者欄を含む標準的な書式です。
+              </p>
+              <ul className="mt-6 space-y-3">
+                {[
+                  '施設名・法人名・所在地を自動記入',
+                  '在職期間・職種・業務内容を正確に記載',
+                  '証明者（施設長等）の署名欄付き',
+                  '電子署名で法人印の代わりに',
+                  'PDF形式でダウンロード・印刷も可能',
+                ].map((text) => (
+                  <li key={text} className="flex items-center gap-3 text-sm text-gray-700">
+                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-indigo-500" />
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Right: Mockup */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+                <div
+                  className="rounded-lg border border-gray-100 bg-gray-50 p-5"
+                  style={{
+                    fontFamily: '"Hiragino Mincho ProN", "Yu Mincho", serif',
+                    fontSize: '11px',
+                    lineHeight: '1.8',
+                  }}
+                >
+                  <div className="text-center mb-3">
+                    <div className="font-bold text-sm tracking-[0.3em]">実 務 経 験 証 明 書</div>
+                  </div>
+                  <div className="text-[10px] text-gray-500 mb-2">
+                    下記の者が当施設において勤務したことを証明します。
+                  </div>
+                  <div className="border border-gray-300 mb-2">
+                    <div className="flex border-b border-gray-300">
+                      <div className="bg-gray-100 px-2 py-1 w-16 text-[9px] font-bold border-r border-gray-300">氏名</div>
+                      <div className="px-2 py-1 flex-1 text-[10px]">田中 花子</div>
+                    </div>
+                    <div className="flex">
+                      <div className="bg-gray-100 px-2 py-1 w-16 text-[9px] font-bold border-r border-gray-300">在職期間</div>
+                      <div className="px-2 py-1 flex-1 text-[10px]">2019年4月 〜 2023年3月</div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end items-end gap-3 mt-4">
+                    <div className="text-[9px] text-right">
+                      <div>社会福祉法人○○</div>
+                      <div>施設長 鈴木 太郎</div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full border-2 border-indigo-400 flex items-center justify-center">
+                      <PenTool className="w-3 h-3 text-indigo-500" />
+                    </div>
+                  </div>
+                  <div className="text-center mt-3 text-[8px] text-indigo-500 font-medium">
+                    電子署名済み
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits */}
+      <section className="py-16 sm:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <h2 className="mb-12 text-center text-2xl font-bold text-gray-900 sm:text-3xl">
+            デジタル発行のメリット
+          </h2>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {benefits.map((benefit) => (
+              <div
+                key={benefit.title}
+                className="rounded-2xl border border-gray-200 bg-white p-6 transition-shadow hover:shadow-md"
+              >
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  {benefit.icon}
+                </div>
+                <h3 className="font-bold text-gray-900">{benefit.title}</h3>
+                <p className="mt-2 text-sm text-gray-600 leading-relaxed">{benefit.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Email workflow detail */}
+      <section className="border-y border-gray-100 bg-gray-50/50 py-16 sm:py-24">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <h2 className="mb-4 text-center text-2xl font-bold text-gray-900 sm:text-3xl">
+            あなた自身が送る、だから安心
+          </h2>
+          <p className="mx-auto mb-12 max-w-2xl text-center text-gray-600">
+            Rootsが代行するのではなく、あなた自身のメールアドレスから送信。
+            先方から見ても、あなたからの正式な依頼として届きます。
+          </p>
+
+          <div className="space-y-6">
+            {/* Sender */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+                  <User className="h-6 w-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-gray-900">あなた（送信者）</div>
+                  <div className="mt-1 text-sm text-gray-500">tanaka.hanako@example.com</div>
+                  <div className="mt-3 rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
+                    <div className="font-bold text-gray-800 mb-1">件名: 実務経験証明書のご確認のお願い</div>
+                    <p className="text-gray-600 text-xs leading-relaxed">
+                      お世話になっております。田中花子と申します。<br />
+                      貴施設に在籍していた際の実務経験証明書を作成いたしましたので、<br />
+                      内容をご確認の上、電子署名をお願いできますでしょうか。<br />
+                      下記のリンクから証明書の確認・署名が可能です。
+                    </p>
+                    <div className="mt-3 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white">
+                      <Send className="h-3 w-3" />
+                      証明書を確認・署名する
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100">
+                <ArrowRight className="h-5 w-5 text-indigo-600 rotate-90" />
+              </div>
+            </div>
+
+            {/* Receiver */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                  <Building2 className="h-6 w-6 text-emerald-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-gray-900">元勤務先の担当者（署名者）</div>
+                  <div className="mt-1 text-sm text-gray-500">suzuki@hoikuen-example.jp</div>
+                  <div className="mt-3 text-sm text-gray-600">
+                    メールを受信 → 証明書の内容を確認 → クラウドサインで電子署名 → 完了
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-20 sm:py-28">
+        <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full bg-white/5" />
+        <div className="absolute -bottom-16 -right-16 h-56 w-56 rounded-full bg-white/5" />
+
+        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
+            実務経験証明書の発行を
+            <br />
+            デジタルで簡単に
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-indigo-100">
+            Rootsキャリアアカウントに無料登録して、
+            キャリア情報の管理から証明書のデジタル発行まで、
+            すべてをオンラインで完結させましょう。
+          </p>
+
+          <div className="mt-10">
+            <Link
+              href="/career"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-indigo-700 shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
+            >
+              Rootsキャリアに無料登録
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          </div>
+
+          <p className="mt-6 text-sm text-indigo-200">
+            無料プランあり・クレジットカード不要
           </p>
         </div>
       </section>
 
-      {/* ====== Main content (form + preview side by side on desktop) ====== */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          {/* ---------- Left: Form ---------- */}
-          <div className="space-y-6">
-            {/* Section 1 */}
-            <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200">
-                <User className="w-4.5 h-4.5 text-indigo-600" />
-                <h2 className="text-sm font-semibold text-gray-800">
-                  証明対象者（あなた）の情報
-                </h2>
+      {/* Footer */}
+      <footer className="border-t border-gray-100 bg-white py-10">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-sm">
+                R
               </div>
-              <div className="p-5 space-y-4">
-                {/* 氏名 */}
-                <div data-error={!!errors.name || undefined}>
-                  <label className={labelClass}>
-                    氏名{requiredBadge}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="山田 太郎"
-                    value={form.name}
-                    onChange={handleChange('name')}
-                    className={inputClass('name')}
-                  />
-                  {errors.name && (
-                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" />{errors.name}
-                    </p>
-                  )}
-                </div>
-                {/* フリガナ */}
-                <div>
-                  <label className={labelClass}>フリガナ</label>
-                  <input
-                    type="text"
-                    placeholder="ヤマダ タロウ"
-                    value={form.name_kana}
-                    onChange={handleChange('name_kana')}
-                    className={inputClass('name_kana')}
-                  />
-                </div>
-                {/* 生年月日 */}
-                <div>
-                  <label className={labelClass}>生年月日</label>
-                  <input
-                    type="date"
-                    value={form.birth_date}
-                    onChange={handleChange('birth_date')}
-                    className={inputClass('birth_date')}
-                  />
-                </div>
-                {/* 住所 */}
-                <div>
-                  <label className={labelClass}>住所</label>
-                  <input
-                    type="text"
-                    placeholder="東京都渋谷区..."
-                    value={form.address}
-                    onChange={handleChange('address')}
-                    className={inputClass('address')}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Section 2 */}
-            <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200">
-                <Building2 className="w-4.5 h-4.5 text-indigo-600" />
-                <h2 className="text-sm font-semibold text-gray-800">勤務先の情報</h2>
-              </div>
-              <div className="p-5 space-y-4">
-                {/* 施設・事業所名 */}
-                <div data-error={!!errors.facility_name || undefined}>
-                  <label className={labelClass}>
-                    施設・事業所名{requiredBadge}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="○○児童発達支援センター"
-                    value={form.facility_name}
-                    onChange={handleChange('facility_name')}
-                    className={inputClass('facility_name')}
-                  />
-                  {errors.facility_name && (
-                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" />{errors.facility_name}
-                    </p>
-                  )}
-                </div>
-                {/* 施設種別 */}
-                <div>
-                  <label className={labelClass}>施設種別</label>
-                  <select
-                    value={form.facility_type}
-                    onChange={handleChange('facility_type')}
-                    className={inputClass('facility_type')}
-                  >
-                    <option value="">選択してください</option>
-                    {FACILITY_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* 所在地 */}
-                <div>
-                  <label className={labelClass}>所在地</label>
-                  <input
-                    type="text"
-                    placeholder="東京都新宿区..."
-                    value={form.facility_address}
-                    onChange={handleChange('facility_address')}
-                    className={inputClass('facility_address')}
-                  />
-                </div>
-                {/* 電話番号 */}
-                <div>
-                  <label className={labelClass}>電話番号</label>
-                  <input
-                    type="tel"
-                    placeholder="03-1234-5678"
-                    value={form.facility_phone}
-                    onChange={handleChange('facility_phone')}
-                    className={inputClass('facility_phone')}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Section 3 */}
-            <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200">
-                <Briefcase className="w-4.5 h-4.5 text-indigo-600" />
-                <h2 className="text-sm font-semibold text-gray-800">勤務期間・内容</h2>
-              </div>
-              <div className="p-5 space-y-4">
-                {/* 在職期間 */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div data-error={!!errors.start_date || undefined}>
-                    <label className={labelClass}>
-                      在職期間（開始）{requiredBadge}
-                    </label>
-                    <input
-                      type="date"
-                      value={form.start_date}
-                      onChange={handleChange('start_date')}
-                      className={inputClass('start_date')}
-                    />
-                    {errors.start_date && (
-                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5" />{errors.start_date}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className={labelClass}>在職期間（終了）</label>
-                    <input
-                      type="date"
-                      value={form.end_date}
-                      onChange={handleChange('end_date')}
-                      className={inputClass('end_date')}
-                    />
-                    <p className="mt-1 text-xs text-gray-400">空欄の場合「現在」となります</p>
-                  </div>
-                </div>
-                {/* 職種 */}
-                <div>
-                  <label className={labelClass}>職種</label>
-                  <select
-                    value={form.job_title}
-                    onChange={handleChange('job_title')}
-                    className={inputClass('job_title')}
-                  >
-                    <option value="">選択してください</option>
-                    {JOB_TITLES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* 雇用形態 */}
-                <div>
-                  <label className={labelClass}>雇用形態</label>
-                  <select
-                    value={form.employment_type}
-                    onChange={handleChange('employment_type')}
-                    className={inputClass('employment_type')}
-                  >
-                    {EMPLOYMENT_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* 主な業務内容 */}
-                <div>
-                  <label className={labelClass}>主な業務内容</label>
-                  <textarea
-                    rows={3}
-                    placeholder="児童の個別支援計画の作成、療育活動の企画・実施、保護者対応..."
-                    value={form.duties}
-                    onChange={handleChange('duties')}
-                    className={inputClass('duties')}
-                  />
-                </div>
-                {/* 総従事日数 */}
-                <div>
-                  <label className={labelClass}>総従事日数（任意）</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="例: 720"
-                      value={form.total_days}
-                      onChange={handleChange('total_days')}
-                      className={`${inputClass('total_days')} max-w-[160px]`}
-                    />
-                    <span className="text-sm text-gray-500">日</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Section 4 */}
-            <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200">
-                <Stamp className="w-4.5 h-4.5 text-indigo-600" />
-                <h2 className="text-sm font-semibold text-gray-800">証明者の情報</h2>
-              </div>
-              <div className="p-5 space-y-4">
-                {/* 証明者氏名 */}
-                <div>
-                  <label className={labelClass}>証明者氏名（施設長名等）</label>
-                  <input
-                    type="text"
-                    placeholder="鈴木 一郎"
-                    value={form.certifier_name}
-                    onChange={handleChange('certifier_name')}
-                    className={inputClass('certifier_name')}
-                  />
-                </div>
-                {/* 証明者役職 */}
-                <div>
-                  <label className={labelClass}>証明者役職</label>
-                  <input
-                    type="text"
-                    placeholder="施設長"
-                    value={form.certifier_title}
-                    onChange={handleChange('certifier_title')}
-                    className={inputClass('certifier_title')}
-                  />
-                </div>
-                {/* 証明日 */}
-                <div>
-                  <label className={labelClass}>証明日</label>
-                  <input
-                    type="date"
-                    value={form.certification_date}
-                    onChange={handleChange('certification_date')}
-                    className={inputClass('certification_date')}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Download button (mobile: visible; desktop: also shown here for convenience) */}
-            <button
-              onClick={handleGeneratePdf}
-              disabled={generating}
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3.5 rounded-xl transition-colors shadow-lg shadow-indigo-200"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  PDF生成中...
-                </>
-              ) : generated ? (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  ダウンロード完了 - もう一度ダウンロード
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  PDFをダウンロード
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* ---------- Right: Preview ---------- */}
-          <div className="lg:sticky lg:top-20">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700">プレビュー</h3>
-              <button
-                onClick={handleGeneratePdf}
-                disabled={generating}
-                className="hidden lg:inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    生成中...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    PDFをダウンロード
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Scrollable preview container */}
-            <div className="bg-gray-100 rounded-xl p-4 overflow-auto max-h-[80vh] border border-gray-200">
-              {/* Hidden-for-PDF + visible-for-preview certificate */}
-              <div
-                ref={certificateRef}
-                className="bg-white mx-auto shadow-sm"
-                style={{
-                  width: '794px', // A4 at 96dpi
-                  minHeight: '1123px',
-                  padding: '60px 60px 80px 60px',
-                  fontFamily:
-                    '"Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", "Noto Serif JP", serif',
-                  fontSize: '14px',
-                  lineHeight: '1.8',
-                  color: '#1a1a1a',
-                }}
-              >
-                {/* Title */}
-                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                  <h1
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: 'bold',
-                      letterSpacing: '0.5em',
-                      margin: 0,
-                    }}
-                  >
-                    実 務 経 験 証 明 書
-                  </h1>
-                </div>
-
-                {/* Intro text */}
-                <p style={{ marginBottom: '30px', fontSize: '14px' }}>
-                  下記の者が、当施設において以下のとおり勤務したことを証明します。
-                </p>
-
-                {/* Section: 証明対象者 */}
-                <div style={{ marginBottom: '28px' }}>
-                  <div
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 'bold',
-                      marginBottom: '12px',
-                      borderBottom: '2px solid #1a1a1a',
-                      paddingBottom: '4px',
-                    }}
-                  >
-                    【証明対象者】
-                  </div>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <tbody>
-                      <tr>
-                        <td
-                          style={{
-                            width: '130px',
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          氏名
-                        </td>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            border: '1px solid #ccc',
-                          }}
-                        >
-                          {form.name || '---'}
-                        </td>
-                        <td
-                          style={{
-                            width: '130px',
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          フリガナ
-                        </td>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            border: '1px solid #ccc',
-                          }}
-                        >
-                          {form.name_kana || '---'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          生年月日
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                          colSpan={3}
-                        >
-                          {form.birth_date ? formatDateJp(form.birth_date) : '---'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          住所
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                          colSpan={3}
-                        >
-                          {form.address || '---'}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Section: 勤務先 */}
-                <div style={{ marginBottom: '28px' }}>
-                  <div
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 'bold',
-                      marginBottom: '12px',
-                      borderBottom: '2px solid #1a1a1a',
-                      paddingBottom: '4px',
-                    }}
-                  >
-                    【勤務先】
-                  </div>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <tbody>
-                      <tr>
-                        <td
-                          style={{
-                            width: '130px',
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          施設・事業所名
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                          colSpan={3}
-                        >
-                          {form.facility_name || '---'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          施設種別
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                          colSpan={3}
-                        >
-                          {form.facility_type || '---'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          所在地
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                          colSpan={3}
-                        >
-                          {form.facility_address || '---'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          電話番号
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                          colSpan={3}
-                        >
-                          {form.facility_phone || '---'}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Section: 勤務内容 */}
-                <div style={{ marginBottom: '28px' }}>
-                  <div
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 'bold',
-                      marginBottom: '12px',
-                      borderBottom: '2px solid #1a1a1a',
-                      paddingBottom: '4px',
-                    }}
-                  >
-                    【勤務内容】
-                  </div>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <tbody>
-                      <tr>
-                        <td
-                          style={{
-                            width: '130px',
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          在職期間
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                          colSpan={3}
-                        >
-                          {form.start_date ? formatDateJp(form.start_date) : '---'}
-                          {' ～ '}
-                          {form.end_date ? formatDateJp(form.end_date) : '現在'}
-                          {form.start_date && (
-                            <span style={{ marginLeft: '12px', color: '#555' }}>
-                              （{computeDuration(form.start_date, form.end_date || undefined)}）
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          職種
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                        >
-                          {form.job_title || '---'}
-                        </td>
-                        <td
-                          style={{
-                            width: '130px',
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                          }}
-                        >
-                          雇用形態
-                        </td>
-                        <td
-                          style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                        >
-                          {form.employment_type || '---'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f0',
-                            border: '1px solid #ccc',
-                            fontWeight: 600,
-                            verticalAlign: 'top',
-                          }}
-                        >
-                          主な業務内容
-                        </td>
-                        <td
-                          style={{
-                            padding: '6px 12px',
-                            border: '1px solid #ccc',
-                            whiteSpace: 'pre-wrap',
-                          }}
-                          colSpan={3}
-                        >
-                          {form.duties || '---'}
-                        </td>
-                      </tr>
-                      {form.total_days && (
-                        <tr>
-                          <td
-                            style={{
-                              padding: '6px 12px',
-                              backgroundColor: '#f5f5f0',
-                              border: '1px solid #ccc',
-                              fontWeight: 600,
-                            }}
-                          >
-                            総従事日数
-                          </td>
-                          <td
-                            style={{ padding: '6px 12px', border: '1px solid #ccc' }}
-                            colSpan={3}
-                          >
-                            {form.total_days} 日
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Certification date + signer block */}
-                <div style={{ marginTop: '50px' }}>
-                  <div style={{ textAlign: 'right', marginBottom: '40px', fontSize: '14px' }}>
-                    {form.certification_date
-                      ? formatDateJp(form.certification_date)
-                      : formatDateJp(todayStr())}
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ width: '380px', fontSize: '13px', lineHeight: '2.2' }}>
-                      {form.facility_address && (
-                        <div>
-                          <span style={{ fontWeight: 600 }}>所在地：</span>
-                          {form.facility_address}
-                        </div>
-                      )}
-                      <div>
-                        <span style={{ fontWeight: 600 }}>施設・事業所名：</span>
-                        {form.facility_name || '---'}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
-                        <div>
-                          {form.certifier_title && (
-                            <div>
-                              <span style={{ fontWeight: 600 }}>役職：</span>
-                              {form.certifier_title}
-                            </div>
-                          )}
-                          <div>
-                            <span style={{ fontWeight: 600 }}>証明者氏名：</span>
-                            {form.certifier_name || '---'}
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            width: '60px',
-                            height: '60px',
-                            border: '2px solid #ccc',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '11px',
-                            color: '#999',
-                            flexShrink: 0,
-                            marginLeft: '20px',
-                          }}
-                        >
-                          印
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer note */}
-                <div
-                  style={{
-                    marginTop: '60px',
-                    textAlign: 'center',
-                    fontSize: '10px',
-                    color: '#999',
-                  }}
-                >
-                  <p>この証明書は Roots 無料ツールにより作成されました</p>
-                  <p style={{ marginTop: '2px' }}>
-                    roots-app.jp/tools/career-certificate
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ====== CTA Banner ====== */}
-        <section className="mt-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 sm:p-10 text-center text-white shadow-xl">
-          <h2 className="text-xl sm:text-2xl font-bold mb-3">
-            Rootsに登録して、キャリアをもっと便利に
-          </h2>
-          <p className="text-indigo-100 text-sm sm:text-base mb-6 max-w-xl mx-auto leading-relaxed">
-            Rootsに無料登録すると、キャリアデータを自動蓄積。
-            <br />
-            証明書もワンクリックで発行できます。研修履歴・資格管理もまとめて管理。
-          </p>
-          <a
-            href="/career"
-            className="inline-flex items-center gap-2 bg-white text-indigo-700 font-semibold px-6 py-3 rounded-xl hover:bg-indigo-50 transition-colors shadow-lg"
-          >
-            Rootsに無料登録する
-            <ChevronRight className="w-5 h-5" />
-          </a>
-        </section>
-      </main>
-
-      {/* ====== Footer ====== */}
-      <footer className="border-t border-gray-200 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
-          <p>Roots - 福祉専門職のためのキャリアプラットフォーム</p>
-          <div className="flex items-center gap-4">
-            <a href="/tools" className="hover:text-gray-600 transition-colors">
-              ツール一覧
-            </a>
-            <a href="/career" className="hover:text-gray-600 transition-colors">
-              Rootsに登録
-            </a>
+              <span className="text-lg font-bold text-gray-900">Roots</span>
+            </Link>
+            <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
+              <Link href="/tools" className="hover:text-indigo-600 transition-colors">
+                ツール一覧
+              </Link>
+              <Link href="/career" className="hover:text-indigo-600 transition-colors">
+                キャリアプラットフォーム
+              </Link>
+            </nav>
+            <p className="text-sm text-gray-400">
+              &copy; {new Date().getFullYear()} Roots
+            </p>
           </div>
         </div>
       </footer>

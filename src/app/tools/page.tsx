@@ -11,13 +11,15 @@ import Link from 'next/link';
 import {
   FileText,
   Clock,
-  Calculator,
   ArrowRight,
   Sparkles,
   Shield,
   Zap,
   ChevronRight,
   Wrench,
+  ScrollText,
+  Briefcase,
+  Lock,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -27,11 +29,11 @@ import {
 export const metadata: Metadata = {
   title: '保育・福祉の専門職のための無料ツール | Roots',
   description:
-    '実務経験証明書の作成、キャリア年表の可視化、処遇改善加算のシミュレーションなど、保育士・福祉専門職のキャリアを支える無料ツール集。登録不要ですぐに使えます。',
+    '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行、キャリア年表の可視化など、保育士・福祉専門職のキャリアを支える無料ツール集。',
   openGraph: {
     title: '保育・福祉の専門職のための無料ツール | Roots',
     description:
-      '実務経験証明書の作成、キャリア年表の可視化、処遇改善加算のシミュレーションなど、保育士・福祉専門職のキャリアを支える無料ツール集。',
+      '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行など、保育士・福祉専門職のキャリアを支える無料ツール集。',
     type: 'website',
     locale: 'ja_JP',
     siteName: 'Roots',
@@ -40,7 +42,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: '保育・福祉の専門職のための無料ツール | Roots',
     description:
-      '保育士・福祉専門職のキャリアを支える無料ツール集。登録不要ですぐに使えます。',
+      '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行。保育士・福祉専門職向け無料ツール。',
   },
 };
 
@@ -56,14 +58,31 @@ interface Tool {
   badge?: string;
 }
 
-const tools: Tool[] = [
+interface PremiumTool {
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+  badge?: string;
+  premium?: boolean;
+}
+
+const tools: PremiumTool[] = [
   {
-    title: '実務経験証明書ジェネレーター',
+    title: '履歴書自動生成',
     description:
-      '施設名・在職期間・業務内容を入力するだけで、正式な実務経験証明書PDFを無料で作成',
-    href: '/tools/career-certificate',
-    icon: <FileText className="h-7 w-7" />,
+      '保育・福祉専門職向けのフォーマットで、入力するだけでJIS規格の履歴書PDFを自動作成。学歴・職歴・資格を整理して出力',
+    href: '/tools/resume',
+    icon: <ScrollText className="h-7 w-7" />,
     badge: '人気',
+  },
+  {
+    title: '職務経歴書自動生成',
+    description:
+      '施設ごとの業務内容・実績・スキルを入力して、採用担当者に伝わる職務経歴書PDFを自動作成',
+    href: '/tools/cv',
+    icon: <Briefcase className="h-7 w-7" />,
+    badge: 'NEW',
   },
   {
     title: 'キャリア年表メーカー',
@@ -73,12 +92,13 @@ const tools: Tool[] = [
     icon: <Clock className="h-7 w-7" />,
   },
   {
-    title: '処遇改善加算シミュレーター',
+    title: '実務経験証明書デジタル発行',
     description:
-      '経験年数・資格・研修実績から処遇改善加算の概算を計算。キャリアパスの参考に',
-    href: '/tools/salary-simulator',
-    icon: <Calculator className="h-7 w-7" />,
-    badge: 'NEW',
+      'キャリア情報から施設ごとの実務経験証明書を自動作成。メールで先方に送付し、クラウドサインで完結',
+    href: '/tools/career-certificate',
+    icon: <FileText className="h-7 w-7" />,
+    premium: true,
+    badge: 'Premium',
   },
 ];
 
@@ -94,21 +114,21 @@ interface Feature {
 
 const features: Feature[] = [
   {
-    title: '完全無料・登録不要',
+    title: '書類作成が一瞬',
     description:
-      'すべてのツールはアカウント登録なしで今すぐ使えます。必要な書類をすぐに作成できます。',
+      '履歴書・職務経歴書を入力するだけで自動生成。面倒な書式調整やレイアウト作業は不要です。',
     icon: <Sparkles className="h-6 w-6" />,
   },
   {
-    title: 'プライバシー保護',
+    title: '実務経験証明書をデジタル化',
     description:
-      '入力データはブラウザ上で処理され、サーバーに保存されません。安心してご利用いただけます。',
+      'キャリア情報から証明書を自動作成し、メールで送付。クラウドサインで印刷・郵送なしに完結します。',
     icon: <Shield className="h-6 w-6" />,
   },
   {
-    title: '専門職特化設計',
+    title: '専門職特化フォーマット',
     description:
-      '保育士・児童指導員・社会福祉士など、福祉専門職の実務に即したフォーマットを採用しています。',
+      '保育士・児童指導員・社会福祉士など、福祉専門職の実務に即した項目・レイアウトを採用。',
     icon: <Zap className="h-6 w-6" />,
   },
 ];
@@ -183,9 +203,9 @@ export default function ToolsPage() {
 
             {/* Subtext */}
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl">
-              実務経験証明書の作成からキャリアの可視化まで。
+              履歴書・職務経歴書の自動生成から実務経験証明書のデジタル発行まで。
               <br className="hidden sm:block" />
-              保育士・児童指導員・社会福祉士の日々の業務とキャリア形成をサポートします。
+              保育士・児童指導員・社会福祉士のキャリア形成をサポートします。
             </p>
 
             {/* Stats */}
@@ -235,12 +255,16 @@ export default function ToolsPage() {
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
             {tools.map((tool) => (
               <Link
                 key={tool.href}
                 href={tool.href}
-                className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:border-indigo-300 hover:shadow-lg hover:-translate-y-1"
+                className={`group relative flex flex-col rounded-2xl border p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 ${
+                  tool.premium
+                    ? 'border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 hover:border-indigo-400 hover:shadow-lg'
+                    : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow-lg'
+                }`}
               >
                 {/* Badge */}
                 {tool.badge && (
@@ -248,15 +272,22 @@ export default function ToolsPage() {
                     className={`absolute right-4 top-4 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                       tool.badge === 'NEW'
                         ? 'bg-green-100 text-green-700'
-                        : 'bg-amber-100 text-amber-700'
+                        : tool.badge === 'Premium'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-amber-100 text-amber-700'
                     }`}
                   >
+                    {tool.badge === 'Premium' && <Lock className="inline h-3 w-3 mr-0.5 -mt-0.5" />}
                     {tool.badge}
                   </span>
                 )}
 
                 {/* Icon */}
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-100">
+                <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-xl transition-colors ${
+                  tool.premium
+                    ? 'bg-indigo-100 text-indigo-700 group-hover:bg-indigo-200'
+                    : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100'
+                }`}>
                   {tool.icon}
                 </div>
 
@@ -268,9 +299,16 @@ export default function ToolsPage() {
                   {tool.description}
                 </p>
 
+                {/* Premium note */}
+                {tool.premium && (
+                  <p className="mt-2 text-xs text-indigo-500 font-medium">
+                    Rootsキャリアアカウント登録で利用可能
+                  </p>
+                )}
+
                 {/* Action hint */}
                 <div className="mt-5 flex items-center gap-1 text-sm font-semibold text-indigo-600 opacity-0 transition-opacity group-hover:opacity-100">
-                  ツールを使う
+                  {tool.premium ? 'くわしく見る' : 'ツールを使う'}
                   <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </div>
               </Link>
