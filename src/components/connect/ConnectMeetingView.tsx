@@ -116,6 +116,9 @@ function mapMeetingRow(row: Record<string, unknown>): ConnectMeeting {
       invitationSentAt: p.invitation_sent_at as string | undefined,
       reminderSentAt: p.reminder_sent_at as string | undefined,
       confirmationSentAt: p.confirmation_sent_at as string | undefined,
+      attendeeCount: (p.attendee_count as number) || 1,
+      attendeeNames: p.attendee_names as string | undefined,
+      comment: p.comment as string | undefined,
       createdAt: p.created_at as string,
       updatedAt: p.updated_at as string,
       responses: ((p.connect_meeting_responses || []) as Record<string, unknown>[]).map((r) => ({
@@ -459,8 +462,8 @@ export default function ConnectMeetingView() {
 
   // ===== 日程確定 =====
   const handleConfirmDate = async (dateOptionId: string) => {
-    if (!selectedMeeting || !user?.id) return;
-    if (!confirm('この日程で確定しますか？')) return;
+    if (!selectedMeeting || !user?.id || !facility) return;
+    if (!confirm('この日程で確定しますか？確定通知メールが全参加者に送信されます。')) return;
 
     await supabase
       .from('connect_meetings')
@@ -472,6 +475,43 @@ export default function ConnectMeetingView() {
         updated_at: new Date().toISOString(),
       })
       .eq('id', selectedMeeting.id);
+
+    // 確定した日程情報を取得
+    const confirmedOpt = (selectedMeeting.dateOptions || []).find((o) => o.id === dateOptionId);
+    if (confirmedOpt) {
+      const confirmedDate = formatDate(confirmedOpt.date);
+      const confirmedTime = formatTime(confirmedOpt.startTime) +
+        (confirmedOpt.endTime ? `〜${formatTime(confirmedOpt.endTime)}` : '');
+
+      // 全参加者に確定通知メールを送信
+      const parts = selectedMeeting.participants || [];
+      for (const p of parts) {
+        try {
+          await fetch('/api/connect/send-confirmation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              participantEmail: p.representativeEmail,
+              participantName: p.responderName || p.representativeName,
+              organizationName: p.organizationName,
+              meetingTitle: selectedMeeting.title,
+              facilityName: facility.name,
+              confirmedDate,
+              confirmedTime,
+              location: selectedMeeting.location,
+            }),
+          });
+
+          // 確定通知送信日時を記録
+          await supabase
+            .from('connect_meeting_participants')
+            .update({ confirmation_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('id', p.id);
+        } catch (err) {
+          console.error('Confirmation email error:', err);
+        }
+      }
+    }
 
     refreshSelectedMeeting(selectedMeeting.id);
     fetchMeetings();
@@ -1237,12 +1277,24 @@ export default function ConnectMeetingView() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {p.representativeName && <span>{p.representativeName}</span>}
+                        {p.responderName && <span className="font-medium text-gray-600">{p.responderName}</span>}
+                        {p.representativeName && !p.responderName && <span>{p.representativeName}</span>}
                         <span className="ml-2">{p.representativeEmail}</span>
+                        {p.attendeeCount && p.attendeeCount > 1 && (
+                          <span className="ml-2 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                            {p.attendeeCount}名参加
+                          </span>
+                        )}
                         {p.respondedAt && (
                           <span className="ml-2 text-gray-400">回答: {formatDateTime(p.respondedAt)}</span>
                         )}
                       </div>
+                      {p.attendeeNames && (
+                        <div className="text-[10px] text-gray-400 mt-0.5">出席者: {p.attendeeNames}</div>
+                      )}
+                      {p.comment && (
+                        <div className="text-[10px] text-gray-400 mt-0.5">コメント: {p.comment}</div>
+                      )}
                     </div>
                     <div className="flex gap-2 shrink-0 ml-4">
                       <button

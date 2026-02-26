@@ -44,6 +44,9 @@ export default function ConnectRespondPage() {
   const [dateOptions, setDateOptions] = useState<DateOptionForResponse[]>([]);
   const [responses, setResponses] = useState<ResponseMap>({});
   const [responderName, setResponderName] = useState('');
+  const [attendeeCount, setAttendeeCount] = useState<number>(1);
+  const [attendeeNames, setAttendeeNames] = useState<string>('');
+  const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [alreadyResponded, setAlreadyResponded] = useState(false);
@@ -86,6 +89,9 @@ export default function ConnectRespondPage() {
       };
       setParticipant(pInfo);
       setResponderName(participantData.responder_name || participantData.representative_name || '');
+      setAttendeeCount(participantData.attendee_count || 1);
+      setAttendeeNames(participantData.attendee_names || '');
+      setComment(participantData.comment || '');
 
       // 会議情報を取得
       const { data: meetingData, error: mError } = await supabase
@@ -214,6 +220,9 @@ export default function ConnectRespondPage() {
           status: 'responded',
           responded_at: new Date().toISOString(),
           responder_name: responderName.trim(),
+          attendee_count: attendeeCount,
+          attendee_names: attendeeNames.trim() || null,
+          comment: comment.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', participant.id);
@@ -372,16 +381,72 @@ export default function ConnectRespondPage() {
           </div>
         </div>
 
-        {/* 回答者名 */}
+        {/* 回答者情報 */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h3 className="font-bold text-gray-800 mb-3">回答者名</h3>
-          <input
-            type="text"
-            value={responderName}
-            onChange={(e) => setResponderName(e.target.value)}
-            placeholder="お名前を入力してください"
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-          />
+          <h3 className="font-bold text-gray-800 mb-4">回答者情報</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                回答者名 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={responderName}
+                onChange={(e) => setResponderName(e.target.value)}
+                placeholder="お名前を入力してください"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                参加人数
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAttendeeCount(Math.max(1, attendeeCount - 1))}
+                  className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-lg text-gray-600 hover:bg-gray-50"
+                >
+                  -
+                </button>
+                <span className="text-xl font-bold text-gray-800 w-12 text-center">{attendeeCount}</span>
+                <button
+                  type="button"
+                  onClick={() => setAttendeeCount(attendeeCount + 1)}
+                  className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-lg text-gray-600 hover:bg-gray-50"
+                >
+                  +
+                </button>
+                <span className="text-sm text-gray-500">名</span>
+              </div>
+            </div>
+            {attendeeCount > 1 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  参加者名（複数の場合）
+                </label>
+                <textarea
+                  value={attendeeNames}
+                  onChange={(e) => setAttendeeNames(e.target.value)}
+                  placeholder="参加される方のお名前をご記入ください（1行に1名）"
+                  rows={Math.min(attendeeCount, 5)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                コメント（任意）
+              </label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="ご連絡事項があればご記入ください"
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+              />
+            </div>
+          </div>
         </div>
 
         {/* 送信ボタン */}

@@ -1009,6 +1009,9 @@ export type ConnectMeetingParticipant = {
   // 回答情報
   respondedAt?: string;
   responderName?: string;
+  attendeeCount?: number;
+  attendeeNames?: string;
+  comment?: string;
   // メール送信履歴
   invitationSentAt?: string;
   reminderSentAt?: string;
