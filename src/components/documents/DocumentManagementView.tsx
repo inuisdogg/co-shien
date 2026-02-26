@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   FolderOpen,
   Upload,
@@ -21,6 +21,9 @@ import {
   UploadCloud,
   ChevronRight,
   Eye,
+  X,
+  Loader2,
+  Save,
 } from 'lucide-react';
 import dynamicImport from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
@@ -154,6 +157,19 @@ function DocumentManagementContent() {
   const [sortBy, setSortBy] = useState<'updated' | 'name' | 'status'>('updated');
   const [isDragging, setIsDragging] = useState(false);
 
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    documentType: '' as string,
+    documentName: '',
+    childId: '',
+    expiryDate: '',
+    description: '',
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!facilityId) return;
     const fetchDocuments = async () => {
@@ -263,12 +279,115 @@ function DocumentManagementContent() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    // File handling would go here - placeholder for now
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      alert(`${files.length}件のファイルがドロップされました。アップロード機能は準備中です。`);
+      openUploadModal(files[0]);
     }
   }, []);
+
+  // Open upload modal with a file
+  const openUploadModal = (file: File) => {
+    setUploadFile(file);
+    setUploadForm({
+      documentType: 'other',
+      documentName: file.name.replace(/\.[^/.]+$/, ''),
+      childId: children.length > 0 ? children[0].id : '',
+      expiryDate: '',
+      description: '',
+    });
+    setShowUploadModal(true);
+  };
+
+  // Handle file input selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      openUploadModal(file);
+    }
+    e.target.value = '';
+  };
+
+  // Handle actual upload to Supabase Storage + DB
+  const handleUpload = async () => {
+    if (!uploadFile || !uploadForm.documentType || !facilityId || !uploadForm.childId) return;
+
+    setUploading(true);
+    try {
+      // Upload file to Supabase Storage
+      const timestamp = Date.now();
+      const sanitizedName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `${facilityId}/${uploadForm.documentType}/${timestamp}_${sanitizedName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('child-documents')
+        .upload(storagePath, uploadFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+      }
+
+      // Save metadata to child_documents table
+      const { error: dbError } = await supabase
+        .from('child_documents')
+        .insert({
+          facility_id: facilityId,
+          child_id: uploadForm.childId,
+          document_type: uploadForm.documentType,
+          document_name: uploadForm.documentName || uploadFile.name,
+          file_name: uploadFile.name,
+          file_path: uploadError ? null : storagePath,
+          file_size: uploadFile.size,
+          mime_type: uploadFile.type,
+          expiry_date: uploadForm.expiryDate || null,
+          description: uploadForm.description || null,
+          status: 'submitted',
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (dbError) throw dbError;
+
+      // Refresh the document list
+      const { data } = await supabase
+        .from('child_documents')
+        .select('*')
+        .eq('facility_id', facilityId)
+        .order('updated_at', { ascending: false });
+      if (data) setDocuments(data.map(mapRowToDocument));
+
+      setShowUploadModal(false);
+      setUploadFile(null);
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('アップロードに失敗しました。再試行してください。');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle file download
+  const handleDownload = async (doc: ChildDocument) => {
+    if (!doc.filePath) return;
+    try {
+      const { data, error } = await supabase.storage
+        .from('child-documents')
+        .download(doc.filePath);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName || 'document';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('ダウンロードに失敗しました。');
+    }
+  };
 
   if (loading) {
     return (
@@ -301,11 +420,17 @@ function DocumentManagementContent() {
           <h1 className="text-xl font-bold text-gray-800">書類管理</h1>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-            <Download className="w-4 h-4" />
-            一括DL
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+            onChange={handleFileSelect}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
+          >
             <Upload className="w-4 h-4" />
             アップロード
           </button>
@@ -468,7 +593,8 @@ function DocumentManagementContent() {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${
           isDragging
             ? 'border-[#00c4cc] bg-[#00c4cc]/5'
             : 'border-gray-200 hover:border-gray-300'
@@ -478,6 +604,7 @@ function DocumentManagementContent() {
         <p className={`text-sm ${isDragging ? 'text-[#00c4cc] font-medium' : 'text-gray-400'}`}>
           {isDragging ? 'ファイルをドロップしてアップロード' : 'ファイルをドラッグ&ドロップ、またはクリックしてアップロード'}
         </p>
+        <p className="text-xs text-gray-300 mt-1">対応形式: PDF, Word, Excel, 画像 / 最大10MB</p>
       </div>
 
       {/* Document List */}
@@ -533,7 +660,11 @@ function DocumentManagementContent() {
                     {/* Actions */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {doc.filePath && (
-                        <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="ダウンロード">
+                        <button
+                          onClick={() => handleDownload(doc)}
+                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="ダウンロード"
+                        >
                           <Download className="w-4 h-4" />
                         </button>
                       )}
@@ -556,6 +687,130 @@ function DocumentManagementContent() {
           </div>
         )}
       </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-800">書類のアップロード</h2>
+              <button
+                onClick={() => { setShowUploadModal(false); setUploadFile(null); }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* File info */}
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <FileText className="w-8 h-8 text-gray-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-800 truncate">{uploadFile?.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {uploadFile && formatFileSize(uploadFile.size)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Child selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  対象児童 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={uploadForm.childId}
+                  onChange={(e) => setUploadForm({ ...uploadForm, childId: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                >
+                  <option value="">選択してください</option>
+                  {children.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Document type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  書類タイプ <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={uploadForm.documentType}
+                  onChange={(e) => setUploadForm({ ...uploadForm, documentType: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                >
+                  {Object.entries(DOCUMENT_TYPE_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Document name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">書類名</label>
+                <input
+                  type="text"
+                  value={uploadForm.documentName}
+                  onChange={(e) => setUploadForm({ ...uploadForm, documentName: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  placeholder="例: 2025年度 受給者証"
+                />
+              </div>
+
+              {/* Expiry date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">有効期限</label>
+                <input
+                  type="date"
+                  value={uploadForm.expiryDate}
+                  onChange={(e) => setUploadForm({ ...uploadForm, expiryDate: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                />
+                <p className="text-xs text-gray-400 mt-1">受給者証など期限がある書類の場合に設定</p>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">備考</label>
+                <textarea
+                  value={uploadForm.description}
+                  onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  placeholder="メモがあれば入力"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => { setShowUploadModal(false); setUploadFile(null); }}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleUpload}
+                disabled={uploading || !uploadForm.documentType || !uploadForm.childId}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-medium bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    アップロード中...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    登録する
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
