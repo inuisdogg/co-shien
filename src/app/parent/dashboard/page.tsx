@@ -886,8 +886,8 @@ export default function ClientDashboardPage() {
         )}
 
         {/* ウェルカムメッセージ */}
-        <div className="bg-gradient-to-r from-[#FBBF6A] to-[#F6AD55] rounded-lg p-6 text-gray-800 mb-6">
-          <h1 className="text-2xl font-bold">
+        <div className="bg-white border-l-4 border-[#F6AD55] rounded-lg p-6 mb-6 shadow-sm">
+          <h1 className="text-2xl font-bold text-gray-800">
             ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
           </h1>
         </div>
@@ -895,10 +895,10 @@ export default function ClientDashboardPage() {
         {/* お知らせセクション（チャット機能はフェーズ3以上で表示） */}
         {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0 || unsignedContacts.length > 0) && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center gap-2">
+            <div className="bg-[#F6AD55] px-4 py-3 flex items-center gap-2">
               <Bell className="w-5 h-5 text-white" />
               <h2 className="font-bold text-white">お知らせ</h2>
-              <span className="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
+              <span className="bg-white text-[#ED8936] text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
                 {(isChatEnabled ? unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) : 0) + signRequests.length + unsignedContactCount}件
               </span>
             </div>
@@ -1134,7 +1134,7 @@ export default function ClientDashboardPage() {
                     </h2>
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                       {/* カレンダーヘッダー */}
-                      <div className="px-4 py-3 bg-gradient-to-r from-[#FBBF6A] to-[#F6AD55] flex items-center justify-between">
+                      <div className="px-4 py-3 bg-[#F6AD55] flex items-center justify-between">
                         <button
                           onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
                           className="p-1.5 hover:bg-white/20 rounded-md text-white"
@@ -1586,7 +1586,7 @@ export default function ClientDashboardPage() {
                               onClick={() => router.push(`/parent/facilities/${contract.facility_id}/chat`)}
                             >
                               <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-gradient-to-br from-[#F6AD55] to-[#ED8936] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
+                                <div className="w-14 h-14 bg-[#F6AD55] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
                                   <Building2 className="w-7 h-7 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">

@@ -306,7 +306,7 @@ export default function UnifiedInvitationPage() {
   // ローディング表示
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0]">
         <div className="text-center">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 max-w-md w-full p-8 mx-4">
             <div className="animate-pulse space-y-4">
@@ -393,7 +393,7 @@ export default function UnifiedInvitationPage() {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 max-w-md w-full p-8">
         <StepIndicator currentStep={error && invitationStatus !== 'pending' ? 0 : isLoggedIn ? 1 : 0} />
 

@@ -123,14 +123,14 @@ export default function ClientLoginPage() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F6AD55]/80 to-[#ED8936]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55]"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F6AD55]/80 to-[#ED8936] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image

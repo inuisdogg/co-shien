@@ -193,7 +193,7 @@ export default function ClientSignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F6AD55]/80 to-[#ED8936] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">

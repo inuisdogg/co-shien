@@ -309,7 +309,7 @@ export default function UsageRequestPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
         <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={40} className="text-green-500" />
@@ -471,7 +471,7 @@ export default function UsageRequestPage() {
 
             {/* カレンダー */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 bg-gradient-to-r from-[#F6AD55] to-[#ED8936] flex items-center justify-between">
+              <div className="px-4 py-3 bg-[#F6AD55] flex items-center justify-between">
                 <button
                   onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
                   className="p-1.5 hover:bg-white/20 rounded-md text-white"

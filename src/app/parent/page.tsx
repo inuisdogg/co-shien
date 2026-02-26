@@ -739,17 +739,17 @@ export default function ClientDashboardPage() {
         )}
 
         {/* ウェルカムメッセージ */}
-        <div className="bg-gradient-to-r from-[#F6AD55] to-[#ED8936] rounded-xl p-6 text-white mb-6 shadow-sm">
-          <h1 className="text-2xl font-bold">
+        <div className="bg-white border-l-4 border-[#F6AD55] rounded-xl p-6 mb-6 shadow-sm">
+          <h1 className="text-2xl font-bold text-gray-800">
             ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
           </h1>
-          <p className="text-white/80 mt-1 text-sm">
+          <p className="text-gray-500 mt-1 text-sm">
             お子様の利用状況を確認できます
           </p>
           {currentMonthUsage > 0 && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-white/20 rounded-lg px-3 py-1.5">
-              <CalendarDays className="w-4 h-4" />
-              <span className="text-sm font-medium">今月の利用: {currentMonthUsage}回</span>
+            <div className="mt-3 inline-flex items-center gap-2 bg-[#FEF3E2] rounded-lg px-3 py-1.5">
+              <CalendarDays className="w-4 h-4 text-[#ED8936]" />
+              <span className="text-sm font-medium text-[#ED8936]">今月の利用: {currentMonthUsage}回</span>
             </div>
           )}
         </div>
@@ -757,7 +757,7 @@ export default function ClientDashboardPage() {
         {/* お知らせセクション */}
         {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0 || unsignedContactLogs.length > 0 || unreadMessages.length > 0) && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#F6AD55] to-[#ED8936] px-4 py-3 flex items-center gap-2">
+            <div className="bg-[#F6AD55] px-4 py-3 flex items-center gap-2">
               <Bell className="w-5 h-5 text-white" />
               <h2 className="font-bold text-white">お知らせ</h2>
               <span className="bg-white text-[#ED8936] text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
@@ -1492,7 +1492,7 @@ export default function ClientDashboardPage() {
                               onClick={() => router.push(`/parent/facilities/${contract.facility_id}/chat`)}
                             >
                               <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-gradient-to-br from-[#F6AD55] to-[#ED8936] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
+                                <div className="w-14 h-14 bg-[#F6AD55] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
                                   <Building2 className="w-7 h-7 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">

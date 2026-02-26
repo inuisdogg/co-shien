@@ -84,7 +84,7 @@ export default function ClientEmailWaitingPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FBBF6A] to-[#F6AD55] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
         <div className="w-16 h-16 bg-[#FEF3E2] rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-[#F6AD55]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

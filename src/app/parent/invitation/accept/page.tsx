@@ -324,7 +324,7 @@ function AcceptInvitationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg max-w-2xl w-full p-8">
           <div className="animate-pulse space-y-4">
             <div className="h-24 bg-gray-100 rounded-xl" />
@@ -345,7 +345,7 @@ function AcceptInvitationContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-red-500" />
@@ -366,11 +366,11 @@ function AcceptInvitationContent() {
   if (!invitation) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 py-8 px-4">
+    <div className="min-h-screen bg-[#FFF8F0] py-8 px-4">
       <div className="max-w-2xl mx-auto">
         {/* ヘッダー */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
-          <div className="bg-gradient-to-r from-[#F6AD55] to-[#ED8936] p-6 text-white">
+          <div className="bg-[#F6AD55] p-6 text-white">
             <p className="text-white/80 text-sm mb-2">保護者の方へ</p>
             <h1 className="text-2xl font-bold mb-1">お子様の通所施設からの招待です</h1>
             <p className="text-white/90">
