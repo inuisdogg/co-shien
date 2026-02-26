@@ -322,8 +322,6 @@ export function usePersonalData(): UsePersonalDataReturn {
 
   // 打刻処理の共通関数（ローカルステートを即座に更新、リロードなし）
   const recordAttendance = async (facilityId: string, type: AttendanceType, gpsData?: GpsData) => {
-    console.log('recordAttendance called:', { facilityId, type, userId: user?.id });
-
     if (!user?.id) {
       console.error('ユーザーIDがありません');
       throw new Error('ログインが必要です');
@@ -332,8 +330,6 @@ export function usePersonalData(): UsePersonalDataReturn {
     const now = new Date();
     const date = now.toISOString().split('T')[0];
     const time = now.toTimeString().slice(0, 5); // HH:mm
-
-    console.log('打刻データ:', { user_id: user.id, facility_id: facilityId, date, type, time });
 
     // まず既存のレコードを確認
     const { data: existing } = await supabase
@@ -388,8 +384,6 @@ export function usePersonalData(): UsePersonalDataReturn {
       console.error('Supabase insert/update error:', error);
       throw error;
     }
-
-    console.log('打刻成功');
 
     // ローカルステートを即座に更新（リロードなし）
     setFacilities(prev => prev.map(facility => {
@@ -462,7 +456,6 @@ export function usePersonalData(): UsePersonalDataReturn {
           : undefined;
 
       await recordAttendance(facilityId, 'start', gpsData);
-      console.log('出勤打刻成功:', facilityId, geoResult.distance >= 0 ? `(距離: ${geoResult.distance}m)` : '');
     } catch (error) {
       console.error('出勤打刻エラー:', error);
       alert('出勤の記録に失敗しました。ページを再読み込みしてください。');
@@ -487,7 +480,6 @@ export function usePersonalData(): UsePersonalDataReturn {
       }
 
       await recordAttendance(facilityId, 'end', gpsData);
-      console.log('退勤打刻成功:', facilityId);
     } catch (error) {
       console.error('退勤打刻エラー:', error);
       alert('退勤の記録に失敗しました。ページを再読み込みしてください。');
@@ -498,7 +490,6 @@ export function usePersonalData(): UsePersonalDataReturn {
   const startBreak = async (facilityId: string) => {
     try {
       await recordAttendance(facilityId, 'break_start');
-      console.log('休憩開始打刻成功:', facilityId);
     } catch (error) {
       console.error('休憩開始打刻エラー:', error);
       alert('休憩開始の記録に失敗しました。ページを再読み込みしてください。');
@@ -509,7 +500,6 @@ export function usePersonalData(): UsePersonalDataReturn {
   const endBreak = async (facilityId: string) => {
     try {
       await recordAttendance(facilityId, 'break_end');
-      console.log('休憩終了打刻成功:', facilityId);
     } catch (error) {
       console.error('休憩終了打刻エラー:', error);
       alert('休憩終了の記録に失敗しました。ページを再読み込みしてください。');

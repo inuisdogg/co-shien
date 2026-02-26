@@ -566,7 +566,7 @@ function PlanEditor({
             )}
 
             <button
-              onClick={() => { /* PDF export - placeholder */ alert('PDF出力機能は準備中です'); }}
+              onClick={() => { window.print(); }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               title="PDF出力"
             >

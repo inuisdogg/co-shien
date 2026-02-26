@@ -106,10 +106,8 @@ export default function AdminSetupPage() {
         // isLoggedInAsPersonalがfalseで、passwordが存在する場合のみ新規ユーザーとして扱う
         if (!isLoggedInAsPersonal && setupData.password && setupData.facilityCode) {
           try {
-            console.log('自動ログイン開始:', { facilityCode: setupData.facilityCode, email: setupData.email });
             // Biz側のログイン（facilityCodeを指定）
             await login(setupData.facilityCode, setupData.email, setupData.password);
-            console.log('自動ログイン成功');
             // ログイン成功後、Biz側ダッシュボードに遷移
             router.push('/');
           } catch (loginError: any) {
@@ -120,7 +118,6 @@ export default function AdminSetupPage() {
         } else if (isLoggedInAsPersonal && user && setupData.facilityCode) {
           // 既存ユーザー（Personal側でログイン済み）の場合、施設情報を取得してlocalStorageに保存し、ページをリロード
           try {
-            console.log('既存ユーザーの施設情報取得開始:', { facilityCode: setupData.facilityCode });
             // 施設コードから施設情報を取得
             const { data: facilityData, error: facilityError } = await supabase
               .from('facilities')
@@ -157,7 +154,6 @@ export default function AdminSetupPage() {
             };
             localStorage.setItem('user', JSON.stringify(updatedUser));
 
-            console.log('施設情報を保存しました。ページをリロードします。');
             // ページをリロードしてAuthContextに施設情報を反映（Biz側ダッシュボードへ）
             window.location.href = '/';
           } catch (error: any) {
@@ -165,7 +161,7 @@ export default function AdminSetupPage() {
             setError('施設情報の取得に失敗しました。手動でログインしてください。');
           }
         } else {
-          console.log('自動ログインをスキップ:', { isLoggedInAsPersonal, hasPassword: !!setupData.password, hasFacilityCode: !!setupData.facilityCode });
+          // 自動ログインをスキップ（条件に合致しない場合）
         }
       };
 

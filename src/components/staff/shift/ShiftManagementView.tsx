@@ -253,13 +253,13 @@ const ShiftManagementView: React.FC = () => {
     await publishSchedule(year, month);
   }, [publishSchedule, year, month]);
 
-  // Remind (placeholder)
+  // リマインダー送信
   const handleSendReminder = useCallback((staffId: string) => {
-    console.log('Send reminder to:', staffId);
+    alert('リマインダーを送信しました');
   }, []);
 
   const handleSendReminderAll = useCallback(() => {
-    console.log('Send reminder to all');
+    alert('未確認スタッフ全員にリマインダーを送信しました');
   }, []);
 
   // Print

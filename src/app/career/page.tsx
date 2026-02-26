@@ -1106,12 +1106,6 @@ export default function PersonalDashboardPage() {
           // facility_idを取得（スネークケースとキャメルケースの両方に対応）
           const targetFacilityId = processedEmployments[0]?.facility_id || processedEmployments[0]?.facilityId;
           
-          console.log('=== 施設設定取得デバッグ ===');
-          console.log('processedEmployments[0]:', processedEmployments[0]);
-          console.log('targetFacilityId:', targetFacilityId);
-          console.log('facility_id (snake_case):', processedEmployments[0]?.facility_id);
-          console.log('facilityId (camelCase):', processedEmployments[0]?.facilityId);
-          
           if (targetFacilityId) {
             const { data: settingsData, error: settingsError } = await supabase
               .from('facility_settings')
@@ -1119,15 +1113,7 @@ export default function PersonalDashboardPage() {
               .eq('facility_id', targetFacilityId)
               .single();
             
-            console.log('施設設定取得結果:', { settingsData, settingsError });
-            
             if (!settingsError && settingsData) {
-              // デバッグ: 取得したデータを確認
-              console.log('施設設定データ:', settingsData);
-              console.log('holiday_periods:', settingsData.holiday_periods);
-              console.log('custom_holidays:', settingsData.custom_holidays);
-              console.log('regular_holidays:', settingsData.regular_holidays);
-              
               // holiday_periodsの処理（JSONBとして保存されている）
               // SupabaseクライアントはJSONBを自動的にパースしてくれるが、念のため処理
               let holidayPeriods: any[] = [];

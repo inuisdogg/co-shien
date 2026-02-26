@@ -504,7 +504,7 @@ async function sendInvitationEmail(
   // TODO: メール送信サービスを実装
   // 招待リンクを含むメールを送信
   // リンク例: https://yourdomain.com/activate?token=${token}
-  console.log(`招待メールを送信: ${email}, トークン: ${token}, 事業所ID: ${facilityId}`);
+  // TODO: 実際のメール送信処理を実装
   // 実際の実装では、SendGrid、AWS SES、Resendなどのサービスを使用
 }
 
@@ -519,7 +519,7 @@ async function sendInvitationSMS(
 ): Promise<void> {
   // TODO: SMS送信サービスを実装
   // 招待リンクを含むSMSを送信
-  console.log(`招待SMSを送信: ${phone}, トークン: ${token}, 事業所ID: ${facilityId}`);
+  // TODO: 実際のSMS送信処理を実装
   // 実際の実装では、Twilio、AWS SNSなどのサービスを使用
 }
 

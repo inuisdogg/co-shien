@@ -88,8 +88,6 @@ export default function CareerLoginPage() {
     setLoading(true);
 
     try {
-      console.log('[Login Debug] Starting login attempt for:', email.toLowerCase());
-
       // usersテーブルからメールアドレスまたはログインIDで検索（スタッフアカウントのみ）
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -99,21 +97,15 @@ export default function CareerLoginPage() {
         .neq('user_type', 'client') // 利用者アカウントは除外
         .single();
 
-      console.log('[Login Debug] Query result:', { userData: userData?.id, userError });
-
       if (userError || !userData) {
-        console.log('[Login Debug] User not found or error:', userError);
         throw new Error('メールアドレスまたはパスワードが正しくありません');
       }
 
       if (!userData.password_hash) {
-        console.log('[Login Debug] No password_hash for user');
         throw new Error('このアカウントにはパスワードが設定されていません');
       }
 
-      console.log('[Login Debug] Verifying password...');
       const isValid = await verifyPassword(password, userData.password_hash);
-      console.log('[Login Debug] Password verification result:', isValid);
 
       if (!isValid) {
         throw new Error('メールアドレスまたはパスワードが正しくありません');
@@ -152,7 +144,6 @@ export default function CareerLoginPage() {
         window.location.href = '/career';
       }
     } catch (err: any) {
-      console.log('[Login Debug] Login error:', err);
       setError(err.message || 'ログインに失敗しました');
     } finally {
       setLoading(false);

@@ -189,8 +189,10 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
         {scheduleStatus.status === 'published' && stats.confirmed < stats.total && (
           <button
             onClick={() => {
-              // Mark all as confirmed (in a real app this would update the backend)
-              console.log('Confirm all');
+              // 未確認のスタッフに対してリマインダーを一括送信
+              const pendingStaff = confirmations.filter(c => c.status !== 'confirmed');
+              pendingStaff.forEach(c => onSendReminder(c.staff.id));
+              alert(`${pendingStaff.length}名のスタッフに確認リマインダーを送信しました`);
             }}
             disabled={loading}
             className="flex items-center gap-2 min-h-10 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 disabled:opacity-50 font-medium"

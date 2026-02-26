@@ -898,17 +898,6 @@ export default function AttendanceCalendar({
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
-  // デバッグ用：施設設定を確認
-  useEffect(() => {
-    console.log('勤怠カレンダー 施設設定:', {
-      regularHolidays,
-      customHolidays,
-      includeHolidays,
-      japaneseHolidays,
-      fetchedSettings,
-    });
-  }, [regularHolidays, customHolidays, includeHolidays, japaneseHolidays, fetchedSettings]);
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* ヘッダー */}
