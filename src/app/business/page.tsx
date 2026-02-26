@@ -51,55 +51,60 @@ const UpperLimitManagementView = dynamicImport(() => import('@/components/upper-
 const RecruitmentView = dynamicImport(() => import('@/components/recruitment/RecruitmentView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 
 /**
- * Onboarding welcome screen shown when setup is incomplete.
- * Uses the SetupGuideContext to determine current setup progress.
+ * Setup guide banner shown at top of dashboard when setup is incomplete.
+ * Non-blocking — users can dismiss or ignore and use all features freely.
  */
-function OnboardingWelcome({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
-  const { isSetupComplete, currentStepIndex, completedSteps, isLoading, getStepStatus } = useSetupGuide();
+function SetupGuideBanner({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const { isSetupComplete, completedSteps, isLoading, getStepStatus } = useSetupGuide();
+  const [dismissed, setDismissed] = React.useState(false);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-t-transparent border-gray-800 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (isLoading || isSetupComplete || dismissed) return null;
 
-  if (isSetupComplete) return null;
+  const totalSteps = SETUP_STEPS.length;
+  const doneCount = completedSteps.length;
 
   return (
-    <div className="max-w-2xl mx-auto py-12">
-      <h1 className="text-2xl font-semibold text-gray-800 mb-2">Rootsへようこそ</h1>
-      <p className="text-gray-500 mb-8">利用を開始するには、以下の初期設定を完了してください。</p>
-
-      <div className="space-y-4">
+    <div className="mb-6 bg-gradient-to-r from-[#00c4cc]/5 to-[#00c4cc]/10 border border-[#00c4cc]/20 rounded-xl p-5">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+            <span className="w-5 h-5 bg-[#00c4cc] text-white rounded-full flex items-center justify-center text-[10px]">&#x2713;</span>
+            初期設定ガイド
+            <span className="text-xs font-normal text-gray-500 ml-1">{doneCount}/{totalSteps} 完了</span>
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">まだ完了していない設定があります。各項目は後からいつでも設定できます。</p>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-gray-400 hover:text-gray-600 text-lg leading-none p-1"
+          title="閉じる"
+        >
+          &times;
+        </button>
+      </div>
+      <div className="flex gap-3">
         {SETUP_STEPS.map((step, i) => {
           const status = getStepStatus(step.id);
           const isCompleted = status === 'completed';
-          const isCurrent = i === currentStepIndex;
           return (
-            <div
+            <button
               key={step.id}
-              className={`p-4 border rounded-lg ${isCompleted ? 'border-gray-200 bg-gray-50' : isCurrent ? 'border-gray-800' : 'border-gray-100'}`}
+              onClick={() => !isCompleted && setActiveTab(step.menuId)}
+              className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors ${
+                isCompleted
+                  ? 'bg-white border-gray-200 opacity-60'
+                  : 'bg-white border-[#00c4cc]/30 hover:border-[#00c4cc] hover:shadow-sm cursor-pointer'
+              }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${isCompleted ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                  {isCompleted ? '\u2713' : i + 1}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-800">{step.label}</p>
-                  <p className="text-xs text-gray-400">{step.description}</p>
-                </div>
-                {isCurrent && !isCompleted && (
-                  <button
-                    onClick={() => setActiveTab(step.menuId)}
-                    className="ml-auto px-4 py-1.5 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    設定する
-                  </button>
-                )}
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                isCompleted ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {isCompleted ? '\u2713' : i + 1}
               </div>
-            </div>
+              <div className="min-w-0">
+                <p className={`text-xs font-medium truncate ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{step.label}</p>
+              </div>
+            </button>
           );
         })}
       </div>
@@ -108,8 +113,8 @@ function OnboardingWelcome({ setActiveTab }: { setActiveTab: (tab: string) => vo
 }
 
 /**
- * Gate component that conditionally shows onboarding or regular content.
- * Must be rendered inside SetupGuideProvider to access setup state.
+ * Content wrapper that shows setup guide banner on dashboard.
+ * No longer gates access — all features are always available.
  */
 function SetupGateContent({
   activeTab,
@@ -120,17 +125,12 @@ function SetupGateContent({
   setActiveTab: (tab: string) => void;
   renderContent: () => React.ReactNode;
 }) {
-  const { isSetupComplete, isLoading } = useSetupGuide();
-
-  // While loading setup state, show regular content (don't flash onboarding)
-  if (isLoading) return <>{renderContent()}</>;
-
-  // If setup is not complete and user is on dashboard, show onboarding
-  if (!isSetupComplete && activeTab === 'dashboard') {
-    return <OnboardingWelcome setActiveTab={setActiveTab} />;
-  }
-
-  return <>{renderContent()}</>;
+  return (
+    <>
+      {activeTab === 'dashboard' && <SetupGuideBanner setActiveTab={setActiveTab} />}
+      {renderContent()}
+    </>
+  );
 }
 
 // 静的生成をスキップ

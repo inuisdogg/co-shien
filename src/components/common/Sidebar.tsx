@@ -98,7 +98,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = false, onClose, mode = 'business' }) => {
   const { facility } = useAuth();
   const { facilitySettings } = useFacilityData();
-  const { currentStepInfo, isSetupComplete, canAccessMenu, isLoading: isSetupLoading } = useSetupGuide();
+  useSetupGuide(); // keep provider active for setup guide banner on dashboard
   const { pendingCount: changeNotificationCount } = useChangeNotifications();
   const [currentFacilityCode, setCurrentFacilityCode] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -311,28 +311,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
               >
                 <nav className="pl-2 pt-1 space-y-0.5">
                   {category.items.map((item) => {
-                    const isCurrentSetupStep = !isSetupComplete && currentStepInfo?.menuId === item.id;
-                    const canAccess = isSetupComplete || canAccessMenu(item.id);
                     const isActive = activeTab === item.id;
 
                     return (
                       <div key={item.id} className="relative" data-tour={`menu-${item.id}`}>
                         <button
                           onClick={() => {
-                            if (canAccess) {
-                              setActiveTab(item.id);
-                              onClose?.();
-                            }
+                            setActiveTab(item.id);
+                            onClose?.();
                           }}
-                          disabled={!canAccess}
                           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 text-[13px] ${
                             isActive
                               ? `${isCareer ? 'bg-[#818CF8]/10 text-[#818CF8] border-l-[3px] border-[#818CF8]' : 'bg-[#00c4cc]/10 text-[#00c4cc] border-l-[3px] border-[#00c4cc]'} font-bold`
-                              : isCurrentSetupStep
-                              ? 'bg-amber-100 text-amber-800 font-bold ring-2 ring-amber-400 animate-pulse'
-                              : canAccess
-                              ? 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
-                              : 'text-gray-400 cursor-not-allowed opacity-50 font-medium'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
                           }`}
                         >
                           <item.icon size={16} strokeWidth={2} className="w-5 h-5 shrink-0" />
@@ -343,15 +334,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                             </span>
                           )}
                         </button>
-                        {/* セットアップガイドのツールチップ */}
-                        {isCurrentSetupStep && (
-                          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 pointer-events-none">
-                            <div className="relative bg-amber-500 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-lg whitespace-nowrap">
-                              <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-r-amber-500" />
-                              {currentStepInfo?.guideText}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}

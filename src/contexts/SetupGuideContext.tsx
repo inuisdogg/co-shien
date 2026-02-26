@@ -119,24 +119,9 @@ export const SetupGuideProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // セットアップ完了判定
   const isSetupComplete = currentStep === 'completed';
 
-  // メニューアクセス可否判定
-  const canAccessMenu = (menuId: string): boolean => {
-    // セットアップ完了時は全てアクセス可能
-    if (isSetupComplete) return true;
-
-    // ダッシュボードは常にアクセス可能
-    if (menuId === 'dashboard') return true;
-
-    // 現在のステップのメニューはアクセス可能
-    if (currentStepInfo && currentStepInfo.menuId === menuId) return true;
-
-    // 完了済みステップのメニューもアクセス可能（戻って編集できるように）
-    for (const step of completedSteps) {
-      const stepInfo = SETUP_STEPS.find(s => s.id === step);
-      if (stepInfo && stepInfo.menuId === menuId) return true;
-    }
-
-    return false;
+  // メニューアクセス可否判定（全メニュー常にアクセス可能 — ガイドはあくまで案内）
+  const canAccessMenu = (): boolean => {
+    return true;
   };
 
   // ステップ状態を取得
