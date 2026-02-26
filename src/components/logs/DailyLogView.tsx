@@ -31,10 +31,13 @@ import {
   PenLine,
   Filter,
   ArrowLeft,
+  Send,
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { useAuth } from '@/contexts/AuthContext';
 import { ScheduleItem, UsageRecord, ContactLog, ContactLogFormData } from '@/types';
 import UsageRecordForm from '@/components/schedule/UsageRecordForm';
+import { supabase } from '@/lib/supabase';
 
 // フェーズ設定
 const FEATURE_PHASE = parseInt(process.env.NEXT_PUBLIC_FEATURE_PHASE || '1', 10);
@@ -94,6 +97,7 @@ type DaySummary = {
 };
 
 export default function DailyLogView() {
+  const { facility } = useAuth();
   const {
     schedules,
     children: facilityChildren,
@@ -312,6 +316,7 @@ export default function DailyLogView() {
         napNotes: existingContactLog.napNotes || '',
         staffComment: existingContactLog.staffComment || '',
         parentMessage: existingContactLog.parentMessage || '',
+        status: existingContactLog.status || 'draft',
       });
     } else {
       setContactFormData({
@@ -326,32 +331,65 @@ export default function DailyLogView() {
         napNotes: '',
         staffComment: '',
         parentMessage: '',
+        status: 'draft',
       });
     }
   }, [getContactLogByScheduleId]);
 
-  // 連絡帳保存
-  const handleSaveContactLog = async () => {
+  // 連絡帳保存 (下書き or 送信)
+  const handleSaveContactLog = async (mode: 'draft' | 'submit' = 'draft') => {
     const schedule = viewState.type === 'contact-form' ? viewState.schedule : null;
     if (!schedule) return;
 
     setIsSaving(true);
     try {
       const existingContactLog = getContactLogByScheduleId(schedule.id);
+      const status = mode === 'submit' ? 'submitted' : 'draft';
       const data: ContactLogFormData = {
         childId: schedule.childId,
         scheduleId: schedule.id,
         date: schedule.date,
         slot: schedule.slot as 'AM' | 'PM',
+        status,
         ...contactFormData,
       };
 
       if (existingContactLog) {
-        await updateContactLog(existingContactLog.id, data);
+        await updateContactLog(existingContactLog.id, { ...data, status });
       } else {
-        await addContactLog(data);
+        await addContactLog({ ...data, status });
       }
-      alert('連絡帳を保存しました');
+
+      // When submitting to parent, create a notification record
+      if (mode === 'submit') {
+        try {
+          const currentFacilityId = facility?.id || existingContactLog?.facilityId || '';
+          // Look up the child's owner (parent user)
+          const { data: childData } = await supabase
+            .from('children')
+            .select('owner_profile_id, name')
+            .eq('id', schedule.childId)
+            .single();
+
+          if (childData?.owner_profile_id && currentFacilityId) {
+            await supabase.from('notifications').insert({
+              id: `notif-contact-${schedule.id}-${Date.now()}`,
+              facility_id: currentFacilityId,
+              user_id: childData.owner_profile_id,
+              type: 'contact_book_submitted',
+              title: '連絡帳が届きました',
+              message: `${childData.name}さんの${schedule.date}の連絡帳が届きました。内容を確認して署名してください。`,
+              is_read: false,
+            });
+          }
+        } catch (notifErr) {
+          console.error('通知作成エラー:', notifErr);
+          // Notification failure should not block the save
+        }
+        alert('連絡帳を保護者に送信しました');
+      } else {
+        alert('連絡帳を下書き保存しました');
+      }
       // リストに戻る
       setViewState({ type: 'contact-list', date: schedule.date });
     } catch (error) {
@@ -489,11 +527,12 @@ export default function DailyLogView() {
   };
 
   // ステータスバッジコンポーネント
-  const StatusBadge = ({ hasRecord, hasContact, isSigned, mode }: {
+  const StatusBadge = ({ hasRecord, hasContact, isSigned, mode, contactStatus }: {
     hasRecord: boolean;
     hasContact: boolean;
     isSigned: boolean;
     mode: 'usage' | 'contact';
+    contactStatus?: string;
   }) => {
     if (mode === 'usage') {
       return hasRecord ? (
@@ -506,17 +545,31 @@ export default function DailyLogView() {
         </span>
       );
     }
-    // contact mode
-    if (isSigned) {
+    // contact mode: status-based badges
+    if (contactStatus === 'signed' || isSigned) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[11px] font-medium">
-          <Mail className="w-3 h-3" /> 署名済
+          <CheckCircle className="w-3 h-3" /> 署名済
+        </span>
+      );
+    }
+    if (contactStatus === 'submitted') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[11px] font-medium">
+          <Send className="w-3 h-3" /> 送信済
+        </span>
+      );
+    }
+    if (hasContact && contactStatus === 'draft') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[11px] font-medium">
+          <PenLine className="w-3 h-3" /> 下書き
         </span>
       );
     }
     if (hasContact) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[11px] font-medium">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[11px] font-medium">
           <PenLine className="w-3 h-3" /> 署名待ち
         </span>
       );
@@ -710,7 +763,7 @@ export default function DailyLogView() {
               </div>
             ) : (
               <div className="space-y-2">
-                {getFilteredChildren(todayStr).map(({ schedule, hasRecord, hasContact, isSigned }) => (
+                {getFilteredChildren(todayStr).map(({ schedule, hasRecord, hasContact, isSigned, contactLog }) => (
                   <div
                     key={schedule.id}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all"
@@ -730,8 +783,8 @@ export default function DailyLogView() {
 
                     {/* ステータス */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <StatusBadge hasRecord={hasRecord} hasContact={hasContact} isSigned={isSigned} mode="usage" />
-                      <StatusBadge hasRecord={hasRecord} hasContact={hasContact} isSigned={isSigned} mode="contact" />
+                      <StatusBadge hasRecord={hasRecord} hasContact={hasContact} isSigned={isSigned} mode="usage" contactStatus={contactLog?.status} />
+                      <StatusBadge hasRecord={hasRecord} hasContact={hasContact} isSigned={isSigned} mode="contact" contactStatus={contactLog?.status} />
                     </div>
 
                     {/* アクション */}
@@ -1080,7 +1133,7 @@ export default function DailyLogView() {
                             </p>
                           )}
                         </div>
-                        <StatusBadge hasRecord={false} hasContact={hasContact} isSigned={isSigned} mode="contact" />
+                        <StatusBadge hasRecord={false} hasContact={hasContact} isSigned={isSigned} mode="contact" contactStatus={contactLog?.status} />
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button
                             onClick={() => {
@@ -1147,10 +1200,21 @@ export default function DailyLogView() {
                   {schedule.slot === 'AM' ? slotInfo.AM.name : (slotInfo.PM?.name || '午後')}
                 </p>
               </div>
-              {existingContactLog?.isSigned && (
-                <span className="ml-auto inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  署名済み
+              {existingContactLog && (
+                <span className={`ml-auto inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
+                  existingContactLog.status === 'signed' || existingContactLog.isSigned
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : existingContactLog.status === 'submitted'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {existingContactLog.status === 'signed' || existingContactLog.isSigned ? (
+                    <><CheckCircle className="w-3.5 h-3.5" /> 署名済み</>
+                  ) : existingContactLog.status === 'submitted' ? (
+                    <><Send className="w-3.5 h-3.5" /> 送信済み・署名待ち</>
+                  ) : (
+                    <><PenLine className="w-3.5 h-3.5" /> 下書き</>
+                  )}
                 </span>
               )}
             </div>
@@ -1408,30 +1472,59 @@ export default function DailyLogView() {
               </div>
             )}
 
-            {/* ボタン */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-              {existingContactLog && !existingContactLog.isSigned && (
-                <button
-                  onClick={() => handleSign(schedule.id)}
-                  className="flex items-center gap-2 px-5 py-2.5 text-[#00c4cc] border border-[#00c4cc] hover:bg-[#00c4cc]/5 font-bold rounded-lg transition-colors text-sm"
-                >
-                  <PenLine className="w-4 h-4" />
-                  保護者署名
-                </button>
+            {/* ステータスとボタン */}
+            <div className="pt-4 border-t border-gray-200 space-y-3">
+              {/* Status indicator for submitted/signed */}
+              {existingContactLog?.status === 'submitted' && !existingContactLog.isSigned && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
+                  <Send className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">送信済み・署名待ち</span>
+                </div>
               )}
-              <div className="flex-1" />
-              <button
-                onClick={handleSaveContactLog}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                保存する
-              </button>
+
+              {existingContactLog?.status === 'signed' && existingContactLog.signedAt && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-medium text-emerald-800">
+                    署名済み - {existingContactLog.parentSignerName || existingContactLog.signatureData || ''}{' '}
+                    ({new Date(existingContactLog.signedAt).toLocaleString('ja-JP')})
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1" />
+                {/* 下書き保存 */}
+                <button
+                  onClick={() => handleSaveContactLog('draft')}
+                  disabled={isSaving || existingContactLog?.status === 'signed'}
+                  className="flex items-center gap-2 px-5 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  下書き保存
+                </button>
+                {/* 保護者に送信 */}
+                <button
+                  onClick={() => {
+                    if (confirm('この連絡帳を保護者に送信しますか？送信後、保護者の署名が必要になります。')) {
+                      handleSaveContactLog('submit');
+                    }
+                  }}
+                  disabled={isSaving || existingContactLog?.status === 'signed'}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  保護者に送信
+                </button>
+              </div>
             </div>
           </div>
         </div>

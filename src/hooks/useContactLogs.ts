@@ -62,6 +62,8 @@ export const useContactLogs = () => {
             signedAt: row.signed_at || undefined,
             signedByUserId: row.signed_by_user_id || undefined,
             signatureData: row.signature_data || undefined,
+            parentSignerName: row.parent_signer_name || undefined,
+            status: row.status || 'draft',
             createdAt: row.created_at,
             updatedAt: row.updated_at,
             createdBy: row.created_by || undefined,
@@ -126,6 +128,8 @@ export const useContactLogs = () => {
           staff_comment: data.staffComment || null,
           staff_user_id: data.staffUserId || null,
           parent_message: data.parentMessage || null,
+          status: data.status || 'draft',
+          parent_signer_name: data.parentSignerName || null,
           created_at: now,
           updated_at: now,
         })
@@ -169,6 +173,12 @@ export const useContactLogs = () => {
       if (data.napNotes !== undefined) updateData.nap_notes = data.napNotes;
       if (data.staffComment !== undefined) updateData.staff_comment = data.staffComment;
       if (data.parentMessage !== undefined) updateData.parent_message = data.parentMessage;
+      if (data.status !== undefined) updateData.status = data.status;
+      if (data.parentSignerName !== undefined) updateData.parent_signer_name = data.parentSignerName;
+      if (data.isSigned !== undefined) updateData.is_signed = data.isSigned;
+      if (data.signedAt !== undefined) updateData.signed_at = data.signedAt;
+      if (data.signedByUserId !== undefined) updateData.signed_by_user_id = data.signedByUserId;
+      if (data.signatureData !== undefined) updateData.signature_data = data.signatureData;
 
       const { error } = await supabase
         .from('contact_logs')

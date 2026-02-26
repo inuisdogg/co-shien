@@ -1,57 +1,67 @@
 /**
- * 施設への連絡ページ（利用者側）
- * 欠席連絡、利用希望、メッセージ送信
- * チャット/メッセージ風の親しみやすいUI
+ * 連絡帳履歴ページ（利用者側）
+ * 署名待ち / 履歴 タブ切り替え
+ * 署名機能付き
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Building2, Calendar, XCircle, Send, CheckCircle,
-  AlertCircle, Clock, User, MessageSquare, Heart, Loader2
+  AlertCircle, Clock, User, MessageSquare, Heart, Loader2,
+  BookOpen, PenLine, ChevronRight, Smile, Frown, Meh
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-type ContactType = 'absence' | 'schedule' | 'message';
+type ContactLog = {
+  id: string;
+  facility_id: string;
+  child_id: string;
+  date: string;
+  slot?: string;
+  activities?: string;
+  health_status?: string;
+  mood?: string;
+  appetite?: string;
+  meal_main?: boolean;
+  meal_side?: boolean;
+  meal_notes?: string;
+  staff_comment?: string;
+  parent_message?: string;
+  parent_reply?: string;
+  parent_reply_at?: string;
+  status?: string;
+  is_signed: boolean;
+  signed_at?: string;
+  signed_by_user_id?: string;
+  parent_signer_name?: string;
+  created_at: string;
+};
 
-// クイックテンプレート
-const MESSAGE_TEMPLATES = [
-  { label: '体調不良', text: '本日、体調不良のためお休みさせていただきます。' },
-  { label: '食事の変更', text: '食事について相談があります。アレルギーの件でお知らせしたいことがございます。' },
-  { label: '送迎変更', text: '本日の送迎時間を変更させていただきたいです。' },
-  { label: '活動の様子', text: '最近の活動の様子について教えていただけますでしょうか。' },
-  { label: '連絡事項', text: '以下の件についてご連絡いたします。' },
-];
-
-export default function FacilityContactPage() {
+export default function ContactBookPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const facilityId = params.facilityId as string;
   const childIdParam = searchParams.get('child');
-  const typeParam = searchParams.get('type') as ContactType || 'message';
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [facility, setFacility] = useState<any>(null);
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string>('');
-  const [contactType, setContactType] = useState<ContactType>(typeParam);
+  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<'unsigned' | 'history'>('unsigned');
 
-  // フォームデータ
-  const [absenceDate, setAbsenceDate] = useState('');
-  const [absenceReason, setAbsenceReason] = useState('');
-  const [scheduleDate, setScheduleDate] = useState('');
-  const [scheduleSlot, setScheduleSlot] = useState<'AM' | 'PM' | 'AMPM'>('PM');
-  const [scheduleReason, setScheduleReason] = useState('');
-  const [message, setMessage] = useState('');
+  // 署名モーダル
+  const [signingLog, setSigningLog] = useState<ContactLog | null>(null);
+  const [signerName, setSignerName] = useState('');
+  const [signing, setSigning] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,6 +79,7 @@ export default function FacilityContactPage() {
         }
 
         setCurrentUser(user);
+        setSignerName(user.name || `${user.lastName || ''} ${user.firstName || ''}`.trim());
 
         // 施設情報を取得
         const { data: facilityData } = await supabase
@@ -88,10 +99,13 @@ export default function FacilityContactPage() {
           .eq('owner_profile_id', user.id);
 
         if (childrenData && childrenData.length > 0) {
-          setChildren(childrenData);
-
-          // この施設との契約を持つ児童を取得
+          // この施設との契約を持つ児童をフィルタ
           const childIds = childrenData.map((c: any) => c.id);
+
+          // 方法1: children.facility_idで関連チェック
+          const relatedChildren = childrenData.filter((c: any) => c.facility_id === facilityId);
+
+          // 方法2: contractsテーブルで確認
           const { data: contractsData } = await supabase
             .from('contracts')
             .select('child_id')
@@ -99,24 +113,24 @@ export default function FacilityContactPage() {
             .eq('facility_id', facilityId)
             .eq('status', 'active');
 
-          if (contractsData && contractsData.length > 0) {
-            const contractedChildIds = contractsData.map((c: any) => c.child_id);
-            const contractedChildren = childrenData.filter((c: any) => contractedChildIds.includes(c.id));
-            setChildren(contractedChildren);
+          const contractedChildIds = contractsData?.map((c: any) => c.child_id) || [];
+          const allRelatedChildIds = new Set([
+            ...relatedChildren.map((c: any) => c.id),
+            ...contractedChildIds
+          ]);
 
-            // 選択する児童を決定
-            if (childIdParam && contractedChildIds.includes(childIdParam)) {
-              setSelectedChildId(childIdParam);
-            } else if (contractedChildren.length > 0) {
-              setSelectedChildId(contractedChildren[0].id);
-            }
+          const filteredChildren = childrenData.filter((c: any) => allRelatedChildIds.has(c.id));
+          setChildren(filteredChildren.length > 0 ? filteredChildren : childrenData);
+
+          // 選択する児童を決定
+          if (childIdParam && allRelatedChildIds.has(childIdParam)) {
+            setSelectedChildId(childIdParam);
+          } else if (filteredChildren.length > 0) {
+            setSelectedChildId(filteredChildren[0].id);
+          } else if (childrenData.length > 0) {
+            setSelectedChildId(childrenData[0].id);
           }
         }
-
-        // デフォルトの日付を設定
-        const today = new Date().toISOString().split('T')[0];
-        setAbsenceDate(today);
-        setScheduleDate(today);
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
       } finally {
@@ -127,83 +141,102 @@ export default function FacilityContactPage() {
     fetchData();
   }, [facilityId, childIdParam, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSubmitting(true);
+  // 連絡帳データを取得
+  const fetchContactLogs = useCallback(async () => {
+    if (!selectedChildId || !facilityId) return;
 
+    const { data, error: fetchError } = await supabase
+      .from('contact_logs')
+      .select('*')
+      .eq('child_id', selectedChildId)
+      .eq('facility_id', facilityId)
+      .order('date', { ascending: false })
+      .limit(50);
+
+    if (fetchError) {
+      console.error('Contact logs fetch error:', fetchError);
+    } else if (data) {
+      setContactLogs(data);
+    }
+  }, [selectedChildId, facilityId]);
+
+  useEffect(() => {
+    fetchContactLogs();
+  }, [fetchContactLogs]);
+
+  // 署名処理
+  const handleSign = async () => {
+    if (!signingLog || !signerName.trim()) return;
+
+    setSigning(true);
     try {
-      const selectedChild = children.find(c => c.id === selectedChildId);
+      const now = new Date().toISOString();
+      const { error: updateError } = await supabase
+        .from('contact_logs')
+        .update({
+          is_signed: true,
+          signed_at: now,
+          signed_by_user_id: currentUser?.id,
+          parent_signer_name: signerName.trim(),
+          status: 'signed',
+        })
+        .eq('id', signingLog.id);
 
-      if (contactType === 'absence') {
-        // 欠席連絡の場合、該当日のスケジュールを更新
-        const { data: existingSchedule } = await supabase
-          .from('schedules')
-          .select('*')
-          .eq('child_id', selectedChildId)
-          .eq('facility_id', facilityId)
-          .eq('date', absenceDate)
-          .single();
+      if (updateError) throw updateError;
 
-        if (existingSchedule) {
-          await supabase
-            .from('schedules')
-            .update({
-              service_status: '欠席(加算なし)',
-              absence_reason: absenceReason,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingSchedule.id);
-        } else {
-          await supabase
-            .from('schedules')
-            .insert({
-              id: `${selectedChildId}-${absenceDate}-absence`,
-              facility_id: facilityId,
-              child_id: selectedChildId,
-              child_name: selectedChild?.name || '',
-              date: absenceDate,
-              slot: 'PM',
-              service_status: '欠席(加算なし)',
-              absence_reason: absenceReason,
-              created_at: new Date().toISOString(),
-            });
-        }
-      } else if (contactType === 'schedule') {
-        // 利用希望の場合、スケジュールを追加
-        const slots = scheduleSlot === 'AMPM' ? ['AM', 'PM'] : [scheduleSlot];
-
-        for (const slot of slots) {
-          await supabase
-            .from('schedules')
-            .upsert({
-              id: `${selectedChildId}-${scheduleDate}-${slot}-request`,
-              facility_id: facilityId,
-              child_id: selectedChildId,
-              child_name: selectedChild?.name || '',
-              date: scheduleDate,
-              slot: slot,
-              request_status: 'pending',
-              request_reason: scheduleReason,
-              created_at: new Date().toISOString(),
-            }, { onConflict: 'id' });
-        }
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        router.push(`/parent/facilities/${facilityId}?child=${selectedChildId}`);
-      }, 2000);
+      // ローカルの状態を更新
+      setContactLogs(prev => prev.map(log =>
+        log.id === signingLog.id
+          ? { ...log, is_signed: true, signed_at: now, parent_signer_name: signerName.trim(), status: 'signed' }
+          : log
+      ));
+      setSigningLog(null);
     } catch (err: any) {
-      setError(err.message || '送信に失敗しました。もう一度お試しください。');
+      setError(err.message || '署名に失敗しました');
     } finally {
-      setSubmitting(false);
+      setSigning(false);
+    }
+  };
+
+  const unsignedLogs = contactLogs.filter(log => !log.is_signed && log.status === 'submitted');
+  const historyLogs = contactLogs;
+
+  const healthStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'excellent': return '元気';
+      case 'good': return '良好';
+      case 'fair': return '普通';
+      case 'poor': return '体調不良';
+      default: return '-';
+    }
+  };
+
+  const healthStatusColor = (status?: string) => {
+    switch (status) {
+      case 'excellent': return 'text-green-600';
+      case 'good': return 'text-blue-600';
+      case 'fair': return 'text-yellow-600';
+      case 'poor': return 'text-red-600';
+      default: return 'text-gray-400';
+    }
+  };
+
+  const moodIcon = (mood?: string) => {
+    switch (mood) {
+      case 'very_happy':
+      case 'happy':
+        return <Smile className="w-4 h-4 text-green-500" />;
+      case 'neutral':
+        return <Meh className="w-4 h-4 text-yellow-500" />;
+      case 'sad':
+      case 'upset':
+        return <Frown className="w-4 h-4 text-red-500" />;
+      default:
+        return null;
     }
   };
 
   const selectedChild = children.find(c => c.id === selectedChildId);
-  const today = new Date();
-  const dateStr = today.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
 
   if (loading) {
     return (
@@ -223,33 +256,15 @@ export default function FacilityContactPage() {
           <div className="animate-pulse space-y-4">
             <div className="h-20 bg-white rounded-xl" />
             <div className="h-40 bg-white rounded-xl" />
-            <div className="h-12 bg-gray-200 rounded-xl" />
           </div>
         </main>
       </div>
     );
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={40} className="text-green-500" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">送信しました</h2>
-          <p className="text-gray-600 mb-2">
-            {contactType === 'absence' ? '欠席連絡' : contactType === 'schedule' ? '利用希望' : 'メッセージ'}を{facility?.name}に送信しました。
-          </p>
-          <p className="text-sm text-gray-400">施設の詳細ページに戻ります...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ヘッダー: チャットアプリ風 */}
+      {/* ヘッダー */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
@@ -259,50 +274,44 @@ export default function FacilityContactPage() {
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="w-10 h-10 bg-[#F6AD55]/10 rounded-full flex items-center justify-center shrink-0">
-              <Building2 size={20} className="text-[#F6AD55]" />
+            <div className="w-10 h-10 bg-[#F472B6]/10 rounded-full flex items-center justify-center shrink-0">
+              <BookOpen size={20} className="text-[#F472B6]" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="font-bold text-gray-800 text-sm truncate">{facility?.name || '施設'}</h1>
-              <p className="text-xs text-gray-500">{dateStr}</p>
+              <h1 className="font-bold text-gray-800 text-sm truncate">
+                連絡帳 - {facility?.name || '施設'}
+              </h1>
+              {selectedChild && (
+                <p className="text-xs text-gray-500">{selectedChild.name}さん</p>
+              )}
             </div>
-            {selectedChild && (
-              <div className="flex items-center gap-2 bg-[#F6AD55]/10 rounded-full px-3 py-1">
-                <User size={14} className="text-[#F6AD55]" />
-                <span className="text-xs font-medium text-gray-700">{selectedChild.name}</span>
-              </div>
-            )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium">送信できませんでした</p>
-              <p className="text-xs text-red-600 mt-0.5">{error}</p>
-            </div>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            {error}
           </div>
         )}
 
-        {/* 児童選択（複数の場合） */}
+        {/* 児童選択 */}
         {children.length > 1 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <label className="block text-xs font-bold text-gray-500 mb-2">お子様を選択</label>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
             <div className="flex gap-2 flex-wrap">
               {children.map((child) => (
                 <button
                   key={child.id}
                   onClick={() => setSelectedChildId(child.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all text-sm font-medium ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
                     selectedChildId === child.id
-                      ? 'border-[#F6AD55] bg-[#F6AD55]/10 text-[#D97706]'
+                      ? 'border-[#F472B6] bg-[#F472B6]/10 text-[#EC4899]'
                       : 'border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}
                 >
-                  <User size={16} />
+                  <User size={14} />
                   {child.name}
                 </button>
               ))}
@@ -310,221 +319,247 @@ export default function FacilityContactPage() {
           </div>
         )}
 
-        {/* 連絡タイプ選択: カード型 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <label className="block text-xs font-bold text-gray-500 mb-3">連絡の種類</label>
-          <div className="grid grid-cols-3 gap-3">
+        {/* タブ */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="flex border-b border-gray-200">
             <button
-              type="button"
-              onClick={() => setContactType('absence')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                contactType === 'absence'
-                  ? 'border-red-400 bg-red-50 shadow-sm'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+              onClick={() => setActiveTab('unsigned')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition-colors ${
+                activeTab === 'unsigned'
+                  ? 'border-[#F472B6] text-[#EC4899] bg-pink-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                contactType === 'absence' ? 'bg-red-100' : 'bg-gray-100'
-              }`}>
-                <XCircle size={20} className={contactType === 'absence' ? 'text-red-600' : 'text-gray-400'} />
-              </div>
-              <span className={`text-sm font-bold ${contactType === 'absence' ? 'text-red-800' : 'text-gray-600'}`}>
-                欠席連絡
-              </span>
+              <PenLine className="w-4 h-4" />
+              署名待ち
+              {unsignedLogs.length > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  {unsignedLogs.length}
+                </span>
+              )}
             </button>
             <button
-              type="button"
-              onClick={() => setContactType('schedule')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                contactType === 'schedule'
-                  ? 'border-blue-400 bg-blue-50 shadow-sm'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+              onClick={() => setActiveTab('history')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition-colors ${
+                activeTab === 'history'
+                  ? 'border-[#F472B6] text-[#EC4899] bg-pink-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                contactType === 'schedule' ? 'bg-blue-100' : 'bg-gray-100'
-              }`}>
-                <Calendar size={20} className={contactType === 'schedule' ? 'text-blue-600' : 'text-gray-400'} />
-              </div>
-              <span className={`text-sm font-bold ${contactType === 'schedule' ? 'text-blue-800' : 'text-gray-600'}`}>
-                利用希望
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setContactType('message')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                contactType === 'message'
-                  ? 'border-[#F6AD55] bg-orange-50 shadow-sm'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                contactType === 'message' ? 'bg-orange-100' : 'bg-gray-100'
-              }`}>
-                <MessageSquare size={20} className={contactType === 'message' ? 'text-[#F6AD55]' : 'text-gray-400'} />
-              </div>
-              <span className={`text-sm font-bold ${contactType === 'message' ? 'text-orange-800' : 'text-gray-600'}`}>
-                メッセージ
-              </span>
+              <Calendar className="w-4 h-4" />
+              履歴
             </button>
           </div>
+
+          <div className="p-4">
+            {/* 署名待ちタブ */}
+            {activeTab === 'unsigned' && (
+              <div>
+                {unsignedLogs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                    <p className="text-gray-600 font-medium">署名待ちの連絡帳はありません</p>
+                    <p className="text-sm text-gray-400 mt-1">全て署名済みです</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {unsignedLogs.map((log) => (
+                      <div key={log.id} className="border border-[#F472B6]/30 bg-pink-50/50 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-gray-800">{log.date}</span>
+                            {log.slot && (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                {log.slot === 'AM' ? '午前' : '午後'}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs bg-[#F472B6] text-white px-2 py-0.5 rounded-full font-bold">
+                            署名待ち
+                          </span>
+                        </div>
+
+                        {/* 活動内容 */}
+                        {log.activities && (
+                          <div className="mb-2">
+                            <p className="text-xs font-bold text-gray-500 mb-1">活動内容</p>
+                            <p className="text-sm text-gray-700 bg-white rounded-lg p-2">{log.activities}</p>
+                          </div>
+                        )}
+
+                        {/* 体調・様子 */}
+                        <div className="flex items-center gap-4 mb-2">
+                          {log.health_status && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-gray-500">体調:</span>
+                              <span className={`text-xs font-bold ${healthStatusColor(log.health_status)}`}>
+                                {healthStatusLabel(log.health_status)}
+                              </span>
+                            </div>
+                          )}
+                          {log.mood && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-gray-500">機嫌:</span>
+                              {moodIcon(log.mood)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* スタッフコメント */}
+                        {log.staff_comment && (
+                          <div className="mb-3">
+                            <p className="text-xs font-bold text-gray-500 mb-1">スタッフからのコメント</p>
+                            <p className="text-sm text-gray-700 bg-white rounded-lg p-2 border-l-4 border-[#F472B6]">
+                              {log.staff_comment}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* 署名ボタン */}
+                        <button
+                          onClick={() => setSigningLog(log)}
+                          className="w-full mt-2 py-2.5 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          <PenLine className="w-4 h-4" />
+                          署名する
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 履歴タブ */}
+            {activeTab === 'history' && (
+              <div>
+                {historyLogs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-600 font-medium">連絡帳の履歴がありません</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {historyLogs.map((log) => (
+                      <div key={log.id} className={`border rounded-xl p-4 ${
+                        log.is_signed ? 'border-gray-100 bg-white' : 'border-yellow-200 bg-yellow-50/50'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-gray-800">{log.date}</span>
+                            {log.slot && (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                {log.slot === 'AM' ? '午前' : '午後'}
+                              </span>
+                            )}
+                          </div>
+                          {log.is_signed ? (
+                            <span className="text-xs text-green-600 font-bold flex items-center gap-1">
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              署名済み {log.signed_at && `(${new Date(log.signed_at).toLocaleDateString('ja-JP')} ${new Date(log.signed_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })})`}
+                            </span>
+                          ) : log.status === 'submitted' ? (
+                            <button
+                              onClick={() => setSigningLog(log)}
+                              className="text-xs bg-[#F472B6] text-white px-2 py-1 rounded-full font-bold hover:bg-[#EC4899]"
+                            >
+                              署名する
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-400">下書き</span>
+                          )}
+                        </div>
+
+                        {log.activities && (
+                          <p className="text-sm text-gray-700 mb-1">
+                            <span className="text-xs text-gray-500">活動: </span>
+                            {log.activities.length > 60 ? `${log.activities.substring(0, 60)}...` : log.activities}
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          {log.health_status && (
+                            <span className={healthStatusColor(log.health_status)}>
+                              {healthStatusLabel(log.health_status)}
+                            </span>
+                          )}
+                          {log.mood && moodIcon(log.mood)}
+                          {log.staff_comment && (
+                            <span className="text-gray-400">コメントあり</span>
+                          )}
+                        </div>
+
+                        {log.is_signed && log.parent_signer_name && (
+                          <p className="text-xs text-gray-400 mt-2">
+                            署名者: {log.parent_signer_name}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+      </main>
 
-        {/* フォーム */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
-          {/* 欠席連絡フォーム */}
-          {contactType === 'absence' && (
-            <>
+      {/* 署名モーダル */}
+      {signingLog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md shadow-xl">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800">連絡帳に署名</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {signingLog.date}の連絡帳を確認しました。
+              </p>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* ログの概要 */}
+              <div className="bg-gray-50 rounded-xl p-3">
+                {signingLog.activities && (
+                  <p className="text-sm text-gray-700 mb-1"><span className="font-bold">活動:</span> {signingLog.activities}</p>
+                )}
+                {signingLog.staff_comment && (
+                  <p className="text-sm text-gray-700"><span className="font-bold">コメント:</span> {signingLog.staff_comment}</p>
+                )}
+              </div>
+
+              {/* 署名者名 */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">欠席日</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">署名者名</label>
                 <input
-                  type="date"
-                  value={absenceDate}
-                  onChange={(e) => setAbsenceDate(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 text-base"
-                  required
+                  type="text"
+                  value={signerName}
+                  onChange={(e) => setSignerName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  placeholder="保護者名を入力"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">欠席理由</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
-                  {['体調不良', '家庭の事情', '学校行事', '通院', 'その他'].map((reason) => (
-                    <button
-                      key={reason}
-                      type="button"
-                      onClick={() => setAbsenceReason(reason)}
-                      className={`px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                        absenceReason === reason
-                          ? 'border-red-400 bg-red-50 text-red-700'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      {reason}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* 利用希望フォーム */}
-          {contactType === 'schedule' && (
-            <>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">希望日</label>
-                <input
-                  type="date"
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 text-base"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">希望時間帯</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: 'AM', label: '午前', sub: '9:00-12:00' },
-                    { value: 'PM', label: '午後', sub: '13:00-17:00' },
-                    { value: 'AMPM', label: '終日', sub: '9:00-17:00' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setScheduleSlot(option.value as 'AM' | 'PM' | 'AMPM')}
-                      className={`p-3 rounded-xl border-2 transition-all text-center ${
-                        scheduleSlot === option.value
-                          ? 'border-blue-400 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <p className={`text-sm font-bold ${scheduleSlot === option.value ? 'text-blue-800' : 'text-gray-600'}`}>
-                        {option.label}
-                      </p>
-                      <p className={`text-[10px] mt-0.5 ${scheduleSlot === option.value ? 'text-blue-500' : 'text-gray-400'}`}>
-                        {option.sub}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">希望理由（任意）</label>
-                <textarea
-                  value={scheduleReason}
-                  onChange={(e) => setScheduleReason(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 text-base"
-                  rows={3}
-                  placeholder="追加利用や振替の理由があれば入力してください"
-                />
-              </div>
-            </>
-          )}
-
-          {/* メッセージフォーム */}
-          {contactType === 'message' && (
-            <div className="space-y-4">
-              {/* クイックテンプレート */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-2">よく使うテンプレート</label>
-                <div className="flex flex-wrap gap-2">
-                  {MESSAGE_TEMPLATES.map((template) => (
-                    <button
-                      key={template.label}
-                      type="button"
-                      onClick={() => setMessage(template.text)}
-                      className="px-3 py-1.5 bg-gray-50 hover:bg-[#F6AD55]/10 border border-gray-200 hover:border-[#F6AD55]/30 rounded-full text-xs font-medium text-gray-600 hover:text-[#D97706] transition-all"
-                    >
-                      {template.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">メッセージ</label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
-                  rows={6}
-                  placeholder="施設へのメッセージを入力してください..."
-                  required
-                />
-                <p className="text-xs text-gray-400 mt-1.5 text-right">
-                  {message.length} 文字
-                </p>
               </div>
             </div>
-          )}
-
-          {/* 送信ボタン */}
-          <button
-            type="submit"
-            disabled={submitting || (contactType === 'absence' && !absenceReason)}
-            className={`w-full font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base ${
-              contactType === 'absence'
-                ? 'bg-red-500 hover:bg-red-600 text-white'
-                : contactType === 'schedule'
-                ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                : 'bg-[#F6AD55] hover:bg-[#ED8936] text-white'
-            }`}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                送信中...
-              </>
-            ) : (
-              <>
-                <Send className="w-5 h-5" />
-                {contactType === 'absence' ? '欠席連絡を送信' : contactType === 'schedule' ? '利用希望を送信' : 'メッセージを送信'}
-              </>
-            )}
-          </button>
-        </form>
-      </main>
+            <div className="p-4 border-t border-gray-200 flex gap-2">
+              <button
+                onClick={() => setSigningLog(null)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleSign}
+                disabled={signing || !signerName.trim()}
+                className="flex-1 py-3 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {signing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <PenLine className="w-4 h-4" />
+                )}
+                署名する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

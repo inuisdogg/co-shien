@@ -777,7 +777,7 @@ export const useTalentManagement = () => {
 
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, name, email')
+        .select('id, name, email, profile_photo_url')
         .in('id', userIds);
 
       const usersMap = new Map((usersData || []).map(u => [u.id, u]));
@@ -796,6 +796,7 @@ export const useTalentManagement = () => {
           employmentType: emp.employment_type || '常勤',
           startDate: emp.start_date || '',
           tenureDays,
+          profilePhotoUrl: (user as any)?.profile_photo_url || undefined,
         };
       });
     } catch {

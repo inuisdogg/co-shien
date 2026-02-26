@@ -268,6 +268,20 @@ export default function PersonalDashboardPage() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const enrollmentCertRef = useRef<HTMLDivElement>(null);
   const trainingHistoryRef = useRef<HTMLDivElement>(null);
+  const resumeFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 履歴書アップロード用の状態
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [uploadedResumes, setUploadedResumes] = useState<Array<{
+    id: string;
+    fileName: string;
+    filePath: string;
+    fileSize: number;
+    uploadType: string;
+    createdAt: string;
+  }>>([]);
+  const [showResumeUploadConfirm, setShowResumeUploadConfirm] = useState(false);
+  const [lastUploadedFileName, setLastUploadedFileName] = useState('');
 
   // キャリア自動蓄積データ
   const [showAnnualDetails, setShowAnnualDetails] = useState(false);
@@ -399,6 +413,87 @@ export default function PersonalDashboardPage() {
       alert('写真のアップロードに失敗しました');
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  // 既存の履歴書をアップロード
+  const handleResumeFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingResume(true);
+    try {
+      const timestamp = Date.now();
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${user.id}/resumes/${timestamp}_${safeFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-photos')
+        .upload(filePath, file, { upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      // DBに記録を保存
+      const { data: insertData, error: insertError } = await supabase
+        .from('resume_uploads')
+        .insert({
+          user_id: user.id,
+          file_path: filePath,
+          file_name: file.name,
+          file_size: file.size,
+          upload_type: 'resume',
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // アップロード一覧を更新
+      setUploadedResumes(prev => [{
+        id: insertData.id,
+        fileName: file.name,
+        filePath: filePath,
+        fileSize: file.size,
+        uploadType: 'resume',
+        createdAt: insertData.created_at,
+      }, ...prev]);
+
+      setLastUploadedFileName(file.name);
+      setShowResumeUploadConfirm(true);
+    } catch (error) {
+      console.error('履歴書アップロードエラー:', error);
+      alert('履歴書のアップロードに失敗しました');
+    } finally {
+      setUploadingResume(false);
+      // inputをリセット
+      if (resumeFileInputRef.current) {
+        resumeFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // アップロード済み履歴書を取得
+  const loadUploadedResumes = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('resume_uploads')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setUploadedResumes(data.map((r: any) => ({
+          id: r.id,
+          fileName: r.file_name,
+          filePath: r.file_path,
+          fileSize: r.file_size || 0,
+          uploadType: r.upload_type || 'resume',
+          createdAt: r.created_at,
+        })));
+      }
+    } catch (err) {
+      console.error('アップロード済み履歴書取得エラー:', err);
     }
   };
 
@@ -740,6 +835,14 @@ export default function PersonalDashboardPage() {
     loadUserData();
   }, [router, isRedirecting]);
 
+  // アップロード済み履歴書を取得
+  useEffect(() => {
+    if (user?.id) {
+      loadUploadedResumes();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   // 通知・アクションを取得
   useEffect(() => {
     if (!user?.id) {
@@ -960,6 +1063,7 @@ export default function PersonalDashboardPage() {
                 ref={photoInputRef}
                 type="file"
                 accept="image/*"
+                capture="environment"
                 onChange={handlePhotoUpload}
                 className="hidden"
               />
@@ -1553,6 +1657,120 @@ export default function PersonalDashboardPage() {
               </button>
             </div>
           </motion.div>
+
+          {/* ===== 既存の履歴書アップロード ===== */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+          >
+            <h2 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-[#818CF8]" />
+              既存の履歴書をアップロード
+            </h2>
+            <p className="text-xs text-gray-500 mb-4">お手持ちの履歴書PDFをアップロードして保管できます</p>
+
+            {/* アップロードエリア */}
+            <div
+              onClick={() => resumeFileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 hover:border-[#818CF8] rounded-xl p-6 text-center cursor-pointer transition-colors group"
+            >
+              {uploadingResume ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-8 h-8 text-[#818CF8] animate-spin" />
+                  <p className="text-sm text-gray-600">アップロード中...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 bg-[#818CF8]/10 rounded-full flex items-center justify-center group-hover:bg-[#818CF8]/20 transition-colors">
+                    <Upload className="w-6 h-6 text-[#818CF8]" />
+                  </div>
+                  <p className="text-sm font-bold text-gray-700">クリックしてファイルを選択</p>
+                  <p className="text-xs text-gray-400">PDF, 画像ファイル対応</p>
+                </div>
+              )}
+            </div>
+            <input
+              ref={resumeFileInputRef}
+              type="file"
+              accept=".pdf,image/*"
+              onChange={handleResumeFileUpload}
+              className="hidden"
+            />
+
+            {/* アップロード済みファイル一覧 */}
+            {uploadedResumes.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h3 className="text-sm font-bold text-gray-700">アップロード済み</h3>
+                {uploadedResumes.map((resume) => (
+                  <div key={resume.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="w-5 h-5 text-[#818CF8] flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{resume.fileName}</p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(resume.createdAt).toLocaleDateString('ja-JP')} ・ {(resume.fileSize / 1024).toFixed(0)}KB
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href="#"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const { data } = supabase.storage
+                          .from('profile-photos')
+                          .getPublicUrl(resume.filePath);
+                        if (data?.publicUrl) {
+                          window.open(data.publicUrl, '_blank');
+                        }
+                      }}
+                      className="text-xs text-[#818CF8] hover:text-[#6366F1] font-bold flex-shrink-0"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* アップロード完了確認モーダル */}
+          {showResumeUploadConfirm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-xl shadow-xl w-full max-w-md p-6"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800">アップロード完了</h3>
+                    <p className="text-xs text-gray-500">{lastUploadedFileName}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  履歴書がアップロードされました。キャリアタブの基本プロフィールを更新して、履歴書の情報を反映しましょう。
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowResumeUploadConfirm(false)}
+                    className="flex-1 py-2 px-4 bg-[#818CF8] text-white font-bold rounded-lg hover:bg-[#6366F1] transition-colors text-sm"
+                  >
+                    プロフィールを編集
+                  </button>
+                  <button
+                    onClick={() => setShowResumeUploadConfirm(false)}
+                    className="py-2 px-4 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
 
           {/* A. 基本情報（履歴書） */}
           <motion.div

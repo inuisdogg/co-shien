@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Staff, StaffPersonnelSettings, QUALIFICATION_CODES } from '@/types';
+import StaffAvatar from './StaffAvatar';
 
 interface StaffCardProps {
   staff: Staff;
@@ -84,9 +85,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
         }`}
         onClick={onClick}
       >
-        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-          <User size={16} className="text-gray-500" />
-        </div>
+        <StaffAvatar name={staff.name} photoUrl={staff.profilePhotoUrl} size="sm" />
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-gray-800 truncate">
             {staff.name}
@@ -115,11 +114,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
       >
         <div className="flex items-start gap-3">
           {/* アバター */}
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-lg">
-              {staff.name?.charAt(0) || '?'}
-            </span>
-          </div>
+          <StaffAvatar name={staff.name} photoUrl={staff.profilePhotoUrl} size="lg" />
 
           {/* 情報 */}
           <div className="flex-1 min-w-0">
@@ -180,11 +175,17 @@ const StaffCard: React.FC<StaffCardProps> = ({
     >
       <div className="flex items-start gap-4">
         {/* アバター */}
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-2xl">
-            {staff.name?.charAt(0) || '?'}
-          </span>
-        </div>
+        {staff.profilePhotoUrl ? (
+          <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
+            <img src={staff.profilePhotoUrl} alt={staff.name} className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-2xl">
+              {staff.name?.charAt(0) || '?'}
+            </span>
+          </div>
+        )}
 
         {/* 情報 */}
         <div className="flex-1">

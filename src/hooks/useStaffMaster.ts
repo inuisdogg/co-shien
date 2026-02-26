@@ -109,7 +109,7 @@ export function useStaffMaster(): UseStaffMasterReturn {
         if (userIds.length > 0) {
           const { data: usersData } = await supabase
             .from('users')
-            .select('id, name, email, phone, account_status')
+            .select('id, name, email, phone, account_status, profile_photo_url')
             .in('id', userIds);
 
           if (usersData) {
@@ -137,6 +137,7 @@ export function useStaffMaster(): UseStaffMasterReturn {
                   type: (emp.employment_type === '常勤' ? '常勤' : '非常勤') as Staff['type'],
                   phone: user.phone || matchingStaffRecord?.phone || undefined,
                   email: user.email || matchingStaffRecord?.email || undefined,
+                  profilePhotoUrl: (user as any).profile_photo_url || undefined,
                   qualifications: matchingStaffRecord?.qualifications || undefined,
                   yearsOfExperience: matchingStaffRecord?.years_of_experience || undefined,
                   emergencyContact: matchingStaffRecord?.emergency_contact || undefined,

@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
 import { useChangeNotifications, detectSettingsChanges, daysUntilDeadline, getDeadlineColor, getDeadlineBgColor } from '@/hooks/useChangeNotifications';
 import ChangeNotificationList from './ChangeNotificationList';
+import OperationsReviewWizard from './OperationsReviewWizard';
 // タブの種類
 type SettingsTab = 'basic' | 'operation' | 'change_notifications';
 
@@ -68,6 +69,7 @@ const FacilitySettingsView: React.FC = () => {
   const [newTimeSlot, setNewTimeSlot] = useState({ name: '', startTime: '09:00', endTime: '12:00', capacity: 10 });
   const [editingTimeSlotId, setEditingTimeSlotId] = useState<string | null>(null);
   const [isAddressLoading, setIsAddressLoading] = useState(false);
+  const [showOperationsWizard, setShowOperationsWizard] = useState(false);
 
   // 郵便番号から住所を検索
   const lookupAddress = async () => {
@@ -321,16 +323,25 @@ const FacilitySettingsView: React.FC = () => {
     <div className="space-y-5 animate-in fade-in duration-500">
       {/* ヘッダー */}
       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
-              <Settings size={18} className="text-[#00c4cc]" />
-            </div>
-            施設情報設定
-          </h2>
-          <p className="text-gray-500 text-sm mt-2">
-            定休日、営業時間、受け入れ人数などの施設情報を設定します
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                <Settings size={18} className="text-[#00c4cc]" />
+              </div>
+              施設情報設定
+            </h2>
+            <p className="text-gray-500 text-sm mt-2">
+              定休日、営業時間、受け入れ人数などの施設情報を設定します
+            </p>
+          </div>
+          <button
+            onClick={() => setShowOperationsWizard(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#00c4cc] text-white rounded-xl text-sm font-bold hover:bg-[#00b0b8] transition-colors shadow-sm shrink-0"
+          >
+            <FileText size={16} />
+            来月の運営確認
+          </button>
         </div>
       </div>
 
@@ -1358,6 +1369,15 @@ const FacilitySettingsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 月次運営確認ウィザード */}
+      <OperationsReviewWizard
+        isOpen={showOperationsWizard}
+        onClose={() => setShowOperationsWizard(false)}
+        onComplete={() => {
+          refetchNotifications();
+        }}
+      />
 
       {/* 履歴モーダル */}
       {isHistoryModalOpen && (

@@ -120,7 +120,7 @@ function SkeletonCard() {
 }
 
 export default function FinanceView() {
-  const { facility } = useAuth();
+  const { facility, user } = useAuth();
   const facilityId = facility?.id || '';
 
   const [activeTab, setActiveTab] = useState<TabId>('expenses');
@@ -131,6 +131,9 @@ export default function FinanceView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddFinancialModal, setShowAddFinancialModal] = useState(false);
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [savingFinancial, setSavingFinancial] = useState(false);
 
   // Add expense form
   const [newExpense, setNewExpense] = useState({
@@ -139,6 +142,20 @@ export default function FinanceView() {
     expenseDate: new Date().toISOString().split('T')[0],
     category: DEFAULT_CATEGORIES[0],
     description: '',
+  });
+
+  // Add monthly financial form
+  const currentDate = new Date();
+  const [newFinancial, setNewFinancial] = useState({
+    year: String(currentDate.getFullYear()),
+    month: String(currentDate.getMonth() + 1),
+    revenueService: '',
+    revenueOther: '',
+    expensePersonnel: '',
+    expenseFixed: '',
+    expenseVariable: '',
+    expenseOther: '',
+    notes: '',
   });
 
   useEffect(() => {
@@ -237,6 +254,116 @@ export default function FinanceView() {
       setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, status: 'approved' as ExpenseStatus, approvedAt: new Date().toISOString() } : e));
     } catch (error) {
       console.error('Error approving expense:', error);
+    }
+  };
+
+  const handleAddExpense = async () => {
+    if (!newExpense.title || !newExpense.amount || !facilityId || !user) return;
+    setSavingExpense(true);
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert({
+          facility_id: facilityId,
+          staff_id: user.id,
+          submitted_by_user_id: user.id,
+          title: newExpense.title,
+          amount: parseFloat(newExpense.amount),
+          expense_date: newExpense.expenseDate,
+          category: newExpense.category,
+          description: newExpense.description || null,
+          status: 'pending',
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        setExpenses(prev => [mapExpenseRow(data), ...prev]);
+      }
+      setNewExpense({
+        title: '',
+        amount: '',
+        expenseDate: new Date().toISOString().split('T')[0],
+        category: DEFAULT_CATEGORIES[0],
+        description: '',
+      });
+      setShowAddModal(false);
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      alert('経費の追加に失敗しました');
+    } finally {
+      setSavingExpense(false);
+    }
+  };
+
+  const handleAddMonthlyFinancial = async () => {
+    if (!newFinancial.year || !newFinancial.month || !facilityId) return;
+    setSavingFinancial(true);
+    try {
+      const now = new Date().toISOString();
+      const revenueService = parseFloat(newFinancial.revenueService) || 0;
+      const revenueOther = parseFloat(newFinancial.revenueOther) || 0;
+      const expPersonnel = parseFloat(newFinancial.expensePersonnel) || 0;
+      const expFixed = parseFloat(newFinancial.expenseFixed) || 0;
+      const expVariable = parseFloat(newFinancial.expenseVariable) || 0;
+      const expOther = parseFloat(newFinancial.expenseOther) || 0;
+      const totalRevenue = revenueService + revenueOther;
+      const totalExpense = expPersonnel + expFixed + expVariable + expOther;
+      const grossProfit = totalRevenue - expPersonnel;
+      const operatingProfit = totalRevenue - totalExpense;
+      const netCashFlow = operatingProfit;
+
+      const { data, error } = await supabase
+        .from('monthly_financials')
+        .insert({
+          facility_id: facilityId,
+          year: parseInt(newFinancial.year),
+          month: parseInt(newFinancial.month),
+          revenue_service: revenueService,
+          revenue_other: revenueOther,
+          expense_personnel: expPersonnel,
+          expense_fixed: expFixed,
+          expense_variable: expVariable,
+          expense_other: expOther,
+          gross_profit: grossProfit,
+          operating_profit: operatingProfit,
+          net_cash_flow: netCashFlow,
+          notes: newFinancial.notes || null,
+          is_finalized: false,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        setFinancials(prev => {
+          const updated = [mapFinancialRow(data), ...prev];
+          updated.sort((a, b) => b.year - a.year || b.month - a.month);
+          return updated;
+        });
+      }
+      const resetDate = new Date();
+      setNewFinancial({
+        year: String(resetDate.getFullYear()),
+        month: String(resetDate.getMonth() + 1),
+        revenueService: '',
+        revenueOther: '',
+        expensePersonnel: '',
+        expenseFixed: '',
+        expenseVariable: '',
+        expenseOther: '',
+        notes: '',
+      });
+      setShowAddFinancialModal(false);
+    } catch (error) {
+      console.error('Error adding monthly financial:', error);
+      alert('月次財務データの追加に失敗しました');
+    } finally {
+      setSavingFinancial(false);
     }
   };
 
@@ -540,13 +667,34 @@ export default function FinanceView() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-bold text-gray-800">損益計算書</h2>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-              <Printer className="w-3.5 h-3.5" />
-              印刷
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddFinancialModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#00c4cc] rounded-lg hover:bg-[#00b0b8] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                月次データ追加
+              </button>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <Printer className="w-3.5 h-3.5" />
+                印刷
+              </button>
+            </div>
           </div>
           {financials.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">月次財務データがありません</div>
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
+                <BarChart3 className="w-8 h-8 text-gray-300" />
+              </div>
+              <p className="text-gray-500 mb-2">月次財務データがありません</p>
+              <button
+                onClick={() => setShowAddFinancialModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors mt-2"
+              >
+                <Plus className="w-4 h-4" />
+                記録を作成
+              </button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -604,13 +752,34 @@ export default function FinanceView() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-bold text-gray-800">キャッシュフロー推移</h2>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-              <Printer className="w-3.5 h-3.5" />
-              印刷
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddFinancialModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#00c4cc] rounded-lg hover:bg-[#00b0b8] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                月次データ追加
+              </button>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <Printer className="w-3.5 h-3.5" />
+                印刷
+              </button>
+            </div>
           </div>
           {financials.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">月次財務データがありません</div>
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
+                <TrendingUp className="w-8 h-8 text-gray-300" />
+              </div>
+              <p className="text-gray-500 mb-2">月次財務データがありません</p>
+              <button
+                onClick={() => setShowAddFinancialModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors mt-2"
+              >
+                <Plus className="w-4 h-4" />
+                記録を作成
+              </button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -655,6 +824,145 @@ export default function FinanceView() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Add Monthly Financial Modal */}
+      {showAddFinancialModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-800">月次財務データを追加</h2>
+              <button onClick={() => setShowAddFinancialModal(false)}>
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    年 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={newFinancial.year}
+                    onChange={e => setNewFinancial(prev => ({ ...prev, year: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                    placeholder="2026"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    月 <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={newFinancial.month}
+                    onChange={e => setNewFinancial(prev => ({ ...prev, month: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  >
+                    {[...Array(12)].map((_, i) => (
+                      <option key={i + 1} value={String(i + 1)}>{i + 1}月</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-sm font-medium text-gray-700 mb-2">収入</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">サービス収入</label>
+                    <input
+                      type="number"
+                      value={newFinancial.revenueService}
+                      onChange={e => setNewFinancial(prev => ({ ...prev, revenueService: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">その他収入</label>
+                    <input
+                      type="number"
+                      value={newFinancial.revenueOther}
+                      onChange={e => setNewFinancial(prev => ({ ...prev, revenueOther: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-sm font-medium text-gray-700 mb-2">支出</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">人件費</label>
+                    <input
+                      type="number"
+                      value={newFinancial.expensePersonnel}
+                      onChange={e => setNewFinancial(prev => ({ ...prev, expensePersonnel: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">固定費</label>
+                    <input
+                      type="number"
+                      value={newFinancial.expenseFixed}
+                      onChange={e => setNewFinancial(prev => ({ ...prev, expenseFixed: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">変動費</label>
+                    <input
+                      type="number"
+                      value={newFinancial.expenseVariable}
+                      onChange={e => setNewFinancial(prev => ({ ...prev, expenseVariable: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">その他経費</label>
+                    <input
+                      type="number"
+                      value={newFinancial.expenseOther}
+                      onChange={e => setNewFinancial(prev => ({ ...prev, expenseOther: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">備考</label>
+                <textarea
+                  value={newFinancial.notes}
+                  onChange={e => setNewFinancial(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={2}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  placeholder="補足メモ..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowAddFinancialModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleAddMonthlyFinancial}
+                disabled={!newFinancial.year || !newFinancial.month || savingFinancial}
+                className="px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {savingFinancial ? '保存中...' : '追加'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -737,10 +1045,11 @@ export default function FinanceView() {
                 キャンセル
               </button>
               <button
-                disabled={!newExpense.title || !newExpense.amount}
+                onClick={handleAddExpense}
+                disabled={!newExpense.title || !newExpense.amount || savingExpense}
                 className="px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                追加
+                {savingExpense ? '保存中...' : '追加'}
               </button>
             </div>
           </div>

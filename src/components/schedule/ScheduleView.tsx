@@ -4,12 +4,31 @@
 
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap, ClipboardList, Settings, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap, ClipboardList, Settings, AlertTriangle, Inbox, CheckCircle, XCircle } from 'lucide-react';
 import { TimeSlot, ScheduleItem, Child, FacilityTimeSlot } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import SlotAssignmentPanel from './SlotAssignmentPanel';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
+
+// 利用申請の型
+type UsageRequestItem = {
+  id: string;
+  facility_id: string;
+  child_id: string;
+  parent_user_id: string;
+  request_month: string;
+  requested_dates: Array<{ date: string; slot: string; notes: string }>;
+  status: string;
+  facility_response?: Array<{ date: string; approved: boolean }>;
+  facility_notes?: string;
+  submitted_at: string;
+  responded_at?: string;
+  child_name?: string;
+  parent_name?: string;
+};
 
 const ScheduleView: React.FC = () => {
   const {
@@ -26,6 +45,139 @@ const ScheduleView: React.FC = () => {
     timeSlots,
     loadingTimeSlots,
   } = useFacilityData();
+
+  const { facility } = useAuth();
+  const facilityId = facility?.id || '';
+
+  // 利用申請の状態
+  const [usageRequests, setUsageRequests] = useState<UsageRequestItem[]>([]);
+  const [showUsageRequests, setShowUsageRequests] = useState(false);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+
+  // 利用申請をフェッチ
+  useEffect(() => {
+    const fetchUsageRequests = async () => {
+      if (!facilityId) return;
+
+      const { data } = await supabase
+        .from('usage_requests')
+        .select('*')
+        .eq('facility_id', facilityId)
+        .eq('status', 'pending')
+        .order('submitted_at', { ascending: false });
+
+      if (data && data.length > 0) {
+        // 児童名と保護者名を取得
+        const childIds = [...new Set(data.map((r: any) => r.child_id))];
+        const parentIds = [...new Set(data.map((r: any) => r.parent_user_id))];
+
+        const { data: childrenData } = await supabase
+          .from('children')
+          .select('id, name')
+          .in('id', childIds);
+
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('id, name, last_name, first_name')
+          .in('id', parentIds);
+
+        const childMap = new Map((childrenData || []).map((c: any) => [c.id, c.name]));
+        const userMap = new Map((usersData || []).map((u: any) => [u.id, u.name || `${u.last_name || ''} ${u.first_name || ''}`.trim()]));
+
+        const enriched: UsageRequestItem[] = data.map((r: any) => ({
+          ...r,
+          child_name: childMap.get(r.child_id) || '不明',
+          parent_name: userMap.get(r.parent_user_id) || '不明',
+        }));
+
+        setUsageRequests(enriched);
+      } else {
+        setUsageRequests([]);
+      }
+    };
+
+    fetchUsageRequests();
+  }, [facilityId]);
+
+  // 申請の一括承認
+  const handleApproveAll = async (request: UsageRequestItem) => {
+    setProcessingRequestId(request.id);
+    try {
+      const response = request.requested_dates.map(d => ({ date: d.date, approved: true }));
+
+      // usage_requestsを更新
+      await supabase
+        .from('usage_requests')
+        .update({
+          status: 'approved',
+          facility_response: response,
+          responded_at: new Date().toISOString(),
+        })
+        .eq('id', request.id);
+
+      // 承認された日程をスケジュールに追加
+      for (const dateItem of request.requested_dates) {
+        const child = children.find(c => c.id === request.child_id);
+        if (!child) continue;
+
+        const slots: TimeSlot[] = dateItem.slot === 'full'
+          ? ['AM', 'PM']
+          : dateItem.slot === 'am'
+          ? ['AM']
+          : ['PM'];
+
+        for (const slot of slots) {
+          // 重複チェック
+          const exists = schedules.some(
+            s => s.childId === request.child_id && s.date === dateItem.date && s.slot === slot
+          );
+          if (!exists) {
+            await addSchedule({
+              date: dateItem.date,
+              childId: child.id,
+              childName: child.name,
+              slot,
+              hasPickup: child.needsPickup || false,
+              hasDropoff: child.needsDropoff || false,
+            });
+          }
+        }
+      }
+
+      // 一覧から削除
+      setUsageRequests(prev => prev.filter(r => r.id !== request.id));
+    } catch (err) {
+      console.error('Error approving request:', err);
+      alert('承認処理に失敗しました');
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  // 申請を却下
+  const handleRejectAll = async (request: UsageRequestItem, notes?: string) => {
+    setProcessingRequestId(request.id);
+    try {
+      const response = request.requested_dates.map(d => ({ date: d.date, approved: false }));
+
+      await supabase
+        .from('usage_requests')
+        .update({
+          status: 'rejected',
+          facility_response: response,
+          facility_notes: notes || '',
+          responded_at: new Date().toISOString(),
+        })
+        .eq('id', request.id);
+
+      setUsageRequests(prev => prev.filter(r => r.id !== request.id));
+    } catch (err) {
+      console.error('Error rejecting request:', err);
+      alert('却下処理に失敗しました');
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
 
   const [viewFormat, setViewFormat] = useState<'month' | 'week'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -1258,6 +1410,87 @@ const ScheduleView: React.FC = () => {
           getUsageRecordByScheduleId={getUsageRecordByScheduleId}
           onScheduleItemClick={handleScheduleItemClickFromPanel}
         />
+      )}
+
+      {/* 利用申請パネル */}
+      {usageRequests.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-40">
+          {!showUsageRequests ? (
+            <button
+              onClick={() => setShowUsageRequests(true)}
+              className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-4 py-3 shadow-lg flex items-center gap-2 font-bold text-sm transition-all hover:shadow-xl"
+            >
+              <Inbox className="w-5 h-5" />
+              利用申請 {usageRequests.length}件
+            </button>
+          ) : (
+            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[420px] max-h-[70vh] flex flex-col overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-orange-500 to-orange-600 flex items-center justify-between flex-shrink-0">
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <Inbox className="w-5 h-5" />
+                  利用申請 ({usageRequests.length}件)
+                </h3>
+                <button
+                  onClick={() => setShowUsageRequests(false)}
+                  className="text-white/80 hover:text-white p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {usageRequests.map(request => (
+                  <div key={request.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">
+                          {request.child_name}さん
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          保護者: {request.parent_name} / {request.request_month}
+                        </p>
+                      </div>
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">
+                        申請中
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {request.requested_dates.map((d, idx) => (
+                        <span key={idx} className="text-[10px] bg-white border border-gray-200 rounded px-2 py-0.5">
+                          {d.date.split('-')[1]}/{d.date.split('-')[2]}
+                          ({d.slot === 'am' ? '午前' : d.slot === 'pm' ? '午後' : '終日'})
+                          {d.notes && ` - ${d.notes}`}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproveAll(request)}
+                        disabled={processingRequestId === request.id}
+                        className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg text-xs transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        一括承認
+                      </button>
+                      <button
+                        onClick={() => {
+                          const notes = prompt('却下理由（任意）:');
+                          if (notes !== null) {
+                            handleRejectAll(request, notes);
+                          }
+                        }}
+                        disabled={processingRequestId === request.id}
+                        className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg text-xs transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        却下
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* 一括処理中オーバーレイ */}

@@ -71,7 +71,7 @@ export const useStaffData = () => {
             // usersテーブルからユーザー情報を取得（個人情報も含む）
             const { data: usersData, error: usersError } = await supabase
               .from('users')
-              .select('id, name, email, phone, birth_date, gender, address, postal_code, my_number, spouse_name, basic_pension_symbol, basic_pension_number, employment_insurance_status, employment_insurance_number, previous_retirement_date, previous_name, social_insurance_status, has_dependents, dependent_count, dependents, account_status')
+              .select('id, name, email, phone, birth_date, gender, address, postal_code, my_number, spouse_name, basic_pension_symbol, basic_pension_number, employment_insurance_status, employment_insurance_number, previous_retirement_date, previous_name, social_insurance_status, has_dependents, dependent_count, dependents, account_status, profile_photo_url')
               .in('id', userIds);
 
             if (usersError) {
@@ -145,6 +145,7 @@ export const useStaffData = () => {
                     hasDependents: user.has_dependents || false,
                     dependentCount: user.dependent_count || 0,
                     dependents: user.dependents || null,
+                    profilePhotoUrl: user.profile_photo_url || undefined,
                     qualifications: '',
                     yearsOfExperience: 0,
                     qualificationCertificate: '',
@@ -246,6 +247,7 @@ export const useStaffData = () => {
                 experienceCertificate: row.experience_certificate,
                 emergencyContact: row.emergency_contact,
                 emergencyContactPhone: row.emergency_contact_phone,
+                profilePhotoUrl: row.profile_photo_url || undefined,
                 memo: row.memo,
                 monthlySalary: row.monthly_salary,
                 hourlyWage: row.hourly_wage,

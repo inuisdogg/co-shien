@@ -726,11 +726,17 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
                       onMouseEnter={() => setTooltipStaffId(staffRow.staff.id)}
                       onMouseLeave={() => setTooltipStaffId(null)}
                     >
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0 mr-2">
-                        <span className="text-white text-[10px] font-bold">
-                          {staffRow.staff.name?.charAt(0) || '?'}
-                        </span>
-                      </div>
+                      {staffRow.staff.profilePhotoUrl ? (
+                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mr-2">
+                          <img src={staffRow.staff.profilePhotoUrl} alt={staffRow.staff.name} className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0 mr-2">
+                          <span className="text-white text-[10px] font-bold">
+                            {staffRow.staff.name?.charAt(0) || '?'}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-medium text-gray-800 truncate">
                           {staffRow.staff.name}

@@ -21,6 +21,7 @@ import {
   Car,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Zap,
   FileText,
   Clock,
@@ -59,6 +60,7 @@ import { checkQualificationExpiry, type QualificationCheckResult } from '@/lib/q
 import ComplianceManagement from './ComplianceManagement';
 import { useChangeNotifications, daysUntilDeadline, getDeadlineColor } from '@/hooks/useChangeNotifications';
 import { CHANGE_NOTIFICATION_TYPE_LABELS } from '@/types';
+import OperationsReviewWizard from '@/components/facility/OperationsReviewWizard';
 
 const DashboardView: React.FC = () => {
   const { facility } = useAuth();
@@ -76,7 +78,24 @@ const DashboardView: React.FC = () => {
   } = useFacilityData();
 
   // 変更届通知
-  const { pendingNotifications, pendingCount: changeNotificationPendingCount } = useChangeNotifications();
+  const { pendingNotifications, pendingCount: changeNotificationPendingCount, refetch: refetchChangeNotifications } = useChangeNotifications();
+
+  // 月次運営確認ウィザード
+  const [showOperationsWizard, setShowOperationsWizard] = useState(false);
+  const [showReviewBanner, setShowReviewBanner] = useState(false);
+
+  // Auto-prompt: show banner in the first 7 days of each month
+  useEffect(() => {
+    const today = new Date();
+    if (today.getDate() <= 7) {
+      // Check localStorage to see if user already dismissed this month
+      const dismissKey = `operations_review_dismissed_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      const dismissed = localStorage.getItem(dismissKey);
+      if (!dismissed) {
+        setShowReviewBanner(true);
+      }
+    }
+  }, []);
 
   // 時間枠が設定されているかチェック
   const hasTimeSlots = timeSlots.length > 0;
@@ -461,6 +480,46 @@ const DashboardView: React.FC = () => {
             </div>
           </div>
 
+          {/* 月次運営確認バナー */}
+          {showReviewBanner && (
+            <div className="bg-[#00c4cc]/5 border border-[#00c4cc]/20 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center shrink-0">
+                  <FileText size={20} className="text-[#00c4cc]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">来月の運営確認を行いましょう</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    スタッフ体制・加算・営業時間など、来月の変更点を確認して変更届の必要性をチェックできます
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <button
+                  onClick={() => {
+                    const today = new Date();
+                    const dismissKey = `operations_review_dismissed_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                    localStorage.setItem(dismissKey, 'true');
+                    setShowReviewBanner(false);
+                  }}
+                  className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                >
+                  後で
+                </button>
+                <button
+                  onClick={() => {
+                    setShowOperationsWizard(true);
+                    setShowReviewBanner(false);
+                  }}
+                  className="px-4 py-2 text-xs bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors font-bold flex items-center gap-1"
+                >
+                  確認を開始
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Alert Section */}
           {alertItems.length > 0 && (
             <div className="rounded-xl border overflow-hidden">
@@ -720,7 +779,7 @@ const DashboardView: React.FC = () => {
               <Zap size={16} className="text-[#00c4cc]" />
               <h3 className="text-sm font-bold text-gray-900">クイックアクション</h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <a
                 href="/business?tab=daily-log"
                 className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
@@ -769,6 +828,18 @@ const DashboardView: React.FC = () => {
                   <p className="text-[10px] text-gray-400">勤務状況の確認</p>
                 </div>
               </a>
+              <button
+                onClick={() => setShowOperationsWizard(true)}
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group text-left"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
+                  <FileText size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">来月の運営確認</p>
+                  <p className="text-[10px] text-gray-400">変更届チェック</p>
+                </div>
+              </button>
             </div>
           </div>
         </>
@@ -1361,6 +1432,15 @@ const DashboardView: React.FC = () => {
 
         </>
       )}
+
+      {/* 月次運営確認ウィザード */}
+      <OperationsReviewWizard
+        isOpen={showOperationsWizard}
+        onClose={() => setShowOperationsWizard(false)}
+        onComplete={() => {
+          refetchChangeNotifications();
+        }}
+      />
     </div>
   );
 };

@@ -877,6 +877,7 @@ function StaffOverviewTab({ facilityId }: { facilityId: string }) {
     employmentType: string;
     startDate: string;
     tenureDays: number;
+    profilePhotoUrl?: string;
   }>>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -956,9 +957,15 @@ function StaffOverviewTab({ facilityId }: { facilityId: string }) {
                   <tr key={staff.employmentRecordId} className="hover:bg-gray-50">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: ACCENT }}>
-                          {staff.name.charAt(0)}
-                        </div>
+                        {staff.profilePhotoUrl ? (
+                          <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                            <img src={staff.profilePhotoUrl} alt={staff.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ backgroundColor: ACCENT }}>
+                            {staff.name.charAt(0)}
+                          </div>
+                        )}
                         <div>
                           <p className="font-medium text-gray-800">{staff.name}</p>
                           <p className="text-xs text-gray-400">{staff.email}</p>

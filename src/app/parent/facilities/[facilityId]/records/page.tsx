@@ -1,6 +1,7 @@
 /**
  * 施設の実績記録表ページ（利用者側）
  * 月別の実績記録とサイン機能
+ * 月次サービス提供サマリー、利用日数、活動概要、連絡帳リンク
  */
 
 'use client';
@@ -9,7 +10,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Building2, Calendar, FileText, CheckCircle,
-  ChevronLeft, ChevronRight, User, AlertCircle, PenTool, Download, Printer
+  ChevronLeft, ChevronRight, User, AlertCircle, PenTool, Download, Printer,
+  BookOpen, Activity, BarChart3
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -31,6 +33,15 @@ type MonthlyRecord = {
   parentSignedAt?: string;
 };
 
+type ContactLogEntry = {
+  id: string;
+  date: string;
+  activities?: string;
+  health_status?: string;
+  staff_comment?: string;
+  is_signed: boolean;
+};
+
 export default function FacilityRecordsPage() {
   const router = useRouter();
   const params = useParams();
@@ -45,8 +56,10 @@ export default function FacilityRecordsPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [monthlyRecords, setMonthlyRecords] = useState<MonthlyRecord[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [contactLogs, setContactLogs] = useState<ContactLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState<'summary' | 'detail'>('summary');
 
   // サイン用のstate
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
@@ -110,6 +123,13 @@ export default function FacilityRecordsPage() {
             } else if (contractedChildren.length > 0) {
               setSelectedChildId(contractedChildren[0].id);
             }
+          } else {
+            // 契約なしの場合もchildren.facility_idで試行
+            const relatedChildren = childrenData.filter((c: any) => c.facility_id === facilityId);
+            if (relatedChildren.length > 0) {
+              setChildren(relatedChildren);
+              setSelectedChildId(childIdParam || relatedChildren[0].id);
+            }
           }
         }
       } catch (err: any) {
@@ -157,8 +177,7 @@ export default function FacilityRecordsPage() {
           const daySchedules = schedulesData.filter((s: any) => s.date === date);
 
           if (daySchedules.length > 0) {
-            // スケジュールがある場合
-            const schedule = daySchedules[0]; // 最初のスケジュールを使用
+            const schedule = daySchedules[0];
             records.push({
               date,
               dayOfWeek,
@@ -175,15 +194,25 @@ export default function FacilityRecordsPage() {
               parentSignedAt: schedule.parent_signed_at,
             });
           } else {
-            // スケジュールがない場合は空の行
-            records.push({
-              date,
-              dayOfWeek,
-            });
+            records.push({ date, dayOfWeek });
           }
         }
 
         setMonthlyRecords(records);
+      }
+
+      // 連絡帳も取得
+      const { data: logsData } = await supabase
+        .from('contact_logs')
+        .select('id, date, activities, health_status, staff_comment, is_signed')
+        .eq('child_id', selectedChildId)
+        .eq('facility_id', facilityId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true });
+
+      if (logsData) {
+        setContactLogs(logsData);
       }
     };
 
@@ -200,7 +229,7 @@ export default function FacilityRecordsPage() {
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    let clientX, clientY;
+    let clientX: number, clientY: number;
 
     if ('touches' in e) {
       clientX = e.touches[0].clientX;
@@ -224,7 +253,7 @@ export default function FacilityRecordsPage() {
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    let clientX, clientY;
+    let clientX: number, clientY: number;
 
     if ('touches' in e) {
       e.preventDefault();
@@ -266,7 +295,7 @@ export default function FacilityRecordsPage() {
     if (schedules.length > 0) {
       const scheduleIds = schedules.map(s => s.id);
 
-      const { error } = await supabase
+      const { error: saveError } = await supabase
         .from('schedules')
         .update({
           parent_signature: signature,
@@ -274,7 +303,7 @@ export default function FacilityRecordsPage() {
         })
         .in('id', scheduleIds);
 
-      if (error) {
+      if (saveError) {
         setError('サインの保存に失敗しました');
       } else {
         setIsSignatureModalOpen(false);
@@ -283,7 +312,7 @@ export default function FacilityRecordsPage() {
         const year = selectedMonth.getFullYear();
         const month = selectedMonth.getMonth();
         const startDate = new Date(year, month, 1).toISOString().split('T')[0];
-        const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+        const endDate2 = new Date(year, month + 1, 0).toISOString().split('T')[0];
 
         const { data: updatedSchedules } = await supabase
           .from('schedules')
@@ -291,7 +320,7 @@ export default function FacilityRecordsPage() {
           .eq('child_id', selectedChildId)
           .eq('facility_id', facilityId)
           .gte('date', startDate)
-          .lte('date', endDate);
+          .lte('date', endDate2);
 
         if (updatedSchedules) {
           setSchedules(updatedSchedules);
@@ -312,12 +341,19 @@ export default function FacilityRecordsPage() {
   const usageDays = monthlyRecords.filter(r => r.serviceStatus === '利用' || r.slot).length;
   const pickupDays = monthlyRecords.filter(r => r.pickup).length;
   const dropoffDays = monthlyRecords.filter(r => r.dropoff).length;
+  const absentDays = monthlyRecords.filter(r => r.serviceStatus === '欠席(加算なし)').length;
+
+  // 活動概要（連絡帳から）
+  const activitiesSummary = contactLogs
+    .filter(l => l.activities)
+    .map(l => l.activities!)
+    .slice(0, 5);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F472B6] mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -338,8 +374,8 @@ export default function FacilityRecordsPage() {
           </button>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#FDEBD0] rounded-full flex items-center justify-center">
-                <FileText className="w-5 h-5 text-[#ED8936]" />
+              <div className="w-10 h-10 bg-pink-50 rounded-full flex items-center justify-center">
+                <FileText className="w-5 h-5 text-[#F472B6]" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800">実績記録表</h1>
@@ -368,7 +404,7 @@ export default function FacilityRecordsPage() {
         )}
 
         {/* 操作パネル（印刷時は非表示） */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 print:hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 print:hidden">
           <div className="flex flex-wrap items-center justify-between gap-4">
             {/* 児童選択 */}
             {children.length > 1 && (
@@ -377,7 +413,7 @@ export default function FacilityRecordsPage() {
                 <select
                   value={selectedChildId}
                   onChange={(e) => setSelectedChildId(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                 >
                   {children.map((child) => (
                     <option key={child.id} value={child.id}>
@@ -415,6 +451,28 @@ export default function FacilityRecordsPage() {
               </button>
             </div>
 
+            {/* 表示切替 */}
+            <div className="flex items-center gap-2">
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setViewMode('summary')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
+                    viewMode === 'summary' ? 'bg-white text-[#F472B6] shadow-sm' : 'text-gray-500'
+                  }`}
+                >
+                  サマリー
+                </button>
+                <button
+                  onClick={() => setViewMode('detail')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
+                    viewMode === 'detail' ? 'bg-white text-[#F472B6] shadow-sm' : 'text-gray-500'
+                  }`}
+                >
+                  詳細
+                </button>
+              </div>
+            </div>
+
             {/* サインボタン */}
             {isSigned ? (
               <span className="flex items-center gap-1 text-green-600 text-sm">
@@ -424,7 +482,7 @@ export default function FacilityRecordsPage() {
             ) : (
               <button
                 onClick={() => setIsSignatureModalOpen(true)}
-                className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
+                className="flex items-center gap-2 bg-[#F472B6] hover:bg-[#EC4899] text-white text-sm font-bold py-2 px-4 rounded-md"
               >
                 <PenTool className="w-4 h-4" />
                 サインする
@@ -433,146 +491,208 @@ export default function FacilityRecordsPage() {
           </div>
         </div>
 
-        {/* 実績記録表 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 print:shadow-none print:border-0 print:p-0">
-          {/* ヘッダー情報（印刷用） */}
-          <div className="mb-6 print:mb-4">
-            <h2 className="text-xl font-bold text-center mb-4 print:text-lg">
-              サービス提供実績記録票
-            </h2>
-            <div className="grid grid-cols-2 gap-4 text-sm print:text-xs">
-              <div className="space-y-1">
-                <p><span className="font-bold">事業所名:</span> {facility?.name}</p>
-                <p><span className="font-bold">対象年月:</span> {selectedMonth.getFullYear()}年{selectedMonth.getMonth() + 1}月</p>
+        {/* サマリービュー */}
+        {viewMode === 'summary' && (
+          <div className="space-y-6 print:space-y-4">
+            {/* 月次サマリーカード */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <BarChart3 className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-blue-600">{usageDays}</p>
+                <p className="text-xs text-gray-600 mt-1">利用日数</p>
               </div>
-              <div className="space-y-1">
-                <p><span className="font-bold">利用者名:</span> {selectedChild?.name}</p>
-                <p><span className="font-bold">受給者証番号:</span> {selectedChild?.beneficiary_number || '未登録'}</p>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <Activity className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-green-600">{pickupDays + dropoffDays}</p>
+                <p className="text-xs text-gray-600 mt-1">送迎回数</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <Calendar className="w-6 h-6 text-red-400 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-red-500">{absentDays}</p>
+                <p className="text-xs text-gray-600 mt-1">欠席日数</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <FileText className="w-6 h-6 text-[#F472B6] mx-auto mb-2" />
+                <p className="text-3xl font-bold text-[#EC4899]">
+                  {selectedChild?.grant_days || '-'}
+                </p>
+                <p className="text-xs text-gray-600 mt-1">支給日数</p>
               </div>
             </div>
-          </div>
 
-          {/* 実績テーブル */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-400 text-sm print:text-xs">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-400 px-2 py-2 text-center w-12">日</th>
-                  <th className="border border-gray-400 px-2 py-2 text-center w-8">曜</th>
-                  <th className="border border-gray-400 px-2 py-2 text-center">サービス内容</th>
-                  <th className="border border-gray-400 px-2 py-2 text-center w-16">開始</th>
-                  <th className="border border-gray-400 px-2 py-2 text-center w-16">終了</th>
-                  <th className="border border-gray-400 px-2 py-2 text-center w-12">算定</th>
-                  <th className="border border-gray-400 px-2 py-2 text-center w-16">送迎</th>
-                  <th className="border border-gray-400 px-2 py-2 text-left">備考</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyRecords.map((record, index) => {
-                  const dayNum = parseInt(record.date.split('-')[2]);
-                  const isWeekend = record.dayOfWeek === 0 || record.dayOfWeek === 6;
-                  const hasActivity = record.slot || record.serviceStatus;
-
-                  return (
-                    <tr
-                      key={index}
-                      className={`${isWeekend && !hasActivity ? 'bg-gray-50' : ''} ${hasActivity ? 'bg-green-50' : ''}`}
-                    >
-                      <td className="border border-gray-400 px-2 py-1 text-center">{dayNum}</td>
-                      <td className={`border border-gray-400 px-2 py-1 text-center ${
-                        record.dayOfWeek === 0 ? 'text-red-600' :
-                        record.dayOfWeek === 6 ? 'text-blue-600' : ''
-                      }`}>
-                        {weekDays[record.dayOfWeek]}
-                      </td>
-                      <td className="border border-gray-400 px-2 py-1 text-center">
-                        {record.serviceStatus === '欠席(加算なし)' ? '欠席' :
-                         record.slot === 'AM' ? '午前' :
-                         record.slot === 'PM' ? '午後' : '-'}
-                      </td>
-                      <td className="border border-gray-400 px-2 py-1 text-center">
-                        {record.startTime || '-'}
-                      </td>
-                      <td className="border border-gray-400 px-2 py-1 text-center">
-                        {record.endTime || '-'}
-                      </td>
-                      <td className="border border-gray-400 px-2 py-1 text-center">
-                        {record.calculatedTime ? `${record.calculatedTime}h` : '-'}
-                      </td>
-                      <td className="border border-gray-400 px-2 py-1 text-center">
-                        {record.pickup && record.dropoff ? '往復' :
-                         record.pickup ? '迎' :
-                         record.dropoff ? '送' : '-'}
-                      </td>
-                      <td className="border border-gray-400 px-2 py-1 text-xs">
-                        {record.recordSheetRemarks || record.memo || '-'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* 集計 */}
-          <div className="mt-6 grid grid-cols-4 gap-4 print:mt-4">
-            <div className="bg-blue-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
-              <p className="text-2xl font-bold text-blue-600 print:text-lg">{usageDays}</p>
-              <p className="text-xs text-gray-600">利用日数</p>
-            </div>
-            <div className="bg-green-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
-              <p className="text-2xl font-bold text-green-600 print:text-lg">{pickupDays}</p>
-              <p className="text-xs text-gray-600">送迎（迎え）</p>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
-              <p className="text-2xl font-bold text-purple-600 print:text-lg">{dropoffDays}</p>
-              <p className="text-xs text-gray-600">送迎（送り）</p>
-            </div>
-            <div className="bg-[#FEF3E2] rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
-              <p className="text-2xl font-bold text-[#ED8936] print:text-lg">
-                {selectedChild?.grant_days || '-'}
-              </p>
-              <p className="text-xs text-gray-600">支給日数</p>
-            </div>
-          </div>
-
-          {/* サイン欄 */}
-          <div className="mt-6 pt-6 border-t border-gray-200 print:mt-4 print:pt-4">
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm font-bold text-gray-700 mb-2">事業所確認印</p>
-                <div className="border border-gray-300 rounded h-20 print:h-16"></div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-700 mb-2">保護者確認印</p>
-                {isSigned && schedules[0]?.parent_signature ? (
-                  <div className="border border-gray-300 rounded p-2 h-20 print:h-16 flex items-center justify-center">
-                    <img
-                      src={schedules[0].parent_signature}
-                      alt="保護者サイン"
-                      className="max-h-full"
-                    />
-                  </div>
-                ) : (
-                  <div className="border border-gray-300 rounded h-20 print:h-16 flex items-center justify-center text-gray-400 text-sm">
-                    未署名
-                  </div>
+            {/* 活動概要 */}
+            {activitiesSummary.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-[#F472B6]" />
+                  今月の活動
+                </h3>
+                <div className="space-y-2">
+                  {activitiesSummary.map((activity, idx) => (
+                    <div key={idx} className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+                      {contactLogs[idx] && (
+                        <span className="text-xs text-gray-400 mr-2">{contactLogs[idx].date.split('-')[2]}日</span>
+                      )}
+                      {activity.length > 100 ? `${activity.substring(0, 100)}...` : activity}
+                    </div>
+                  ))}
+                </div>
+                {contactLogs.length > 0 && (
+                  <button
+                    onClick={() => router.push(`/parent/facilities/${facilityId}/contact?child=${selectedChildId}`)}
+                    className="mt-3 text-sm text-[#F472B6] hover:text-[#EC4899] font-medium flex items-center gap-1"
+                  >
+                    連絡帳を全て見る
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 )}
               </div>
-            </div>
-            {isSigned && schedules[0]?.parent_signed_at && (
-              <p className="text-xs text-gray-500 mt-2 text-right print:text-xs">
-                署名日時: {new Date(schedules[0].parent_signed_at).toLocaleString('ja-JP')}
-              </p>
             )}
           </div>
-        </div>
+        )}
+
+        {/* 詳細ビュー */}
+        {viewMode === 'detail' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 print:shadow-none print:border-0 print:p-0">
+            {/* ヘッダー情報（印刷用） */}
+            <div className="mb-6 print:mb-4">
+              <h2 className="text-xl font-bold text-center mb-4 print:text-lg">
+                サービス提供実績記録票
+              </h2>
+              <div className="grid grid-cols-2 gap-4 text-sm print:text-xs">
+                <div className="space-y-1">
+                  <p><span className="font-bold">事業所名:</span> {facility?.name}</p>
+                  <p><span className="font-bold">対象年月:</span> {selectedMonth.getFullYear()}年{selectedMonth.getMonth() + 1}月</p>
+                </div>
+                <div className="space-y-1">
+                  <p><span className="font-bold">利用者名:</span> {selectedChild?.name}</p>
+                  <p><span className="font-bold">受給者証番号:</span> {selectedChild?.beneficiary_number || '未登録'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 実績テーブル */}
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-400 text-sm print:text-xs">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-gray-400 px-2 py-2 text-center w-12">日</th>
+                    <th className="border border-gray-400 px-2 py-2 text-center w-8">曜</th>
+                    <th className="border border-gray-400 px-2 py-2 text-center">サービス内容</th>
+                    <th className="border border-gray-400 px-2 py-2 text-center w-16">開始</th>
+                    <th className="border border-gray-400 px-2 py-2 text-center w-16">終了</th>
+                    <th className="border border-gray-400 px-2 py-2 text-center w-12">算定</th>
+                    <th className="border border-gray-400 px-2 py-2 text-center w-16">送迎</th>
+                    <th className="border border-gray-400 px-2 py-2 text-left">備考</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyRecords.map((record, index) => {
+                    const dayNum = parseInt(record.date.split('-')[2]);
+                    const isWeekend = record.dayOfWeek === 0 || record.dayOfWeek === 6;
+                    const hasActivity = record.slot || record.serviceStatus;
+
+                    return (
+                      <tr
+                        key={index}
+                        className={`${isWeekend && !hasActivity ? 'bg-gray-50' : ''} ${hasActivity ? 'bg-green-50' : ''}`}
+                      >
+                        <td className="border border-gray-400 px-2 py-1 text-center">{dayNum}</td>
+                        <td className={`border border-gray-400 px-2 py-1 text-center ${
+                          record.dayOfWeek === 0 ? 'text-red-600' :
+                          record.dayOfWeek === 6 ? 'text-blue-600' : ''
+                        }`}>
+                          {weekDays[record.dayOfWeek]}
+                        </td>
+                        <td className="border border-gray-400 px-2 py-1 text-center">
+                          {record.serviceStatus === '欠席(加算なし)' ? '欠席' :
+                           record.slot === 'AM' ? '午前' :
+                           record.slot === 'PM' ? '午後' : '-'}
+                        </td>
+                        <td className="border border-gray-400 px-2 py-1 text-center">
+                          {record.startTime || '-'}
+                        </td>
+                        <td className="border border-gray-400 px-2 py-1 text-center">
+                          {record.endTime || '-'}
+                        </td>
+                        <td className="border border-gray-400 px-2 py-1 text-center">
+                          {record.calculatedTime ? `${record.calculatedTime}h` : '-'}
+                        </td>
+                        <td className="border border-gray-400 px-2 py-1 text-center">
+                          {record.pickup && record.dropoff ? '往復' :
+                           record.pickup ? '迎' :
+                           record.dropoff ? '送' : '-'}
+                        </td>
+                        <td className="border border-gray-400 px-2 py-1 text-xs">
+                          {record.recordSheetRemarks || record.memo || '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 集計 */}
+            <div className="mt-6 grid grid-cols-4 gap-4 print:mt-4">
+              <div className="bg-blue-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
+                <p className="text-2xl font-bold text-blue-600 print:text-lg">{usageDays}</p>
+                <p className="text-xs text-gray-600">利用日数</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
+                <p className="text-2xl font-bold text-green-600 print:text-lg">{pickupDays}</p>
+                <p className="text-xs text-gray-600">送迎（迎え）</p>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
+                <p className="text-2xl font-bold text-purple-600 print:text-lg">{dropoffDays}</p>
+                <p className="text-xs text-gray-600">送迎（送り）</p>
+              </div>
+              <div className="bg-pink-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
+                <p className="text-2xl font-bold text-[#EC4899] print:text-lg">
+                  {selectedChild?.grant_days || '-'}
+                </p>
+                <p className="text-xs text-gray-600">支給日数</p>
+              </div>
+            </div>
+
+            {/* サイン欄 */}
+            <div className="mt-6 pt-6 border-t border-gray-200 print:mt-4 print:pt-4">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm font-bold text-gray-700 mb-2">事業所確認印</p>
+                  <div className="border border-gray-300 rounded h-20 print:h-16"></div>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-700 mb-2">保護者確認印</p>
+                  {isSigned && schedules[0]?.parent_signature ? (
+                    <div className="border border-gray-300 rounded p-2 h-20 print:h-16 flex items-center justify-center">
+                      <img
+                        src={schedules[0].parent_signature}
+                        alt="保護者サイン"
+                        className="max-h-full"
+                      />
+                    </div>
+                  ) : (
+                    <div className="border border-gray-300 rounded h-20 print:h-16 flex items-center justify-center text-gray-400 text-sm">
+                      未署名
+                    </div>
+                  )}
+                </div>
+              </div>
+              {isSigned && schedules[0]?.parent_signed_at && (
+                <p className="text-xs text-gray-500 mt-2 text-right print:text-xs">
+                  署名日時: {new Date(schedules[0].parent_signed_at).toLocaleString('ja-JP')}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* サインモーダル */}
       {isSignatureModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 print:hidden">
-          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-4">保護者サイン</h3>
             <p className="text-sm text-gray-600 mb-4">
               {selectedMonth.getFullYear()}年{selectedMonth.getMonth() + 1}月分の実績記録を確認し、サインしてください。
@@ -609,7 +729,7 @@ export default function FacilityRecordsPage() {
               </button>
               <button
                 onClick={saveSignature}
-                className="flex-1 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md"
+                className="flex-1 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-2 px-4 rounded-md"
               >
                 保存
               </button>

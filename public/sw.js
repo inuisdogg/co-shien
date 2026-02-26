@@ -109,6 +109,58 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Push event: サーバーからプッシュ通知を受信した時
+self.addEventListener('push', (event) => {
+  let data = { title: 'Roots', body: '新しい通知があります', url: '/parent/dashboard' };
+
+  if (event.data) {
+    try {
+      data = { ...data, ...event.data.json() };
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: '/favicon.png',
+    badge: '/favicon.png',
+    tag: 'roots-notification',
+    renotify: true,
+    data: { url: data.url || '/parent/dashboard' },
+    actions: [
+      { action: 'open', title: '開く' },
+    ],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Notification click: 通知をクリックした時
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/parent/dashboard';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // 既に開いているウィンドウがあればフォーカス
+      for (const client of windowClients) {
+        if (client.url.includes('/parent') && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      // なければ新しいウィンドウを開く
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url);
+      }
+    })
+  );
+});
+
 // Message event: クライアントからのメッセージを受信
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {

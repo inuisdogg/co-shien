@@ -647,6 +647,7 @@ export type Staff = {
   qualificationCertificate?: string; // 資格証画像（Base64またはURL）
   experienceCertificate?: string; // 実務経験証明書画像（Base64またはURL）
   // その他
+  profilePhotoUrl?: string; // プロフィール写真URL
   emergencyContact?: string; // 緊急連絡先
   emergencyContactPhone?: string; // 緊急連絡先電話番号
   memo?: string; // 備考
@@ -808,11 +809,15 @@ export type ContactLog = {
   parentReply?: string;
   parentReplyAt?: string;
 
+  // ワークフローステータス
+  status?: 'draft' | 'submitted' | 'signed';
+
   // サイン関連
   isSigned?: boolean;
   signedAt?: string;
   signedByUserId?: string;
   signatureData?: string;
+  parentSignerName?: string;
 
   // メタデータ
   createdAt: string;
@@ -2164,6 +2169,52 @@ export const CHANGE_NOTIFICATION_STATUS_CONFIG: Record<ChangeNotificationStatus,
   in_progress: { label: '作成中', color: 'text-amber-600', bg: 'bg-amber-100' },
   submitted: { label: '提出済', color: 'text-blue-600', bg: 'bg-blue-100' },
   completed: { label: '完了', color: 'text-green-600', bg: 'bg-green-100' },
+};
+
+// 月次運営確認レビュー
+export type OperationsReview = {
+  id: string;
+  facilityId: string;
+  reviewMonth: string; // '2026-03'
+  responses: OperationsReviewResponses;
+  changesDetected: OperationsReviewChange[];
+  completedAt?: string;
+  createdBy?: string;
+  createdAt: string;
+};
+
+export type OperationsReviewResponses = {
+  staff?: {
+    hasChange: boolean;
+    changeType?: 'increase' | 'decrease';
+    count?: number;
+    positions?: string[];
+  };
+  subsidies?: {
+    hasChange: boolean;
+    additions?: string[];
+    removals?: string[];
+  };
+  businessHours?: {
+    hasChange: boolean;
+    details?: string;
+  };
+  capacity?: {
+    hasChange: boolean;
+    newCapacityAM?: number;
+    newCapacityPM?: number;
+  };
+  other?: {
+    hasChange: boolean;
+    details?: string;
+  };
+};
+
+export type OperationsReviewChange = {
+  type: ChangeNotificationType;
+  description: string;
+  deadline: string;
+  requiredDocuments: string[];
 };
 
 // 規定文書作成/更新用

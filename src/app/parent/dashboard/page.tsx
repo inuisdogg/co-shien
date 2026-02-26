@@ -12,9 +12,10 @@ import Image from 'next/image';
 import {
   Plus, User, Calendar, LogOut, ChevronRight, AlertCircle, Building2,
   FileText, Clock, CheckCircle, XCircle, MessageSquare, Bell,
-  CalendarDays, ClipboardList, Send, Settings, PenLine, Mail
+  CalendarDays, ClipboardList, Send, Settings, PenLine, Mail, BookOpen
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import PushNotificationToggle from '@/components/pwa/PushNotificationToggle';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import type { Child } from '@/types';
 
@@ -104,6 +105,7 @@ export default function ClientDashboardPage() {
   const [unreadChats, setUnreadChats] = useState<UnreadChatInfo[]>([]);
   const [signRequests, setSignRequests] = useState<SignRequest[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+  const [unsignedContactCount, setUnsignedContactCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'facilities' | 'records' | 'messages'>('overview');
@@ -399,13 +401,26 @@ export default function ClientDashboardPage() {
 
         // 署名依頼を取得（sign_requestsテーブルがある場合）
         // TODO: 署名依頼テーブルができたら実装
-        // 現在はダミーデータで表示テスト
-        // const { data: signData } = await supabase
-        //   .from('sign_requests')
-        //   .select('*')
-        //   .eq('client_user_id', userId)
-        //   .eq('status', 'pending');
-        // if (signData) setSignRequests(signData);
+
+        // 署名待ちの連絡帳を取得
+        const allChildIds = (childrenData || []).map((c: any) => c.id);
+
+        if (allChildIds.length > 0) {
+          try {
+            const { data: unsignedData, error: unsignedErr } = await supabase
+              .from('contact_logs')
+              .select('id')
+              .in('child_id', allChildIds)
+              .eq('status', 'submitted')
+              .eq('is_signed', false);
+
+            if (!unsignedErr && unsignedData) {
+              setUnsignedContactCount(unsignedData.length);
+            }
+          } catch {
+            // ignore - status column may not exist yet
+          }
+        }
 
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
@@ -523,11 +538,11 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            {(pendingInvitations.length > 0 || unreadChats.length > 0 || signRequests.length > 0) && (
+            {(pendingInvitations.length > 0 || unreadChats.length > 0 || signRequests.length > 0 || unsignedContactCount > 0) && (
               <div className="relative">
                 <Bell className="w-5 h-5 text-gray-600" />
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
-                  {pendingInvitations.length + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length}
+                  {pendingInvitations.length + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length + unsignedContactCount}
                 </span>
               </div>
             )}
@@ -793,6 +808,45 @@ export default function ClientDashboardPage() {
                     )}
                   </div>
                 </div>
+
+                {/* 連絡帳 - 施設ごとのリンク */}
+                {facilities.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-[#8B5CF6]" />
+                      連絡帳
+                    </h2>
+                    <div className="space-y-2">
+                      {facilities.map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => router.push(`/parent/facilities/${f.id}/contact-book`)}
+                          className="w-full flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors"
+                        >
+                          <div className="w-10 h-10 bg-[#8B5CF6]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                            <BookOpen className="w-5 h-5 text-[#8B5CF6]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-800 text-sm truncate">{f.name}</p>
+                            <p className="text-xs text-gray-500">連絡帳を確認・署名する</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 通知設定 */}
+                {currentUser?.id && (
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-[#F6AD55]" />
+                      通知設定
+                    </h2>
+                    <PushNotificationToggle userId={currentUser.id} />
+                  </div>
+                )}
               </div>
             )}
 

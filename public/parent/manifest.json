@@ -3,7 +3,7 @@
   "short_name": "Roots 保護者",
   "description": "児童発達支援 - 保護者向け",
   "start_url": "/parent",
-  "scope": "/parent",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#8B5CF6",
@@ -23,5 +23,6 @@
     }
   ],
   "categories": ["health", "lifestyle"],
-  "lang": "ja"
+  "lang": "ja",
+  "permissions": ["notifications"]
 }

@@ -1316,6 +1316,7 @@ export default function SupportPlanView() {
           period_end: endDate,
           plan_created_date: today,
           status: 'draft',
+          file_name: '',
           plan_content: createEmptyPlanContent(),
           created_at: now,
           updated_at: now,

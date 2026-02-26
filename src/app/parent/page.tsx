@@ -1,6 +1,7 @@
 /**
  * 利用者ダッシュボード
  * 登録済みの児童一覧、契約施設一覧、実績記録、連絡機能を提供
+ * 追加: 利用予定カレンダー、連絡帳バッジ、お知らせ、利用施設一覧
  * フェーズ管理対応: チャット・メッセージ機能はフェーズ3でのみ表示
  */
 
@@ -12,7 +13,8 @@ import Image from 'next/image';
 import {
   Plus, User, Calendar, LogOut, ChevronRight, AlertCircle, Building2,
   FileText, Clock, CheckCircle, XCircle, MessageSquare, Bell,
-  CalendarDays, ClipboardList, Send, Settings, PenLine, Mail
+  CalendarDays, ClipboardList, Send, Settings, PenLine, Mail,
+  ChevronLeft, BookOpen, Inbox
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
@@ -93,6 +95,43 @@ type SignRequest = {
   requestedAt: string;
 };
 
+// 連絡帳の型
+type ContactLog = {
+  id: string;
+  facility_id: string;
+  child_id: string;
+  date: string;
+  activities?: string;
+  health_status?: string;
+  staff_comment?: string;
+  status?: string;
+  is_signed: boolean;
+  signed_at?: string;
+  parent_signer_name?: string;
+};
+
+// 施設メッセージの型
+type FacilityMessage = {
+  id: string;
+  facility_id: string;
+  parent_user_id: string;
+  sender_type: string;
+  sender_name?: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+// 利用申請の型
+type UsageRequest = {
+  id: string;
+  facility_id: string;
+  child_id: string;
+  request_month: string;
+  status: string;
+  submitted_at: string;
+};
+
 export default function ClientDashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -105,13 +144,19 @@ export default function ClientDashboardPage() {
   const [unreadChats, setUnreadChats] = useState<UnreadChatInfo[]>([]);
   const [signRequests, setSignRequests] = useState<SignRequest[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState<FacilityMessage[]>([]);
+  const [usageRequests, setUsageRequests] = useState<UsageRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'facilities' | 'records' | 'messages'>('overview');
 
+  // カレンダー表示用の状態
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+
   // 児童選択モーダル用の状態
   const [showChildSelector, setShowChildSelector] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{ type: 'facilities' | 'calendar' | 'message'; } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ type: 'facilities' | 'calendar' | 'message' | 'usage-request'; } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -341,6 +386,33 @@ export default function ClientDashboardPage() {
               if (!schedulesError && schedulesData) {
                 setUsageRecords(schedulesData);
               }
+
+              // 連絡帳を取得（署名待ちと最近の履歴）
+              const { data: contactLogsData } = await supabase
+                .from('contact_logs')
+                .select('*')
+                .in('child_id', childIds)
+                .in('facility_id', activeFacilityIds)
+                .order('date', { ascending: false })
+                .limit(30);
+
+              if (contactLogsData) {
+                setContactLogs(contactLogsData);
+              }
+            }
+
+            // 利用申請を取得
+            if (userId) {
+              const { data: requestsData } = await supabase
+                .from('usage_requests')
+                .select('*')
+                .eq('parent_user_id', userId)
+                .order('submitted_at', { ascending: false })
+                .limit(20);
+
+              if (requestsData) {
+                setUsageRequests(requestsData);
+              }
             }
           }
         }
@@ -402,17 +474,20 @@ export default function ClientDashboardPage() {
             });
             setUnreadChats(Array.from(chatMap.values()));
           }
-        }
 
-        // 署名依頼を取得（sign_requestsテーブルがある場合）
-        // TODO: 署名依頼テーブルができたら実装
-        // 現在はダミーデータで表示テスト
-        // const { data: signData } = await supabase
-        //   .from('sign_requests')
-        //   .select('*')
-        //   .eq('client_user_id', userId)
-        //   .eq('status', 'pending');
-        // if (signData) setSignRequests(signData);
+          // 未読施設メッセージを取得
+          const { data: facilityMsgData } = await supabase
+            .from('facility_messages')
+            .select('*')
+            .eq('parent_user_id', userId)
+            .eq('sender_type', 'facility')
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+          if (facilityMsgData) {
+            setUnreadMessages(facilityMsgData);
+          }
+        }
 
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
@@ -450,22 +525,85 @@ export default function ClientDashboardPage() {
   // アクティブな契約数を取得
   const activeContractsCount = contracts.filter(c => c.status === 'active').length;
 
+  // 署名待ちの連絡帳の数
+  const unsignedContactLogs = contactLogs.filter(cl => !cl.is_signed && cl.status === 'submitted');
+
+  // 総未読バッジ数
+  const totalBadgeCount = pendingInvitations.length
+    + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0)
+    + signRequests.length
+    + unsignedContactLogs.length
+    + unreadMessages.length;
+
+  // カレンダー用日付データ
+  const calendarDates = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+
+    const dates: Array<{ date: string; day: number; isCurrentMonth: boolean }> = [];
+
+    const formatDate = (d: Date): string => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+
+    // 前月の末尾
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = new Date(year, month, -i);
+      dates.push({ date: formatDate(d), day: d.getDate(), isCurrentMonth: false });
+    }
+
+    // 当月の日付
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = new Date(year, month, day);
+      dates.push({ date: formatDate(d), day, isCurrentMonth: true });
+    }
+
+    // 次月の初め
+    const remaining = 42 - dates.length;
+    for (let day = 1; day <= remaining; day++) {
+      const d = new Date(year, month + 1, day);
+      dates.push({ date: formatDate(d), day, isCurrentMonth: false });
+    }
+
+    return dates;
+  }, [calendarMonth]);
+
+  // カレンダー上の利用予定日を集計
+  const scheduledDateMap = useMemo(() => {
+    const map = new Map<string, { count: number; facilities: Set<string> }>();
+    usageRecords.forEach(r => {
+      const existing = map.get(r.date);
+      if (existing) {
+        existing.count++;
+        existing.facilities.add(r.facility_id);
+      } else {
+        map.set(r.date, { count: 1, facilities: new Set([r.facility_id]) });
+      }
+    });
+    return map;
+  }, [usageRecords]);
+
   // クイックアクションの処理
-  const handleQuickAction = (actionType: 'facilities' | 'calendar' | 'message') => {
+  const handleQuickAction = (actionType: 'facilities' | 'calendar' | 'message' | 'usage-request') => {
     if (children.length === 0) return;
 
     if (children.length === 1) {
-      // 1人の場合は直接遷移
       executeAction(children[0].id, actionType);
     } else {
-      // 複数の場合はモーダルを表示
       setPendingAction({ type: actionType });
       setShowChildSelector(true);
     }
   };
 
   // アクション実行
-  const executeAction = (childId: string, actionType: 'facilities' | 'calendar' | 'message') => {
+  const executeAction = (childId: string, actionType: 'facilities' | 'calendar' | 'message' | 'usage-request') => {
     switch (actionType) {
       case 'facilities':
         router.push(`/parent/children/${childId}?tab=facilities`);
@@ -473,14 +611,17 @@ export default function ClientDashboardPage() {
       case 'calendar':
         router.push(`/parent/children/${childId}?tab=calendar`);
         break;
-      case 'message':
-        // 契約中の施設があればチャット画面へ、なければメッセージタブへ
+      case 'message': {
         const childContracts = contracts.filter(c => c.child_id === childId && c.status === 'active');
         if (childContracts.length > 0) {
           router.push(`/parent/facilities/${childContracts[0].facility_id}/chat`);
         } else {
           setActiveTab('messages');
         }
+        break;
+      }
+      case 'usage-request':
+        router.push(`/parent/children/${childId}/usage-request`);
         break;
     }
     setShowChildSelector(false);
@@ -510,11 +651,16 @@ export default function ClientDashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F472B6] mx-auto mb-4"></div>
         </div>
       </div>
     );
   }
+
+  const todayStr = (() => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  })();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -529,16 +675,16 @@ export default function ClientDashboardPage() {
               height={40}
               className="h-8 w-auto"
             />
-            <span className="inline-block bg-[#F6AD55] text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="inline-block bg-[#F472B6] text-white text-xs font-bold px-2 py-0.5 rounded-full">
               利用者
             </span>
           </div>
           <div className="flex items-center gap-4">
-            {(pendingInvitations.length > 0 || unreadChats.length > 0 || signRequests.length > 0) && (
+            {totalBadgeCount > 0 && (
               <div className="relative">
                 <Bell className="w-5 h-5 text-gray-600" />
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
-                  {pendingInvitations.length + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length}
+                  {totalBadgeCount}
                 </span>
               </div>
             )}
@@ -566,8 +712,8 @@ export default function ClientDashboardPage() {
 
         {/* 招待通知 */}
         {pendingInvitations.length > 0 && (
-          <div className="bg-[#FEF3E2] border border-[#F6AD55]/30 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
+          <div className="bg-pink-50 border border-[#F472B6]/30 rounded-xl p-4 mb-6">
+            <h3 className="font-bold text-pink-800 mb-2 flex items-center gap-2">
               <Bell className="w-5 h-5" />
               施設からの招待があります
             </h3>
@@ -582,7 +728,7 @@ export default function ClientDashboardPage() {
                   </div>
                   <button
                     onClick={() => router.push(`/parent/invitations/${inv.invitation_token}`)}
-                    className="bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
+                    className="bg-[#F472B6] hover:bg-[#EC4899] text-white text-sm font-bold py-2 px-4 rounded-md"
                   >
                     確認する
                   </button>
@@ -593,45 +739,103 @@ export default function ClientDashboardPage() {
         )}
 
         {/* ウェルカムメッセージ */}
-        <div className="bg-gradient-to-r from-[#FBBF6A] to-[#F6AD55] rounded-xl p-6 text-gray-800 mb-6 shadow-sm">
+        <div className="bg-gradient-to-r from-[#F472B6] to-[#EC4899] rounded-xl p-6 text-white mb-6 shadow-sm">
           <h1 className="text-2xl font-bold">
             ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
           </h1>
-          <p className="text-gray-700/80 mt-1 text-sm">
+          <p className="text-white/80 mt-1 text-sm">
             お子様の利用状況を確認できます
           </p>
           {currentMonthUsage > 0 && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-white/30 rounded-lg px-3 py-1.5">
+            <div className="mt-3 inline-flex items-center gap-2 bg-white/20 rounded-lg px-3 py-1.5">
               <CalendarDays className="w-4 h-4" />
               <span className="text-sm font-medium">今月の利用: {currentMonthUsage}回</span>
             </div>
           )}
         </div>
 
-        {/* お知らせセクション（チャット機能はフェーズ3以上で表示） */}
-        {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0) && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center gap-2">
+        {/* お知らせセクション */}
+        {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0 || unsignedContactLogs.length > 0 || unreadMessages.length > 0) && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+            <div className="bg-gradient-to-r from-[#F472B6] to-[#EC4899] px-4 py-3 flex items-center gap-2">
               <Bell className="w-5 h-5 text-white" />
               <h2 className="font-bold text-white">お知らせ</h2>
-              <span className="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
-                {(isChatEnabled ? unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) : 0) + signRequests.length}件
+              <span className="bg-white text-[#EC4899] text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
+                {(isChatEnabled ? unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) : 0) + signRequests.length + unsignedContactLogs.length + unreadMessages.length}件
               </span>
             </div>
             <div className="divide-y divide-gray-100">
+              {/* 署名待ち連絡帳 */}
+              {unsignedContactLogs.length > 0 && (
+                <button
+                  onClick={() => {
+                    const firstLog = unsignedContactLogs[0];
+                    router.push(`/parent/facilities/${firstLog.facility_id}/contact`);
+                  }}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
+                >
+                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-6 h-6 text-[#F472B6]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-[#F472B6] text-white text-xs font-bold px-2 py-0.5 rounded">
+                        署名待ち
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-gray-800 truncate">
+                      {unsignedContactLogs.length}件の連絡帳が署名を待っています
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      タップして確認・署名する
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                </button>
+              )}
+
+              {/* 未読施設メッセージ */}
+              {unreadMessages.length > 0 && (
+                <button
+                  onClick={() => {
+                    const firstMsg = unreadMessages[0];
+                    router.push(`/parent/facilities/${firstMsg.facility_id}/chat`);
+                  }}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
+                >
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Inbox className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                        未読メッセージ
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-gray-800 truncate">
+                      施設からの{unreadMessages.length}件のメッセージ
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      タップして確認する
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                </button>
+              )}
+
               {/* 未読チャットメッセージ（フェーズ3以上で表示） */}
               {isChatEnabled && unreadChats.map((chat) => (
                 <button
                   key={chat.facilityId}
                   onClick={() => router.push(`/parent/facilities/${chat.facilityId}/chat`)}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-blue-50 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
                 >
-                  <div className="w-12 h-12 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="w-6 h-6 text-[#F6AD55]" />
+                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <MessageSquare className="w-6 h-6 text-[#F472B6]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#ED8936] text-white text-xs font-bold px-2 py-0.5 rounded">
+                      <span className="bg-[#EC4899] text-white text-xs font-bold px-2 py-0.5 rounded">
                         新着メッセージ
                       </span>
                     </div>
@@ -651,14 +855,14 @@ export default function ClientDashboardPage() {
                 <button
                   key={request.id}
                   onClick={() => router.push(`/parent/facilities/${request.facilityId}/records?sign=${request.id}`)}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-[#FEF3E2] transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
                 >
-                  <div className="w-12 h-12 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
-                    <PenLine className="w-6 h-6 text-[#F6AD55]" />
+                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <PenLine className="w-6 h-6 text-[#F472B6]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#FEF3E2]0 text-white text-xs font-bold px-2 py-0.5 rounded">
+                      <span className="bg-[#F472B6] text-white text-xs font-bold px-2 py-0.5 rounded">
                         署名依頼
                       </span>
                     </div>
@@ -677,7 +881,7 @@ export default function ClientDashboardPage() {
         )}
 
         {/* タブナビゲーション */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
           <div className="flex border-b border-gray-200 overflow-x-auto">
             {[
               { id: 'overview', label: '概要', icon: ClipboardList, phase: 1 },
@@ -692,7 +896,7 @@ export default function ClientDashboardPage() {
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-[#F6AD55] text-[#ED8936] bg-[#FEF3E2]'
+                      ? 'border-[#F472B6] text-[#EC4899] bg-pink-50'
                       : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                   }`}
                 >
@@ -707,13 +911,160 @@ export default function ClientDashboardPage() {
             {/* 概要タブ */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
+                {/* 利用予定カレンダー */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      <CalendarDays className="w-5 h-5 text-[#F472B6]" />
+                      利用予定カレンダー
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                        className="p-1.5 hover:bg-gray-100 rounded-md"
+                      >
+                        <ChevronLeft className="w-4 h-4 text-gray-600" />
+                      </button>
+                      <span className="text-sm font-medium text-gray-700 min-w-[100px] text-center">
+                        {calendarMonth.getFullYear()}年{calendarMonth.getMonth() + 1}月
+                      </span>
+                      <button
+                        onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                        className="p-1.5 hover:bg-gray-100 rounded-md"
+                      >
+                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 overflow-hidden">
+                    <div className="grid grid-cols-7 bg-gray-50">
+                      {['日', '月', '火', '水', '木', '金', '土'].map((day, i) => (
+                        <div
+                          key={i}
+                          className={`p-2 text-center text-xs font-bold ${
+                            i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'
+                          }`}
+                        >
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7">
+                      {calendarDates.map((dateInfo, idx) => {
+                        const scheduled = scheduledDateMap.get(dateInfo.date);
+                        const isToday = dateInfo.date === todayStr;
+                        const dayOfWeek = new Date(dateInfo.date).getDay();
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`min-h-[48px] p-1 border-t border-r border-gray-100 relative ${
+                              !dateInfo.isCurrentMonth ? 'bg-gray-50 opacity-40' : ''
+                            } ${isToday ? 'bg-pink-50' : ''}`}
+                          >
+                            <div className={`text-xs text-center font-medium ${
+                              isToday
+                                ? 'w-6 h-6 rounded-full bg-[#F472B6] text-white flex items-center justify-center mx-auto'
+                                : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-gray-700'
+                            }`}>
+                              {dateInfo.day}
+                            </div>
+                            {scheduled && dateInfo.isCurrentMonth && (
+                              <div className="flex justify-center mt-1">
+                                <div className="w-2 h-2 rounded-full bg-[#F472B6]" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-[#F472B6]" />
+                      <span>利用予定日</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 最新の連絡帳 */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-[#F472B6]" />
+                      最新の連絡帳
+                      {unsignedContactLogs.length > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          {unsignedContactLogs.length}件署名待ち
+                        </span>
+                      )}
+                    </h2>
+                  </div>
+                  {contactLogs.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-6 text-center">
+                      <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">連絡帳はまだありません</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {contactLogs.slice(0, 5).map((log) => {
+                        const child = children.find(c => c.id === log.child_id);
+                        const facility = facilities.find(f => f.id === log.facility_id);
+                        const needsSign = !log.is_signed && log.status === 'submitted';
+                        return (
+                          <div
+                            key={log.id}
+                            className={`rounded-xl p-4 border cursor-pointer transition-all hover:shadow-sm ${
+                              needsSign
+                                ? 'border-[#F472B6]/40 bg-pink-50 hover:border-[#F472B6]'
+                                : 'border-gray-100 bg-white hover:border-gray-200'
+                            }`}
+                            onClick={() => router.push(`/parent/facilities/${log.facility_id}/contact`)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                  needsSign ? 'bg-[#F472B6]/10' : 'bg-gray-100'
+                                }`}>
+                                  <BookOpen className={`w-5 h-5 ${needsSign ? 'text-[#F472B6]' : 'text-gray-400'}`} />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-gray-800">{log.date}</span>
+                                    {needsSign && (
+                                      <span className="text-[10px] bg-[#F472B6] text-white px-1.5 py-0.5 rounded font-bold">
+                                        署名待ち
+                                      </span>
+                                    )}
+                                    {log.is_signed && (
+                                      <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                        <CheckCircle className="w-3 h-3" />
+                                        署名済み
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    {child?.name} - {facility?.name || '施設'}
+                                    {log.activities && ` / ${log.activities.substring(0, 30)}...`}
+                                  </p>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {/* 児童一覧 */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-bold text-gray-800">お子様一覧</h2>
                     <button
                       onClick={() => router.push('/parent/children/register')}
-                      className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md transition-colors"
+                      className="flex items-center gap-2 bg-[#F472B6] hover:bg-[#EC4899] text-white text-sm font-bold py-2 px-4 rounded-md transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       追加
@@ -722,8 +1073,8 @@ export default function ClientDashboardPage() {
 
                   {children.length === 0 ? (
                     <div className="bg-gray-50 rounded-lg p-8 text-center">
-                      <div className="w-16 h-16 bg-[#FEF3E2] rounded-full flex items-center justify-center mx-auto mb-4">
-                        <User className="w-8 h-8 text-[#F6AD55]" />
+                      <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <User className="w-8 h-8 text-[#F472B6]" />
                       </div>
                       <h3 className="text-lg font-bold text-gray-800 mb-2">お子様が登録されていません</h3>
                       <p className="text-gray-600 text-sm mb-4">
@@ -731,7 +1082,7 @@ export default function ClientDashboardPage() {
                       </p>
                       <button
                         onClick={() => router.push('/parent/children/register')}
-                        className="inline-flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                        className="inline-flex items-center gap-2 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-2 px-4 rounded-md transition-colors"
                       >
                         <Plus className="w-4 h-4" />
                         お子様を登録する
@@ -748,12 +1099,12 @@ export default function ClientDashboardPage() {
                         return (
                           <div
                             key={child.id}
-                            className="bg-white rounded-xl p-5 hover:shadow-md transition-all cursor-pointer border border-gray-200 hover:border-[#F6AD55]/50 group"
+                            className="bg-white rounded-xl p-5 hover:shadow-md transition-all cursor-pointer border border-gray-100 hover:border-[#F472B6]/50 group"
                             onClick={() => router.push(`/parent/children/${child.id}`)}
                           >
                             <div className="flex items-start gap-4">
-                              <div className="w-14 h-14 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <User className="w-7 h-7 text-[#F6AD55]" />
+                              <div className="w-14 h-14 bg-pink-50 rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <User className="w-7 h-7 text-[#F472B6]" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
@@ -779,7 +1130,7 @@ export default function ClientDashboardPage() {
                                   )}
                                 </div>
                               </div>
-                              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 group-hover:text-[#F6AD55] transition-colors mt-2" />
+                              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 group-hover:text-[#F472B6] transition-colors mt-2" />
                             </div>
                           </div>
                         );
@@ -788,14 +1139,62 @@ export default function ClientDashboardPage() {
                   )}
                 </div>
 
+                {/* 利用施設一覧 */}
+                {facilities.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-[#F472B6]" />
+                      利用施設一覧
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {facilities.map((facility) => {
+                        const facilityContracts = contracts.filter(c => c.facility_id === facility.id && c.status === 'active');
+                        const facilityChildren = facilityContracts.map(c => children.find(ch => ch.id === c.child_id)).filter(Boolean);
+                        return (
+                          <div
+                            key={facility.id}
+                            className="bg-white rounded-xl p-4 border border-gray-100 hover:border-[#F472B6]/40 hover:shadow-sm transition-all cursor-pointer group"
+                            onClick={() => {
+                              const childForFacility = facilityChildren[0];
+                              router.push(`/parent/facilities/${facility.id}${childForFacility ? `?child=${childForFacility.id}` : ''}`);
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-pink-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                <Building2 className="w-5 h-5 text-[#F472B6]" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-gray-800 truncate">{facility.name}</h4>
+                                <p className="text-xs text-gray-500">
+                                  {facilityChildren.map(c => c?.name).join(', ')}
+                                </p>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#F472B6]" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* クイックアクション */}
                 <div>
                   <h2 className="text-lg font-bold text-gray-800 mb-4">クイックアクション</h2>
-                  <div className={`grid grid-cols-1 ${isChatEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <button
+                      onClick={() => handleQuickAction('usage-request')}
+                      disabled={children.length === 0}
+                      className="bg-pink-50 hover:bg-pink-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F472B6]/20 hover:border-[#F472B6]/40"
+                    >
+                      <CalendarDays className="w-8 h-8 text-[#F472B6] mb-2" />
+                      <h3 className="font-bold text-gray-800 text-sm">利用希望申請</h3>
+                      <p className="text-xs text-gray-500 mt-1">日程を申請する</p>
+                    </button>
                     <button
                       onClick={() => handleQuickAction('facilities')}
                       disabled={children.length === 0}
-                      className="bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-gray-50 hover:bg-gray-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-100"
                     >
                       <Building2 className="w-8 h-8 text-blue-500 mb-2" />
                       <h3 className="font-bold text-gray-800 text-sm">施設を確認</h3>
@@ -804,9 +1203,9 @@ export default function ClientDashboardPage() {
                     <button
                       onClick={() => handleQuickAction('calendar')}
                       disabled={children.length === 0}
-                      className="bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-gray-50 hover:bg-gray-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-100"
                     >
-                      <CalendarDays className="w-8 h-8 text-[#F6AD55] mb-2" />
+                      <Calendar className="w-8 h-8 text-[#F472B6] mb-2" />
                       <h3 className="font-bold text-gray-800 text-sm">予定を見る</h3>
                       <p className="text-xs text-gray-500 mt-1">利用カレンダー</p>
                     </button>
@@ -814,9 +1213,9 @@ export default function ClientDashboardPage() {
                       <button
                         onClick={() => handleQuickAction('message')}
                         disabled={children.length === 0}
-                        className="bg-[#FEF3E2] hover:bg-[#FDEBD0] rounded-lg p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F6AD55]/30 hover:border-[#F6AD55]/50"
+                        className="bg-pink-50 hover:bg-pink-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F472B6]/20 hover:border-[#F472B6]/40"
                       >
-                        <MessageSquare className="w-8 h-8 text-[#F6AD55] mb-2" />
+                        <MessageSquare className="w-8 h-8 text-[#F472B6] mb-2" />
                         <h3 className="font-bold text-gray-800 text-sm">施設にチャット</h3>
                         <p className="text-xs text-gray-500 mt-1">施設とメッセージ</p>
                       </button>
@@ -857,7 +1256,7 @@ export default function ClientDashboardPage() {
                               return (
                                 <div
                                   key={contract.id}
-                                  className="bg-green-50 border border-green-200 rounded-lg p-4 hover:border-green-300 transition-colors cursor-pointer"
+                                  className="bg-green-50 border border-green-200 rounded-xl p-4 hover:border-green-300 transition-colors cursor-pointer"
                                   onClick={() => child && router.push(`/parent/facilities/${contract.facility_id}?child=${child.id}`)}
                                 >
                                   <div className="flex items-start justify-between mb-3">
@@ -880,7 +1279,7 @@ export default function ClientDashboardPage() {
                                     {contract.contract_start_date && (
                                       <span className="flex items-center gap-1">
                                         <Calendar className="w-4 h-4" />
-                                        {contract.contract_start_date}〜
+                                        {contract.contract_start_date}~
                                       </span>
                                     )}
                                   </div>
@@ -888,9 +1287,19 @@ export default function ClientDashboardPage() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        router.push(`/parent/facilities/${contract.facility_id}/contact`);
+                                      }}
+                                      className="flex-1 text-sm bg-white hover:bg-gray-50 text-gray-700 py-2 px-3 rounded-lg border border-gray-200 transition-colors flex items-center justify-center gap-1.5"
+                                    >
+                                      <BookOpen className="w-4 h-4" />
+                                      連絡帳
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         router.push(`/parent/facilities/${contract.facility_id}/records?child=${child?.id}`);
                                       }}
-                                      className={`${isChatEnabled ? 'flex-1' : 'w-full'} text-sm bg-white hover:bg-gray-50 text-gray-700 py-2 px-3 rounded border border-gray-200 transition-colors flex items-center justify-center gap-1.5`}
+                                      className="flex-1 text-sm bg-white hover:bg-gray-50 text-gray-700 py-2 px-3 rounded-lg border border-gray-200 transition-colors flex items-center justify-center gap-1.5"
                                     >
                                       <FileText className="w-4 h-4" />
                                       実績記録
@@ -901,7 +1310,7 @@ export default function ClientDashboardPage() {
                                           e.stopPropagation();
                                           router.push(`/parent/facilities/${contract.facility_id}/chat`);
                                         }}
-                                        className="flex-1 text-sm bg-[#F6AD55] hover:bg-[#ED8936] text-white py-2 px-3 rounded border border-[#ED8936] transition-colors font-bold flex items-center justify-center gap-1.5 shadow-md"
+                                        className="flex-1 text-sm bg-[#F472B6] hover:bg-[#EC4899] text-white py-2 px-3 rounded-lg border border-[#EC4899] transition-colors font-bold flex items-center justify-center gap-1.5 shadow-md"
                                       >
                                         <MessageSquare className="w-4 h-4" />
                                         チャット
@@ -927,7 +1336,7 @@ export default function ClientDashboardPage() {
                               return (
                                 <div
                                   key={contract.id}
-                                  className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
+                                  className="bg-yellow-50 border border-yellow-200 rounded-xl p-4"
                                 >
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -961,10 +1370,41 @@ export default function ClientDashboardPage() {
                   <h2 className="text-lg font-bold text-gray-800">利用実績</h2>
                 </div>
 
+                {/* 利用申請のステータス */}
+                {usageRequests.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-sm font-bold text-gray-600 mb-2">利用希望申請</h3>
+                    <div className="space-y-2">
+                      {usageRequests.slice(0, 5).map((req) => {
+                        const child = children.find(c => c.id === req.child_id);
+                        const facility = facilities.find(f => f.id === req.facility_id);
+                        const statusConfig: Record<string, { label: string; color: string }> = {
+                          pending: { label: '申請中', color: 'bg-yellow-100 text-yellow-800' },
+                          approved: { label: '承認済み', color: 'bg-green-100 text-green-800' },
+                          partially_approved: { label: '一部承認', color: 'bg-blue-100 text-blue-800' },
+                          rejected: { label: '却下', color: 'bg-red-100 text-red-800' },
+                        };
+                        const st = statusConfig[req.status] || { label: req.status, color: 'bg-gray-100 text-gray-800' };
+                        return (
+                          <div key={req.id} className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">{req.request_month}</p>
+                              <p className="text-xs text-gray-500">{child?.name} - {facility?.name}</p>
+                            </div>
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${st.color}`}>
+                              {st.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {usageRecords.length === 0 ? (
                   <div className="bg-gray-50 rounded-lg p-8 text-center">
-                    <div className="w-16 h-16 bg-[#FEF3E2] rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Calendar className="w-8 h-8 text-[#F6AD55]" />
+                    <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Calendar className="w-8 h-8 text-[#F472B6]" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-800 mb-2">利用実績がありません</h3>
                     <p className="text-gray-600 text-sm">
@@ -979,7 +1419,7 @@ export default function ClientDashboardPage() {
                       return (
                         <div
                           key={record.id}
-                          className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                          className="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -1048,11 +1488,11 @@ export default function ClientDashboardPage() {
                           return (
                             <div
                               key={contract.id}
-                              className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#F6AD55] hover:shadow-lg transition-all cursor-pointer group"
+                              className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#F472B6] hover:shadow-lg transition-all cursor-pointer group"
                               onClick={() => router.push(`/parent/facilities/${contract.facility_id}/chat`)}
                             >
                               <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-gradient-to-br from-[#F6AD55] to-[#ED8936] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
+                                <div className="w-14 h-14 bg-gradient-to-br from-[#F472B6] to-[#EC4899] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
                                   <Building2 className="w-7 h-7 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -1068,7 +1508,7 @@ export default function ClientDashboardPage() {
                                     チャットで連絡する
                                   </p>
                                 </div>
-                                <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0 group-hover:text-[#F6AD55] transition-colors" />
+                                <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0 group-hover:text-[#F472B6] transition-colors" />
                               </div>
                             </div>
                           );
@@ -1092,7 +1532,7 @@ export default function ClientDashboardPage() {
       {/* 児童選択モーダル */}
       {showChildSelector && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-800">
                 お子様を選択してください
@@ -1101,6 +1541,7 @@ export default function ClientDashboardPage() {
                 {pendingAction?.type === 'facilities' && '施設一覧を確認するお子様を選択'}
                 {pendingAction?.type === 'calendar' && '予定カレンダーを確認するお子様を選択'}
                 {pendingAction?.type === 'message' && '連絡するお子様を選択'}
+                {pendingAction?.type === 'usage-request' && '利用希望を申請するお子様を選択'}
               </p>
             </div>
             <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
@@ -1112,10 +1553,10 @@ export default function ClientDashboardPage() {
                   <button
                     key={child.id}
                     onClick={() => handleChildSelect(child.id)}
-                    className="w-full flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-[#F6AD55]/50 hover:bg-[#FEF3E2] transition-colors text-left"
+                    className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-[#F472B6]/50 hover:bg-pink-50 transition-colors text-left"
                   >
-                    <div className="w-12 h-12 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
-                      <User className="w-6 h-6 text-[#F6AD55]" />
+                    <div className="w-12 h-12 bg-pink-50 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User className="w-6 h-6 text-[#F472B6]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
