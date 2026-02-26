@@ -67,6 +67,16 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // ツールページ（公開・認証不要）
+  if (pathname.startsWith('/tools')) {
+    return NextResponse.next();
+  }
+
+  // 連絡会議外部回答ページ（トークン認証）
+  if (pathname.startsWith('/connect/respond/')) {
+    return NextResponse.next();
+  }
+
   // PWA関連ファイル
   if (pathname === '/favicon.ico' || pathname === '/sw.js' || pathname === '/manifest.json') {
     const response = NextResponse.next();
