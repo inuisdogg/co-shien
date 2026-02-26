@@ -300,7 +300,7 @@ export default function ParentContactBookPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8B5CF6] mx-auto mb-3" />
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F6AD55] mx-auto mb-3" />
           <p className="text-gray-500 text-sm">読み込み中...</p>
         </div>
       </div>
@@ -399,11 +399,11 @@ export default function ParentContactBookPage() {
 
       {/* Parent Message */}
       {entry.parent_message && (
-        <div className="bg-purple-50 border border-purple-100 rounded-lg p-3">
-          <div className="flex items-center gap-1 text-xs font-bold text-purple-600 mb-1">
+        <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+          <div className="flex items-center gap-1 text-xs font-bold text-amber-600 mb-1">
             <MessageSquare className="w-3 h-3" /> 保護者への連絡
           </div>
-          <p className="text-purple-800 whitespace-pre-wrap">{entry.parent_message}</p>
+          <p className="text-amber-800 whitespace-pre-wrap">{entry.parent_message}</p>
         </div>
       )}
 
@@ -430,7 +430,7 @@ export default function ParentContactBookPage() {
               <textarea
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6] text-[13px]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F6AD55]/20 focus:border-[#F6AD55] text-[13px]"
                 rows={2}
                 placeholder="スタッフへの返信を入力..."
               />
@@ -444,7 +444,7 @@ export default function ParentContactBookPage() {
                 <button
                   onClick={() => handleReply(entry.id)}
                   disabled={isReplying || !replyText.trim()}
-                  className="px-3 py-1.5 text-xs text-white bg-[#8B5CF6] rounded-lg hover:bg-[#7C3AED] disabled:opacity-50 flex items-center gap-1"
+                  className="px-3 py-1.5 text-xs text-white bg-[#F6AD55] rounded-lg hover:bg-[#ED8936] disabled:opacity-50 flex items-center gap-1"
                 >
                   {isReplying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                   返信
@@ -454,7 +454,7 @@ export default function ParentContactBookPage() {
           ) : (
             <button
               onClick={() => setReplyingId(entry.id)}
-              className="text-xs text-[#8B5CF6] hover:text-[#7C3AED] font-medium"
+              className="text-xs text-[#F6AD55] hover:text-[#ED8936] font-medium"
             >
               返信する
             </button>
@@ -478,7 +478,7 @@ export default function ParentContactBookPage() {
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-gray-800 text-base flex items-center gap-2">
-                <BookOpen size={18} className="text-[#8B5CF6]" />
+                <BookOpen size={18} className="text-[#F6AD55]" />
                 連絡帳
               </h1>
               <p className="text-xs text-gray-500">{facility?.name || '施設'}</p>
@@ -507,7 +507,7 @@ export default function ParentContactBookPage() {
             onClick={() => setTab('unsigned')}
             className={`flex-1 px-4 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
               tab === 'unsigned'
-                ? 'text-[#8B5CF6] border-b-2 border-[#8B5CF6] bg-[#8B5CF6]/5'
+                ? 'text-[#F6AD55] border-b-2 border-[#F6AD55] bg-[#F6AD55]/5'
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
@@ -523,7 +523,7 @@ export default function ParentContactBookPage() {
             onClick={() => setTab('history')}
             className={`flex-1 px-4 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
               tab === 'history'
-                ? 'text-[#8B5CF6] border-b-2 border-[#8B5CF6] bg-[#8B5CF6]/5'
+                ? 'text-[#F6AD55] border-b-2 border-[#F6AD55] bg-[#F6AD55]/5'
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
@@ -553,8 +553,8 @@ export default function ParentContactBookPage() {
                     onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                     className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 transition-colors"
                   >
-                    <div className="w-9 h-9 rounded-full bg-[#8B5CF6]/10 flex items-center justify-center flex-shrink-0">
-                      <User size={16} className="text-[#8B5CF6]" />
+                    <div className="w-9 h-9 rounded-full bg-[#F6AD55]/10 flex items-center justify-center flex-shrink-0">
+                      <User size={16} className="text-[#F6AD55]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-gray-800">{entry.child_name}</p>
@@ -589,7 +589,7 @@ export default function ParentContactBookPage() {
                             type="text"
                             value={signerName}
                             onChange={(e) => setSignerName(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6] text-sm"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F6AD55]/20 focus:border-[#F6AD55] text-sm"
                             placeholder="保護者のお名前を入力"
                             autoFocus
                           />
@@ -604,7 +604,7 @@ export default function ParentContactBookPage() {
                           <button
                             onClick={() => handleSign(entry)}
                             disabled={!signerName.trim() || isSigning}
-                            className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-[#8B5CF6] hover:bg-[#7C3AED] rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-[#F6AD55] hover:bg-[#ED8936] rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                           >
                             {isSigning ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -621,7 +621,7 @@ export default function ParentContactBookPage() {
                           setSigningId(entry.id);
                           setSignerName(currentUser?.name || `${currentUser?.last_name || ''} ${currentUser?.first_name || ''}`.trim());
                         }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-[#8B5CF6] hover:bg-[#7C3AED] rounded-lg transition-colors shadow-sm"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-[#F6AD55] hover:bg-[#ED8936] rounded-lg transition-colors shadow-sm"
                       >
                         <PenLine className="w-4 h-4" />
                         内容を確認して署名する

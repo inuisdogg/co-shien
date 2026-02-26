@@ -592,7 +592,19 @@ export default function FacilityDetailPage() {
             )}
 
             {/* 予約カレンダータブ */}
-            {activeTab === 'calendar' && (
+            {activeTab === 'calendar' && (() => {
+              // 児童カラー設定
+              const CHILD_COLORS_CAL = ['#93C5FD', '#86EFAC', '#FCA5A5', '#C4B5FD', '#FDBA74'];
+              const CHILD_COLORS_DARK_CAL = ['#3B82F6', '#22C55E', '#EF4444', '#8B5CF6', '#F97316'];
+              const childIndexMapCal = new Map<string, number>();
+              contracts.forEach((c: any, idx: number) => {
+                if (!childIndexMapCal.has(c.child_id)) {
+                  childIndexMapCal.set(c.child_id, childIndexMapCal.size);
+                }
+              });
+              const hasMultipleChildren = childIndexMapCal.size > 1;
+
+              return (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-gray-800">予約カレンダー</h2>
@@ -622,6 +634,24 @@ export default function FacilityDetailPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* 児童凡例（複数児童がこの施設に契約している場合） */}
+                {hasMultipleChildren && (
+                  <div className="flex flex-wrap items-center gap-3 bg-gray-50 rounded-lg px-4 py-2">
+                    {Array.from(childIndexMapCal.entries()).map(([cId, cIdx]) => {
+                      const c = children.find((ch: any) => ch.id === cId);
+                      return (
+                        <div key={cId} className="flex items-center gap-1.5">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: CHILD_COLORS_CAL[cIdx % CHILD_COLORS_CAL.length] }}
+                          />
+                          <span className="text-xs font-medium text-gray-700">{c?.name || '不明'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* カレンダー */}
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -675,15 +705,34 @@ export default function FacilityDetailPage() {
                             <div className={`text-xs font-bold mb-1 ${isToday ? 'text-[#ED8936]' : ''}`}>
                               {day}
                             </div>
-                            <div className="space-y-1">
-                              {daySchedules.map((schedule: any) => (
-                                <div
-                                  key={schedule.id}
-                                  className="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded truncate"
-                                >
-                                  {schedule.slot === 'AM' ? '午前' : '午後'}
-                                </div>
-                              ))}
+                            <div className="space-y-0.5">
+                              {daySchedules.map((schedule: any) => {
+                                const cIdx = childIndexMapCal.get(schedule.child_id) ?? 0;
+                                const bgColor = hasMultipleChildren
+                                  ? CHILD_COLORS_CAL[cIdx % CHILD_COLORS_CAL.length] + '40'
+                                  : undefined;
+                                const textColor = hasMultipleChildren
+                                  ? CHILD_COLORS_DARK_CAL[cIdx % CHILD_COLORS_DARK_CAL.length]
+                                  : undefined;
+                                const childForSchedule = hasMultipleChildren
+                                  ? children.find((ch: any) => ch.id === schedule.child_id)
+                                  : null;
+
+                                return (
+                                  <div
+                                    key={schedule.id}
+                                    className={`text-xs px-1 py-0.5 rounded truncate ${
+                                      hasMultipleChildren ? '' : 'bg-green-100 text-green-800'
+                                    }`}
+                                    style={hasMultipleChildren ? { backgroundColor: bgColor, color: textColor } : undefined}
+                                  >
+                                    {hasMultipleChildren && (
+                                      <span className="font-bold">{childForSchedule?.name?.charAt(0)}</span>
+                                    )}
+                                    {schedule.slot === 'AM' ? '午前' : schedule.slot === 'PM' ? '午後' : ''}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -695,11 +744,26 @@ export default function FacilityDetailPage() {
                 </div>
 
                 {/* 凡例 */}
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-green-100 rounded"></div>
-                    <span>利用予定</span>
-                  </div>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                  {hasMultipleChildren ? (
+                    Array.from(childIndexMapCal.entries()).map(([cId, cIdx]) => {
+                      const c = children.find((ch: any) => ch.id === cId);
+                      return (
+                        <div key={cId} className="flex items-center gap-1">
+                          <div
+                            className="w-4 h-4 rounded"
+                            style={{ backgroundColor: CHILD_COLORS_CAL[cIdx % CHILD_COLORS_CAL.length] + '40' }}
+                          />
+                          <span>{c?.name || '不明'}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <div className="w-4 h-4 bg-green-100 rounded"></div>
+                      <span>利用予定</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1">
                     <div className="w-4 h-4 bg-[#FEF3E2] border border-[#F6AD55]/30 rounded"></div>
                     <span>今日</span>
@@ -717,7 +781,8 @@ export default function FacilityDetailPage() {
                   </button>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
           </div>
         </div>

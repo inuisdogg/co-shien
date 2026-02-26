@@ -10,7 +10,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  Plus, User, Calendar, LogOut, ChevronRight, AlertCircle, Building2,
+  Plus, User, Calendar, LogOut, ChevronRight, ChevronLeft, AlertCircle, Building2,
   FileText, Clock, CheckCircle, XCircle, MessageSquare, Bell,
   CalendarDays, ClipboardList, Send, Settings, PenLine, Mail, BookOpen
 } from 'lucide-react';
@@ -94,6 +94,13 @@ type SignRequest = {
   requestedAt: string;
 };
 
+// 施設ごとの未署名連絡帳情報
+type UnsignedContactInfo = {
+  facilityId: string;
+  facilityName: string;
+  count: number;
+};
+
 export default function ClientDashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -106,6 +113,8 @@ export default function ClientDashboardPage() {
   const [signRequests, setSignRequests] = useState<SignRequest[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
   const [unsignedContactCount, setUnsignedContactCount] = useState(0);
+  const [unsignedContacts, setUnsignedContacts] = useState<UnsignedContactInfo[]>([]);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'facilities' | 'records' | 'messages'>('overview');
@@ -113,6 +122,19 @@ export default function ClientDashboardPage() {
   // 児童選択モーダル用の状態
   const [showChildSelector, setShowChildSelector] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'facilities' | 'calendar' | 'message'; } | null>(null);
+
+  // カレンダー月の状態
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+
+  // 児童ごとのカラー設定
+  const CHILD_COLORS = ['#93C5FD', '#86EFAC', '#FCA5A5', '#C4B5FD', '#FDBA74'];
+  const getChildColor = (childIndex: number): string => {
+    return CHILD_COLORS[childIndex % CHILD_COLORS.length];
+  };
+  const getChildColorDark = (childIndex: number): string => {
+    const darkColors = ['#3B82F6', '#22C55E', '#EF4444', '#8B5CF6', '#F97316'];
+    return darkColors[childIndex % darkColors.length];
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -257,9 +279,10 @@ export default function ClientDashboardPage() {
           // 児童IDのリストを取得
           const childIds = formattedChildren.map(c => c.id);
 
+          // 施設情報を抽出するためのMap（外側スコープで定義して署名待ち取得でも使えるようにする）
+          const uniqueFacilities = new Map<string, Facility>();
+
           if (childIds.length > 0) {
-            // 施設情報を抽出するためのMap
-            const uniqueFacilities = new Map<string, Facility>();
 
             // 方法1: childrenのfacility_idから施設を取得
             const childFacilityIds = formattedChildren
@@ -402,20 +425,45 @@ export default function ClientDashboardPage() {
         // 署名依頼を取得（sign_requestsテーブルがある場合）
         // TODO: 署名依頼テーブルができたら実装
 
-        // 署名待ちの連絡帳を取得
+        // 署名待ちの連絡帳を取得（施設ごとにグループ化）
         const allChildIds = (childrenData || []).map((c: any) => c.id);
 
         if (allChildIds.length > 0) {
           try {
             const { data: unsignedData, error: unsignedErr } = await supabase
               .from('contact_logs')
-              .select('id')
+              .select('id, facility_id, facilities:facility_id (id, name)')
               .in('child_id', allChildIds)
               .eq('status', 'submitted')
               .eq('is_signed', false);
 
             if (!unsignedErr && unsignedData) {
               setUnsignedContactCount(unsignedData.length);
+
+              // 施設ごとにグループ化
+              const facilityCountMap = new Map<string, { count: number; name: string }>();
+              unsignedData.forEach((entry: any) => {
+                const fid = entry.facility_id;
+                const existing = facilityCountMap.get(fid);
+                if (existing) {
+                  existing.count++;
+                } else {
+                  facilityCountMap.set(fid, {
+                    count: 1,
+                    name: entry.facilities?.name || '施設',
+                  });
+                }
+              });
+
+              const unsignedByFacility: UnsignedContactInfo[] = [];
+              facilityCountMap.forEach((info, fid) => {
+                unsignedByFacility.push({
+                  facilityId: fid,
+                  facilityName: info.name,
+                  count: info.count,
+                });
+              });
+              setUnsignedContacts(unsignedByFacility);
             }
           } catch {
             // ignore - status column may not exist yet
@@ -509,6 +557,139 @@ export default function ClientDashboardPage() {
     return recordDate.getMonth() === now.getMonth() && recordDate.getFullYear() === now.getFullYear();
   }).length;
 
+  // 児童のインデックスマップ（色割当用）
+  const childIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    children.forEach((child, index) => {
+      map.set(child.id, index);
+    });
+    return map;
+  }, [children]);
+
+  // カレンダー日付の生成
+  const calendarDates = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+
+    const dates: Array<{ date: string; day: number; isCurrentMonth: boolean }> = [];
+
+    const formatDate = (d: Date): string => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = new Date(year, month, -i);
+      dates.push({ date: formatDate(d), day: d.getDate(), isCurrentMonth: false });
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = new Date(year, month, day);
+      dates.push({ date: formatDate(d), day, isCurrentMonth: true });
+    }
+
+    const remaining = 42 - dates.length;
+    for (let day = 1; day <= remaining; day++) {
+      const d = new Date(year, month + 1, day);
+      dates.push({ date: formatDate(d), day, isCurrentMonth: false });
+    }
+
+    return dates;
+  }, [calendarMonth]);
+
+  // 日付ごとのスケジュールをまとめる（複数児童対応）
+  const schedulesByDate = useMemo(() => {
+    const map = new Map<string, Array<{
+      childId: string;
+      childName: string;
+      facilityId: string;
+      facilityName: string;
+      slot?: string;
+      serviceStatus?: string;
+    }>>();
+
+    usageRecords.forEach(record => {
+      const child = children.find(c => c.id === record.child_id);
+      const facility = facilities.find(f => f.id === record.facility_id);
+      if (!child) return;
+
+      const existing = map.get(record.date) || [];
+      existing.push({
+        childId: record.child_id,
+        childName: child.name,
+        facilityId: record.facility_id,
+        facilityName: facility?.name || '施設',
+        slot: record.slot,
+        serviceStatus: record.service_status,
+      });
+      map.set(record.date, existing);
+    });
+
+    return map;
+  }, [usageRecords, children, facilities]);
+
+  // 直近の予定リスト（今日以降）
+  const upcomingSchedules = useMemo(() => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const weekDayNames = ['日', '月', '火', '水', '木', '金', '土'];
+
+    return usageRecords
+      .filter(r => r.date >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 10)
+      .map(record => {
+        const child = children.find(c => c.id === record.child_id);
+        const facility = facilities.find(f => f.id === record.facility_id);
+        const d = new Date(record.date);
+        const dayOfWeek = weekDayNames[d.getDay()];
+        return {
+          ...record,
+          childName: child?.name || '不明',
+          childIndex: childIndexMap.get(record.child_id) ?? 0,
+          facilityName: facility?.name || '施設',
+          dayOfWeek,
+        };
+      });
+  }, [usageRecords, children, facilities, childIndexMap]);
+
+  // 日付ごとにグループ化した直近予定
+  const upcomingGrouped = useMemo(() => {
+    const groups: Array<{
+      date: string;
+      dayOfWeek: string;
+      items: typeof upcomingSchedules;
+    }> = [];
+
+    upcomingSchedules.forEach(item => {
+      const existing = groups.find(g => g.date === item.date);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        groups.push({
+          date: item.date,
+          dayOfWeek: item.dayOfWeek,
+          items: [item],
+        });
+      }
+    });
+
+    return groups;
+  }, [upcomingSchedules]);
+
+  const todayStr = (() => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  })();
+
+  const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -540,10 +721,118 @@ export default function ClientDashboardPage() {
           <div className="flex items-center gap-4">
             {(pendingInvitations.length > 0 || unreadChats.length > 0 || signRequests.length > 0 || unsignedContactCount > 0) && (
               <div className="relative">
-                <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
-                  {pendingInvitations.length + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length + unsignedContactCount}
-                </span>
+                <button
+                  onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+                  className="relative p-1 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label="通知を表示"
+                >
+                  <Bell className="w-5 h-5 text-gray-600" />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
+                    {pendingInvitations.length + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length + unsignedContactCount}
+                  </span>
+                </button>
+
+                {showNotificationDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setShowNotificationDropdown(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-lg border border-gray-200 z-30 max-h-[70vh] overflow-y-auto">
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-bold text-gray-800 text-sm">通知</h3>
+                        <span className="text-xs text-gray-500">
+                          {pendingInvitations.length + unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) + signRequests.length + unsignedContactCount}件
+                        </span>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {unsignedContacts.map((uc) => (
+                          <button
+                            key={`contact-${uc.facilityId}`}
+                            onClick={() => {
+                              setShowNotificationDropdown(false);
+                              router.push(`/parent/facilities/${uc.facilityId}/contact-book`);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FEF3E2] transition-colors text-left"
+                          >
+                            <div className="w-9 h-9 bg-[#F6AD55]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <BookOpen className="w-4 h-4 text-[#F6AD55]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">連絡帳 署名待ち {uc.count}件</p>
+                              <p className="text-xs text-gray-500 truncate">{uc.facilityName}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          </button>
+                        ))}
+                        {unreadChats.map((chat) => (
+                          <button
+                            key={`chat-${chat.facilityId}`}
+                            onClick={() => {
+                              setShowNotificationDropdown(false);
+                              router.push(`/parent/facilities/${chat.facilityId}/chat`);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left"
+                          >
+                            <div className="w-9 h-9 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
+                              <MessageSquare className="w-4 h-4 text-[#F6AD55]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">新着メッセージ {chat.unreadCount}件</p>
+                              <p className="text-xs text-gray-500 truncate">{chat.facilityName}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          </button>
+                        ))}
+                        {pendingInvitations.map((inv) => (
+                          <button
+                            key={`inv-${inv.id}`}
+                            onClick={() => {
+                              setShowNotificationDropdown(false);
+                              router.push(`/parent/invitations/${inv.invitation_token}`);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FEF3E2] transition-colors text-left"
+                          >
+                            <div className="w-9 h-9 bg-[#FEF3E2] rounded-full flex items-center justify-center flex-shrink-0">
+                              <Mail className="w-4 h-4 text-[#F6AD55]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">施設からの招待</p>
+                              <p className="text-xs text-gray-500 truncate">{inv.facilities?.name}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          </button>
+                        ))}
+                        {signRequests.map((request) => (
+                          <button
+                            key={`sign-${request.id}`}
+                            onClick={() => {
+                              setShowNotificationDropdown(false);
+                              router.push(`/parent/facilities/${request.facilityId}/records?sign=${request.id}`);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FEF3E2] transition-colors text-left"
+                          >
+                            <div className="w-9 h-9 bg-[#FEF3E2] rounded-full flex items-center justify-center flex-shrink-0">
+                              <PenLine className="w-4 h-4 text-[#F6AD55]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">
+                                署名依頼: {request.type === 'monthly_record' ? '実績記録表' : 'サービス計画'}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">{request.facilityName} - {request.childName}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                      {pendingInvitations.length === 0 && unreadChats.length === 0 && signRequests.length === 0 && unsignedContacts.length === 0 && (
+                        <div className="px-4 py-6 text-center text-sm text-gray-500">
+                          通知はありません
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             <span className="text-sm text-gray-600 hidden sm:block">
@@ -604,13 +893,13 @@ export default function ClientDashboardPage() {
         </div>
 
         {/* お知らせセクション（チャット機能はフェーズ3以上で表示） */}
-        {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0) && (
+        {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0 || unsignedContacts.length > 0) && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center gap-2">
               <Bell className="w-5 h-5 text-white" />
               <h2 className="font-bold text-white">お知らせ</h2>
               <span className="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
-                {(isChatEnabled ? unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) : 0) + signRequests.length}件
+                {(isChatEnabled ? unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) : 0) + signRequests.length + unsignedContactCount}件
               </span>
             </div>
             <div className="divide-y divide-gray-100">
@@ -641,6 +930,33 @@ export default function ClientDashboardPage() {
                 </button>
               ))}
 
+              {/* 未署名の連絡帳 */}
+              {unsignedContacts.map((uc) => (
+                <button
+                  key={`notify-contact-${uc.facilityId}`}
+                  onClick={() => router.push(`/parent/facilities/${uc.facilityId}/contact-book`)}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-[#FEF3E2] transition-colors text-left"
+                >
+                  <div className="w-12 h-12 bg-[#F6AD55]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-6 h-6 text-[#F6AD55]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-[#F6AD55] text-white text-xs font-bold px-2 py-0.5 rounded">
+                        連絡帳 署名待ち
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-gray-800 truncate">
+                      {uc.facilityName}から{uc.count}件の署名待ち
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      タップして連絡帳を確認・署名する
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                </button>
+              ))}
+
               {/* 署名依頼 */}
               {signRequests.map((request) => (
                 <button
@@ -653,7 +969,7 @@ export default function ClientDashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#FEF3E2]0 text-white text-xs font-bold px-2 py-0.5 rounded">
+                      <span className="bg-[#F6AD55] text-white text-xs font-bold px-2 py-0.5 rounded">
                         署名依頼
                       </span>
                     </div>
@@ -809,30 +1125,224 @@ export default function ClientDashboardPage() {
                   </div>
                 </div>
 
+                {/* 利用予定カレンダー（複数児童・施設対応） */}
+                {children.length > 0 && usageRecords.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <CalendarDays className="w-5 h-5 text-[#F6AD55]" />
+                      利用予定カレンダー
+                    </h2>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                      {/* カレンダーヘッダー */}
+                      <div className="px-4 py-3 bg-gradient-to-r from-[#FBBF6A] to-[#F6AD55] flex items-center justify-between">
+                        <button
+                          onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                          className="p-1.5 hover:bg-white/20 rounded-md text-white"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <h3 className="text-white font-bold">
+                          {calendarMonth.getFullYear()}年{calendarMonth.getMonth() + 1}月
+                        </h3>
+                        <button
+                          onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                          className="p-1.5 hover:bg-white/20 rounded-md text-white"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* 児童凡例（複数児童の場合） */}
+                      {children.length > 1 && (
+                        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-3">
+                          {children.map((child, idx) => (
+                            <div key={child.id} className="flex items-center gap-1.5">
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: getChildColor(idx) }}
+                              />
+                              <span className="text-xs font-medium text-gray-700">{child.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="p-3">
+                        {/* 曜日ヘッダー */}
+                        <div className="grid grid-cols-7 mb-1">
+                          {weekDays.map((day, i) => (
+                            <div
+                              key={i}
+                              className={`p-1.5 text-center text-xs font-bold ${
+                                i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'
+                              }`}
+                            >
+                              {day}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* 日付セル */}
+                        <div className="grid grid-cols-7 gap-0.5">
+                          {calendarDates.map((dateInfo, idx) => {
+                            const daySchedules = schedulesByDate.get(dateInfo.date) || [];
+                            const isToday = dateInfo.date === todayStr;
+                            const dayOfWeek = new Date(dateInfo.date).getDay();
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`min-h-[68px] p-1 rounded-lg transition-all ${
+                                  !dateInfo.isCurrentMonth
+                                    ? 'bg-gray-50 opacity-30'
+                                    : isToday
+                                    ? 'bg-[#FEF3E2] border border-[#F6AD55]/40'
+                                    : dayOfWeek === 0
+                                    ? 'bg-red-50/30'
+                                    : dayOfWeek === 6
+                                    ? 'bg-blue-50/30'
+                                    : 'bg-white'
+                                }`}
+                              >
+                                <div className={`text-xs text-center font-medium mb-0.5 ${
+                                  isToday
+                                    ? 'w-5 h-5 rounded-full bg-[#F6AD55] text-white flex items-center justify-center mx-auto text-[10px]'
+                                    : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-gray-700'
+                                }`}>
+                                  {dateInfo.day}
+                                </div>
+                                {daySchedules.length > 0 && dateInfo.isCurrentMonth && (
+                                  <div className="space-y-0.5">
+                                    {daySchedules.map((sched, sIdx) => {
+                                      const cIdx = childIndexMap.get(sched.childId) ?? 0;
+                                      return (
+                                        <div
+                                          key={sIdx}
+                                          className="rounded px-0.5 py-0.5 text-center"
+                                          style={{ backgroundColor: getChildColor(cIdx) + '40' }}
+                                        >
+                                          <div
+                                            className="text-[9px] font-bold truncate leading-tight"
+                                            style={{ color: getChildColorDark(cIdx) }}
+                                          >
+                                            {children.length > 1 ? sched.childName.charAt(0) : ''}
+                                            {sched.slot === 'AM' ? '午前' : sched.slot === 'PM' ? '午後' : ''}
+                                          </div>
+                                          <div className="text-[8px] text-gray-500 truncate leading-tight">
+                                            {sched.facilityName.length > 4 ? sched.facilityName.substring(0, 4) + '..' : sched.facilityName}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 直近の利用予定リスト（複数児童・施設対応） */}
+                {upcomingGrouped.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-[#F6AD55]" />
+                      直近の利用予定
+                    </h2>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+                      {upcomingGrouped.map((group) => (
+                        <div key={group.date} className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-sm font-bold text-gray-800">
+                              {group.date.split('-')[1]}/{group.date.split('-')[2]}
+                            </span>
+                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                              group.dayOfWeek === '日' ? 'bg-red-50 text-red-600' :
+                              group.dayOfWeek === '土' ? 'bg-blue-50 text-blue-600' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {group.dayOfWeek}
+                            </span>
+                            {group.date === todayStr && (
+                              <span className="text-xs font-bold text-[#F6AD55] bg-[#FEF3E2] px-1.5 py-0.5 rounded">
+                                TODAY
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-1.5">
+                            {group.items.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex items-center gap-3 pl-2"
+                              >
+                                <div
+                                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+                                  style={{ backgroundColor: getChildColorDark(item.childIndex) }}
+                                >
+                                  {item.childName.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-gray-800">{item.childName}</span>
+                                    {item.slot && (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                        item.slot === 'AM' ? 'bg-blue-100 text-blue-700' :
+                                        item.slot === 'PM' ? 'bg-orange-100 text-orange-700' :
+                                        'bg-gray-100 text-gray-600'
+                                      }`}>
+                                        {item.slot === 'AM' ? '午前' : item.slot === 'PM' ? '午後' : item.slot}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                                    <Building2 className="w-3 h-3" />
+                                    <span>{item.facilityName}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* 連絡帳 - 施設ごとのリンク */}
                 {facilities.length > 0 && (
                   <div>
                     <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-[#8B5CF6]" />
+                      <BookOpen className="w-5 h-5 text-[#F6AD55]" />
                       連絡帳
                     </h2>
                     <div className="space-y-2">
-                      {facilities.map((f) => (
-                        <button
-                          key={f.id}
-                          onClick={() => router.push(`/parent/facilities/${f.id}/contact-book`)}
-                          className="w-full flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors"
-                        >
-                          <div className="w-10 h-10 bg-[#8B5CF6]/10 rounded-full flex items-center justify-center flex-shrink-0">
-                            <BookOpen className="w-5 h-5 text-[#8B5CF6]" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-gray-800 text-sm truncate">{f.name}</p>
-                            <p className="text-xs text-gray-500">連絡帳を確認・署名する</p>
-                          </div>
-                          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                        </button>
-                      ))}
+                      {facilities.map((f) => {
+                        const unsignedForFacility = unsignedContacts.find(uc => uc.facilityId === f.id);
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => router.push(`/parent/facilities/${f.id}/contact-book`)}
+                            className="w-full flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors"
+                          >
+                            <div className="w-10 h-10 bg-[#F6AD55]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <BookOpen className="w-5 h-5 text-[#F6AD55]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-gray-800 text-sm truncate">{f.name}</p>
+                              <p className="text-xs text-gray-500">連絡帳を確認・署名する</p>
+                            </div>
+                            {unsignedForFacility && unsignedForFacility.count > 0 && (
+                              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                                {unsignedForFacility.count}
+                              </span>
+                            )}
+                            <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

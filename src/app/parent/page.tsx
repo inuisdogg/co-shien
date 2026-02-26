@@ -651,7 +651,7 @@ export default function ClientDashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F472B6] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
         </div>
       </div>
     );
@@ -675,7 +675,7 @@ export default function ClientDashboardPage() {
               height={40}
               className="h-8 w-auto"
             />
-            <span className="inline-block bg-[#F472B6] text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="inline-block bg-[#F6AD55] text-white text-xs font-bold px-2 py-0.5 rounded-full">
               利用者
             </span>
           </div>
@@ -712,8 +712,8 @@ export default function ClientDashboardPage() {
 
         {/* 招待通知 */}
         {pendingInvitations.length > 0 && (
-          <div className="bg-pink-50 border border-[#F472B6]/30 rounded-xl p-4 mb-6">
-            <h3 className="font-bold text-pink-800 mb-2 flex items-center gap-2">
+          <div className="bg-amber-50 border border-[#F6AD55]/30 rounded-xl p-4 mb-6">
+            <h3 className="font-bold text-amber-800 mb-2 flex items-center gap-2">
               <Bell className="w-5 h-5" />
               施設からの招待があります
             </h3>
@@ -728,7 +728,7 @@ export default function ClientDashboardPage() {
                   </div>
                   <button
                     onClick={() => router.push(`/parent/invitations/${inv.invitation_token}`)}
-                    className="bg-[#F472B6] hover:bg-[#EC4899] text-white text-sm font-bold py-2 px-4 rounded-md"
+                    className="bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
                   >
                     確認する
                   </button>
@@ -739,7 +739,7 @@ export default function ClientDashboardPage() {
         )}
 
         {/* ウェルカムメッセージ */}
-        <div className="bg-gradient-to-r from-[#F472B6] to-[#EC4899] rounded-xl p-6 text-white mb-6 shadow-sm">
+        <div className="bg-gradient-to-r from-[#F6AD55] to-[#ED8936] rounded-xl p-6 text-white mb-6 shadow-sm">
           <h1 className="text-2xl font-bold">
             ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
           </h1>
@@ -757,10 +757,10 @@ export default function ClientDashboardPage() {
         {/* お知らせセクション */}
         {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0 || unsignedContactLogs.length > 0 || unreadMessages.length > 0) && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#F472B6] to-[#EC4899] px-4 py-3 flex items-center gap-2">
+            <div className="bg-gradient-to-r from-[#F6AD55] to-[#ED8936] px-4 py-3 flex items-center gap-2">
               <Bell className="w-5 h-5 text-white" />
               <h2 className="font-bold text-white">お知らせ</h2>
-              <span className="bg-white text-[#EC4899] text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
+              <span className="bg-white text-[#ED8936] text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
                 {(isChatEnabled ? unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) : 0) + signRequests.length + unsignedContactLogs.length + unreadMessages.length}件
               </span>
             </div>
@@ -772,14 +772,14 @@ export default function ClientDashboardPage() {
                     const firstLog = unsignedContactLogs[0];
                     router.push(`/parent/facilities/${firstLog.facility_id}/contact`);
                   }}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-amber-50 transition-colors text-left"
                 >
-                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="w-6 h-6 text-[#F472B6]" />
+                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-6 h-6 text-[#F6AD55]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#F472B6] text-white text-xs font-bold px-2 py-0.5 rounded">
+                      <span className="bg-[#F6AD55] text-white text-xs font-bold px-2 py-0.5 rounded">
                         署名待ち
                       </span>
                     </div>
@@ -801,7 +801,7 @@ export default function ClientDashboardPage() {
                     const firstMsg = unreadMessages[0];
                     router.push(`/parent/facilities/${firstMsg.facility_id}/chat`);
                   }}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-amber-50 transition-colors text-left"
                 >
                   <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                     <Inbox className="w-6 h-6 text-blue-500" />
@@ -828,14 +828,14 @@ export default function ClientDashboardPage() {
                 <button
                   key={chat.facilityId}
                   onClick={() => router.push(`/parent/facilities/${chat.facilityId}/chat`)}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-amber-50 transition-colors text-left"
                 >
-                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="w-6 h-6 text-[#F472B6]" />
+                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <MessageSquare className="w-6 h-6 text-[#F6AD55]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#EC4899] text-white text-xs font-bold px-2 py-0.5 rounded">
+                      <span className="bg-[#ED8936] text-white text-xs font-bold px-2 py-0.5 rounded">
                         新着メッセージ
                       </span>
                     </div>
@@ -855,14 +855,14 @@ export default function ClientDashboardPage() {
                 <button
                   key={request.id}
                   onClick={() => router.push(`/parent/facilities/${request.facilityId}/records?sign=${request.id}`)}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-pink-50 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-amber-50 transition-colors text-left"
                 >
-                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <PenLine className="w-6 h-6 text-[#F472B6]" />
+                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <PenLine className="w-6 h-6 text-[#F6AD55]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#F472B6] text-white text-xs font-bold px-2 py-0.5 rounded">
+                      <span className="bg-[#F6AD55] text-white text-xs font-bold px-2 py-0.5 rounded">
                         署名依頼
                       </span>
                     </div>
@@ -896,7 +896,7 @@ export default function ClientDashboardPage() {
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-[#F472B6] text-[#EC4899] bg-pink-50'
+                      ? 'border-[#F6AD55] text-[#ED8936] bg-amber-50'
                       : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                   }`}
                 >
@@ -915,7 +915,7 @@ export default function ClientDashboardPage() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                      <CalendarDays className="w-5 h-5 text-[#F472B6]" />
+                      <CalendarDays className="w-5 h-5 text-[#F6AD55]" />
                       利用予定カレンダー
                     </h2>
                     <div className="flex items-center gap-2">
@@ -960,18 +960,18 @@ export default function ClientDashboardPage() {
                             key={idx}
                             className={`min-h-[48px] p-1 border-t border-r border-gray-100 relative ${
                               !dateInfo.isCurrentMonth ? 'bg-gray-50 opacity-40' : ''
-                            } ${isToday ? 'bg-pink-50' : ''}`}
+                            } ${isToday ? 'bg-amber-50' : ''}`}
                           >
                             <div className={`text-xs text-center font-medium ${
                               isToday
-                                ? 'w-6 h-6 rounded-full bg-[#F472B6] text-white flex items-center justify-center mx-auto'
+                                ? 'w-6 h-6 rounded-full bg-[#F6AD55] text-white flex items-center justify-center mx-auto'
                                 : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-gray-700'
                             }`}>
                               {dateInfo.day}
                             </div>
                             {scheduled && dateInfo.isCurrentMonth && (
                               <div className="flex justify-center mt-1">
-                                <div className="w-2 h-2 rounded-full bg-[#F472B6]" />
+                                <div className="w-2 h-2 rounded-full bg-[#F6AD55]" />
                               </div>
                             )}
                           </div>
@@ -981,7 +981,7 @@ export default function ClientDashboardPage() {
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-[#F472B6]" />
+                      <div className="w-2 h-2 rounded-full bg-[#F6AD55]" />
                       <span>利用予定日</span>
                     </div>
                   </div>
@@ -991,7 +991,7 @@ export default function ClientDashboardPage() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-[#F472B6]" />
+                      <BookOpen className="w-5 h-5 text-[#F6AD55]" />
                       最新の連絡帳
                       {unsignedContactLogs.length > 0 && (
                         <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -1016,7 +1016,7 @@ export default function ClientDashboardPage() {
                             key={log.id}
                             className={`rounded-xl p-4 border cursor-pointer transition-all hover:shadow-sm ${
                               needsSign
-                                ? 'border-[#F472B6]/40 bg-pink-50 hover:border-[#F472B6]'
+                                ? 'border-[#F6AD55]/40 bg-amber-50 hover:border-[#F6AD55]'
                                 : 'border-gray-100 bg-white hover:border-gray-200'
                             }`}
                             onClick={() => router.push(`/parent/facilities/${log.facility_id}/contact`)}
@@ -1024,15 +1024,15 @@ export default function ClientDashboardPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                  needsSign ? 'bg-[#F472B6]/10' : 'bg-gray-100'
+                                  needsSign ? 'bg-[#F6AD55]/10' : 'bg-gray-100'
                                 }`}>
-                                  <BookOpen className={`w-5 h-5 ${needsSign ? 'text-[#F472B6]' : 'text-gray-400'}`} />
+                                  <BookOpen className={`w-5 h-5 ${needsSign ? 'text-[#F6AD55]' : 'text-gray-400'}`} />
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-bold text-gray-800">{log.date}</span>
                                     {needsSign && (
-                                      <span className="text-[10px] bg-[#F472B6] text-white px-1.5 py-0.5 rounded font-bold">
+                                      <span className="text-[10px] bg-[#F6AD55] text-white px-1.5 py-0.5 rounded font-bold">
                                         署名待ち
                                       </span>
                                     )}
@@ -1064,7 +1064,7 @@ export default function ClientDashboardPage() {
                     <h2 className="text-lg font-bold text-gray-800">お子様一覧</h2>
                     <button
                       onClick={() => router.push('/parent/children/register')}
-                      className="flex items-center gap-2 bg-[#F472B6] hover:bg-[#EC4899] text-white text-sm font-bold py-2 px-4 rounded-md transition-colors"
+                      className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       追加
@@ -1073,8 +1073,8 @@ export default function ClientDashboardPage() {
 
                   {children.length === 0 ? (
                     <div className="bg-gray-50 rounded-lg p-8 text-center">
-                      <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <User className="w-8 h-8 text-[#F472B6]" />
+                      <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <User className="w-8 h-8 text-[#F6AD55]" />
                       </div>
                       <h3 className="text-lg font-bold text-gray-800 mb-2">お子様が登録されていません</h3>
                       <p className="text-gray-600 text-sm mb-4">
@@ -1082,7 +1082,7 @@ export default function ClientDashboardPage() {
                       </p>
                       <button
                         onClick={() => router.push('/parent/children/register')}
-                        className="inline-flex items-center gap-2 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                        className="inline-flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors"
                       >
                         <Plus className="w-4 h-4" />
                         お子様を登録する
@@ -1099,12 +1099,12 @@ export default function ClientDashboardPage() {
                         return (
                           <div
                             key={child.id}
-                            className="bg-white rounded-xl p-5 hover:shadow-md transition-all cursor-pointer border border-gray-100 hover:border-[#F472B6]/50 group"
+                            className="bg-white rounded-xl p-5 hover:shadow-md transition-all cursor-pointer border border-gray-100 hover:border-[#F6AD55]/50 group"
                             onClick={() => router.push(`/parent/children/${child.id}`)}
                           >
                             <div className="flex items-start gap-4">
-                              <div className="w-14 h-14 bg-pink-50 rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <User className="w-7 h-7 text-[#F472B6]" />
+                              <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <User className="w-7 h-7 text-[#F6AD55]" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
@@ -1130,7 +1130,7 @@ export default function ClientDashboardPage() {
                                   )}
                                 </div>
                               </div>
-                              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 group-hover:text-[#F472B6] transition-colors mt-2" />
+                              <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 group-hover:text-[#F6AD55] transition-colors mt-2" />
                             </div>
                           </div>
                         );
@@ -1143,7 +1143,7 @@ export default function ClientDashboardPage() {
                 {facilities.length > 0 && (
                   <div>
                     <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-[#F472B6]" />
+                      <Building2 className="w-5 h-5 text-[#F6AD55]" />
                       利用施設一覧
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1153,15 +1153,15 @@ export default function ClientDashboardPage() {
                         return (
                           <div
                             key={facility.id}
-                            className="bg-white rounded-xl p-4 border border-gray-100 hover:border-[#F472B6]/40 hover:shadow-sm transition-all cursor-pointer group"
+                            className="bg-white rounded-xl p-4 border border-gray-100 hover:border-[#F6AD55]/40 hover:shadow-sm transition-all cursor-pointer group"
                             onClick={() => {
                               const childForFacility = facilityChildren[0];
                               router.push(`/parent/facilities/${facility.id}${childForFacility ? `?child=${childForFacility.id}` : ''}`);
                             }}
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-pink-50 rounded-full flex items-center justify-center flex-shrink-0">
-                                <Building2 className="w-5 h-5 text-[#F472B6]" />
+                              <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                <Building2 className="w-5 h-5 text-[#F6AD55]" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-bold text-gray-800 truncate">{facility.name}</h4>
@@ -1169,7 +1169,7 @@ export default function ClientDashboardPage() {
                                   {facilityChildren.map(c => c?.name).join(', ')}
                                 </p>
                               </div>
-                              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#F472B6]" />
+                              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#F6AD55]" />
                             </div>
                           </div>
                         );
@@ -1185,9 +1185,9 @@ export default function ClientDashboardPage() {
                     <button
                       onClick={() => handleQuickAction('usage-request')}
                       disabled={children.length === 0}
-                      className="bg-pink-50 hover:bg-pink-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F472B6]/20 hover:border-[#F472B6]/40"
+                      className="bg-amber-50 hover:bg-amber-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F6AD55]/20 hover:border-[#F6AD55]/40"
                     >
-                      <CalendarDays className="w-8 h-8 text-[#F472B6] mb-2" />
+                      <CalendarDays className="w-8 h-8 text-[#F6AD55] mb-2" />
                       <h3 className="font-bold text-gray-800 text-sm">利用希望申請</h3>
                       <p className="text-xs text-gray-500 mt-1">日程を申請する</p>
                     </button>
@@ -1205,7 +1205,7 @@ export default function ClientDashboardPage() {
                       disabled={children.length === 0}
                       className="bg-gray-50 hover:bg-gray-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-100"
                     >
-                      <Calendar className="w-8 h-8 text-[#F472B6] mb-2" />
+                      <Calendar className="w-8 h-8 text-[#F6AD55] mb-2" />
                       <h3 className="font-bold text-gray-800 text-sm">予定を見る</h3>
                       <p className="text-xs text-gray-500 mt-1">利用カレンダー</p>
                     </button>
@@ -1213,9 +1213,9 @@ export default function ClientDashboardPage() {
                       <button
                         onClick={() => handleQuickAction('message')}
                         disabled={children.length === 0}
-                        className="bg-pink-50 hover:bg-pink-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F472B6]/20 hover:border-[#F472B6]/40"
+                        className="bg-amber-50 hover:bg-amber-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F6AD55]/20 hover:border-[#F6AD55]/40"
                       >
-                        <MessageSquare className="w-8 h-8 text-[#F472B6] mb-2" />
+                        <MessageSquare className="w-8 h-8 text-[#F6AD55] mb-2" />
                         <h3 className="font-bold text-gray-800 text-sm">施設にチャット</h3>
                         <p className="text-xs text-gray-500 mt-1">施設とメッセージ</p>
                       </button>
@@ -1310,7 +1310,7 @@ export default function ClientDashboardPage() {
                                           e.stopPropagation();
                                           router.push(`/parent/facilities/${contract.facility_id}/chat`);
                                         }}
-                                        className="flex-1 text-sm bg-[#F472B6] hover:bg-[#EC4899] text-white py-2 px-3 rounded-lg border border-[#EC4899] transition-colors font-bold flex items-center justify-center gap-1.5 shadow-md"
+                                        className="flex-1 text-sm bg-[#F6AD55] hover:bg-[#ED8936] text-white py-2 px-3 rounded-lg border border-[#ED8936] transition-colors font-bold flex items-center justify-center gap-1.5 shadow-md"
                                       >
                                         <MessageSquare className="w-4 h-4" />
                                         チャット
@@ -1403,8 +1403,8 @@ export default function ClientDashboardPage() {
 
                 {usageRecords.length === 0 ? (
                   <div className="bg-gray-50 rounded-lg p-8 text-center">
-                    <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Calendar className="w-8 h-8 text-[#F472B6]" />
+                    <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Calendar className="w-8 h-8 text-[#F6AD55]" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-800 mb-2">利用実績がありません</h3>
                     <p className="text-gray-600 text-sm">
@@ -1488,11 +1488,11 @@ export default function ClientDashboardPage() {
                           return (
                             <div
                               key={contract.id}
-                              className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#F472B6] hover:shadow-lg transition-all cursor-pointer group"
+                              className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#F6AD55] hover:shadow-lg transition-all cursor-pointer group"
                               onClick={() => router.push(`/parent/facilities/${contract.facility_id}/chat`)}
                             >
                               <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-gradient-to-br from-[#F472B6] to-[#EC4899] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
+                                <div className="w-14 h-14 bg-gradient-to-br from-[#F6AD55] to-[#ED8936] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow">
                                   <Building2 className="w-7 h-7 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -1508,7 +1508,7 @@ export default function ClientDashboardPage() {
                                     チャットで連絡する
                                   </p>
                                 </div>
-                                <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0 group-hover:text-[#F472B6] transition-colors" />
+                                <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0 group-hover:text-[#F6AD55] transition-colors" />
                               </div>
                             </div>
                           );
@@ -1553,10 +1553,10 @@ export default function ClientDashboardPage() {
                   <button
                     key={child.id}
                     onClick={() => handleChildSelect(child.id)}
-                    className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-[#F472B6]/50 hover:bg-pink-50 transition-colors text-left"
+                    className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-[#F6AD55]/50 hover:bg-amber-50 transition-colors text-left"
                   >
-                    <div className="w-12 h-12 bg-pink-50 rounded-full flex items-center justify-center flex-shrink-0">
-                      <User className="w-6 h-6 text-[#F472B6]" />
+                    <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User className="w-6 h-6 text-[#F6AD55]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">

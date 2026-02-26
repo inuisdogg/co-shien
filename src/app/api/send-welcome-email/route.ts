@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
+// TODO: RESEND_API_KEY is NOT set in .env.local — emails will NOT send until configured.
 // Resendインスタンスを遅延初期化（ビルド時エラー回避）
 let resend: Resend | null = null;
 

@@ -9,7 +9,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, Calendar, CheckCircle, ChevronLeft, ChevronRight,
-  Clock, AlertCircle, Send, X
+  Clock, AlertCircle, Send, X, Building2, User, Users
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -35,8 +35,11 @@ type ExistingRequest = {
 export default function UsageRequestPage() {
   const router = useRouter();
   const params = useParams();
-  const childId = params.id as string;
+  const initialChildId = params.id as string;
 
+  // 複数児童対応: 選択中の児童ID
+  const [activeChildId, setActiveChildId] = useState<string>(initialChildId);
+  const [siblings, setSiblings] = useState<any[]>([]); // 保護者の全児童
   const [child, setChild] = useState<any>(null);
   const [contracts, setContracts] = useState<any[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<string>('');
@@ -62,6 +65,10 @@ export default function UsageRequestPage() {
   // 既存申請
   const [existingRequests, setExistingRequests] = useState<ExistingRequest[]>([]);
 
+  // 児童カラー設定
+  const CHILD_COLORS = ['#93C5FD', '#86EFAC', '#FCA5A5', '#C4B5FD', '#FDBA74'];
+  const getChildColor = (idx: number): string => CHILD_COLORS[idx % CHILD_COLORS.length];
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -74,13 +81,20 @@ export default function UsageRequestPage() {
         const user = JSON.parse(userStr);
         setUserId(user.id);
 
-        // 児童情報を取得
-        const { data: childData } = await supabase
+        // 保護者の全児童を取得（兄弟姉妹セレクター用）
+        const { data: allChildrenData } = await supabase
           .from('children')
           .select('*')
-          .eq('id', childId)
           .eq('owner_profile_id', user.id)
-          .single();
+          .order('created_at', { ascending: false });
+
+        if (allChildrenData && allChildrenData.length > 0) {
+          setSiblings(allChildrenData);
+        }
+
+        // 対象児童の情報を取得
+        const targetChildId = activeChildId;
+        const childData = allChildrenData?.find((c: any) => c.id === targetChildId) || null;
 
         if (childData) {
           setChild(childData);
@@ -97,7 +111,7 @@ export default function UsageRequestPage() {
               code
             )
           `)
-          .eq('child_id', childId)
+          .eq('child_id', targetChildId)
           .eq('status', 'active');
 
         if (contractsData && contractsData.length > 0) {
@@ -114,9 +128,9 @@ export default function UsageRequestPage() {
 
             if (facilityData) {
               setContracts([{
-                id: `virtual-${childId}-${facilityData.id}`,
+                id: `virtual-${targetChildId}-${facilityData.id}`,
                 facility_id: facilityData.id,
-                child_id: childId,
+                child_id: targetChildId,
                 status: 'active',
                 facilities: facilityData,
               }]);
@@ -129,7 +143,7 @@ export default function UsageRequestPage() {
         const { data: requestsData } = await supabase
           .from('usage_requests')
           .select('*')
-          .eq('child_id', childId)
+          .eq('child_id', targetChildId)
           .eq('parent_user_id', user.id)
           .order('submitted_at', { ascending: false })
           .limit(10);
@@ -144,10 +158,10 @@ export default function UsageRequestPage() {
       }
     };
 
-    if (childId) {
+    if (activeChildId) {
       fetchData();
     }
-  }, [childId, router]);
+  }, [activeChildId, router]);
 
   // カレンダー日付の生成
   const calendarDates = useMemo(() => {
@@ -222,6 +236,23 @@ export default function UsageRequestPage() {
     setEditingNotes('');
   };
 
+  // 児童切り替え
+  const handleChildSwitch = (newChildId: string) => {
+    if (newChildId === activeChildId) return;
+    setActiveChildId(newChildId);
+    setSelectedDates(new Map());
+    setSelectedFacility('');
+    setContracts([]);
+    setExistingRequests([]);
+    setLoading(true);
+  };
+
+  // 選択中の施設名を取得
+  const selectedFacilityName = useMemo(() => {
+    const contract = contracts.find(c => c.facility_id === selectedFacility);
+    return contract?.facilities?.name || '';
+  }, [contracts, selectedFacility]);
+
   const handleSubmit = async () => {
     setError('');
 
@@ -244,7 +275,7 @@ export default function UsageRequestPage() {
         .from('usage_requests')
         .insert({
           facility_id: selectedFacility,
-          child_id: childId,
+          child_id: activeChildId,
           parent_user_id: userId,
           request_month: requestMonth,
           requested_dates: requestedDates,
@@ -256,7 +287,7 @@ export default function UsageRequestPage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push(`/parent/children/${childId}`);
+        router.push(`/parent/children/${activeChildId}`);
       }, 2000);
     } catch (err: any) {
       setError(err.message || '申請の送信に失敗しました');
@@ -269,7 +300,7 @@ export default function UsageRequestPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F472B6] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -278,7 +309,7 @@ export default function UsageRequestPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
         <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={40} className="text-green-500" />
@@ -308,7 +339,7 @@ export default function UsageRequestPage() {
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <button
-            onClick={() => router.push(`/parent/children/${childId}`)}
+            onClick={() => router.push(`/parent/children/${activeChildId}`)}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-3"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -327,6 +358,41 @@ export default function UsageRequestPage() {
           </div>
         )}
 
+        {/* 児童セレクター（複数児童がいる場合） */}
+        {siblings.length > 1 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <label className="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#F6AD55]" />
+              お子様を選択
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {siblings.map((sib, idx) => {
+                const isActive = sib.id === activeChildId;
+                const color = getChildColor(idx);
+                return (
+                  <button
+                    key={sib.id}
+                    onClick={() => handleChildSwitch(sib.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all font-medium text-sm ${
+                      isActive
+                        ? 'border-[#F6AD55] bg-[#FEF3E2] text-gray-800 shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    >
+                      {sib.name.charAt(0)}
+                    </div>
+                    {sib.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {contracts.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
             <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -335,14 +401,17 @@ export default function UsageRequestPage() {
           </div>
         ) : (
           <>
-            {/* 施設選択 */}
-            {contracts.length > 1 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                <label className="block text-sm font-bold text-gray-700 mb-2">施設</label>
+            {/* 施設表示・選択 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-500" />
+                申請先施設
+              </label>
+              {contracts.length > 1 ? (
                 <select
                   value={selectedFacility}
                   onChange={(e) => setSelectedFacility(e.target.value)}
-                  className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6] focus:border-[#F472B6] text-base"
+                  className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-[#F6AD55] text-base"
                 >
                   {contracts.map((contract) => (
                     <option key={contract.id} value={contract.facility_id}>
@@ -350,8 +419,18 @@ export default function UsageRequestPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800">{selectedFacilityName || contracts[0]?.facilities?.name || '施設'}</p>
+                    <p className="text-xs text-gray-500">{child?.name}さんの利用希望を申請</p>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* 既存申請がある場合の通知 */}
             {existingForMonth && (
@@ -392,7 +471,7 @@ export default function UsageRequestPage() {
 
             {/* カレンダー */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 bg-gradient-to-r from-[#F472B6] to-[#EC4899] flex items-center justify-between">
+              <div className="px-4 py-3 bg-gradient-to-r from-[#F6AD55] to-[#ED8936] flex items-center justify-between">
                 <button
                   onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
                   className="p-1.5 hover:bg-white/20 rounded-md text-white"
@@ -445,8 +524,8 @@ export default function UsageRequestPage() {
                             : isPast
                             ? 'bg-gray-50 opacity-50 border-transparent cursor-not-allowed'
                             : isSelected
-                            ? 'bg-[#F472B6]/10 border-[#F472B6] cursor-pointer shadow-sm'
-                            : 'bg-white border-gray-100 cursor-pointer hover:border-[#F472B6]/40 hover:bg-pink-50/30'
+                            ? 'bg-[#F6AD55]/10 border-[#F6AD55] cursor-pointer shadow-sm'
+                            : 'bg-white border-gray-100 cursor-pointer hover:border-[#F6AD55]/40 hover:bg-amber-50/30'
                         }`}
                         onClick={() => {
                           if (dateInfo.isCurrentMonth && !isPast) {
@@ -456,9 +535,9 @@ export default function UsageRequestPage() {
                       >
                         <div className={`text-xs text-center font-medium mb-1 ${
                           isToday
-                            ? 'w-6 h-6 rounded-full bg-[#F472B6] text-white flex items-center justify-center mx-auto'
+                            ? 'w-6 h-6 rounded-full bg-[#F6AD55] text-white flex items-center justify-center mx-auto'
                             : isSelected
-                            ? 'text-[#EC4899] font-bold'
+                            ? 'text-[#ED8936] font-bold'
                             : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-gray-700'
                         }`}>
                           {dateInfo.day}
@@ -475,7 +554,7 @@ export default function UsageRequestPage() {
                                   }}
                                   className={`text-[8px] px-1 py-0.5 rounded transition-colors ${
                                     selectedData.slot === slot
-                                      ? 'bg-[#F472B6] text-white'
+                                      ? 'bg-[#F6AD55] text-white'
                                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                   }`}
                                 >
@@ -501,7 +580,7 @@ export default function UsageRequestPage() {
             {selectedDates.size > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#F472B6]" />
+                  <Calendar className="w-4 h-4 text-[#F6AD55]" />
                   選択した日程 ({selectedDates.size}日)
                 </h3>
                 <div className="space-y-2">
@@ -511,7 +590,7 @@ export default function UsageRequestPage() {
                       const d = new Date(item.date);
                       const dayName = weekDays[d.getDay()];
                       return (
-                        <div key={item.date} className="flex items-center justify-between bg-pink-50 rounded-lg px-3 py-2">
+                        <div key={item.date} className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2">
                           <div className="flex items-center gap-3">
                             <span className="text-sm font-bold text-gray-800">
                               {item.date.split('-')[1]}/{item.date.split('-')[2]} ({dayName})
@@ -519,7 +598,7 @@ export default function UsageRequestPage() {
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                               item.slot === 'am' ? 'bg-blue-100 text-blue-700' :
                               item.slot === 'pm' ? 'bg-orange-100 text-orange-700' :
-                              'bg-[#F472B6]/20 text-[#EC4899]'
+                              'bg-[#F6AD55]/20 text-[#ED8936]'
                             }`}>
                               {item.slot === 'am' ? '午前' : item.slot === 'pm' ? '午後' : '終日'}
                             </span>
@@ -530,7 +609,7 @@ export default function UsageRequestPage() {
                                 setEditingDate(item.date);
                                 setEditingNotes(item.notes);
                               }}
-                              className="text-xs text-gray-500 hover:text-[#F472B6] transition-colors"
+                              className="text-xs text-gray-500 hover:text-[#F6AD55] transition-colors"
                             >
                               {item.notes ? 'メモ編集' : 'メモ追加'}
                             </button>
@@ -557,7 +636,7 @@ export default function UsageRequestPage() {
               <button
                 onClick={handleSubmit}
                 disabled={submitting || selectedDates.size === 0}
-                className="w-full h-14 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base shadow-md active:shadow-sm"
+                className="w-full h-14 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base shadow-md active:shadow-sm"
               >
                 {submitting ? (
                   <>
@@ -631,7 +710,7 @@ export default function UsageRequestPage() {
               <textarea
                 value={editingNotes}
                 onChange={(e) => setEditingNotes(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                 rows={3}
                 placeholder="追加の要望やメモを入力..."
               />
@@ -645,7 +724,7 @@ export default function UsageRequestPage() {
               </button>
               <button
                 onClick={saveNotes}
-                className="flex-1 py-2.5 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-xl text-sm"
+                className="flex-1 py-2.5 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl text-sm"
               >
                 保存
               </button>

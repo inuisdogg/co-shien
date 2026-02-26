@@ -274,8 +274,8 @@ export default function ContactBookPage() {
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="w-10 h-10 bg-[#F472B6]/10 rounded-full flex items-center justify-center shrink-0">
-              <BookOpen size={20} className="text-[#F472B6]" />
+            <div className="w-10 h-10 bg-[#F6AD55]/10 rounded-full flex items-center justify-center shrink-0">
+              <BookOpen size={20} className="text-[#F6AD55]" />
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-gray-800 text-sm truncate">
@@ -307,7 +307,7 @@ export default function ContactBookPage() {
                   onClick={() => setSelectedChildId(child.id)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
                     selectedChildId === child.id
-                      ? 'border-[#F472B6] bg-[#F472B6]/10 text-[#EC4899]'
+                      ? 'border-[#F6AD55] bg-[#F6AD55]/10 text-[#ED8936]'
                       : 'border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}
                 >
@@ -326,7 +326,7 @@ export default function ContactBookPage() {
               onClick={() => setActiveTab('unsigned')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'unsigned'
-                  ? 'border-[#F472B6] text-[#EC4899] bg-pink-50'
+                  ? 'border-[#F6AD55] text-[#ED8936] bg-amber-50'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -342,7 +342,7 @@ export default function ContactBookPage() {
               onClick={() => setActiveTab('history')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'history'
-                  ? 'border-[#F472B6] text-[#EC4899] bg-pink-50'
+                  ? 'border-[#F6AD55] text-[#ED8936] bg-amber-50'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -364,7 +364,7 @@ export default function ContactBookPage() {
                 ) : (
                   <div className="space-y-3">
                     {unsignedLogs.map((log) => (
-                      <div key={log.id} className="border border-[#F472B6]/30 bg-pink-50/50 rounded-xl p-4">
+                      <div key={log.id} className="border border-[#F6AD55]/30 bg-amber-50/50 rounded-xl p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-gray-800">{log.date}</span>
@@ -374,7 +374,7 @@ export default function ContactBookPage() {
                               </span>
                             )}
                           </div>
-                          <span className="text-xs bg-[#F472B6] text-white px-2 py-0.5 rounded-full font-bold">
+                          <span className="text-xs bg-[#F6AD55] text-white px-2 py-0.5 rounded-full font-bold">
                             署名待ち
                           </span>
                         </div>
@@ -409,7 +409,7 @@ export default function ContactBookPage() {
                         {log.staff_comment && (
                           <div className="mb-3">
                             <p className="text-xs font-bold text-gray-500 mb-1">スタッフからのコメント</p>
-                            <p className="text-sm text-gray-700 bg-white rounded-lg p-2 border-l-4 border-[#F472B6]">
+                            <p className="text-sm text-gray-700 bg-white rounded-lg p-2 border-l-4 border-[#F6AD55]">
                               {log.staff_comment}
                             </p>
                           </div>
@@ -418,7 +418,7 @@ export default function ContactBookPage() {
                         {/* 署名ボタン */}
                         <button
                           onClick={() => setSigningLog(log)}
-                          className="w-full mt-2 py-2.5 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                          className="w-full mt-2 py-2.5 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
                         >
                           <PenLine className="w-4 h-4" />
                           署名する
@@ -461,7 +461,7 @@ export default function ContactBookPage() {
                           ) : log.status === 'submitted' ? (
                             <button
                               onClick={() => setSigningLog(log)}
-                              className="text-xs bg-[#F472B6] text-white px-2 py-1 rounded-full font-bold hover:bg-[#EC4899]"
+                              className="text-xs bg-[#F6AD55] text-white px-2 py-1 rounded-full font-bold hover:bg-[#ED8936]"
                             >
                               署名する
                             </button>
@@ -532,7 +532,7 @@ export default function ContactBookPage() {
                   type="text"
                   value={signerName}
                   onChange={(e) => setSignerName(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                   placeholder="保護者名を入力"
                 />
               </div>
@@ -547,7 +547,7 @@ export default function ContactBookPage() {
               <button
                 onClick={handleSign}
                 disabled={signing || !signerName.trim()}
-                className="flex-1 py-3 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {signing ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

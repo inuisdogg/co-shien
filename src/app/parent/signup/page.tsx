@@ -193,7 +193,7 @@ export default function ClientSignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F472B6]/80 to-[#EC4899] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F6AD55]/80 to-[#ED8936] p-4">
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -262,7 +262,7 @@ export default function ClientSignupPage() {
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowTermsModal(false)}
-                className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors"
               >
                 閉じる
               </button>
@@ -282,7 +282,7 @@ export default function ClientSignupPage() {
             priority
           />
           <div className="mb-3">
-            <span className="inline-block bg-[#F472B6] text-white text-xs font-bold px-3 py-1.5 rounded-full">
+            <span className="inline-block bg-[#F6AD55] text-white text-xs font-bold px-3 py-1.5 rounded-full">
               保護者の方はこちら
             </span>
           </div>
@@ -319,7 +319,7 @@ export default function ClientSignupPage() {
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                   placeholder="山田"
                   disabled={loading}
                 />
@@ -334,7 +334,7 @@ export default function ClientSignupPage() {
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                   placeholder="太郎"
                   disabled={loading}
                 />
@@ -352,7 +352,7 @@ export default function ClientSignupPage() {
                   value={formData.lastNameKana}
                   onChange={(e) => setFormData({ ...formData, lastNameKana: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                   placeholder="ヤマダ"
                   disabled={loading}
                 />
@@ -367,7 +367,7 @@ export default function ClientSignupPage() {
                   value={formData.firstNameKana}
                   onChange={(e) => setFormData({ ...formData, firstNameKana: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                   placeholder="タロウ"
                   disabled={loading}
                 />
@@ -385,7 +385,7 @@ export default function ClientSignupPage() {
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
               placeholder="090-1234-5678"
               disabled={loading}
             />
@@ -401,7 +401,7 @@ export default function ClientSignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
               placeholder="example@email.com"
               disabled={loading}
             />
@@ -422,7 +422,7 @@ export default function ClientSignupPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 minLength={6}
-                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                 placeholder="6文字以上のパスワード"
                 disabled={loading}
               />
@@ -458,7 +458,7 @@ export default function ClientSignupPage() {
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
                 minLength={6}
-                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] text-base"
+                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
                 placeholder="もう一度パスワードを入力"
                 disabled={loading}
               />
@@ -495,7 +495,7 @@ export default function ClientSignupPage() {
               <button
                 type="button"
                 onClick={() => setShowTermsModal(true)}
-                className="text-[#F472B6] hover:underline font-medium"
+                className="text-[#F6AD55] hover:underline font-medium"
               >
                 利用規約
               </button>
@@ -506,7 +506,7 @@ export default function ClientSignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg text-base"
+            className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg text-base"
           >
             {loading ? '登録中...' : 'アカウントを作成する'}
           </button>
@@ -517,7 +517,7 @@ export default function ClientSignupPage() {
             既にアカウントをお持ちの方は{' '}
             <button
               onClick={() => router.push('/parent/login')}
-              className="text-[#F472B6] hover:underline font-bold"
+              className="text-[#F6AD55] hover:underline font-bold"
             >
               ログイン
             </button>

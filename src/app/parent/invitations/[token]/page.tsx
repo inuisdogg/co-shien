@@ -26,7 +26,7 @@ const StepIndicator = ({ currentStep }: { currentStep: number }) => {
                 index < currentStep
                   ? 'bg-green-500 text-white'
                   : index === currentStep
-                  ? 'bg-[#F472B6] text-white ring-4 ring-[#F472B6]/20'
+                  ? 'bg-[#F6AD55] text-white ring-4 ring-[#F6AD55]/20'
                   : 'bg-gray-200 text-gray-400'
               }`}
             >
@@ -306,7 +306,7 @@ export default function UnifiedInvitationPage() {
   // ローディング表示
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
         <div className="text-center">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 max-w-md w-full p-8 mx-4">
             <div className="animate-pulse space-y-4">
@@ -347,7 +347,7 @@ export default function UnifiedInvitationPage() {
           </div>
           <button
             onClick={() => router.push('/parent')}
-            className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium flex items-center gap-1 mx-auto"
+            className="text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium flex items-center gap-1 mx-auto"
           >
             今すぐダッシュボードへ <ArrowRight size={14} />
           </button>
@@ -359,11 +359,11 @@ export default function UnifiedInvitationPage() {
   // 招待詳細カード（常に表示）
   const InvitationDetails = () => (
     invitation && facility ? (
-      <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 mb-6">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
         <h3 className="font-bold text-gray-800 mb-3 text-sm">招待の内容</h3>
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-3">
-            <Building2 size={16} className="text-[#F472B6] shrink-0" />
+            <Building2 size={16} className="text-[#F6AD55] shrink-0" />
             <div>
               <span className="text-xs text-gray-500">施設名</span>
               <p className="font-bold text-gray-800">{facility.name}</p>
@@ -371,7 +371,7 @@ export default function UnifiedInvitationPage() {
           </div>
           {(child || invitation.temp_child_name) && (
             <div className="flex items-center gap-3">
-              <Heart size={16} className="text-[#F472B6] shrink-0" />
+              <Heart size={16} className="text-[#F6AD55] shrink-0" />
               <div>
                 <span className="text-xs text-gray-500">対象のお子様</span>
                 <p className="font-bold text-gray-800">{child?.name || invitation.temp_child_name}</p>
@@ -379,7 +379,7 @@ export default function UnifiedInvitationPage() {
             </div>
           )}
           <div className="flex items-center gap-3">
-            <Shield size={16} className="text-[#F472B6] shrink-0" />
+            <Shield size={16} className="text-[#F6AD55] shrink-0" />
             <div>
               <span className="text-xs text-gray-500">有効期限</span>
               <p className="font-medium text-gray-800">
@@ -393,7 +393,7 @@ export default function UnifiedInvitationPage() {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 max-w-md w-full p-8">
         <StepIndicator currentStep={error && invitationStatus !== 'pending' ? 0 : isLoggedIn ? 1 : 0} />
 
@@ -406,10 +406,10 @@ export default function UnifiedInvitationPage() {
             className="h-12 w-auto mx-auto mb-6"
             priority
           />
-          <div className="w-16 h-16 bg-[#F472B6]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Building2 size={28} className="text-[#F472B6]" />
+          <div className="w-16 h-16 bg-[#F6AD55]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building2 size={28} className="text-[#F6AD55]" />
           </div>
-          <p className="text-sm text-[#F472B6] font-medium mb-1">
+          <p className="text-sm text-[#F6AD55] font-medium mb-1">
             保護者の方へ
           </p>
           <h1 className="text-xl font-bold text-gray-800 mb-2">
@@ -441,7 +441,7 @@ export default function UnifiedInvitationPage() {
             </p>
             <button
               onClick={() => router.push('/parent')}
-              className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium"
+              className="text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium"
             >
               ダッシュボードへ戻る
             </button>
@@ -452,7 +452,7 @@ export default function UnifiedInvitationPage() {
           <div className="text-center">
             <button
               onClick={() => router.push('/parent')}
-              className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               ダッシュボードへ <ArrowRight size={16} />
             </button>
@@ -463,7 +463,7 @@ export default function UnifiedInvitationPage() {
           <div className="text-center">
             <button
               onClick={() => router.push('/parent')}
-              className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium"
+              className="text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium"
             >
               ダッシュボードへ戻る
             </button>
@@ -478,14 +478,14 @@ export default function UnifiedInvitationPage() {
             </p>
             <button
               onClick={() => router.push(`/parent/login?redirect=/parent/invitations/${token}`)}
-              className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base"
+              className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base"
             >
               <LogIn size={18} />
               ログインして承認
             </button>
             <button
               onClick={() => router.push(`/parent/signup?redirect=/parent/invitations/${token}`)}
-              className="w-full bg-white border-2 border-[#F472B6] text-[#F472B6] hover:bg-pink-50 font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-base"
+              className="w-full bg-white border-2 border-[#F6AD55] text-[#F6AD55] hover:bg-amber-50 font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-base"
             >
               <UserPlus size={18} />
               新規登録して承認
@@ -507,7 +507,7 @@ export default function UnifiedInvitationPage() {
               <button
                 onClick={handleAccept}
                 disabled={processing}
-                className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base"
+                className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base"
               >
                 {processing ? (
                   <>
@@ -538,7 +538,7 @@ export default function UnifiedInvitationPage() {
           <div className="text-center">
             <button
               onClick={() => router.push('/parent/login')}
-              className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium"
+              className="text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium"
             >
               ログインページへ
             </button>

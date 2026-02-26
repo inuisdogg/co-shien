@@ -6,6 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
+// TODO: RESEND_API_KEY is NOT set in .env.local — emails will NOT send until configured.
+// Set RESEND_API_KEY in .env.local with a valid Resend API key to enable email delivery.
+// Without it, invitation emails fail silently (the invitation record is still created in DB).
+
 // ビルド時にエラーにならないよう、遅延初期化
 const getResend = () => {
   const apiKey = process.env.RESEND_API_KEY;
@@ -40,10 +44,10 @@ export async function POST(request: NextRequest) {
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #F472B6 0%, #EC4899 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+            .header { background: linear-gradient(135deg, #F6AD55 0%, #ED8936 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
             .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; background: #F472B6; color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0; font-size: 16px; }
-            .button:hover { background: #EC4899; }
+            .button { display: inline-block; background: #F6AD55; color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0; font-size: 16px; }
+            .button:hover { background: #ED8936; }
             .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
           </style>
         </head>

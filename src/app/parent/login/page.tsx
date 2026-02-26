@@ -123,14 +123,14 @@ export default function ClientLoginPage() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F472B6]/80 to-[#EC4899]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F6AD55]/80 to-[#ED8936]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F472B6]/80 to-[#EC4899] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F6AD55]/80 to-[#ED8936] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
@@ -142,7 +142,7 @@ export default function ClientLoginPage() {
             priority
           />
           <div className="mb-3">
-            <span className="inline-block bg-[#F472B6]/10 text-[#F472B6] text-xs font-bold px-3 py-1 rounded-lg">
+            <span className="inline-block bg-[#F6AD55]/10 text-[#F6AD55] text-xs font-bold px-3 py-1 rounded-lg">
               保護者
             </span>
           </div>
@@ -174,7 +174,7 @@ export default function ClientLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] transition-all"
+                className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] transition-all"
                 placeholder="example@email.com"
                 disabled={loading}
               />
@@ -195,7 +195,7 @@ export default function ClientLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F472B6]/30 focus:border-[#F472B6] transition-all"
+                className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] transition-all"
                 placeholder="パスワードを入力"
                 disabled={loading}
               />
@@ -226,7 +226,7 @@ export default function ClientLoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 text-[#F472B6] border-gray-300 rounded focus:ring-[#F472B6]"
+                className="w-4 h-4 text-[#F6AD55] border-gray-300 rounded focus:ring-[#F6AD55]"
                 disabled={loading}
               />
               <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
@@ -236,7 +236,7 @@ export default function ClientLoginPage() {
             <button
               type="button"
               onClick={() => router.push('/login/forgot-password')}
-              className="text-xs text-[#F472B6] hover:underline"
+              className="text-xs text-[#F6AD55] hover:underline"
             >
               パスワードを忘れた場合
             </button>
@@ -245,7 +245,7 @@ export default function ClientLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
+            className="w-full h-12 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
           >
             {loading ? (
               <>
@@ -263,7 +263,7 @@ export default function ClientLoginPage() {
           <button
             type="button"
             onClick={() => router.push(redirectPath ? `/parent/signup?redirect=${encodeURIComponent(redirectPath)}` : '/parent/signup')}
-            className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-[#F472B6] hover:text-[#F472B6] font-bold rounded-lg transition-colors text-sm min-w-[120px]"
+            className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-[#F6AD55] hover:text-[#F6AD55] font-bold rounded-lg transition-colors text-sm min-w-[120px]"
           >
             保護者として新規登録
           </button>
@@ -272,7 +272,7 @@ export default function ClientLoginPage() {
         <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-4">
           <button
             onClick={() => router.push('/login/forgot-login-id')}
-            className="text-xs text-gray-400 hover:text-[#F472B6] hover:underline"
+            className="text-xs text-gray-400 hover:text-[#F6AD55] hover:underline"
           >
             ログインIDを忘れた場合
           </button>

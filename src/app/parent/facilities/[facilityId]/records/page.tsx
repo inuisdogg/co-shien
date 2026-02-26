@@ -353,7 +353,7 @@ export default function FacilityRecordsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F472B6] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -374,8 +374,8 @@ export default function FacilityRecordsPage() {
           </button>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-pink-50 rounded-full flex items-center justify-center">
-                <FileText className="w-5 h-5 text-[#F472B6]" />
+              <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center">
+                <FileText className="w-5 h-5 text-[#F6AD55]" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800">実績記録表</h1>
@@ -413,7 +413,7 @@ export default function FacilityRecordsPage() {
                 <select
                   value={selectedChildId}
                   onChange={(e) => setSelectedChildId(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
                 >
                   {children.map((child) => (
                     <option key={child.id} value={child.id}>
@@ -457,7 +457,7 @@ export default function FacilityRecordsPage() {
                 <button
                   onClick={() => setViewMode('summary')}
                   className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
-                    viewMode === 'summary' ? 'bg-white text-[#F472B6] shadow-sm' : 'text-gray-500'
+                    viewMode === 'summary' ? 'bg-white text-[#F6AD55] shadow-sm' : 'text-gray-500'
                   }`}
                 >
                   サマリー
@@ -465,7 +465,7 @@ export default function FacilityRecordsPage() {
                 <button
                   onClick={() => setViewMode('detail')}
                   className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
-                    viewMode === 'detail' ? 'bg-white text-[#F472B6] shadow-sm' : 'text-gray-500'
+                    viewMode === 'detail' ? 'bg-white text-[#F6AD55] shadow-sm' : 'text-gray-500'
                   }`}
                 >
                   詳細
@@ -482,7 +482,7 @@ export default function FacilityRecordsPage() {
             ) : (
               <button
                 onClick={() => setIsSignatureModalOpen(true)}
-                className="flex items-center gap-2 bg-[#F472B6] hover:bg-[#EC4899] text-white text-sm font-bold py-2 px-4 rounded-md"
+                className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
               >
                 <PenTool className="w-4 h-4" />
                 サインする
@@ -512,8 +512,8 @@ export default function FacilityRecordsPage() {
                 <p className="text-xs text-gray-600 mt-1">欠席日数</p>
               </div>
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                <FileText className="w-6 h-6 text-[#F472B6] mx-auto mb-2" />
-                <p className="text-3xl font-bold text-[#EC4899]">
+                <FileText className="w-6 h-6 text-[#F6AD55] mx-auto mb-2" />
+                <p className="text-3xl font-bold text-[#ED8936]">
                   {selectedChild?.grant_days || '-'}
                 </p>
                 <p className="text-xs text-gray-600 mt-1">支給日数</p>
@@ -524,7 +524,7 @@ export default function FacilityRecordsPage() {
             {activitiesSummary.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-[#F472B6]" />
+                  <BookOpen className="w-4 h-4 text-[#F6AD55]" />
                   今月の活動
                 </h3>
                 <div className="space-y-2">
@@ -540,7 +540,7 @@ export default function FacilityRecordsPage() {
                 {contactLogs.length > 0 && (
                   <button
                     onClick={() => router.push(`/parent/facilities/${facilityId}/contact?child=${selectedChildId}`)}
-                    className="mt-3 text-sm text-[#F472B6] hover:text-[#EC4899] font-medium flex items-center gap-1"
+                    className="mt-3 text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium flex items-center gap-1"
                   >
                     連絡帳を全て見る
                     <ChevronRight className="w-4 h-4" />
@@ -647,8 +647,8 @@ export default function FacilityRecordsPage() {
                 <p className="text-2xl font-bold text-purple-600 print:text-lg">{dropoffDays}</p>
                 <p className="text-xs text-gray-600">送迎（送り）</p>
               </div>
-              <div className="bg-pink-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
-                <p className="text-2xl font-bold text-[#EC4899] print:text-lg">
+              <div className="bg-amber-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
+                <p className="text-2xl font-bold text-[#ED8936] print:text-lg">
                   {selectedChild?.grant_days || '-'}
                 </p>
                 <p className="text-xs text-gray-600">支給日数</p>
@@ -729,7 +729,7 @@ export default function FacilityRecordsPage() {
               </button>
               <button
                 onClick={saveSignature}
-                className="flex-1 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-2 px-4 rounded-md"
+                className="flex-1 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md"
               >
                 保存
               </button>
