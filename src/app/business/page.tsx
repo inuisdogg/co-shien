@@ -171,7 +171,7 @@ export default function BusinessPage() {
         }
         // facilityIdクエリパラメータがない場合のみ、スタッフ権限チェック
         // （facilityIdがある場合はemployment_recordsで権限を確認する）
-        if (!facilityIdFromQuery && userData?.userType === 'staff' && userData?.role !== 'admin') {
+        if (!facilityIdFromQuery && userData?.userType === 'staff' && userData?.role !== 'admin' && userData?.role !== 'owner') {
           // selectedFacilityがある場合は権限を確認
           if (facilityStr) {
             try {
@@ -260,6 +260,7 @@ export default function BusinessPage() {
             id: facilityData.id,
             name: facilityData.name,
             code: facilityData.code || '',
+            ownerUserId: facilityData.owner_user_id || '',
             createdAt: facilityData.created_at || new Date().toISOString(),
             updatedAt: facilityData.updated_at || new Date().toISOString(),
           };
