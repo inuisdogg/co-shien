@@ -33,6 +33,7 @@ import LeaveApprovalView from '@/components/staff/LeaveApprovalView';
 import TalentManagementView from '@/components/talent/TalentManagementView';
 import RegulationsManagementView from '@/components/regulations/RegulationsManagementView';
 import ComplianceView from '@/components/compliance/ComplianceView';
+import ConnectMeetingView from '@/components/connect/ConnectMeetingView';
 import { useAuth } from '@/contexts/AuthContext';
 import { SetupGuideProvider, useSetupGuide, SETUP_STEPS } from '@/contexts/SetupGuideContext';
 import { UserPermissions } from '@/types';
@@ -436,6 +437,8 @@ export default function BusinessPage() {
         return <RegulationsManagementView />;
       case 'compliance':
         return <ComplianceView />;
+      case 'connect':
+        return <ConnectMeetingView />;
       default:
         return <DashboardView />;
     }

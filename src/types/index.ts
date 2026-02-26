@@ -1050,6 +1050,26 @@ export type ConnectMeetingFormData = {
   }>;
 };
 
+// 連絡会議 拡張型
+export type ConnectMeetingAgendaItem = {
+  title: string;
+  description?: string;
+  order: number;
+};
+
+export type ConnectMeetingDecision = {
+  title: string;
+  description?: string;
+  assignee?: string;
+};
+
+export type ConnectMeetingActionItem = {
+  task: string;
+  assignee?: string;
+  dueDate?: string;
+  status: 'pending' | 'done';
+};
+
 // ==========================================
 // 施設別時間枠設定
 // ==========================================

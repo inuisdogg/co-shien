@@ -739,28 +739,55 @@ export default function ClientDashboardPage() {
         )}
 
         {/* ウェルカムメッセージ */}
-        <div className="bg-white border-l-4 border-[#F6AD55] rounded-xl p-6 mb-6 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-800">
-            ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            お子様の利用状況を確認できます
-          </p>
-          {currentMonthUsage > 0 && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-[#FEF3E2] rounded-lg px-3 py-1.5">
-              <CalendarDays className="w-4 h-4 text-[#ED8936]" />
-              <span className="text-sm font-medium text-[#ED8936]">今月の利用: {currentMonthUsage}回</span>
+        <div className="bg-[#FEF3E2] rounded-2xl p-6 mb-6 border border-[#F6AD55]/20">
+          <div className="flex items-start gap-3 mb-4">
+            <span className="text-3xl">👋</span>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">
+                ようこそ、{currentUser?.last_name || currentUser?.name?.split(' ')[0]}さん
+              </h1>
+              <p className="text-gray-600 mt-1 text-sm">
+                お子様の利用状況を確認できます
+              </p>
             </div>
-          )}
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm">
+              <User className="w-4 h-4 text-[#F6AD55]" />
+              <span className="text-xs text-gray-500">お子様</span>
+              <span className="text-sm font-bold text-gray-800">{children.length}人</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm">
+              <Building2 className="w-4 h-4 text-blue-500" />
+              <span className="text-xs text-gray-500">利用施設</span>
+              <span className="text-sm font-bold text-gray-800">{facilities.length}</span>
+            </div>
+            {currentMonthUsage > 0 && (
+              <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm">
+                <CalendarDays className="w-4 h-4 text-green-500" />
+                <span className="text-xs text-gray-500">今月の利用</span>
+                <span className="text-sm font-bold text-gray-800">{currentMonthUsage}回</span>
+              </div>
+            )}
+            {unsignedContactLogs.length > 0 && (
+              <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm border border-red-200">
+                <BookOpen className="w-4 h-4 text-red-500" />
+                <span className="text-xs text-gray-500">署名待ち</span>
+                <span className="text-sm font-bold text-red-600">{unsignedContactLogs.length}件</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* お知らせセクション */}
         {((isChatEnabled && unreadChats.length > 0) || signRequests.length > 0 || unsignedContactLogs.length > 0 || unreadMessages.length > 0) && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-            <div className="bg-[#F6AD55] px-4 py-3 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-white" />
-              <h2 className="font-bold text-white">お知らせ</h2>
-              <span className="bg-white text-[#ED8936] text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
+            <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
+              <div className="w-8 h-8 bg-[#FEF3E2] rounded-full flex items-center justify-center">
+                <Bell className="w-4 h-4 text-[#F6AD55]" />
+              </div>
+              <h2 className="font-bold text-gray-800">お知らせ</h2>
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-auto">
                 {(isChatEnabled ? unreadChats.reduce((sum, c) => sum + c.unreadCount, 0) : 0) + signRequests.length + unsignedContactLogs.length + unreadMessages.length}件
               </span>
             </div>
@@ -882,7 +909,7 @@ export default function ClientDashboardPage() {
 
         {/* タブナビゲーション */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-          <div className="flex border-b border-gray-200 overflow-x-auto">
+          <div className="flex overflow-x-auto p-1.5 gap-1">
             {[
               { id: 'overview', label: '概要', icon: ClipboardList, phase: 1 },
               { id: 'facilities', label: '利用施設', icon: Building2, phase: 1 },
@@ -894,10 +921,10 @@ export default function ClientDashboardPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-[#F6AD55] text-[#ED8936] bg-amber-50'
-                      : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                      ? 'bg-[#FEF3E2] text-[#ED8936] font-bold rounded-lg'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -911,157 +938,69 @@ export default function ClientDashboardPage() {
             {/* 概要タブ */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
-                {/* 利用予定カレンダー */}
+                {/* クイックアクション */}
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                      <CalendarDays className="w-5 h-5 text-[#F6AD55]" />
-                      利用予定カレンダー
-                    </h2>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
-                        className="p-1.5 hover:bg-gray-100 rounded-md"
-                      >
-                        <ChevronLeft className="w-4 h-4 text-gray-600" />
-                      </button>
-                      <span className="text-sm font-medium text-gray-700 min-w-[100px] text-center">
-                        {calendarMonth.getFullYear()}年{calendarMonth.getMonth() + 1}月
-                      </span>
-                      <button
-                        onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
-                        className="p-1.5 hover:bg-gray-100 rounded-md"
-                      >
-                        <ChevronRight className="w-4 h-4 text-gray-600" />
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-1 h-6 bg-[#F6AD55] rounded-full" />
+                    <h2 className="text-lg font-bold text-gray-800">クイックアクション</h2>
                   </div>
-                  <div className="rounded-xl border border-gray-100 overflow-hidden">
-                    <div className="grid grid-cols-7 bg-gray-50">
-                      {['日', '月', '火', '水', '木', '金', '土'].map((day, i) => (
-                        <div
-                          key={i}
-                          className={`p-2 text-center text-xs font-bold ${
-                            i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'
-                          }`}
-                        >
-                          {day}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <button
+                      onClick={() => handleQuickAction('usage-request')}
+                      disabled={children.length === 0}
+                      className="bg-[#FEF3E2] hover:bg-[#FDEBD0] rounded-xl p-5 text-left transition-all hover:shadow-md border border-[#F6AD55]/20 hover:border-[#F6AD55]/40 group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-105 transition-transform">
+                        <CalendarDays className="w-6 h-6 text-[#F6AD55]" />
+                      </div>
+                      <h3 className="font-bold text-gray-800 text-sm">利用希望申請</h3>
+                      <p className="text-xs text-gray-500 mt-1">日程を申請する</p>
+                    </button>
+                    <button
+                      onClick={() => handleQuickAction('facilities')}
+                      disabled={children.length === 0}
+                      className="bg-[#FEF3E2] hover:bg-[#FDEBD0] rounded-xl p-5 text-left transition-all hover:shadow-md border border-[#F6AD55]/20 hover:border-[#F6AD55]/40 group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-105 transition-transform">
+                        <Building2 className="w-6 h-6 text-[#F6AD55]" />
+                      </div>
+                      <h3 className="font-bold text-gray-800 text-sm">施設を確認</h3>
+                      <p className="text-xs text-gray-500 mt-1">利用施設一覧</p>
+                    </button>
+                    <button
+                      onClick={() => handleQuickAction('calendar')}
+                      disabled={children.length === 0}
+                      className="bg-[#FEF3E2] hover:bg-[#FDEBD0] rounded-xl p-5 text-left transition-all hover:shadow-md border border-[#F6AD55]/20 hover:border-[#F6AD55]/40 group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-105 transition-transform">
+                        <Calendar className="w-6 h-6 text-[#F6AD55]" />
+                      </div>
+                      <h3 className="font-bold text-gray-800 text-sm">予定を見る</h3>
+                      <p className="text-xs text-gray-500 mt-1">利用カレンダー</p>
+                    </button>
+                    {isChatEnabled && (
+                      <button
+                        onClick={() => handleQuickAction('message')}
+                        disabled={children.length === 0}
+                        className="bg-[#FEF3E2] hover:bg-[#FDEBD0] rounded-xl p-5 text-left transition-all hover:shadow-md border border-[#F6AD55]/20 hover:border-[#F6AD55]/40 group disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-105 transition-transform">
+                          <MessageSquare className="w-6 h-6 text-[#F6AD55]" />
                         </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7">
-                      {calendarDates.map((dateInfo, idx) => {
-                        const scheduled = scheduledDateMap.get(dateInfo.date);
-                        const isToday = dateInfo.date === todayStr;
-                        const dayOfWeek = new Date(dateInfo.date).getDay();
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`min-h-[48px] p-1 border-t border-r border-gray-100 relative ${
-                              !dateInfo.isCurrentMonth ? 'bg-gray-50 opacity-40' : ''
-                            } ${isToday ? 'bg-amber-50' : ''}`}
-                          >
-                            <div className={`text-xs text-center font-medium ${
-                              isToday
-                                ? 'w-6 h-6 rounded-full bg-[#F6AD55] text-white flex items-center justify-center mx-auto'
-                                : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-gray-700'
-                            }`}>
-                              {dateInfo.day}
-                            </div>
-                            {scheduled && dateInfo.isCurrentMonth && (
-                              <div className="flex justify-center mt-1">
-                                <div className="w-2 h-2 rounded-full bg-[#F6AD55]" />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                        <h3 className="font-bold text-gray-800 text-sm">施設にチャット</h3>
+                        <p className="text-xs text-gray-500 mt-1">施設とメッセージ</p>
+                      </button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-[#F6AD55]" />
-                      <span>利用予定日</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 最新の連絡帳 */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-[#F6AD55]" />
-                      最新の連絡帳
-                      {unsignedContactLogs.length > 0 && (
-                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                          {unsignedContactLogs.length}件署名待ち
-                        </span>
-                      )}
-                    </h2>
-                  </div>
-                  {contactLogs.length === 0 ? (
-                    <div className="bg-gray-50 rounded-lg p-6 text-center">
-                      <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">連絡帳はまだありません</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {contactLogs.slice(0, 5).map((log) => {
-                        const child = children.find(c => c.id === log.child_id);
-                        const facility = facilities.find(f => f.id === log.facility_id);
-                        const needsSign = !log.is_signed && log.status === 'submitted';
-                        return (
-                          <div
-                            key={log.id}
-                            className={`rounded-xl p-4 border cursor-pointer transition-all hover:shadow-sm ${
-                              needsSign
-                                ? 'border-[#F6AD55]/40 bg-amber-50 hover:border-[#F6AD55]'
-                                : 'border-gray-100 bg-white hover:border-gray-200'
-                            }`}
-                            onClick={() => router.push(`/parent/facilities/${log.facility_id}/contact`)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                  needsSign ? 'bg-[#F6AD55]/10' : 'bg-gray-100'
-                                }`}>
-                                  <BookOpen className={`w-5 h-5 ${needsSign ? 'text-[#F6AD55]' : 'text-gray-400'}`} />
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-gray-800">{log.date}</span>
-                                    {needsSign && (
-                                      <span className="text-[10px] bg-[#F6AD55] text-white px-1.5 py-0.5 rounded font-bold">
-                                        署名待ち
-                                      </span>
-                                    )}
-                                    {log.is_signed && (
-                                      <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                                        <CheckCircle className="w-3 h-3" />
-                                        署名済み
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-gray-500">
-                                    {child?.name} - {facility?.name || '施設'}
-                                    {log.activities && ` / ${log.activities.substring(0, 30)}...`}
-                                  </p>
-                                </div>
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-gray-400" />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
 
                 {/* 児童一覧 */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-gray-800">お子様一覧</h2>
+                    <div className="flex items-center gap-3">
+                      <div className="w-1 h-6 bg-[#F6AD55] rounded-full" />
+                      <h2 className="text-lg font-bold text-gray-800">お子様一覧</h2>
+                    </div>
                     <button
                       onClick={() => router.push('/parent/children/register')}
                       className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md transition-colors"
@@ -1139,13 +1078,160 @@ export default function ClientDashboardPage() {
                   )}
                 </div>
 
+                {/* 利用予定カレンダー */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1 h-6 bg-[#F6AD55] rounded-full" />
+                      <h2 className="text-lg font-bold text-gray-800">利用予定カレンダー</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                        className="p-1.5 hover:bg-gray-100 rounded-md"
+                      >
+                        <ChevronLeft className="w-4 h-4 text-gray-600" />
+                      </button>
+                      <span className="text-sm font-medium text-gray-700 min-w-[100px] text-center">
+                        {calendarMonth.getFullYear()}年{calendarMonth.getMonth() + 1}月
+                      </span>
+                      <button
+                        onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                        className="p-1.5 hover:bg-gray-100 rounded-md"
+                      >
+                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 overflow-hidden">
+                    <div className="grid grid-cols-7 bg-gray-50">
+                      {['日', '月', '火', '水', '木', '金', '土'].map((day, i) => (
+                        <div
+                          key={i}
+                          className={`p-2 text-center text-xs font-bold ${
+                            i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'
+                          }`}
+                        >
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7">
+                      {calendarDates.map((dateInfo, idx) => {
+                        const scheduled = scheduledDateMap.get(dateInfo.date);
+                        const isToday = dateInfo.date === todayStr;
+                        const dayOfWeek = new Date(dateInfo.date).getDay();
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`min-h-[48px] p-1 border-t border-r border-gray-100 relative ${
+                              !dateInfo.isCurrentMonth ? 'bg-gray-50 opacity-40' : ''
+                            } ${isToday ? 'bg-amber-50' : ''}`}
+                          >
+                            <div className={`text-xs text-center font-medium ${
+                              isToday
+                                ? 'w-6 h-6 rounded-full bg-[#F6AD55] text-white flex items-center justify-center mx-auto'
+                                : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-gray-700'
+                            }`}>
+                              {dateInfo.day}
+                            </div>
+                            {scheduled && dateInfo.isCurrentMonth && (
+                              <div className="flex justify-center mt-1">
+                                <div className="w-2 h-2 rounded-full bg-[#F6AD55]" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-[#F6AD55]" />
+                      <span>利用予定日</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 最新の連絡帳 */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1 h-6 bg-[#F6AD55] rounded-full" />
+                      <h2 className="text-lg font-bold text-gray-800">最新の連絡帳</h2>
+                      {unsignedContactLogs.length > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          {unsignedContactLogs.length}件署名待ち
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {contactLogs.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-6 text-center">
+                      <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">連絡帳はまだありません</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {contactLogs.slice(0, 5).map((log) => {
+                        const child = children.find(c => c.id === log.child_id);
+                        const facility = facilities.find(f => f.id === log.facility_id);
+                        const needsSign = !log.is_signed && log.status === 'submitted';
+                        return (
+                          <div
+                            key={log.id}
+                            className={`rounded-xl p-4 border cursor-pointer transition-all hover:shadow-sm ${
+                              needsSign
+                                ? 'border-[#F6AD55]/40 bg-amber-50 hover:border-[#F6AD55]'
+                                : 'border-gray-100 bg-white hover:border-gray-200'
+                            }`}
+                            onClick={() => router.push(`/parent/facilities/${log.facility_id}/contact`)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                  needsSign ? 'bg-[#F6AD55]/10' : 'bg-gray-100'
+                                }`}>
+                                  <BookOpen className={`w-5 h-5 ${needsSign ? 'text-[#F6AD55]' : 'text-gray-400'}`} />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-gray-800">{log.date}</span>
+                                    {needsSign && (
+                                      <span className="text-[10px] bg-[#F6AD55] text-white px-1.5 py-0.5 rounded font-bold">
+                                        署名待ち
+                                      </span>
+                                    )}
+                                    {log.is_signed && (
+                                      <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                        <CheckCircle className="w-3 h-3" />
+                                        署名済み
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    {child?.name} - {facility?.name || '施設'}
+                                    {log.activities && ` / ${log.activities.substring(0, 30)}...`}
+                                  </p>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {/* 利用施設一覧 */}
                 {facilities.length > 0 && (
                   <div>
-                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-[#F6AD55]" />
-                      利用施設一覧
-                    </h2>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-1 h-6 bg-[#F6AD55] rounded-full" />
+                      <h2 className="text-lg font-bold text-gray-800">利用施設一覧</h2>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {facilities.map((facility) => {
                         const facilityContracts = contracts.filter(c => c.facility_id === facility.id && c.status === 'active');
@@ -1177,51 +1263,6 @@ export default function ClientDashboardPage() {
                     </div>
                   </div>
                 )}
-
-                {/* クイックアクション */}
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800 mb-4">クイックアクション</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <button
-                      onClick={() => handleQuickAction('usage-request')}
-                      disabled={children.length === 0}
-                      className="bg-amber-50 hover:bg-amber-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F6AD55]/20 hover:border-[#F6AD55]/40"
-                    >
-                      <CalendarDays className="w-8 h-8 text-[#F6AD55] mb-2" />
-                      <h3 className="font-bold text-gray-800 text-sm">利用希望申請</h3>
-                      <p className="text-xs text-gray-500 mt-1">日程を申請する</p>
-                    </button>
-                    <button
-                      onClick={() => handleQuickAction('facilities')}
-                      disabled={children.length === 0}
-                      className="bg-gray-50 hover:bg-gray-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-100"
-                    >
-                      <Building2 className="w-8 h-8 text-blue-500 mb-2" />
-                      <h3 className="font-bold text-gray-800 text-sm">施設を確認</h3>
-                      <p className="text-xs text-gray-500 mt-1">利用施設一覧</p>
-                    </button>
-                    <button
-                      onClick={() => handleQuickAction('calendar')}
-                      disabled={children.length === 0}
-                      className="bg-gray-50 hover:bg-gray-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-100"
-                    >
-                      <Calendar className="w-8 h-8 text-[#F6AD55] mb-2" />
-                      <h3 className="font-bold text-gray-800 text-sm">予定を見る</h3>
-                      <p className="text-xs text-gray-500 mt-1">利用カレンダー</p>
-                    </button>
-                    {isChatEnabled && (
-                      <button
-                        onClick={() => handleQuickAction('message')}
-                        disabled={children.length === 0}
-                        className="bg-amber-50 hover:bg-amber-100 rounded-xl p-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#F6AD55]/20 hover:border-[#F6AD55]/40"
-                      >
-                        <MessageSquare className="w-8 h-8 text-[#F6AD55] mb-2" />
-                        <h3 className="font-bold text-gray-800 text-sm">施設にチャット</h3>
-                        <p className="text-xs text-gray-500 mt-1">施設とメッセージ</p>
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
             )}
 
