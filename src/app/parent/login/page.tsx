@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
@@ -14,6 +14,8 @@ export const dynamic = 'force-dynamic';
 
 export default function ClientLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get('redirect');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,7 +31,7 @@ export default function ClientLoginPage() {
         if (userStr) {
           const user = JSON.parse(userStr);
           if (user?.id && user?.userType === 'client') {
-            router.push('/parent');
+            router.push(redirectPath || '/parent');
             return;
           }
         }
@@ -110,7 +112,8 @@ export default function ClientLoginPage() {
         localStorage.removeItem('savedLoginData');
       }
 
-      router.push('/parent');
+      // リダイレクト先がある場合はそちらへ、なければダッシュボードへ
+      router.push(redirectPath || '/parent');
     } catch (err: any) {
       setError(err.message || 'ログインに失敗しました');
     } finally {
@@ -259,7 +262,7 @@ export default function ClientLoginPage() {
           </p>
           <button
             type="button"
-            onClick={() => router.push('/parent/signup')}
+            onClick={() => router.push(redirectPath ? `/parent/signup?redirect=${encodeURIComponent(redirectPath)}` : '/parent/signup')}
             className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-[#F472B6] hover:text-[#F472B6] font-bold rounded-lg transition-colors text-sm min-w-[120px]"
           >
             保護者として新規登録

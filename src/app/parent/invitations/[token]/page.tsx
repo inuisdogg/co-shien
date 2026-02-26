@@ -1,6 +1,6 @@
 /**
- * 施設からの招待承認ページ
- * ステップインジケーター付きの親切なUI
+ * 統一招待承認ページ
+ * 全てのシナリオ（未ログイン・ログイン済み・期限切れ・承認済み）を1ページで処理
  */
 
 'use client';
@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
-import { CheckCircle, XCircle, AlertCircle, Building2, Shield, Heart, ArrowRight, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Building2, Shield, Heart, ArrowRight, Loader2, LogIn, UserPlus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ const StepIndicator = ({ currentStep }: { currentStep: number }) => {
                 index < currentStep
                   ? 'bg-green-500 text-white'
                   : index === currentStep
-                  ? 'bg-[#F6AD55] text-white ring-4 ring-[#F6AD55]/20'
+                  ? 'bg-[#F472B6] text-white ring-4 ring-[#F472B6]/20'
                   : 'bg-gray-200 text-gray-400'
               }`}
             >
@@ -49,7 +49,7 @@ const StepIndicator = ({ currentStep }: { currentStep: number }) => {
   );
 };
 
-export default function InvitationAcceptPage() {
+export default function UnifiedInvitationPage() {
   const router = useRouter();
   const params = useParams();
   const token = params.token as string;
@@ -61,11 +61,30 @@ export default function InvitationAcceptPage() {
   const [child, setChild] = useState<any>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [invitationStatus, setInvitationStatus] = useState<'pending' | 'accepted' | 'expired' | 'cancelled' | 'invalid'>('pending');
 
+  // ログイン状態を確認
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user?.id && user?.userType === 'client') {
+          setIsLoggedIn(true);
+          setCurrentUser(user);
+        }
+      } catch {
+        // invalid JSON, ignore
+      }
+    }
+  }, []);
+
+  // 招待情報を取得
   useEffect(() => {
     const fetchInvitation = async () => {
       try {
-        // 招待情報を取得
         const { data: invitationData, error: invitationError } = await supabase
           .from('contract_invitations')
           .select(`
@@ -84,6 +103,7 @@ export default function InvitationAcceptPage() {
           .single();
 
         if (invitationError || !invitationData) {
+          setInvitationStatus('invalid');
           setError('この招待リンクは無効です。URLが正しいかご確認ください。施設の担当者に再送をお願いすることもできます。');
           setLoading(false);
           return;
@@ -91,18 +111,44 @@ export default function InvitationAcceptPage() {
 
         // 有効期限チェック
         if (new Date(invitationData.expires_at) < new Date()) {
+          setInvitationStatus('expired');
+          setInvitation(invitationData);
+          setFacility(invitationData.facilities);
+          setChild(invitationData.children);
           setError('この招待の有効期限が切れています。お手数ですが、施設の担当者に新しい招待の送信をお願いしてください。');
           setLoading(false);
           return;
         }
 
         // ステータスチェック
+        if (invitationData.status === 'accepted') {
+          setInvitationStatus('accepted');
+          setInvitation(invitationData);
+          setFacility(invitationData.facilities);
+          setChild(invitationData.children);
+          setError('この招待は既に承認済みです。ダッシュボードからご確認ください。');
+          setLoading(false);
+          return;
+        }
+
+        if (invitationData.status === 'cancelled') {
+          setInvitationStatus('cancelled');
+          setInvitation(invitationData);
+          setFacility(invitationData.facilities);
+          setChild(invitationData.children);
+          setError('この招待はキャンセルされています。施設の担当者にお問い合わせください。');
+          setLoading(false);
+          return;
+        }
+
         if (invitationData.status !== 'pending') {
+          setInvitationStatus('invalid');
           setError('この招待は既に処理済みです。既に承認されている場合は、ダッシュボードからご確認ください。');
           setLoading(false);
           return;
         }
 
+        setInvitationStatus('pending');
         setInvitation(invitationData);
         setFacility(invitationData.facilities);
         setChild(invitationData.children);
@@ -125,7 +171,6 @@ export default function InvitationAcceptPage() {
     try {
       const userStr = localStorage.getItem('user');
       if (!userStr) {
-        // ログインが必要
         router.push(`/parent/login?redirect=/parent/invitations/${token}`);
         return;
       }
@@ -174,7 +219,7 @@ export default function InvitationAcceptPage() {
         return;
       }
 
-      // トランザクション: 招待を承認し、契約を作成
+      // 招待を承認
       const { error: acceptError } = await supabase
         .from('contract_invitations')
         .update({
@@ -203,6 +248,17 @@ export default function InvitationAcceptPage() {
 
       if (contractError) {
         throw contractError;
+      }
+
+      // children.owner_profile_id を現在のユーザーに更新
+      if (targetChildId) {
+        await supabase
+          .from('children')
+          .update({
+            owner_profile_id: user.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', targetChildId);
       }
 
       setSuccess(true);
@@ -247,12 +303,12 @@ export default function InvitationAcceptPage() {
     }
   };
 
+  // ローディング表示
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
         <div className="text-center">
-          {/* スケルトンローディング */}
-          <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 mx-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 max-w-md w-full p-8 mx-4">
             <div className="animate-pulse space-y-4">
               <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto" />
               <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto" />
@@ -268,10 +324,11 @@ export default function InvitationAcceptPage() {
     );
   }
 
+  // 承認完了画面
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 max-w-md w-full p-8 text-center">
           <StepIndicator currentStep={3} />
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Heart size={36} className="text-green-500" />
@@ -290,7 +347,7 @@ export default function InvitationAcceptPage() {
           </div>
           <button
             onClick={() => router.push('/parent')}
-            className="text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium flex items-center gap-1 mx-auto"
+            className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium flex items-center gap-1 mx-auto"
           >
             今すぐダッシュボードへ <ArrowRight size={14} />
           </button>
@@ -299,10 +356,46 @@ export default function InvitationAcceptPage() {
     );
   }
 
+  // 招待詳細カード（常に表示）
+  const InvitationDetails = () => (
+    invitation && facility ? (
+      <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 mb-6">
+        <h3 className="font-bold text-gray-800 mb-3 text-sm">招待の内容</h3>
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center gap-3">
+            <Building2 size={16} className="text-[#F472B6] shrink-0" />
+            <div>
+              <span className="text-xs text-gray-500">施設名</span>
+              <p className="font-bold text-gray-800">{facility.name}</p>
+            </div>
+          </div>
+          {(child || invitation.temp_child_name) && (
+            <div className="flex items-center gap-3">
+              <Heart size={16} className="text-[#F472B6] shrink-0" />
+              <div>
+                <span className="text-xs text-gray-500">対象のお子様</span>
+                <p className="font-bold text-gray-800">{child?.name || invitation.temp_child_name}</p>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <Shield size={16} className="text-[#F472B6] shrink-0" />
+            <div>
+              <span className="text-xs text-gray-500">有効期限</span>
+              <p className="font-medium text-gray-800">
+                {new Date(invitation.expires_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}まで
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null
+  );
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
-        <StepIndicator currentStep={error && !invitation ? 0 : 1} />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50 p-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 max-w-md w-full p-8">
+        <StepIndicator currentStep={error && invitationStatus !== 'pending' ? 0 : isLoggedIn ? 1 : 0} />
 
         <div className="text-center mb-6">
           <Image
@@ -313,10 +406,10 @@ export default function InvitationAcceptPage() {
             className="h-12 w-auto mx-auto mb-6"
             priority
           />
-          <div className="w-16 h-16 bg-[#F6AD55]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Building2 size={28} className="text-[#F6AD55]" />
+          <div className="w-16 h-16 bg-[#F472B6]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building2 size={28} className="text-[#F472B6]" />
           </div>
-          <p className="text-sm text-[#F6AD55] font-medium mb-1">
+          <p className="text-sm text-[#F472B6] font-medium mb-1">
             保護者の方へ
           </p>
           <h1 className="text-xl font-bold text-gray-800 mb-2">
@@ -324,6 +417,7 @@ export default function InvitationAcceptPage() {
           </h1>
         </div>
 
+        {/* エラー表示 */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
             <div className="flex items-start gap-2">
@@ -336,44 +430,84 @@ export default function InvitationAcceptPage() {
           </div>
         )}
 
-        {invitation && facility && (
-          <div className="space-y-4 mb-6">
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-              <h3 className="font-bold text-gray-800 mb-3 text-sm">招待の内容</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <Building2 size={16} className="text-[#F6AD55] shrink-0" />
-                  <div>
-                    <span className="text-xs text-gray-500">施設名</span>
-                    <p className="font-bold text-gray-800">{facility.name}</p>
-                  </div>
-                </div>
-                {child && (
-                  <div className="flex items-center gap-3">
-                    <Heart size={16} className="text-[#F6AD55] shrink-0" />
-                    <div>
-                      <span className="text-xs text-gray-500">対象のお子様</span>
-                      <p className="font-bold text-gray-800">{child.name}</p>
-                    </div>
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <Shield size={16} className="text-[#F6AD55] shrink-0" />
-                  <div>
-                    <span className="text-xs text-gray-500">有効期限</span>
-                    <p className="font-medium text-gray-800">
-                      {new Date(invitation.expires_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}まで
-                    </p>
-                  </div>
-                </div>
+        {/* 招待詳細は常に表示（データがある場合） */}
+        <InvitationDetails />
+
+        {/* 期限切れ・承認済みの場合のアクション */}
+        {invitationStatus === 'expired' && (
+          <div className="text-center">
+            <p className="text-sm text-gray-500 mb-4">
+              施設の担当者に新しい招待の送信をお願いしてください。
+            </p>
+            <button
+              onClick={() => router.push('/parent')}
+              className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium"
+            >
+              ダッシュボードへ戻る
+            </button>
+          </div>
+        )}
+
+        {invitationStatus === 'accepted' && (
+          <div className="text-center">
+            <button
+              onClick={() => router.push('/parent')}
+              className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              ダッシュボードへ <ArrowRight size={16} />
+            </button>
+          </div>
+        )}
+
+        {invitationStatus === 'cancelled' && (
+          <div className="text-center">
+            <button
+              onClick={() => router.push('/parent')}
+              className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium"
+            >
+              ダッシュボードへ戻る
+            </button>
+          </div>
+        )}
+
+        {/* 有効な招待 & 未ログイン → ログイン/新規登録ボタン */}
+        {invitationStatus === 'pending' && !isLoggedIn && invitation && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 text-center mb-2">
+              招待を承認するには、ログインまたは新規登録が必要です。
+            </p>
+            <button
+              onClick={() => router.push(`/parent/login?redirect=/parent/invitations/${token}`)}
+              className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base"
+            >
+              <LogIn size={18} />
+              ログインして承認
+            </button>
+            <button
+              onClick={() => router.push(`/parent/signup?redirect=/parent/invitations/${token}`)}
+              className="w-full bg-white border-2 border-[#F472B6] text-[#F472B6] hover:bg-pink-50 font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-base"
+            >
+              <UserPlus size={18} />
+              新規登録して承認
+            </button>
+          </div>
+        )}
+
+        {/* 有効な招待 & ログイン済み → 承認フォーム */}
+        {invitationStatus === 'pending' && isLoggedIn && invitation && (
+          <div className="space-y-4">
+            {currentUser && (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-2">
+                <p className="text-xs text-gray-500">ログイン中のアカウント</p>
+                <p className="text-sm font-bold text-gray-800">{currentUser.name || currentUser.email}</p>
               </div>
-            </div>
+            )}
 
             <div className="space-y-3">
               <button
                 onClick={handleAccept}
                 disabled={processing}
-                className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base"
+                className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-base"
               >
                 {processing ? (
                   <>
@@ -399,13 +533,22 @@ export default function InvitationAcceptPage() {
           </div>
         )}
 
-        <div className="text-center pt-4 border-t border-gray-100">
-          <button
-            onClick={() => router.push('/parent/login')}
-            className="text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium"
-          >
-            ログインが必要な場合はこちら
-          </button>
+        {/* 無効な招待リンクの場合のフッター */}
+        {invitationStatus === 'invalid' && (
+          <div className="text-center">
+            <button
+              onClick={() => router.push('/parent/login')}
+              className="text-sm text-[#F472B6] hover:text-[#EC4899] font-medium"
+            >
+              ログインページへ
+            </button>
+          </div>
+        )}
+
+        <div className="text-center pt-4 border-t border-gray-100 mt-6">
+          <p className="text-xs text-gray-400">
+            Roots - 児童発達支援管理システム
+          </p>
         </div>
       </div>
     </div>

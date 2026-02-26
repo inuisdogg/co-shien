@@ -119,6 +119,383 @@ function AdminAccessLink({ userId }: { userId?: string }) {
   );
 }
 
+// ========== 規定確認セクション ==========
+function CareerRegulationSection({ userId, activeEmployments }: { userId?: string; activeEmployments: EmploymentRecord[] }) {
+  const [regulations, setRegulations] = useState<{ id: string; title: string; facilityId: string; facilityName: string; acknowledged: boolean }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acknowledging, setAcknowledging] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId || activeEmployments.length === 0) {
+      setLoading(false);
+      return;
+    }
+    const fetchRegulations = async () => {
+      setLoading(true);
+      try {
+        const facilityIds = activeEmployments.map(e => e.facilityId).filter(Boolean);
+        if (facilityIds.length === 0) { setLoading(false); return; }
+
+        const { data: regs } = await supabase
+          .from('company_regulations')
+          .select('id, title, facility_id')
+          .in('facility_id', facilityIds)
+          .eq('is_published', true);
+
+        if (!regs || regs.length === 0) { setRegulations([]); setLoading(false); return; }
+
+        const { data: acks } = await supabase
+          .from('regulation_acknowledgments')
+          .select('regulation_id')
+          .eq('user_id', userId)
+          .in('facility_id', facilityIds);
+
+        const ackedIds = new Set((acks ?? []).map((a: any) => a.regulation_id));
+
+        const result = regs.map((r: any) => {
+          const emp = activeEmployments.find(e => e.facilityId === r.facility_id);
+          return {
+            id: r.id,
+            title: r.title,
+            facilityId: r.facility_id,
+            facilityName: emp?.facilityName || '施設',
+            acknowledged: ackedIds.has(r.id),
+          };
+        });
+        setRegulations(result);
+      } catch (e) {
+        // silently ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRegulations();
+  }, [userId, activeEmployments]);
+
+  const handleAcknowledge = async (regId: string, facilityId: string) => {
+    if (!userId) return;
+    setAcknowledging(regId);
+    try {
+      await supabase.from('regulation_acknowledgments').insert({
+        regulation_id: regId,
+        user_id: userId,
+        facility_id: facilityId,
+        acknowledged_at: new Date().toISOString(),
+      });
+      setRegulations(prev => prev.map(r => r.id === regId ? { ...r, acknowledged: true } : r));
+    } catch (e) {
+      // silently ignore
+    } finally {
+      setAcknowledging(null);
+    }
+  };
+
+  const unacknowledged = regulations.filter(r => !r.acknowledged);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="w-5 h-5 text-[#818CF8]" />
+          <h2 className="text-lg font-bold text-gray-800">規定確認</h2>
+        </div>
+        <div className="flex items-center justify-center py-6">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+    >
+      <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <FileText className="w-5 h-5 text-[#818CF8]" />
+        規定確認
+        {unacknowledged.length > 0 && (
+          <span className="bg-[#818CF8] text-white text-xs px-2 py-0.5 rounded-full font-bold">
+            {unacknowledged.length}
+          </span>
+        )}
+      </h2>
+      {unacknowledged.length === 0 ? (
+        <div className="text-center py-6">
+          <CheckCircle className="w-10 h-10 mx-auto mb-2 text-emerald-400" />
+          <p className="text-sm text-gray-500">全ての規定を確認済みです</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {unacknowledged.map((reg) => (
+            <div
+              key={reg.id}
+              className="flex items-center justify-between p-3 bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-lg"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-800 truncate">{reg.title}</p>
+                <p className="text-xs text-gray-500">{reg.facilityName}</p>
+              </div>
+              <button
+                onClick={() => handleAcknowledge(reg.id, reg.facilityId)}
+                disabled={acknowledging === reg.id}
+                className="ml-3 px-4 py-2 bg-[#818CF8] text-white text-xs font-bold rounded-lg hover:bg-[#6366F1] transition-colors disabled:opacity-50 shrink-0"
+              >
+                {acknowledging === reg.id ? '処理中...' : '確認する'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ========== 資格期限通知セクション ==========
+function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: string; activeEmployments: EmploymentRecord[] }) {
+  const [qualifications, setQualifications] = useState<{ id: string; name: string; expiryDate: string; daysLeft: number; status: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId || activeEmployments.length === 0) {
+      setLoading(false);
+      return;
+    }
+    const fetchQualifications = async () => {
+      setLoading(true);
+      try {
+        const facilityIds = activeEmployments.map(e => e.facilityId).filter(Boolean);
+        if (facilityIds.length === 0) { setLoading(false); return; }
+
+        const { data } = await supabase
+          .from('staff_qualifications')
+          .select('id, qualification_name, expiry_date, status')
+          .eq('user_id', userId)
+          .in('facility_id', facilityIds)
+          .not('expiry_date', 'is', null)
+          .order('expiry_date', { ascending: true });
+
+        if (data) {
+          const todayMs = new Date().setHours(0, 0, 0, 0);
+          setQualifications(
+            data.map((q: any) => {
+              const daysLeft = Math.ceil((new Date(q.expiry_date).getTime() - todayMs) / (1000 * 60 * 60 * 24));
+              return {
+                id: q.id,
+                name: q.qualification_name,
+                expiryDate: q.expiry_date,
+                daysLeft,
+                status: q.status,
+              };
+            })
+          );
+        }
+      } catch (e) {
+        // silently ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchQualifications();
+  }, [userId, activeEmployments]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Award className="w-5 h-5 text-[#818CF8]" />
+          <h2 className="text-lg font-bold text-gray-800">資格期限通知</h2>
+        </div>
+        <div className="flex items-center justify-center py-6">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+        </div>
+      </div>
+    );
+  }
+
+  const alertQuals = qualifications.filter(q => q.daysLeft <= 90);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+    >
+      <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <Award className="w-5 h-5 text-[#818CF8]" />
+        資格期限通知
+      </h2>
+      {qualifications.length === 0 ? (
+        <div className="text-center py-6">
+          <Award className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+          <p className="text-sm text-gray-500">登録された資格はありません</p>
+        </div>
+      ) : alertQuals.length === 0 ? (
+        <div className="text-center py-6">
+          <CheckCircle className="w-10 h-10 mx-auto mb-2 text-emerald-400" />
+          <p className="text-sm text-gray-500">期限が近い資格はありません</p>
+          <p className="text-xs text-gray-400 mt-1">登録資格数: {qualifications.length}件</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {alertQuals.map((q) => (
+            <div
+              key={q.id}
+              className={`flex items-center justify-between p-3 rounded-lg border ${
+                q.daysLeft <= 0
+                  ? 'bg-red-50 border-red-200'
+                  : q.daysLeft <= 30
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-yellow-50 border-yellow-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  q.daysLeft <= 0 ? 'bg-red-100' : q.daysLeft <= 30 ? 'bg-amber-100' : 'bg-yellow-100'
+                }`}>
+                  <AlertCircle className={`w-4 h-4 ${
+                    q.daysLeft <= 0 ? 'text-red-600' : q.daysLeft <= 30 ? 'text-amber-600' : 'text-yellow-600'
+                  }`} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">{q.name}</p>
+                  <p className="text-xs text-gray-500">
+                    有効期限: {new Date(q.expiryDate).toLocaleDateString('ja-JP')}
+                  </p>
+                </div>
+              </div>
+              <span className={`text-xs font-bold px-2 py-1 rounded ${
+                q.daysLeft <= 0
+                  ? 'bg-red-100 text-red-700'
+                  : q.daysLeft <= 30
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                {q.daysLeft <= 0 ? '期限切れ' : `あと${q.daysLeft}日`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ========== 有給残日数表示セクション ==========
+function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string; activeEmployments: EmploymentRecord[] }) {
+  const [balances, setBalances] = useState<{ facilityName: string; totalDays: number; usedDays: number; remainingDays: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId || activeEmployments.length === 0) {
+      setLoading(false);
+      return;
+    }
+    const fetchBalances = async () => {
+      setLoading(true);
+      try {
+        const facilityIds = activeEmployments.map(e => e.facilityId).filter(Boolean);
+        if (facilityIds.length === 0) { setLoading(false); return; }
+
+        const { data } = await supabase
+          .from('paid_leave_balances')
+          .select('facility_id, total_days, used_days, remaining_days')
+          .eq('user_id', userId)
+          .in('facility_id', facilityIds);
+
+        if (data) {
+          setBalances(
+            data.map((b: any) => {
+              const emp = activeEmployments.find(e => e.facilityId === b.facility_id);
+              return {
+                facilityName: emp?.facilityName || '施設',
+                totalDays: b.total_days ?? 0,
+                usedDays: b.used_days ?? 0,
+                remainingDays: b.remaining_days ?? (b.total_days ?? 0) - (b.used_days ?? 0),
+              };
+            })
+          );
+        }
+      } catch (e) {
+        // silently ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBalances();
+  }, [userId, activeEmployments]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Calendar className="w-5 h-5 text-[#818CF8]" />
+          <h2 className="text-lg font-bold text-gray-800">有給残日数</h2>
+        </div>
+        <div className="flex items-center justify-center py-6">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+      className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+    >
+      <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <Calendar className="w-5 h-5 text-[#818CF8]" />
+        有給残日数
+      </h2>
+      {balances.length === 0 ? (
+        <div className="text-center py-6">
+          <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+          <p className="text-sm text-gray-500">有給休暇データがありません</p>
+          <p className="text-xs text-gray-400 mt-1">施設側で有給管理が設定されると表示されます</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {balances.map((b, i) => {
+            const usageRate = b.totalDays > 0 ? (b.usedDays / b.totalDays) * 100 : 0;
+            return (
+              <div key={i} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-bold text-gray-800">{b.facilityName}</span>
+                  <span className="text-xs text-gray-500">{b.usedDays}日消化 / {b.totalDays}日付与</span>
+                </div>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-3xl font-bold text-[#818CF8]">{b.remainingDays}</span>
+                  <span className="text-sm text-gray-500">日残り</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-[#818CF8] h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(usageRate, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-gray-400">消化率: {usageRate.toFixed(0)}%</span>
+                  {b.usedDays < 5 && (
+                    <span className="text-xs text-amber-600 font-medium">
+                      年5日以上の取得が必要です
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export default function PersonalDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserType | null>(null);
@@ -1278,6 +1655,15 @@ export default function PersonalDashboardPage() {
             </div>
           )}
         </motion.div>
+
+        {/* ========== 規定確認セクション ========== */}
+        <CareerRegulationSection userId={user?.id} activeEmployments={activeEmployments} />
+
+        {/* ========== 資格期限通知セクション ========== */}
+        <CareerQualificationAlerts userId={user?.id} activeEmployments={activeEmployments} />
+
+        {/* ========== 有給残日数表示セクション ========== */}
+        <CareerPaidLeaveBalance userId={user?.id} activeEmployments={activeEmployments} />
       </div>
       )}
 

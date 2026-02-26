@@ -1,5 +1,6 @@
 /**
  * 契約招待メール送信API
+ * 統一された招待URL（/parent/invitations/[token]）のみ送信
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,7 +17,7 @@ const getResend = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, facilityName, childName, invitationUrl, loginUrl } = await request.json();
+    const { email, facilityName, childName, invitationUrl } = await request.json();
 
     if (!email || !facilityName || !childName || !invitationUrl) {
       return NextResponse.json(
@@ -24,17 +25,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // 既存アカウント用のリンクセクション（loginUrlが提供された場合のみ表示）
-    const existingAccountSection = loginUrl ? `
-      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
-        <p style="font-size: 14px; color: #6b7280;">
-          既にアカウントをお持ちの方は
-          <a href="${loginUrl}" style="color: #f97316; text-decoration: underline;">こちらからログイン</a>
-          してください
-        </p>
-      </div>
-    ` : '';
 
     // メール送信
     const resend = getResend();
@@ -50,9 +40,10 @@ export async function POST(request: NextRequest) {
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #00c4cc 0%, #00b0b8 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+            .header { background: linear-gradient(135deg, #F472B6 0%, #EC4899 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
             .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; background: #f97316; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+            .button { display: inline-block; background: #F472B6; color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0; font-size: 16px; }
+            .button:hover { background: #EC4899; }
             .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
           </style>
         </head>
@@ -64,11 +55,10 @@ export async function POST(request: NextRequest) {
             <div class="content">
               <h2>施設からの利用招待</h2>
               <p>${facilityName}から、${childName}さんの施設利用に関する招待が届きました。</p>
-              <p>以下のリンクから招待を承認してください。</p>
+              <p>以下のボタンから招待を確認・承認してください。<br>アカウントをお持ちでない方は、リンク先から新規登録ができます。</p>
               <div style="text-align: center;">
-                <a href="${invitationUrl}" class="button">新規登録して招待を承認</a>
+                <a href="${invitationUrl}" class="button">招待を確認する</a>
               </div>
-              ${existingAccountSection}
               <p style="font-size: 12px; color: #6b7280; margin-top: 30px;">
                 このリンクは7日間有効です。<br>
                 心当たりがない場合は、このメールを無視してください。
@@ -100,4 +90,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

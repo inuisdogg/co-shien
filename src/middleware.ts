@@ -89,6 +89,16 @@ export function middleware(req: NextRequest) {
   }
 
   // ========================================
+  // 旧招待パスからのリダイレクト（統一招待ページへ）
+  // ========================================
+  if (pathname === '/parent/invitation/accept' || pathname === '/parent/invitation/confirm') {
+    const token = req.nextUrl.searchParams.get('token');
+    if (token) {
+      return NextResponse.redirect(new URL(`/parent/invitations/${token}`, req.url), 301);
+    }
+  }
+
+  // ========================================
   // 保護ルートへのセキュリティヘッダー
   // ========================================
   const isProtectedPath = PROTECTED_PATHS.some(p => pathname.startsWith(p));

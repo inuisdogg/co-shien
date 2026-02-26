@@ -2233,3 +2233,92 @@ export type CompanyRegulationInput = {
   displayOrder?: number;
 };
 
+// ========== 労務管理・コンプライアンス関連 ==========
+
+// 36協定（時間外労働協定）
+export interface OvertimeAgreement {
+  id: string;
+  facility_id: string;
+  fiscal_year: number;
+  monthly_limit_hours: number;
+  annual_limit_hours: number;
+  special_monthly_limit: number;
+  special_months_limit: number;
+  effective_from: string;
+  effective_to?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 規定確認記録
+export interface RegulationAcknowledgment {
+  id: string;
+  regulation_id: string;
+  user_id: string;
+  facility_id: string;
+  acknowledged_at: string;
+  created_at: string;
+}
+
+// BCP計画
+export interface BcpPlan {
+  id: string;
+  facility_id: string;
+  plan_type: string;
+  title: string;
+  content: Record<string, unknown>;
+  version?: string;
+  status: string;
+  last_reviewed_at?: string;
+  next_review_date?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// BCP緊急連絡先
+export interface BcpEmergencyContact {
+  id: string;
+  facility_id: string;
+  bcp_plan_id?: string;
+  contact_name: string;
+  role?: string;
+  phone?: string;
+  email?: string;
+  priority: number;
+  created_at: string;
+}
+
+// 虐待防止記録
+export interface AbusePreventionRecord {
+  id: string;
+  facility_id: string;
+  record_type: string;
+  title: string;
+  content: Record<string, unknown>;
+  date?: string;
+  participants: unknown[];
+  status: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// スタッフ資格管理
+export interface StaffQualification {
+  id: string;
+  user_id: string;
+  facility_id: string;
+  qualification_name: string;
+  qualification_code?: string;
+  certificate_number?: string;
+  issued_date?: string;
+  expiry_date?: string;
+  certificate_file_url?: string;
+  certificate_file_name?: string;
+  status: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+

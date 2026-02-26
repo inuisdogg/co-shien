@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
@@ -17,6 +17,8 @@ export const dynamic = 'force-dynamic';
 
 export default function ClientSignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get('redirect');
   const [formData, setFormData] = useState({
     lastName: '',
     firstName: '',
@@ -175,6 +177,11 @@ export default function ClientSignupPage() {
 
       // 登録したメールアドレスをlocalStorageに保存
       localStorage.setItem('pending_signup_email', formData.email.trim().toLowerCase());
+
+      // リダイレクト先がある場合はlocalStorageに保存（メール認証後に使用）
+      if (redirectPath) {
+        localStorage.setItem('post_signup_redirect', redirectPath);
+      }
 
       // メール認証待機ページにリダイレクト
       router.push(`/parent/signup/waiting?email=${encodeURIComponent(formData.email)}`);

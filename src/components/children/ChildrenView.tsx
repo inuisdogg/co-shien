@@ -59,6 +59,13 @@ type PendingInvitation = {
   created_at: string;
 };
 
+// 児童ごとの招待ステータス
+type ChildInvitationStatus = {
+  childId: string;
+  status: 'pending' | 'accepted' | 'expired' | 'none';
+  email?: string;
+};
+
 const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const { facility } = useAuth();
   const { children, addChild, updateChild, getLeadsByChildId, timeSlots, facilitySettings } = useFacilityData();
@@ -101,6 +108,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   // 招待枠作成モーダル用の状態
   const [isInvitationSlotModalOpen, setIsInvitationSlotModalOpen] = useState(false);
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+  const [childInvitationStatuses, setChildInvitationStatuses] = useState<Record<string, ChildInvitationStatus>>({});
 
   // フォームの初期値
   const initialFormData: ChildFormData = {
@@ -180,9 +188,56 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     fetchPendingInvitations();
   }, []);
 
+  // 児童ごとの招待ステータスを取得
+  useEffect(() => {
+    const fetchChildInvitationStatuses = async () => {
+      const facilityId = localStorage.getItem('selectedFacilityId');
+      if (!facilityId || children.length === 0) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('contract_invitations')
+          .select('child_id, status, email, expires_at')
+          .eq('facility_id', facilityId)
+          .in('status', ['pending', 'accepted'])
+          .not('child_id', 'is', null)
+          .order('created_at', { ascending: false });
+
+        if (error || !data) return;
+
+        const statusMap: Record<string, ChildInvitationStatus> = {};
+        for (const inv of data) {
+          if (!inv.child_id || statusMap[inv.child_id]) continue;
+          const isExpired = inv.status === 'pending' && new Date(inv.expires_at) < new Date();
+          statusMap[inv.child_id] = {
+            childId: inv.child_id,
+            status: isExpired ? 'expired' : (inv.status as 'pending' | 'accepted'),
+            email: inv.email,
+          };
+        }
+        setChildInvitationStatuses(statusMap);
+      } catch {
+        // silently fail
+      }
+    };
+
+    fetchChildInvitationStatuses();
+  }, [children]);
+
   // 招待送信完了時のコールバック
   const handleInvitationSent = (invitation: any) => {
     setPendingInvitations(prev => [invitation, ...prev]);
+    // 児童の招待ステータスも更新
+    if (invitation.child_id) {
+      setChildInvitationStatuses(prev => ({
+        ...prev,
+        [invitation.child_id]: {
+          childId: invitation.child_id,
+          status: 'pending',
+          email: invitation.email,
+        },
+      }));
+    }
   };
 
   // 契約ステータスをインライン更新する関数
@@ -933,6 +988,28 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                           連携
                         </span>
                       )}
+                      {!child.ownerProfileId && childInvitationStatuses[child.id] && (
+                        <>
+                          {childInvitationStatuses[child.id].status === 'pending' && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium shrink-0">
+                              <Mail size={10} />
+                              招待中
+                            </span>
+                          )}
+                          {childInvitationStatuses[child.id].status === 'expired' && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium shrink-0">
+                              <AlertCircle size={10} />
+                              期限切れ
+                            </span>
+                          )}
+                          {childInvitationStatuses[child.id].status === 'accepted' && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium shrink-0">
+                              <CheckCircle size={10} />
+                              承認済
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
                     <p className="text-xs text-gray-500">
                       {child.birthDate ? calculateAgeWithMonths(child.birthDate).display : child.age ? `${child.age}歳` : '年齢未登録'}
@@ -943,12 +1020,26 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
 
                 {/* 下部情報 */}
                 <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold ${statusInfo.color}`}
-                  >
-                    <StatusIcon size={10} />
-                    {statusInfo.label}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold ${statusInfo.color}`}
+                    >
+                      <StatusIcon size={10} />
+                      {statusInfo.label}
+                    </span>
+                    {!child.ownerProfileId && !childInvitationStatuses[child.id] && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded font-medium border border-pink-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsInvitationSlotModalOpen(true);
+                        }}
+                      >
+                        <Mail size={9} />
+                        要招待
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {child.beneficiaryNumber && (
                       <span className="text-[10px] text-gray-400 font-mono">{child.beneficiaryNumber}</span>

@@ -31,6 +31,8 @@ import TrainingRecordView from '@/components/training/TrainingRecordView';
 import IncidentReportView from '@/components/incident/IncidentReportView';
 import LeaveApprovalView from '@/components/staff/LeaveApprovalView';
 import TalentManagementView from '@/components/talent/TalentManagementView';
+import RegulationsManagementView from '@/components/regulations/RegulationsManagementView';
+import ComplianceView from '@/components/compliance/ComplianceView';
 import { useAuth } from '@/contexts/AuthContext';
 import { SetupGuideProvider, useSetupGuide, SETUP_STEPS } from '@/contexts/SetupGuideContext';
 import { UserPermissions } from '@/types';
@@ -429,6 +431,10 @@ export default function BusinessPage() {
         return <LeaveApprovalView />;
       case 'talent-management':
         return <TalentManagementView />;
+      case 'regulations':
+        return <RegulationsManagementView />;
+      case 'compliance':
+        return <ComplianceView />;
       default:
         return <DashboardView />;
     }

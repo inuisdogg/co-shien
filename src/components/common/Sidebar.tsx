@@ -58,6 +58,8 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'training': 1,        // 研修・委員会（研修記録＋委員会を統合）
   'incident': 1,        // 事故・苦情報告
   'documents': 1,       // 書類・監査（書類管理＋監査エクスポート＋サービス提供記録を統合）
+  'regulations': 1,     // 規定管理
+  'compliance': 1,      // コンプライアンス
   'facility': 1,        // 施設情報
 
   // Phase 2: 請求・監査・経営
@@ -161,6 +163,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'training', label: '研修・委員会', icon: GraduationCap, permission: 'staff' as const },
         { id: 'incident', label: '事故・苦情報告', icon: AlertTriangle, permission: 'dashboard' as const },
         { id: 'documents', label: '書類・監査', icon: FolderOpen, permission: 'children' as const },
+        { id: 'regulations', label: '規定管理', icon: BookOpen, permission: 'staff' as const },
+        { id: 'compliance', label: 'コンプライアンス', icon: Shield, permission: 'dashboard' as const },
       ],
     },
     {

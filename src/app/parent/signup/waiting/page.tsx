@@ -35,8 +35,14 @@ export default function ClientEmailWaitingPage() {
           })
           .eq('id', session.user.id);
 
-        // ダッシュボードにリダイレクト
-        router.push('/parent');
+        // リダイレクト先を確認（招待フローからの登録の場合）
+        const postSignupRedirect = localStorage.getItem('post_signup_redirect');
+        if (postSignupRedirect) {
+          localStorage.removeItem('post_signup_redirect');
+          router.push(postSignupRedirect);
+        } else {
+          router.push('/parent');
+        }
       }
 
       setChecking(false);
@@ -60,7 +66,14 @@ export default function ClientEmailWaitingPage() {
           })
           .eq('id', session.user.id);
 
-        router.push('/parent');
+        // リダイレクト先を確認（招待フローからの登録の場合）
+        const postSignupRedirect = localStorage.getItem('post_signup_redirect');
+        if (postSignupRedirect) {
+          localStorage.removeItem('post_signup_redirect');
+          router.push(postSignupRedirect);
+        } else {
+          router.push('/parent');
+        }
       }
     });
 

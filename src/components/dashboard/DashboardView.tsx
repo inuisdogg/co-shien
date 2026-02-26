@@ -34,9 +34,14 @@ import {
   ClipboardList,
   MessageSquare,
   UserCog,
+  Award,
+  CalendarClock,
+  Palmtree,
+  LogIn,
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import {
   calculateWeeklyRevenue,
   calculateSlotStatistics,
@@ -79,6 +84,129 @@ const DashboardView: React.FC = () => {
 
   // 変更届通知
   const { pendingNotifications, pendingCount: changeNotificationPendingCount, refetch: refetchChangeNotifications } = useChangeNotifications();
+
+  // ========== 新規管理サマリーウィジェット用のstate ==========
+  const [attendanceSummary, setAttendanceSummary] = useState<{ clockedIn: number; total: number } | null>(null);
+  const [expiringQualifications, setExpiringQualifications] = useState<{ staffName: string; qualName: string; daysLeft: number }[]>([]);
+  const [unacknowledgedRegulations, setUnacknowledgedRegulations] = useState<number>(0);
+  const [paidLeaveAlerts, setPaidLeaveAlerts] = useState<{ staffName: string; daysTaken: number }[]>([]);
+  const [bcpNextReview, setBcpNextReview] = useState<{ title: string; nextDate: string } | null>(null);
+  const [widgetsLoading, setWidgetsLoading] = useState(true);
+
+  // 管理サマリーウィジェットのデータ取得
+  useEffect(() => {
+    if (!facility?.id) return;
+    const fetchWidgets = async () => {
+      setWidgetsLoading(true);
+      try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+        const thirtyDaysStr = thirtyDaysLater.toISOString().split('T')[0];
+
+        // 1. 本日の出退勤状況
+        const { data: staffList } = await supabase
+          .from('employment_records')
+          .select('user_id, users!inner(name)')
+          .eq('facility_id', facility.id)
+          .is('end_date', null);
+
+        const totalStaff = staffList?.length ?? 0;
+
+        const { count: clockedInCount } = await supabase
+          .from('attendance_records')
+          .select('*', { count: 'exact', head: true })
+          .eq('facility_id', facility.id)
+          .eq('date', todayISO)
+          .not('clock_in', 'is', null)
+          .is('clock_out', null);
+
+        setAttendanceSummary({ clockedIn: clockedInCount ?? 0, total: totalStaff });
+
+        // 2. 期限切れ間近の資格
+        const { data: qualData } = await supabase
+          .from('staff_qualifications')
+          .select('qualification_name, expiry_date, user_id, users!inner(name)')
+          .eq('facility_id', facility.id)
+          .lte('expiry_date', thirtyDaysStr)
+          .gte('expiry_date', todayISO)
+          .order('expiry_date', { ascending: true })
+          .limit(5);
+
+        if (qualData) {
+          setExpiringQualifications(
+            qualData.map((q: any) => ({
+              staffName: (q.users as any)?.name ?? '不明',
+              qualName: q.qualification_name,
+              daysLeft: Math.ceil(
+                (new Date(q.expiry_date).getTime() - new Date(todayISO).getTime()) / (1000 * 60 * 60 * 24)
+              ),
+            }))
+          );
+        }
+
+        // 3. 未確認の規定件数
+        const { count: totalRegulations } = await supabase
+          .from('company_regulations')
+          .select('*', { count: 'exact', head: true })
+          .eq('facility_id', facility.id)
+          .eq('is_published', true);
+
+        const { data: ackData } = await supabase
+          .from('regulation_acknowledgments')
+          .select('regulation_id')
+          .eq('facility_id', facility.id);
+
+        const ackedRegIds = new Set((ackData ?? []).map((a: any) => a.regulation_id));
+        const unacked = (totalRegulations ?? 0) > 0
+          ? Math.max(0, (totalRegulations ?? 0) - ackedRegIds.size)
+          : 0;
+        setUnacknowledgedRegulations(unacked);
+
+        // 4. 有給消化率アラート（今年度5日未満の取得者）
+        const fiscalYearStart = new Date().getMonth() >= 3
+          ? `${new Date().getFullYear()}-04-01`
+          : `${new Date().getFullYear() - 1}-04-01`;
+
+        const { data: leaveBalances } = await supabase
+          .from('paid_leave_balances')
+          .select('user_id, used_days, users!inner(name)')
+          .eq('facility_id', facility.id);
+
+        if (leaveBalances) {
+          const alerts = leaveBalances
+            .filter((lb: any) => (lb.used_days ?? 0) < 5)
+            .map((lb: any) => ({
+              staffName: (lb.users as any)?.name ?? '不明',
+              daysTaken: lb.used_days ?? 0,
+            }))
+            .slice(0, 5);
+          setPaidLeaveAlerts(alerts);
+        }
+
+        // 5. BCP次回見直し日
+        const { data: bcpData } = await supabase
+          .from('bcp_plans')
+          .select('title, next_review_date')
+          .eq('facility_id', facility.id)
+          .not('next_review_date', 'is', null)
+          .order('next_review_date', { ascending: true })
+          .limit(1);
+
+        if (bcpData && bcpData.length > 0) {
+          setBcpNextReview({
+            title: bcpData[0].title,
+            nextDate: bcpData[0].next_review_date!,
+          });
+        }
+      } catch (e) {
+        // Silently ignore - widgets will show empty state
+      } finally {
+        setWidgetsLoading(false);
+      }
+    };
+    fetchWidgets();
+  }, [facility?.id]);
 
   // 月次運営確認ウィザード
   const [showOperationsWizard, setShowOperationsWizard] = useState(false);
@@ -841,6 +969,157 @@ const DashboardView: React.FC = () => {
                 </div>
               </button>
             </div>
+          </div>
+
+          {/* ========== 管理サマリーウィジェット ========== */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <ClipboardList size={16} className="text-[#00c4cc]" />
+              管理サマリー
+            </h3>
+            {widgetsLoading ? (
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="bg-gray-50 rounded-xl p-4 animate-pulse">
+                    <div className="h-3 bg-gray-200 rounded w-2/3 mb-3" />
+                    <div className="h-6 bg-gray-200 rounded w-1/2 mb-2" />
+                    <div className="h-2 bg-gray-200 rounded w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                {/* 本日の出退勤状況 */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">出退勤状況</span>
+                    <div className="w-7 h-7 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                      <LogIn size={14} className="text-[#00c4cc]" />
+                    </div>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold text-gray-900">{attendanceSummary?.clockedIn ?? 0}</span>
+                    <span className="text-xs text-gray-500">/ {attendanceSummary?.total ?? 0}名</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">出勤中</p>
+                  {attendanceSummary && attendanceSummary.total > 0 && (
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
+                      <div
+                        className="bg-[#00c4cc] h-1.5 rounded-full transition-all"
+                        style={{ width: `${Math.min((attendanceSummary.clockedIn / attendanceSummary.total) * 100, 100)}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 期限切れ間近の資格 */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">資格期限</span>
+                    <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                      <Award size={14} className="text-amber-500" />
+                    </div>
+                  </div>
+                  {expiringQualifications.length === 0 ? (
+                    <>
+                      <div className="text-2xl font-bold text-emerald-600">0件</div>
+                      <p className="text-[10px] text-gray-400 mt-1">30日以内の期限なし</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold text-amber-600">{expiringQualifications.length}件</div>
+                      <div className="mt-1 space-y-0.5">
+                        {expiringQualifications.slice(0, 2).map((q, i) => (
+                          <p key={i} className="text-[10px] text-amber-700 truncate">
+                            {q.staffName}: {q.qualName}（あと{q.daysLeft}日）
+                          </p>
+                        ))}
+                        {expiringQualifications.length > 2 && (
+                          <p className="text-[10px] text-gray-400">他{expiringQualifications.length - 2}件</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* 未確認の規定件数 */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">未確認規定</span>
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+                      <FileText size={14} className="text-indigo-500" />
+                    </div>
+                  </div>
+                  <div className={`text-2xl font-bold ${unacknowledgedRegulations > 0 ? 'text-indigo-600' : 'text-emerald-600'}`}>
+                    {unacknowledgedRegulations}件
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {unacknowledgedRegulations > 0 ? 'スタッフ未確認あり' : '全員確認済み'}
+                  </p>
+                </div>
+
+                {/* 有給消化率アラート */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">有給消化</span>
+                    <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
+                      <Palmtree size={14} className="text-orange-500" />
+                    </div>
+                  </div>
+                  {paidLeaveAlerts.length === 0 ? (
+                    <>
+                      <div className="text-2xl font-bold text-emerald-600">0名</div>
+                      <p className="text-[10px] text-gray-400 mt-1">全員5日以上取得済</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold text-orange-600">{paidLeaveAlerts.length}名</div>
+                      <p className="text-[10px] text-orange-700 mt-1">年5日未満の取得</p>
+                      <div className="mt-0.5 space-y-0.5">
+                        {paidLeaveAlerts.slice(0, 2).map((a, i) => (
+                          <p key={i} className="text-[10px] text-gray-500 truncate">
+                            {a.staffName}: {a.daysTaken}日
+                          </p>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* BCP次回見直し日 */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">BCP見直し</span>
+                    <div className="w-7 h-7 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                      <CalendarClock size={14} className="text-[#00c4cc]" />
+                    </div>
+                  </div>
+                  {bcpNextReview ? (
+                    <>
+                      <div className="text-lg font-bold text-gray-900">
+                        {new Date(bcpNextReview.nextDate).getMonth() + 1}/{new Date(bcpNextReview.nextDate).getDate()}
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-1 truncate">{bcpNextReview.title}</p>
+                      {(() => {
+                        const daysUntil = Math.ceil(
+                          (new Date(bcpNextReview.nextDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                        );
+                        return (
+                          <p className={`text-[10px] font-medium mt-0.5 ${daysUntil <= 7 ? 'text-red-600' : daysUntil <= 30 ? 'text-amber-600' : 'text-gray-400'}`}>
+                            {daysUntil <= 0 ? '見直し期限超過' : `あと${daysUntil}日`}
+                          </p>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-lg font-bold text-gray-400">-</div>
+                      <p className="text-[10px] text-gray-400 mt-1">BCP計画未登録</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

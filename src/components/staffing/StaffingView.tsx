@@ -16,6 +16,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import WorkScheduleView from './WorkScheduleView';
+import AttendanceOverviewPanel from './AttendanceOverviewPanel';
+import OvertimeDashboardPanel from './OvertimeDashboardPanel';
+import PaidLeaveManagementPanel from './PaidLeaveManagementPanel';
 import {
   StaffPersonnelSettings,
   PersonnelType,
@@ -611,7 +614,10 @@ function OrgChartContent() {
 
 const STAFFING_TABS = [
   { id: 'staffing', label: '人員配置' },
-  { id: 'work-schedule', label: '勤務体制一覧表' },
+  { id: 'attendance', label: '出退勤' },
+  { id: 'overtime', label: '残業・36協定' },
+  { id: 'paid-leave', label: '有給管理' },
+  { id: 'work-schedule', label: '勤務体制一覧' },
   { id: 'org-chart', label: '組織図' },
 ] as const;
 
@@ -622,14 +628,14 @@ export default function StaffingView() {
     <div className="space-y-6">
       {/* Tab Switcher */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-6" aria-label="Tabs">
+        <nav className="flex gap-4 overflow-x-auto" aria-label="Tabs">
           {STAFFING_TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'border-gray-800 text-gray-800'
+                  ? 'border-[#00c4cc] text-gray-800'
                   : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
               }`}
             >
@@ -641,6 +647,9 @@ export default function StaffingView() {
 
       {/* Tab Content */}
       {activeTab === 'staffing' && <StaffingContent />}
+      {activeTab === 'attendance' && <AttendanceOverviewPanel />}
+      {activeTab === 'overtime' && <OvertimeDashboardPanel />}
+      {activeTab === 'paid-leave' && <PaidLeaveManagementPanel />}
       {activeTab === 'work-schedule' && <WorkScheduleView />}
       {activeTab === 'org-chart' && <OrgChartContent />}
     </div>

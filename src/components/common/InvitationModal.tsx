@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Mail, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Mail, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Child } from '@/types';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
@@ -27,17 +27,105 @@ export default function InvitationModal({
 }: InvitationModalProps) {
   const [selectedChildId, setSelectedChildId] = useState('');
   const [sending, setSending] = useState(false);
+  const [useCustomEmail, setUseCustomEmail] = useState(false);
+  const [customEmail, setCustomEmail] = useState('');
+  const [existingInvitation, setExistingInvitation] = useState<any>(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
 
   // 未連携の児童のみフィルタリング
   const unlinkedChildren = childList.filter(c => !c.ownerProfileId);
 
   // 選択中の児童のメールアドレスを取得
   const selectedChild = childList.find(c => c.id === selectedChildId);
-  const selectedEmail = selectedChild?.email || '';
+  const childEmail = selectedChild?.email || '';
+  const effectiveEmail = useCustomEmail ? customEmail.trim().toLowerCase() : childEmail;
+
+  // 児童選択時に既存の招待を確認
+  useEffect(() => {
+    const checkExistingInvitation = async () => {
+      if (!selectedChildId || !facilityId) {
+        setExistingInvitation(null);
+        return;
+      }
+
+      setCheckingExisting(true);
+      try {
+        const { data, error } = await supabase
+          .from('contract_invitations')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .eq('child_id', selectedChildId)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          setExistingInvitation(data);
+        } else {
+          setExistingInvitation(null);
+        }
+      } catch {
+        setExistingInvitation(null);
+      } finally {
+        setCheckingExisting(false);
+      }
+    };
+
+    checkExistingInvitation();
+  }, [selectedChildId, facilityId]);
 
   const handleClose = () => {
     setSelectedChildId('');
+    setUseCustomEmail(false);
+    setCustomEmail('');
+    setExistingInvitation(null);
     onClose();
+  };
+
+  // 再送処理
+  const handleResendInvitation = async () => {
+    if (!existingInvitation) return;
+
+    setSending(true);
+    try {
+      // resend_countとlast_resent_atを更新
+      const { error: updateError } = await supabase
+        .from('contract_invitations')
+        .update({
+          resend_count: (existingInvitation.resend_count || 0) + 1,
+          last_resent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingInvitation.id);
+
+      if (updateError) throw updateError;
+
+      // 招待メールを再送
+      const invitationUrl = `${window.location.origin}/parent/invitations/${existingInvitation.invitation_token}`;
+      try {
+        await fetch('/api/send-contract-invitation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: existingInvitation.email,
+            facilityName: facilityName,
+            childName: selectedChild?.name || existingInvitation.temp_child_name,
+            invitationUrl,
+          }),
+        });
+      } catch (emailError) {
+        console.error('メール再送エラー:', emailError);
+      }
+
+      handleClose();
+      alert('招待を再送しました');
+    } catch (error: any) {
+      console.error('招待再送エラー:', error);
+      alert('招待の再送に失敗しました: ' + error.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleSendInvitation = async () => {
@@ -45,8 +133,8 @@ export default function InvitationModal({
       alert('招待する児童を選択してください');
       return;
     }
-    if (!selectedEmail) {
-      alert('選択した児童にはメールアドレスが登録されていません。児童管理からメールアドレスを追加してください。');
+    if (!effectiveEmail) {
+      alert('メールアドレスを入力してください。児童のメールアドレスがない場合は、手動で入力してください。');
       return;
     }
 
@@ -67,30 +155,29 @@ export default function InvitationModal({
           child_id: selectedChildId,
           temp_child_name: selectedChild.name,
           temp_child_name_kana: selectedChild.nameKana || null,
-          email: selectedEmail.trim().toLowerCase(),
+          email: effectiveEmail,
           invitation_token: invitationToken,
           status: 'pending',
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7日後
           invited_by: userId,
+          resend_count: 0,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // 招待メールを送信
+      // 招待メールを送信（統一URL: /parent/invitations/[token]）
       try {
-        const invitationUrl = `${window.location.origin}/parent/invitation/accept?token=${invitationToken}`;
-        const loginUrl = `${window.location.origin}/login?redirect=/parent/invitation/confirm&token=${invitationToken}`;
+        const invitationUrl = `${window.location.origin}/parent/invitations/${invitationToken}`;
         await fetch('/api/send-contract-invitation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: selectedEmail.trim().toLowerCase(),
+            email: effectiveEmail,
             facilityName: facilityName,
             childName: selectedChild.name,
             invitationUrl,
-            loginUrl, // 既存アカウント用のログインURL
           }),
         });
       } catch (emailError) {
@@ -157,7 +244,11 @@ export default function InvitationModal({
                 <select
                   className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
                   value={selectedChildId}
-                  onChange={(e) => setSelectedChildId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedChildId(e.target.value);
+                    setUseCustomEmail(false);
+                    setCustomEmail('');
+                  }}
                 >
                   <option value="">-- 児童を選択 --</option>
                   {unlinkedChildren.map((child) => (
@@ -172,51 +263,113 @@ export default function InvitationModal({
                 </p>
               </div>
 
-              {/* メールアドレス表示 */}
-              {selectedChildId && (
+              {/* 既存招待が見つかった場合 → 再送ボタン */}
+              {selectedChildId && checkingExisting && (
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-xs text-gray-500">
+                  既存の招待を確認中...
+                </div>
+              )}
+
+              {selectedChildId && !checkingExisting && existingInvitation && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <div className="flex items-start gap-3">
+                    <RefreshCw className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-bold text-blue-800">既に招待が送信済みです</h4>
+                      <p className="text-xs text-blue-700 mt-1">
+                        送信先: {existingInvitation.email}<br />
+                        有効期限: {new Date(existingInvitation.expires_at).toLocaleDateString('ja-JP')}
+                        {existingInvitation.resend_count > 0 && (
+                          <><br />再送回数: {existingInvitation.resend_count}回</>
+                        )}
+                      </p>
+                      <button
+                        onClick={handleResendInvitation}
+                        disabled={sending}
+                        className="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-md transition-colors disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {sending ? (
+                          <>送信中...</>
+                        ) : (
+                          <>
+                            <RefreshCw size={14} />
+                            招待を再送する
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* メールアドレス表示 (既存招待がない場合のみ) */}
+              {selectedChildId && !checkingExisting && !existingInvitation && (
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">
                     招待メール送信先
                   </label>
-                  {selectedEmail ? (
+
+                  {/* 児童のメールアドレスがある場合 */}
+                  {childEmail && !useCustomEmail ? (
                     <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
                       <div className="flex items-center gap-2">
                         <Mail size={16} className="text-orange-500" />
-                        <span className="text-sm font-medium text-gray-800">{selectedEmail}</span>
+                        <span className="text-sm font-medium text-gray-800">{childEmail}</span>
                       </div>
                       <p className="text-xs text-orange-600 mt-2">
                         招待メールをこのアドレスに送信します
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => setUseCustomEmail(true)}
+                        className="text-xs text-blue-500 hover:text-blue-700 mt-2 underline"
+                      >
+                        別のメールアドレスに送信する
+                      </button>
                     </div>
                   ) : (
-                    <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle size={16} className="text-red-500 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-red-700">
-                            メールアドレスが登録されていません
-                          </p>
-                          <p className="text-xs text-red-600 mt-1">
-                            この児童にはメールアドレスが登録されていません。
-                            児童管理画面から保護者のメールアドレスを追加してください。
-                          </p>
-                        </div>
-                      </div>
+                    <div>
+                      <input
+                        type="email"
+                        value={customEmail}
+                        onChange={(e) => setCustomEmail(e.target.value)}
+                        placeholder="保護者のメールアドレスを入力"
+                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                      />
+                      {childEmail && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUseCustomEmail(false);
+                            setCustomEmail('');
+                          }}
+                          className="text-xs text-blue-500 hover:text-blue-700 mt-1 underline"
+                        >
+                          児童登録のメールアドレスを使用する
+                        </button>
+                      )}
+                      {!childEmail && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          この児童にはメールアドレスが登録されていません。保護者のメールアドレスを入力してください。
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
               {/* 招待の流れ */}
-              <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
-                <h4 className="text-xs font-bold text-orange-800 mb-1">招待の流れ</h4>
-                <ol className="text-xs text-orange-700 space-y-1 list-decimal list-inside">
-                  <li>保護者にメールで招待リンクを送信</li>
-                  <li>保護者がリンクからログイン/登録</li>
-                  <li>保護者が児童情報を確認・連携</li>
-                  <li>施設と児童の契約が完了</li>
-                </ol>
-              </div>
+              {selectedChildId && !existingInvitation && (
+                <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                  <h4 className="text-xs font-bold text-orange-800 mb-1">招待の流れ</h4>
+                  <ol className="text-xs text-orange-700 space-y-1 list-decimal list-inside">
+                    <li>保護者にメールで招待リンクを送信</li>
+                    <li>保護者がリンクからログイン/登録</li>
+                    <li>保護者が児童情報を確認・連携</li>
+                    <li>施設と児童の契約が完了</li>
+                  </ol>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -229,15 +382,15 @@ export default function InvitationModal({
           >
             キャンセル
           </button>
-          {unlinkedChildren.length > 0 && (
+          {unlinkedChildren.length > 0 && !existingInvitation && (
             <button
               onClick={handleSendInvitation}
-              disabled={sending || !selectedChildId || !selectedEmail}
+              disabled={sending || !selectedChildId || !effectiveEmail}
               className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-bold shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {sending ? (
                 <>
-                  <span className="animate-spin">⏳</span>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
                   送信中...
                 </>
               ) : (
