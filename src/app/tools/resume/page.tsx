@@ -15,6 +15,7 @@ import {
   FileText,
   Plus,
   X,
+  Camera,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -150,10 +151,12 @@ export default function ResumePage() {
   const [education, setEducation] = useState<TimeEntry[]>([emptyEntry()]);
   const [work, setWork] = useState<TimeEntry[]>([emptyEntry()]);
   const [licenses, setLicenses] = useState<TimeEntry[]>([emptyEntry()]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
   const resumeRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // ----------------------------------------------------------
   // Form handlers
@@ -213,6 +216,35 @@ export default function ResumePage() {
     },
     [],
   );
+
+  // Photo upload handler
+  const handlePhotoUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        alert('画像ファイルを選択してください');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert('ファイルサイズは10MB以下にしてください');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setPhotoUrl(ev.target?.result as string);
+        setGenerated(false);
+      };
+      reader.readAsDataURL(file);
+    },
+    [],
+  );
+
+  const removePhoto = useCallback(() => {
+    setPhotoUrl(null);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+    setGenerated(false);
+  }, []);
 
   // Validation
   const validate = useCallback((): boolean => {
@@ -601,6 +633,58 @@ export default function ResumePage() {
                     className={inputClass()}
                   />
                 </div>
+                {/* 顔写真 */}
+                <div>
+                  <label className={labelClass}>証明写真</label>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    id="photo-upload"
+                  />
+                  {photoUrl ? (
+                    <div className="flex items-start gap-3">
+                      <div className="w-[75px] h-[100px] rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
+                        <img
+                          src={photoUrl}
+                          alt="証明写真"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => photoInputRef.current?.click()}
+                          className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                        >
+                          写真を変更
+                        </button>
+                        <button
+                          type="button"
+                          onClick={removePhoto}
+                          className="text-xs text-red-500 hover:text-red-600 font-medium"
+                        >
+                          写真を削除
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors text-sm text-gray-500 hover:text-indigo-600 w-full"
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span>カメラで撮影 または 写真を選択</span>
+                    </button>
+                  )}
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    スマホのインカメラで撮影、またはギャラリーから選択できます（3×4cm比率で表示）
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -888,7 +972,7 @@ export default function ResumePage() {
                     </tbody>
                   </table>
 
-                  {/* Right: Photo placeholder */}
+                  {/* Right: Photo */}
                   <div
                     style={{
                       width: '113px',
@@ -901,20 +985,33 @@ export default function ResumePage() {
                       justifyContent: 'center',
                       marginLeft: '-1px',
                       backgroundColor: '#fafafa',
+                      overflow: 'hidden',
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: '9px',
-                        color: '#999',
-                        textAlign: 'center',
-                        lineHeight: '1.4',
-                      }}
-                    >
-                      写真
-                      <br />
-                      (3x4cm)
-                    </div>
+                    {photoUrl ? (
+                      <img
+                        src={photoUrl}
+                        alt="証明写真"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          fontSize: '9px',
+                          color: '#999',
+                          textAlign: 'center',
+                          lineHeight: '1.4',
+                        }}
+                      >
+                        写真
+                        <br />
+                        (3x4cm)
+                      </div>
+                    )}
                   </div>
                 </div>
 
