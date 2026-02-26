@@ -29,6 +29,7 @@ import {
   Award,
   Users2,
   Car,
+  Calculator,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -65,6 +66,7 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'facility': 1,        // 施設情報
   'connect': 1,          // 連絡会議
   'transport': 1,         // 送迎管理
+  'upper-limit': 1,      // 上限管理
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
@@ -140,6 +142,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'support-plan', label: '個別支援計画', icon: FileText, permission: 'children' as const },
         { id: 'connect', label: '連絡会議', icon: Users2, permission: 'children' as const },
         { id: 'transport', label: '送迎管理', icon: Car, permission: 'schedule' as const },
+        { id: 'upper-limit', label: '上限管理', icon: Calculator, permission: 'dashboard' as const },
       ],
     },
     {

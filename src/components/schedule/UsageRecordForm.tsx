@@ -265,6 +265,10 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
     instructionForm: '小集団',
     billingTarget: '請求する',
     selfPayItem: '',
+    supportRecord: '',
+    supportGoal: '',
+    childCondition: '',
+    specialNotes: '',
     memo: '',
     recordSheetRemarks: '',
     addonItems: [],
@@ -283,7 +287,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
     { id: 1, label: '出欠確認', icon: ClipboardCheck },
     { id: 2, label: 'サービス内容', icon: Clock },
     { id: 3, label: '加算記録', icon: Plus },
-    { id: 4, label: '備考', icon: FileText },
+    { id: 4, label: '支援記録・備考', icon: FileText },
   ];
 
   // 前回のコピー
@@ -828,9 +832,79 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
           </>
         )}
 
-        {/* ステップ4: 備考 */}
+        {/* ステップ4: 支援記録・備考 */}
         {activeStep === 4 && (
           <>
+            {/* 支援記録セクション（欠席(加算なし)の場合は非表示） */}
+            {formData.serviceStatus !== '欠席(加算なし)' && (
+              <div className="bg-gray-50 rounded-xl p-5 space-y-4 border border-gray-100">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <FileText className="w-5 h-5 text-[#00c4cc]" />
+                  <span className="font-bold">支援記録</span>
+                </div>
+
+                {/* 支援内容 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    支援内容
+                  </label>
+                  <textarea
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    rows={4}
+                    placeholder="本日実施した支援の内容を記録してください"
+                    value={formData.supportRecord || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, supportRecord: e.target.value }))}
+                  />
+                </div>
+
+                {/* 本日の支援目標 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    本日の支援目標
+                  </label>
+                  <textarea
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    rows={2}
+                    placeholder="個別支援計画に基づく本日の目標"
+                    value={formData.supportGoal || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, supportGoal: e.target.value }))}
+                  />
+                </div>
+
+                {/* 児童の様子 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
+                    <Heart className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    児童の様子
+                  </label>
+                  <textarea
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    rows={2}
+                    placeholder="児童の体調・気分・反応等"
+                    value={formData.childCondition || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, childCondition: e.target.value }))}
+                  />
+                </div>
+
+                {/* 特記事項・引継ぎ */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    特記事項・引継ぎ
+                  </label>
+                  <textarea
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    rows={2}
+                    placeholder="次回への引継ぎ事項等"
+                    value={formData.specialNotes || ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, specialNotes: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">メモ</label>
               <textarea

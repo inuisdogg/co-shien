@@ -12,7 +12,9 @@ export type CommitteeType =
   | 'operation_promotion'
   | 'safety'
   | 'infection_control'
-  | 'quality_improvement';
+  | 'quality_improvement'
+  | 'staff_meeting'
+  | 'case_conference';
 
 export type CommitteeRequirement = {
   type: CommitteeType;

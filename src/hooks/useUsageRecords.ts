@@ -60,6 +60,10 @@ export const useUsageRecords = () => {
             instructionForm: row.instruction_form || undefined,
             billingTarget: row.billing_target,
             selfPayItem: row.self_pay_item || undefined,
+            supportRecord: row.support_record || undefined,
+            supportGoal: row.support_goal || undefined,
+            childCondition: row.child_condition || undefined,
+            specialNotes: row.special_notes || undefined,
             memo: row.memo || undefined,
             recordSheetRemarks: row.record_sheet_remarks || undefined,
             addonItems: row.addon_items || [],
@@ -118,6 +122,10 @@ export const useUsageRecords = () => {
           instruction_form: recordData.instructionForm || '個別',
           billing_target: recordData.billingTarget,
           self_pay_item: recordData.selfPayItem || null,
+          support_record: recordData.supportRecord || null,
+          support_goal: recordData.supportGoal || null,
+          child_condition: recordData.childCondition || null,
+          special_notes: recordData.specialNotes || null,
           memo: recordData.memo || null,
           record_sheet_remarks: recordData.recordSheetRemarks || null,
           addon_items: recordData.addonItems || [],
@@ -170,6 +178,10 @@ export const useUsageRecords = () => {
       if (recordData.instructionForm !== undefined) updateData.instruction_form = recordData.instructionForm;
       if (recordData.billingTarget !== undefined) updateData.billing_target = recordData.billingTarget;
       if (recordData.selfPayItem !== undefined) updateData.self_pay_item = recordData.selfPayItem;
+      if (recordData.supportRecord !== undefined) updateData.support_record = recordData.supportRecord;
+      if (recordData.supportGoal !== undefined) updateData.support_goal = recordData.supportGoal;
+      if (recordData.childCondition !== undefined) updateData.child_condition = recordData.childCondition;
+      if (recordData.specialNotes !== undefined) updateData.special_notes = recordData.specialNotes;
       if (recordData.memo !== undefined) updateData.memo = recordData.memo;
       if (recordData.recordSheetRemarks !== undefined) updateData.record_sheet_remarks = recordData.recordSheetRemarks;
       if (recordData.addonItems !== undefined) updateData.addon_items = recordData.addonItems;

@@ -47,6 +47,7 @@ const ComplianceView = dynamicImport(() => import('@/components/compliance/Compl
 const ConnectMeetingView = dynamicImport(() => import('@/components/connect/ConnectMeetingView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const FinanceView = dynamicImport(() => import('@/components/finance/FinanceView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const TransportManagementView = dynamicImport(() => import('@/components/transport/TransportManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const UpperLimitManagementView = dynamicImport(() => import('@/components/upper-limit/UpperLimitManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 
 /**
  * Onboarding welcome screen shown when setup is incomplete.
@@ -438,6 +439,8 @@ export default function BusinessPage() {
         return <ConnectMeetingView />;
       case 'transport':
         return <TransportManagementView />;
+      case 'upper-limit':
+        return <UpperLimitManagementView />;
       default:
         return <DashboardView />;
     }

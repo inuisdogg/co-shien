@@ -18,7 +18,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-type CommitteeType = 'operation_promotion' | 'abuse_prevention' | 'restraint_review' | 'safety' | 'infection_control' | 'quality_improvement' | 'other';
+type CommitteeType = 'operation_promotion' | 'abuse_prevention' | 'restraint_review' | 'safety' | 'infection_control' | 'quality_improvement' | 'staff_meeting' | 'case_conference' | 'other';
 type MeetingType = 'regular' | 'extraordinary';
 type MeetingStatus = 'draft' | 'finalized' | 'approved';
 
@@ -49,6 +49,8 @@ const COMMITTEE_TYPE_LABELS: Record<CommitteeType, string> = {
   safety: '安全委員会',
   infection_control: '感染症対策委員会',
   quality_improvement: '質の改善委員会',
+  staff_meeting: '職員会議',
+  case_conference: 'ケース会議',
   other: 'その他',
 };
 

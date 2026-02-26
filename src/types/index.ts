@@ -753,6 +753,11 @@ export type UsageRecord = {
   billingTarget: '請求する' | '請求しない';
   // 自費項目
   selfPayItem?: string;
+  // 支援記録（フリーフォーマット）
+  supportRecord?: string; // 支援内容の詳細記録
+  supportGoal?: string; // 本日の支援目標
+  childCondition?: string; // 児童の様子・状態
+  specialNotes?: string; // 特記事項・引継ぎ事項
   // メモ
   memo?: string; // 最大2000文字
   // 実績記録票備考
@@ -766,6 +771,40 @@ export type UsageRecord = {
 
 // 利用実績フォームデータ
 export type UsageRecordFormData = Omit<UsageRecord, 'id' | 'facilityId' | 'createdAt' | 'updatedAt'>;
+
+// 上限管理
+export type UpperLimitManagement = {
+  id: string;
+  facilityId: string;
+  childId: string;
+  yearMonth: string; // YYYY-MM
+  managementType: 'none' | 'self' | 'coordinator' | 'managed';
+  upperLimitAmount: number;
+  selfTotalUnits: number;
+  selfCopayAmount: number;
+  selfUsageDays: number;
+  resultType?: 'confirmed' | 'adjusted' | 'pending';
+  adjustedCopayAmount?: number;
+  totalCopayAllFacilities?: number;
+  notes?: string;
+  otherFacilities?: UpperLimitOtherFacility[];
+  childName?: string; // JOIN用
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpperLimitOtherFacility = {
+  id: string;
+  upperLimitId: string;
+  facilityNumber?: string;
+  facilityName: string;
+  totalUnits: number;
+  copayAmount: number;
+  usageDays: number;
+  adjustedCopayAmount?: number;
+  contactPhone?: string;
+  contactFax?: string;
+};
 
 // 連絡帳
 export type ContactLog = {

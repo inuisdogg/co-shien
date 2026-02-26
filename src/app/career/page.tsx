@@ -50,7 +50,6 @@ import WorkExperienceForm from '@/components/personal/WorkExperienceForm';
 import AttendanceCalendar from '@/components/personal/AttendanceCalendar';
 import ShiftConfirmationView from '@/components/personal/ShiftConfirmationView';
 import ShiftAvailabilityForm from '@/components/personal/ShiftAvailabilityForm';
-import LeaveRequestForm from '@/components/personal/LeaveRequestForm';
 import { usePersonalData } from '@/hooks/usePersonalData';
 import { useCareerAccumulation } from '@/hooks/useCareerAccumulation';
 import type { CareerTimelineEvent } from '@/hooks/useCareerAccumulation';
@@ -550,8 +549,6 @@ export default function PersonalDashboardPage() {
   const [shiftConfirmationFacilityId, setShiftConfirmationFacilityId] = useState<string | null>(null);
   const [showShiftAvailabilityForm, setShowShiftAvailabilityForm] = useState(false);
   const [shiftAvailabilityFacility, setShiftAvailabilityFacility] = useState<{ id: string; name: string } | null>(null);
-  const [showLeaveRequest, setShowLeaveRequest] = useState(false);
-  const [leaveRequestFacility, setLeaveRequestFacility] = useState<{ id: string; name: string } | null>(null);
   const [facilitySettings, setFacilitySettings] = useState<Partial<FacilitySettings> | null>(null);
 
   // 本日の利用予定児童（業務タブ用）
@@ -1715,22 +1712,6 @@ export default function PersonalDashboardPage() {
         />
       )}
 
-      {/* 休暇申請モーダル */}
-      {showLeaveRequest && leaveRequestFacility && user && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full max-h-[95vh] overflow-y-auto bg-white rounded-xl">
-            <LeaveRequestForm
-              userId={user.id}
-              facilityId={leaveRequestFacility.id}
-              facilityName={leaveRequestFacility.name}
-              onClose={() => {
-                setShowLeaveRequest(false);
-                setLeaveRequestFacility(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
 
       {activeTab === 'career' && (
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -3413,18 +3394,6 @@ export default function PersonalDashboardPage() {
                       >
                         <Calendar className="w-6 h-6" strokeWidth={1.5} />
                         <span className="text-xs font-medium">勤怠カレンダー</span>
-                      </button>
-
-                      {/* 休暇申請 */}
-                      <button
-                        onClick={() => {
-                          setLeaveRequestFacility({ id: facility.facilityId, name: facility.facilityName });
-                          setShowLeaveRequest(true);
-                        }}
-                        className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
-                      >
-                        <FileText className="w-6 h-6" strokeWidth={1.5} />
-                        <span className="text-xs font-medium">休暇申請</span>
                       </button>
 
                       {/* 施設管理（権限を持つスタッフのみ） */}

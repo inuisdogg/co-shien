@@ -152,6 +152,8 @@ const COMMITTEE_TYPE_LABELS: Record<string, string> = {
   safety: '安全委員会',
   infection_control: '感染症対策委員会',
   quality_improvement: '質の改善委員会',
+  staff_meeting: '職員会議',
+  case_conference: 'ケース会議',
   other: 'その他',
 };
 
