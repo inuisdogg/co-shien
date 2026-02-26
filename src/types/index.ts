@@ -1506,14 +1506,29 @@ export type DailyTransportAssignment = {
   id: string;
   facilityId: string;
   date: string;               // YYYY-MM-DD
-  driverStaffId: string;      // 運転手
-  attendantStaffId: string;   // 添乗員
+  // レガシー（送迎共通）
+  driverStaffId?: string;
+  attendantStaffId?: string;
+  // 迎え担当
+  pickupDriverStaffId?: string;
+  pickupAttendantStaffId?: string;
+  // 送り担当
+  dropoffDriverStaffId?: string;
+  dropoffAttendantStaffId?: string;
+  // 追加情報
+  vehicleInfo?: string;
+  pickupTime?: string;
+  dropoffTime?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  // 拡張情報（JOINで取得）
+  // JOIN情報
   driverName?: string;
   attendantName?: string;
+  pickupDriverName?: string;
+  pickupAttendantName?: string;
+  dropoffDriverName?: string;
+  dropoffAttendantName?: string;
 };
 
 // 送迎完了チェック記録

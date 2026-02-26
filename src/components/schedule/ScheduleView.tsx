@@ -11,6 +11,7 @@ import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import SlotAssignmentPanel from './SlotAssignmentPanel';
+import TransportAssignmentPanel from './TransportAssignmentPanel';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
 // 利用申請の型
@@ -178,6 +179,9 @@ const ScheduleView: React.FC = () => {
       setProcessingRequestId(null);
     }
   };
+
+  // 利用予約 / 送迎体制 切替タブ
+  const [scheduleTab, setScheduleTab] = useState<'reservation' | 'transport'>('reservation');
 
   const [viewFormat, setViewFormat] = useState<'month' | 'week'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -693,8 +697,44 @@ const ScheduleView: React.FC = () => {
 
   return (
     <div className="h-[calc(100vh-100px)] sm:h-[calc(100vh-100px)] animate-in fade-in duration-500">
+      {/* タブ切替: 利用予約 / 送迎体制 */}
+      <div className="flex items-center gap-1 mb-2">
+        <button
+          onClick={() => setScheduleTab('reservation')}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+            scheduleTab === 'reservation'
+              ? 'text-[#00c4cc] border-[#00c4cc] bg-white'
+              : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <CalendarDays className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
+          利用予約
+        </button>
+        <button
+          onClick={() => setScheduleTab('transport')}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+            scheduleTab === 'transport'
+              ? 'text-[#00c4cc] border-[#00c4cc] bg-white'
+              : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Car className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
+          送迎体制
+        </button>
+      </div>
+
+      {/* 送迎体制タブ */}
+      {scheduleTab === 'transport' && (
+        <div className="h-[calc(100%-44px)] bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden p-4">
+          <TransportAssignmentPanel />
+        </div>
+      )}
+
+      {/* 利用予約タブ (既存コンテンツ) */}
+      {scheduleTab === 'reservation' && (
+      <>
       {/* Calendar Panel */}
-      <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="h-[calc(100%-44px)] flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-white z-10">
           <div className="flex items-center space-x-2 sm:space-x-4 flex-wrap">
             <div className="flex bg-gray-100 p-1 rounded">
@@ -1503,6 +1543,8 @@ const ScheduleView: React.FC = () => {
         </div>
       )}
 
+      </>
+      )}
     </div>
   );
 };
