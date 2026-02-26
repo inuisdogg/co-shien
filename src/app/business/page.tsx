@@ -34,7 +34,6 @@ import TalentManagementView from '@/components/talent/TalentManagementView';
 import RegulationsManagementView from '@/components/regulations/RegulationsManagementView';
 import ComplianceView from '@/components/compliance/ComplianceView';
 import ConnectMeetingView from '@/components/connect/ConnectMeetingView';
-import TransportManagementView from '@/components/transport/TransportManagementView';
 import { useAuth } from '@/contexts/AuthContext';
 import { SetupGuideProvider, useSetupGuide, SETUP_STEPS } from '@/contexts/SetupGuideContext';
 import { UserPermissions } from '@/types';
@@ -49,6 +48,11 @@ const DynamicLoadingSpinner = () => (
 
 const FinanceView = dynamicImport(
   () => import('@/components/finance/FinanceView'),
+  { ssr: false, loading: DynamicLoadingSpinner }
+);
+
+const TransportManagementView = dynamicImport(
+  () => import('@/components/transport/TransportManagementView'),
   { ssr: false, loading: DynamicLoadingSpinner }
 );
 
