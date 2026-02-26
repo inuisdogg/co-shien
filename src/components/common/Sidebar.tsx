@@ -30,6 +30,7 @@ import {
   Users2,
   Car,
   Calculator,
+  Briefcase,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -67,6 +68,7 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'connect': 1,          // 連絡会議
   'transport': 1,         // 送迎管理
   'upper-limit': 1,      // 上限管理
+  'recruitment': 1,       // 採用・求人
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
@@ -154,6 +156,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'staffing', label: '勤務・配置', icon: Shield, permission: 'staff' as const },
         { id: 'leave-approval', label: '休暇管理', icon: CalendarMinus, permission: 'staff' as const },
         { id: 'talent-management', label: 'タレントマネジメント', icon: Award, permission: 'staff' as const },
+      ],
+    },
+    {
+      category: '採用',
+      icon: Briefcase,
+      items: [
+        { id: 'recruitment', label: '採用・求人', icon: Briefcase, permission: 'recruitment' as const },
       ],
     },
     {

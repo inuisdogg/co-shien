@@ -149,6 +149,9 @@ export type UserPermissions = {
   expenseManagement?: boolean;// 経費管理
   management?: boolean;       // 経営設定
 
+  // 採用
+  recruitment?: boolean;      // 採用・求人管理
+
   // 設定
   facility?: boolean;         // 施設情報
 
@@ -166,6 +169,7 @@ export const PERMISSION_CATEGORIES = {
   'スタッフ管理': ['staff', 'shift', 'training'] as PermissionKey[],
   '運営管理': ['auditPreparation', 'committee', 'documents'] as PermissionKey[],
   '売上・経営管理': ['dashboard', 'profitLoss', 'cashFlow', 'expenseManagement', 'management'] as PermissionKey[],
+  '採用': ['recruitment'] as PermissionKey[],
   '設定': ['facility'] as PermissionKey[],
   'キャリアアプリ': ['facilityManagement'] as PermissionKey[],
 } as const;
@@ -193,6 +197,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   cashFlow: 'キャッシュフロー',
   expenseManagement: '経費管理',
   management: '経営設定',
+  recruitment: '採用・求人管理',
   facility: '施設情報',
   facilityManagement: '施設管理画面アクセス',
 };
@@ -2398,4 +2403,101 @@ export interface StaffQualification {
   created_at: string;
   updated_at: string;
 }
+
+// ==========================================
+// 求人・人材紹介
+// ==========================================
+
+export type JobType = 'full_time' | 'part_time' | 'spot';
+export type JobStatus = 'draft' | 'published' | 'closed' | 'filled';
+export type SalaryType = 'monthly' | 'hourly' | 'daily' | 'annual';
+export type ApplicationStatus = 'applied' | 'screening' | 'interview_scheduled' | 'interviewed' | 'offer_sent' | 'offer_accepted' | 'hired' | 'rejected' | 'withdrawn';
+export type PaymentStatus = 'pending' | 'invoiced' | 'paid' | 'overdue' | 'refunded' | 'cancelled';
+
+export type JobPosting = {
+  id: string;
+  facilityId: string;
+  jobType: JobType;
+  title: string;
+  description?: string;
+  requiredQualifications: string[];
+  preferredQualifications: string[];
+  experienceYearsMin: number;
+  employmentType?: string;
+  workLocation?: string;
+  workHours?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryType?: SalaryType;
+  benefits?: string;
+  annualSalaryEstimate?: number;
+  spotsNeeded: number;
+  status: JobStatus;
+  publishedAt?: string;
+  closesAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  facilityName?: string;
+  facilityAddress?: string;
+};
+
+export type SpotWorkShift = {
+  id: string;
+  jobPostingId: string;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+  roleNeeded?: string;
+  hourlyRate?: number;
+  spotsAvailable: number;
+  spotsFilled: number;
+  status: 'open' | 'filled' | 'cancelled' | 'completed';
+  notes?: string;
+  createdAt: string;
+};
+
+export type JobApplication = {
+  id: string;
+  jobPostingId: string;
+  spotShiftId?: string;
+  applicantUserId: string;
+  status: ApplicationStatus;
+  coverMessage?: string;
+  resumeUrl?: string;
+  interviewDate?: string;
+  interviewNotes?: string;
+  facilityRating?: number;
+  facilityNotes?: string;
+  hiredAt?: string;
+  startDate?: string;
+  agreedSalary?: number;
+  createdAt: string;
+  updatedAt: string;
+  applicantName?: string;
+  applicantEmail?: string;
+  applicantQualifications?: string[];
+  jobTitle?: string;
+  jobType?: JobType;
+};
+
+export type Placement = {
+  id: string;
+  jobApplicationId: string;
+  facilityId: string;
+  workerUserId: string;
+  jobType: JobType;
+  agreedSalary: number;
+  feeRate: number;
+  feeAmount: number;
+  stripeInvoiceId?: string;
+  stripePaymentIntentId?: string;
+  paymentStatus: PaymentStatus;
+  paidAt?: string;
+  placementDate: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  workerName?: string;
+  facilityName?: string;
+};
 

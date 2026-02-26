@@ -21,6 +21,7 @@
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@simplewebauthn/server": "^13.2.2",
+    "@stripe/stripe-js": "^8.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@tiptap/extension-bubble-menu": "^3.18.0",
     "@tiptap/extension-code-block-lowlight": "^3.18.0",
@@ -54,6 +55,7 @@
     "recharts": "^2.10.3",
     "remark-gfm": "^4.0.1",
     "resend": "^6.6.0",
+    "stripe": "^20.4.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

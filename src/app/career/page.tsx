@@ -42,7 +42,8 @@ import {
   Megaphone,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { User as UserType, EmploymentRecord, FacilitySettings, WorkToolId } from '@/types';
+import { User as UserType, EmploymentRecord, FacilitySettings, WorkToolId, QUALIFICATION_CODES, type QualificationCode } from '@/types';
+import { calculateMatchScore, type MatchScore } from '@/lib/jobMatcher';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import { getBizBaseUrl } from '@/utils/domain';
 import { Shield, Download, Loader2, Eye, TrendingUp, GraduationCap, Hash, ChevronDown, ChevronUp } from 'lucide-react';
@@ -489,6 +490,256 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
               </div>
             );
           })}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ========== おすすめ求人セクション ==========
+const JOB_TYPE_LABELS: Record<string, string> = {
+  full_time: '正社員',
+  part_time: 'パート・アルバイト',
+  spot: 'スポット勤務',
+};
+const SALARY_TYPE_LABELS: Record<string, string> = {
+  monthly: '月給',
+  hourly: '時給',
+  daily: '日給',
+  annual: '年収',
+};
+
+type RecommendedJob = {
+  id: string;
+  title: string;
+  jobType: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryType?: string;
+  requiredQualifications: string[];
+  facilityName?: string;
+  score: number;
+  matchReasons: string[];
+};
+
+function RecommendedJobsSection({ userId }: { userId?: string }) {
+  const router = useRouter();
+  const [jobs, setJobs] = useState<RecommendedJob[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    const fetchRecommended = async () => {
+      setLoading(true);
+      try {
+        // ユーザーの資格を取得
+        const { data: userData } = await supabase
+          .from('users')
+          .select('qualifications')
+          .eq('id', userId)
+          .single();
+
+        // staff テーブルから経験年数を取得
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('years_of_experience')
+          .eq('user_id', userId)
+          .order('years_of_experience', { ascending: false })
+          .limit(1);
+
+        const userQualifications: string[] = userData
+          ? Array.isArray(userData.qualifications)
+            ? userData.qualifications
+            : typeof userData.qualifications === 'string' && userData.qualifications
+              ? userData.qualifications.split(',').map((q: string) => q.trim())
+              : []
+          : [];
+
+        const userExperienceYears =
+          staffData && staffData.length > 0
+            ? Number(staffData[0].years_of_experience) || 0
+            : 0;
+
+        // 公開中の求人を取得（施設名含む）
+        const { data: jobData } = await supabase
+          .from('job_postings')
+          .select('id, title, job_type, salary_min, salary_max, salary_type, required_qualifications, preferred_qualifications, experience_years_min, facility_id, facilities(id, name)')
+          .eq('status', 'published');
+
+        if (!jobData) {
+          setJobs([]);
+          return;
+        }
+
+        // スコア計算してソート
+        const scored = jobData
+          .map((job: Record<string, unknown>) => {
+            const facility = job.facilities as Record<string, unknown> | null;
+            const { score, reasons } = calculateMatchScore(
+              userQualifications,
+              userExperienceYears,
+              {
+                requiredQualifications: (job.required_qualifications as string[]) || [],
+                preferredQualifications: (job.preferred_qualifications as string[]) || [],
+                experienceYearsMin: Number(job.experience_years_min) || 0,
+              }
+            );
+            return {
+              id: job.id as string,
+              title: job.title as string,
+              jobType: job.job_type as string,
+              salaryMin: job.salary_min != null ? Number(job.salary_min) : undefined,
+              salaryMax: job.salary_max != null ? Number(job.salary_max) : undefined,
+              salaryType: (job.salary_type as string) || undefined,
+              requiredQualifications: (job.required_qualifications as string[]) || [],
+              facilityName: facility ? (facility.name as string) : undefined,
+              score,
+              matchReasons: reasons,
+            };
+          })
+          .filter((j) => j.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5);
+
+        setJobs(scored);
+      } catch (e) {
+        console.error('おすすめ求人の取得エラー:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRecommended();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Briefcase className="w-5 h-5 text-[#818CF8]" />
+          <h2 className="text-lg font-bold text-gray-800">おすすめ求人</h2>
+        </div>
+        <div className="flex items-center justify-center py-6">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+        </div>
+      </div>
+    );
+  }
+
+  // 未ログイン
+  if (!userId) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+      >
+        <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <Briefcase className="w-5 h-5 text-[#818CF8]" />
+          おすすめ求人
+        </h2>
+        <div className="text-center py-6">
+          <Briefcase className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+          <p className="text-sm text-gray-500 mb-3">ログインしておすすめ求人を見る</p>
+          <button
+            onClick={() => router.push('/login')}
+            className="px-4 py-2 bg-[#818CF8] text-white text-sm font-bold rounded-lg hover:bg-[#6366F1] transition-colors"
+          >
+            ログイン
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.6 }}
+      className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+    >
+      <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <Briefcase className="w-5 h-5 text-[#818CF8]" />
+        おすすめ求人
+      </h2>
+      {jobs.length === 0 ? (
+        <div className="text-center py-6">
+          <Briefcase className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+          <p className="text-sm text-gray-500 mb-3">マッチする求人が見つかりませんでした</p>
+          <button
+            onClick={() => router.push('/jobs')}
+            className="px-4 py-2 bg-[#818CF8] text-white text-sm font-bold rounded-lg hover:bg-[#6366F1] transition-colors"
+          >
+            求人を探す
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {jobs.map((job) => {
+            const salaryTypeLabel = job.salaryType ? SALARY_TYPE_LABELS[job.salaryType] || '' : '';
+            let salaryText = '要相談';
+            if (job.salaryMin != null && job.salaryMax != null) {
+              salaryText = `${salaryTypeLabel} ${job.salaryMin.toLocaleString()}円〜${job.salaryMax.toLocaleString()}円`;
+            } else if (job.salaryMin != null) {
+              salaryText = `${salaryTypeLabel} ${job.salaryMin.toLocaleString()}円〜`;
+            } else if (job.salaryMax != null) {
+              salaryText = `${salaryTypeLabel} 〜${job.salaryMax.toLocaleString()}円`;
+            }
+
+            // マッチスコアに応じた色
+            const scoreColor =
+              job.score >= 60 ? 'bg-emerald-100 text-emerald-700' :
+              job.score >= 30 ? 'bg-[#818CF8]/10 text-[#818CF8]' :
+              'bg-gray-100 text-gray-600';
+
+            return (
+              <button
+                key={job.id}
+                onClick={() => router.push(`/jobs/${job.id}`)}
+                className="w-full text-left p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-[#818CF8] hover:shadow-sm transition-all"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="font-bold text-gray-800 text-sm">{job.title}</h3>
+                  <span className={`shrink-0 text-xs font-bold px-2 py-1 rounded ${scoreColor}`}>
+                    {job.score}pt
+                  </span>
+                </div>
+                {job.facilityName && (
+                  <p className="text-xs text-gray-500 mb-2">{job.facilityName}</p>
+                )}
+                <div className="flex items-center flex-wrap gap-2 mb-2">
+                  <span className="text-xs px-2 py-0.5 rounded bg-[#818CF8] text-white font-bold">
+                    {JOB_TYPE_LABELS[job.jobType] || job.jobType}
+                  </span>
+                  <span className="text-xs text-gray-600">{salaryText}</span>
+                </div>
+                {job.requiredQualifications.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {job.requiredQualifications.map((q, i) => (
+                      <span
+                        key={i}
+                        className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600"
+                      >
+                        {QUALIFICATION_CODES[q as QualificationCode] || q}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+          <div className="text-center pt-2">
+            <button
+              onClick={() => router.push('/jobs')}
+              className="text-sm text-[#818CF8] hover:underline font-bold"
+            >
+              すべての求人を見る &rarr;
+            </button>
+          </div>
         </div>
       )}
     </motion.div>
@@ -1647,6 +1898,9 @@ export default function PersonalDashboardPage() {
 
         {/* ========== 有給残日数表示セクション ========== */}
         <CareerPaidLeaveBalance userId={user?.id} activeEmployments={activeEmployments} />
+
+        {/* ========== おすすめ求人セクション ========== */}
+        <RecommendedJobsSection userId={user?.id} />
       </div>
       )}
 
