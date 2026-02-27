@@ -2034,13 +2034,30 @@ export const QUALIFICATION_CODES = {
   OT: '作業療法士',
   ST: '言語聴覚士',
   PSYCHOLOGIST: '公認心理師',
+  CLINICAL_PSYCHOLOGIST: '臨床心理士',
   VISION_TRAINER: '視能訓練士',
   NURSE: '看護師',
+  ASSOCIATE_NURSE: '准看護師',
   PUBLIC_HEALTH_NURSE: '保健師',
   NURSERY_TEACHER: '保育士',
   CHILD_INSTRUCTOR: '児童指導員',
+  CHILD_DEVELOPMENT_MANAGER: '児童発達支援管理責任者',
+  SERVICE_MANAGER: 'サービス管理責任者',
+  CONSULTATION_SPECIALIST: '相談支援専門員',
   SOCIAL_WORKER: '社会福祉士',
+  PSYCHIATRIC_SOCIAL_WORKER: '精神保健福祉士',
   CARE_WORKER: '介護福祉士',
+  DIETITIAN: '管理栄養士',
+  NUTRITIONIST: '栄養士',
+  JUDO_THERAPIST: '柔道整復師',
+  ORTHOPTIST: '視能訓練士',
+  PROSTHETIST: '義肢装具士',
+  MUSIC_THERAPIST: '音楽療法士',
+  BEHAVIOR_SUPPORT_SPECIALIST: '強度行動障害支援者',
+  MEDICAL_CARE_CHILD_SUPPORT: '医療的ケア児支援者',
+  DEVELOPMENT_DISORDER_SV: '発達障害支援スーパーバイザー',
+  DRIVERS_LICENSE: '普通自動車運転免許',
+  // Legacy alias (kept for backward compatibility)
   PSYCH_WELFARE_WORKER: '精神保健福祉士',
 } as const;
 
@@ -2518,5 +2535,105 @@ export type JobFavorite = {
   userId: string;
   jobPostingId: string;
   createdAt: string;
+};
+
+// ==========================================
+// 施設タイプ・レビュー・スカウト・面接・通知
+// ==========================================
+
+export type FacilityType =
+  | 'child_development_support'
+  | 'after_school_day'
+  | 'severe_disability'
+  | 'employment_transition'
+  | 'employment_continuation_a'
+  | 'employment_continuation_b'
+  | 'residential'
+  | 'home_care'
+  | 'group_home'
+  | 'consultation_support';
+
+export type CertificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+
+export type FacilityReview = {
+  id: string;
+  facilityId: string;
+  userId: string;
+  jobApplicationId?: string;
+  rating: number;
+  workLifeBalance?: number;
+  staffRelations?: number;
+  growthOpportunity?: number;
+  management?: number;
+  title?: string;
+  pros?: string;
+  cons?: string;
+  isAnonymous: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+  // joined
+  userName?: string;
+};
+
+export type ScoutMessage = {
+  id: string;
+  facilityId: string;
+  senderUserId: string;
+  targetUserId: string;
+  jobPostingId?: string;
+  subject: string;
+  message: string;
+  status: 'sent' | 'read' | 'replied' | 'declined';
+  readAt?: string;
+  repliedAt?: string;
+  createdAt: string;
+  // joined
+  facilityName?: string;
+  jobTitle?: string;
+  senderName?: string;
+};
+
+export type InterviewSlot = {
+  id: string;
+  jobApplicationId: string;
+  proposedBy: 'facility' | 'applicant';
+  proposedDatetime: string;
+  durationMinutes: number;
+  format: 'in_person' | 'online' | 'phone';
+  location?: string;
+  meetingUrl?: string;
+  status: 'proposed' | 'accepted' | 'declined' | 'cancelled';
+  notes?: string;
+  createdAt: string;
+};
+
+export type AppNotification = {
+  id: string;
+  userId: string;
+  type: 'new_application' | 'application_status' | 'new_message' | 'scout' | 'interview_proposed' | 'interview_confirmed' | 'new_review' | 'job_match';
+  title: string;
+  body?: string;
+  data?: Record<string, unknown>;
+  read: boolean;
+  createdAt: string;
+};
+
+export type NotificationPreferences = {
+  id: string;
+  userId: string;
+  emailNewApplication: boolean;
+  emailNewMessage: boolean;
+  emailStatusChange: boolean;
+  emailScout: boolean;
+  emailJobMatch: boolean;
+  pushEnabled: boolean;
+  pushNewApplication: boolean;
+  pushNewMessage: boolean;
+  pushStatusChange: boolean;
+  pushScout: boolean;
+  pushJobMatch: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 

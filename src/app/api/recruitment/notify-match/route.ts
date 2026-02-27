@@ -149,6 +149,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'メール送信に失敗しました' }, { status: 500 });
     }
 
+    // アプリ内通知を作成（ユーザー向け）
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: 'job_match',
+      title: `おすすめ求人が${jobs.length}件あります`,
+      body: jobs.length === 1
+        ? `「${jobs[0].title}」があなたにマッチしています`
+        : `「${jobs[0].title}」など${jobs.length}件の求人があなたにマッチしています`,
+      data: { jobPostingIds },
+      read: false,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error('notify-match error:', error);

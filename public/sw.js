@@ -2,7 +2,7 @@
 // バージョン管理: デプロイごとにこのファイルの内容が変更されることで、ブラウザが新しいバージョンとして認識
 // このファイルを編集するたびに、ブラウザは新しいService Workerとして認識する
 // バージョン番号を手動で更新するか、ビルド時に自動生成する
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE_NAME = `roots-${CACHE_VERSION}`;
 // 重要: HTMLページ(/)はキャッシュしない - 常に最新を取得するため
 const urlsToCache = [
@@ -110,53 +110,62 @@ self.addEventListener('fetch', (event) => {
 });
 
 // Push event: サーバーからプッシュ通知を受信した時
-self.addEventListener('push', (event) => {
-  let data = { title: 'Roots', body: '新しい通知があります', url: '/parent/dashboard' };
+// データ形式: { title, body, data: { url, ... }, tag }
+self.addEventListener('push', function(event) {
+  var data = {};
 
   if (event.data) {
     try {
-      data = { ...data, ...event.data.json() };
+      data = event.data.json();
     } catch (e) {
-      data.body = event.data.text();
+      // JSONパースに失敗した場合はテキストをbodyとして使用
+      data = { body: event.data.text() };
     }
   }
 
-  const options = {
-    body: data.body,
-    icon: '/favicon.png',
-    badge: '/favicon.png',
-    tag: 'roots-notification',
+  var title = data.title || 'Roots';
+  var options = {
+    body: data.body || '新しい通知があります',
+    icon: '/logo-cropped-center.png',
+    badge: '/logo-cropped-center.png',
+    data: data.data || {},
+    tag: data.tag || 'default',
     renotify: true,
-    data: { url: data.url || '/parent/dashboard' },
     actions: [
       { action: 'open', title: '開く' },
     ],
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // Notification click: 通知をクリックした時
-self.addEventListener('notificationclick', (event) => {
+// data.url がある場合はそのURLを開く。既にウィンドウが開いていればフォーカスする
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
 
-  const url = event.notification.data?.url || '/parent/dashboard';
+  var data = event.notification.data || {};
+  var url = data.url || '/';
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // 既に開いているウィンドウがあればフォーカス
-      for (const client of windowClients) {
-        if (client.url.includes('/parent') && 'focus' in client) {
-          client.navigate(url);
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      // 既にそのURLを含むウィンドウが開いていればフォーカス
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url.includes(url) && 'focus' in client) {
           return client.focus();
         }
       }
-      // なければ新しいウィンドウを開く
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
+      // 既存ウィンドウがあればそこにナビゲート
+      for (var j = 0; j < clientList.length; j++) {
+        var existingClient = clientList[j];
+        if ('navigate' in existingClient && 'focus' in existingClient) {
+          existingClient.navigate(url);
+          return existingClient.focus();
+        }
       }
+      // なければ新しいウィンドウを開く
+      return clients.openWindow(url);
     })
   );
 });

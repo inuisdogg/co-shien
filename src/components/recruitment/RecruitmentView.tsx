@@ -26,8 +26,11 @@ import {
   Trash2,
   Copy,
   Send,
+  BarChart3,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { useRecruitment } from '@/hooks/useRecruitment';
 import {
   JobPosting,
@@ -43,6 +46,8 @@ import {
   QualificationCode,
 } from '@/types';
 import jsPDF from 'jspdf';
+import InterviewScheduler from '@/components/recruitment/InterviewScheduler';
+import RecruitmentAnalyticsView from '@/components/recruitment/RecruitmentAnalyticsView';
 
 // ================================================================
 // Constants & Labels
@@ -128,12 +133,13 @@ const KANBAN_COLUMNS: { key: string; label: string; statuses: ApplicationStatus[
 ];
 
 // Tab definitions
-type TabKey = 'postings' | 'spot' | 'applications' | 'placements';
+type TabKey = 'postings' | 'spot' | 'applications' | 'placements' | 'analytics';
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'postings', label: '求人管理', icon: Briefcase },
   { key: 'spot', label: 'スポットワーク', icon: Clock },
   { key: 'applications', label: '応募管理', icon: Users },
   { key: 'placements', label: '成約・請求', icon: DollarSign },
+  { key: 'analytics', label: '分析', icon: BarChart3 },
 ];
 
 // Qualification options for multi-select
@@ -302,8 +308,19 @@ export default function RecruitmentView() {
   const [sendingReply, setSendingReply] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
+  // ---- Interview Scheduler state ----
+  const [showInterviewScheduler, setShowInterviewScheduler] = useState(false);
+  const [schedulerAppId, setSchedulerAppId] = useState('');
+  const [schedulerAppName, setSchedulerAppName] = useState('');
+
   // ---- Tab 4: Placements state ----
   // (uses placements from hook)
+
+  // ---- Certification state ----
+  const [facilityCertificationStatus, setFacilityCertificationStatus] = useState<string>('unverified');
+
+  // ---- Unread message counts state ----
+  const [unreadByApp, setUnreadByApp] = useState<Record<string, number>>({});
 
   // ---- Data fetching ----
   useEffect(() => {
@@ -311,7 +328,42 @@ export default function RecruitmentView() {
     fetchJobPostings();
     fetchApplications();
     fetchPlacements();
+
+    // 施設の認証ステータスを取得
+    (async () => {
+      const { data } = await supabase
+        .from('facilities')
+        .select('certification_status')
+        .eq('id', facilityId)
+        .single();
+      if (data?.certification_status) {
+        setFacilityCertificationStatus(data.certification_status);
+      }
+    })();
   }, [facilityId, fetchJobPostings, fetchApplications, fetchPlacements]);
+
+  // Fetch unread message counts for applications
+  useEffect(() => {
+    if (!user?.id || applications.length === 0) return;
+    (async () => {
+      try {
+        const appIds = applications.map(a => a.id);
+        const { data: msgData } = await supabase
+          .from('recruitment_messages')
+          .select('id, job_application_id')
+          .in('job_application_id', appIds)
+          .neq('sender_user_id', user.id)
+          .is('read_at', null);
+
+        const counts: Record<string, number> = {};
+        for (const msg of (msgData || []) as Record<string, unknown>[]) {
+          const appId = msg.job_application_id as string;
+          counts[appId] = (counts[appId] || 0) + 1;
+        }
+        setUnreadByApp(counts);
+      } catch { /* ignore */ }
+    })();
+  }, [user?.id, applications]);
 
   useEffect(() => {
     if (activeTab === 'spot' && facilityId) {
@@ -1559,7 +1611,7 @@ export default function RecruitmentView() {
                             const { supabase: sb } = await import('@/lib/supabase');
                             const { data: msgs } = await sb
                               .from('recruitment_messages')
-                              .select('id, sender_type, content, created_at')
+                              .select('id, sender_type, sender_user_id, content, created_at')
                               .eq('job_application_id', app.id)
                               .order('created_at', { ascending: true });
                             setAppMessages((msgs || []).map((m: Record<string, unknown>) => ({
@@ -1568,14 +1620,37 @@ export default function RecruitmentView() {
                               content: m.content as string,
                               createdAt: m.created_at as string,
                             })));
+                            // Mark applicant messages as read
+                            if (user?.id) {
+                              await sb
+                                .from('recruitment_messages')
+                                .update({ read_at: new Date().toISOString() })
+                                .eq('job_application_id', app.id)
+                                .neq('sender_user_id', user.id)
+                                .is('read_at', null);
+                              // Clear unread badge for this application
+                              setUnreadByApp(prev => {
+                                const next = { ...prev };
+                                delete next[app.id];
+                                return next;
+                              });
+                            }
                           } catch { /* ignore */ }
                           setLoadingMessages(false);
                         }}
-                        className="w-full bg-white rounded-lg p-3 shadow-sm border border-gray-100 text-left hover:shadow-md transition-shadow"
+                        className="w-full bg-white rounded-lg p-3 shadow-sm border border-gray-100 text-left hover:shadow-md transition-shadow relative"
                       >
-                        <p className="text-sm font-medium text-gray-800 truncate">
-                          {app.applicantName || '名前未設定'}
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-800 truncate">
+                            {app.applicantName || '名前未設定'}
+                          </p>
+                          {(unreadByApp[app.id] || 0) > 0 && (
+                            <span className="inline-flex items-center gap-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 ml-1 shrink-0">
+                              <MessageCircle className="w-2.5 h-2.5" />
+                              {unreadByApp[app.id]}
+                            </span>
+                          )}
+                        </div>
                         {app.applicantQualifications && app.applicantQualifications.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {app.applicantQualifications.slice(0, 2).map(q => (
@@ -1604,7 +1679,15 @@ export default function RecruitmentView() {
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                  <h2 className="text-lg font-bold text-gray-800">応募詳細</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-gray-800">応募詳細</h2>
+                    {facilityCertificationStatus === 'verified' && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                        <CheckCircle className="w-3 h-3" />
+                        認証済み
+                      </span>
+                    )}
+                  </div>
                   <button
                     onClick={() => { setShowApplicationDetail(false); setSelectedApplication(null); }}
                     className="p-2 hover:bg-gray-100 rounded-lg"
@@ -1866,6 +1949,44 @@ export default function RecruitmentView() {
                       メモ保存
                     </button>
 
+                    {/* スカウト送信 */}
+                    <button
+                      onClick={() => {
+                        const subject = prompt('スカウトの件名を入力:');
+                        if (!subject) return;
+                        const message = prompt('スカウトメッセージを入力:');
+                        if (!message) return;
+                        supabase.from('scout_messages').insert({
+                          facility_id: facilityId,
+                          sender_user_id: user?.id || '',
+                          target_user_id: selectedApplication.applicantUserId,
+                          job_posting_id: selectedApplication.jobPostingId,
+                          subject,
+                          message,
+                        }).then(() => {
+                          alert('スカウトを送信しました');
+                        });
+                      }}
+                      className="px-3 py-1.5 bg-purple-500 text-white text-xs font-medium rounded-lg hover:bg-purple-600 transition-colors"
+                    >
+                      スカウト送信
+                    </button>
+
+                    {/* 面接日程を提案 */}
+                    {(selectedApplication.status === 'interview_scheduled' || selectedApplication.status === 'screening') && (
+                      <button
+                        onClick={() => {
+                          setSchedulerAppId(selectedApplication.id);
+                          setSchedulerAppName(selectedApplication.applicantName || '応募者');
+                          setShowInterviewScheduler(true);
+                          setShowApplicationDetail(false);
+                        }}
+                        className="px-3 py-1.5 bg-purple-500 text-white text-xs font-medium rounded-lg hover:bg-purple-600 transition-colors"
+                      >
+                        面接日程を提案
+                      </button>
+                    )}
+
                     {/* Status progression buttons */}
                     {selectedApplication.status === 'applied' && (
                       <button
@@ -2124,6 +2245,23 @@ export default function RecruitmentView() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* Tab 5: Analytics */}
+      {/* ============================================================ */}
+      {activeTab === 'analytics' && facilityId && (
+        <RecruitmentAnalyticsView facilityId={facilityId} />
+      )}
+
+      {/* Interview Scheduler Modal */}
+      {showInterviewScheduler && (
+        <InterviewScheduler
+          applicationId={schedulerAppId}
+          applicantName={schedulerAppName}
+          onClose={() => setShowInterviewScheduler(false)}
+          facilityUserId={user?.id || ''}
+        />
       )}
     </div>
   );

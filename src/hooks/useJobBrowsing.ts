@@ -384,7 +384,7 @@ export function useJobBrowsing() {
   // メッセージ
   // ================================================================
 
-  const fetchMessages = useCallback(async (applicationId: string): Promise<RecruitmentMessage[]> => {
+  const fetchMessages = useCallback(async (applicationId: string, currentUserId?: string): Promise<RecruitmentMessage[]> => {
     setError(null);
     try {
       const { data, error: err } = await supabase
@@ -393,6 +393,16 @@ export function useJobBrowsing() {
         .eq('job_application_id', applicationId)
         .order('created_at', { ascending: true });
       if (err) throw err;
+
+      // Mark messages from others as read
+      if (currentUserId) {
+        await supabase
+          .from('recruitment_messages')
+          .update({ read_at: new Date().toISOString() })
+          .eq('job_application_id', applicationId)
+          .neq('sender_user_id', currentUserId)
+          .is('read_at', null);
+      }
 
       return (data || []).map((r: Record<string, unknown>) => mapMessage(r));
     } catch (e: unknown) {
@@ -423,6 +433,46 @@ export function useJobBrowsing() {
       const msg = e instanceof Error ? e.message : 'Failed to send message';
       setError(msg);
       console.error('sendMessage error:', msg);
+    }
+  }, []);
+
+  // ================================================================
+  // 未読メッセージ数取得
+  // ================================================================
+
+  const fetchUnreadCounts = useCallback(async (userId: string): Promise<{ total: number; byApplication: Record<string, number> }> => {
+    try {
+      // Get all application IDs for this user
+      const { data: appData, error: appErr } = await supabase
+        .from('job_applications')
+        .select('id')
+        .eq('applicant_user_id', userId);
+      if (appErr) throw appErr;
+
+      const appIds = (appData || []).map((a: Record<string, unknown>) => a.id as string);
+      if (appIds.length === 0) return { total: 0, byApplication: {} };
+
+      // Get unread messages (from others) for these applications
+      const { data: msgData, error: msgErr } = await supabase
+        .from('recruitment_messages')
+        .select('id, job_application_id')
+        .in('job_application_id', appIds)
+        .neq('sender_user_id', userId)
+        .is('read_at', null);
+      if (msgErr) throw msgErr;
+
+      const byApplication: Record<string, number> = {};
+      let total = 0;
+      for (const msg of (msgData || []) as Record<string, unknown>[]) {
+        const appId = msg.job_application_id as string;
+        byApplication[appId] = (byApplication[appId] || 0) + 1;
+        total++;
+      }
+
+      return { total, byApplication };
+    } catch (e: unknown) {
+      console.error('fetchUnreadCounts error:', e);
+      return { total: 0, byApplication: {} };
     }
   }, []);
 
@@ -525,6 +575,9 @@ export function useJobBrowsing() {
     // メッセージ
     fetchMessages,
     sendMessage,
+
+    // 未読
+    fetchUnreadCounts,
 
     // おすすめ
     getRecommendedJobs,

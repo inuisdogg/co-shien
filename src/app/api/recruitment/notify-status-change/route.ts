@@ -140,6 +140,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'メール送信に失敗しました' }, { status: 500 });
     }
 
+    // アプリ内通知を作成（応募者向け）
+    if (applicant?.id) {
+      await supabase.from('notifications').insert({
+        user_id: applicant.id as string,
+        type: 'application_status',
+        title: `選考ステータス更新: ${statusLabel}`,
+        body: `${facilityName}の「${jobTitle}」の選考ステータスが「${statusLabel}」に更新されました`,
+        data: { applicationId, jobPostingId: jobPosting.id, newStatus },
+        read: false,
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error('notify-status-change error:', error);

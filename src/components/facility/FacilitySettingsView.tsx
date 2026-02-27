@@ -4,9 +4,10 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck, AlertTriangle, FileText, ChevronRight, Bell } from 'lucide-react';
-import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory, ChangeNotification, CHANGE_NOTIFICATION_TYPE_LABELS, CHANGE_NOTIFICATION_STATUS_CONFIG } from '@/types';
+import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck, AlertTriangle, FileText, ChevronRight, Bell, Shield, CheckCircle, Loader2, Camera, ImagePlus } from 'lucide-react';
+import { normalizeAddress } from '@/lib/addressNormalizer';
+import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory, ChangeNotification, CHANGE_NOTIFICATION_TYPE_LABELS, CHANGE_NOTIFICATION_STATUS_CONFIG, CertificationStatus } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -41,25 +42,6 @@ const FacilitySettingsView: React.FC = () => {
   const [showPostSaveAlert, setShowPostSaveAlert] = useState(false);
   const settingsSnapshotRef = useRef<FacilitySettings>(facilitySettings);
 
-  // 最新の施設コードを取得
-  useEffect(() => {
-    const fetchFacilityCode = async () => {
-      if (facility?.id) {
-        const { data, error } = await supabase
-          .from('facilities')
-          .select('code')
-          .eq('id', facility.id)
-          .single();
-
-        if (!error && data) {
-          setCurrentFacilityCode(data.code || '');
-        }
-      }
-    };
-
-    fetchFacilityCode();
-  }, [facility?.id]);
-
   const [settings, setSettings] = useState<FacilitySettings>(facilitySettings);
   const [newHoliday, setNewHoliday] = useState('');
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -70,6 +52,171 @@ const FacilitySettingsView: React.FC = () => {
   const [editingTimeSlotId, setEditingTimeSlotId] = useState<string | null>(null);
   const [isAddressLoading, setIsAddressLoading] = useState(false);
   const [showOperationsWizard, setShowOperationsWizard] = useState(false);
+
+  // 施設認証
+  const [certificationNumber, setCertificationNumber] = useState('');
+  const [certificationStatus, setCertificationStatus] = useState<CertificationStatus>('unverified');
+  const [certificationVerifiedAt, setCertificationVerifiedAt] = useState<string | null>(null);
+  const [certificationSubmitting, setCertificationSubmitting] = useState(false);
+
+  // 施設写真
+  const [facilityPhotos, setFacilityPhotos] = useState<string[]>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // 最新の施設コード・認証情報・写真を取得
+  useEffect(() => {
+    const fetchFacilityCode = async () => {
+      if (facility?.id) {
+        const { data, error } = await supabase
+          .from('facilities')
+          .select('code, certification_number, certification_status, certification_verified_at, photos')
+          .eq('id', facility.id)
+          .single();
+
+        if (!error && data) {
+          setCurrentFacilityCode(data.code || '');
+          setCertificationNumber(data.certification_number || '');
+          setCertificationStatus((data.certification_status as CertificationStatus) || 'unverified');
+          setCertificationVerifiedAt(data.certification_verified_at || null);
+          setFacilityPhotos(Array.isArray(data.photos) ? data.photos : []);
+        }
+      }
+    };
+
+    fetchFacilityCode();
+  }, [facility?.id]);
+
+  // 認証申請
+  const handleCertificationSubmit = async () => {
+    if (!facility?.id || !certificationNumber.trim()) return;
+    setCertificationSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('facilities')
+        .update({
+          certification_number: certificationNumber.trim(),
+          certification_status: 'pending',
+        })
+        .eq('id', facility.id);
+
+      if (error) {
+        console.error('認証申請に失敗しました:', error);
+        alert('認証申請に失敗しました');
+      } else {
+        setCertificationStatus('pending');
+        alert('認証申請を送信しました。審査完了までしばらくお待ちください。');
+      }
+    } catch (err) {
+      console.error('認証申請時にエラーが発生しました:', err);
+      alert('認証申請に失敗しました');
+    } finally {
+      setCertificationSubmitting(false);
+    }
+  };
+
+  // 写真アップロード
+  const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !facility?.id) return;
+
+    // バリデーション
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルのみアップロードできます');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('ファイルサイズは5MB以下にしてください');
+      return;
+    }
+    if (facilityPhotos.length >= 10) {
+      alert('写真は最大10枚までです');
+      return;
+    }
+
+    setPhotoUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `${facility.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('facility-photos')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) {
+        console.error('写真のアップロードに失敗しました:', uploadError);
+        alert('写真のアップロードに失敗しました');
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('facility-photos')
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl;
+      const newPhotos = [...facilityPhotos, publicUrl];
+
+      const { error: updateError } = await supabase
+        .from('facilities')
+        .update({ photos: newPhotos })
+        .eq('id', facility.id);
+
+      if (updateError) {
+        console.error('写真情報の更新に失敗しました:', updateError);
+        alert('写真情報の更新に失敗しました');
+        return;
+      }
+
+      setFacilityPhotos(newPhotos);
+    } catch (err) {
+      console.error('写真アップロード時にエラーが発生しました:', err);
+      alert('写真のアップロードに失敗しました');
+    } finally {
+      setPhotoUploading(false);
+      // file inputをリセット
+      if (photoInputRef.current) {
+        photoInputRef.current.value = '';
+      }
+    }
+  };
+
+  // 写真削除
+  const handlePhotoDelete = async (photoUrl: string) => {
+    if (!facility?.id) return;
+    if (!confirm('この写真を削除しますか？')) return;
+
+    try {
+      const newPhotos = facilityPhotos.filter((url) => url !== photoUrl);
+
+      const { error: updateError } = await supabase
+        .from('facilities')
+        .update({ photos: newPhotos })
+        .eq('id', facility.id);
+
+      if (updateError) {
+        console.error('写真の削除に失敗しました:', updateError);
+        alert('写真の削除に失敗しました');
+        return;
+      }
+
+      setFacilityPhotos(newPhotos);
+
+      // ストレージからも削除を試みる（エラーがあっても無視）
+      try {
+        const url = new URL(photoUrl);
+        const pathParts = url.pathname.split('/facility-photos/');
+        if (pathParts.length > 1) {
+          const storagePath = decodeURIComponent(pathParts[1]);
+          await supabase.storage.from('facility-photos').remove([storagePath]);
+        }
+      } catch {
+        // ストレージ削除のエラーは無視
+      }
+    } catch (err) {
+      console.error('写真削除時にエラーが発生しました:', err);
+      alert('写真の削除に失敗しました');
+    }
+  };
 
   // 郵便番号から住所を検索
   const lookupAddress = async () => {
@@ -505,6 +652,12 @@ const FacilitySettingsView: React.FC = () => {
                   address: e.target.value,
                 })
               }
+              onBlur={(e) => {
+                const normalized = normalizeAddress(e.target.value);
+                if (normalized !== e.target.value) {
+                  setSettings({ ...settings, address: normalized });
+                }
+              }}
               placeholder="東京都○○区1-2-3 ビル名"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
             />
@@ -721,6 +874,146 @@ const FacilitySettingsView: React.FC = () => {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* 施設認証 */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Shield size={20} className="mr-2 text-[#00c4cc]" />
+                施設認証
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                指定事業所番号を入力して認証申請を行うと、求人に認証バッジが表示されます。
+              </p>
+
+              <div className="space-y-4">
+                {/* 認証ステータス表示 */}
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-2">認証ステータス</label>
+                  {certificationStatus === 'verified' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 text-sm bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-medium">
+                        <CheckCircle className="w-4 h-4" />
+                        認証済み
+                      </span>
+                      {certificationVerifiedAt && (
+                        <span className="text-xs text-gray-500">
+                          ({new Date(certificationVerifiedAt).toLocaleDateString('ja-JP')} 認証)
+                        </span>
+                      )}
+                    </div>
+                  ) : certificationStatus === 'pending' ? (
+                    <span className="inline-flex items-center gap-1 text-sm bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-medium">
+                      <Clock size={14} />
+                      審査中
+                    </span>
+                  ) : certificationStatus === 'rejected' ? (
+                    <span className="inline-flex items-center gap-1 text-sm bg-red-100 text-red-700 px-3 py-1 rounded-full font-medium">
+                      <X size={14} />
+                      却下 - 番号を確認して再申請してください
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-500">未申請</span>
+                  )}
+                </div>
+
+                {/* 指定事業所番号入力 */}
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-2">
+                    指定事業所番号
+                  </label>
+                  <input
+                    type="text"
+                    value={certificationNumber}
+                    onChange={(e) => setCertificationNumber(e.target.value)}
+                    placeholder="例: 1234567890"
+                    disabled={certificationStatus === 'verified'}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] disabled:bg-gray-50 disabled:text-gray-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    障害福祉サービス事業所として指定を受けた際に交付された番号を入力してください
+                  </p>
+                </div>
+
+                {/* 認証申請ボタン */}
+                {certificationStatus !== 'verified' && (
+                  <button
+                    onClick={handleCertificationSubmit}
+                    disabled={certificationSubmitting || !certificationNumber.trim() || certificationStatus === 'pending'}
+                    className="inline-flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {certificationSubmitting ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Shield size={14} />
+                    )}
+                    {certificationStatus === 'pending' ? '審査中...' : '認証を申請'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 写真管理 */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Camera size={20} className="mr-2 text-[#00c4cc]" />
+                写真管理 ({facilityPhotos.length}/10)
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                施設の写真をアップロードしてください。求人ページに表示されます。（最大10枚、各5MBまで）
+              </p>
+
+              {/* 写真グリッド */}
+              {facilityPhotos.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {facilityPhotos.map((photoUrl, index) => (
+                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden group">
+                      <img
+                        src={photoUrl}
+                        alt={`施設写真 ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => handlePhotoDelete(photoUrl)}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="削除"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* アップロードボタン */}
+              {facilityPhotos.length < 10 && (
+                <div>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photoUploading}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:border-[#00c4cc] hover:text-[#00c4cc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {photoUploading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        アップロード中...
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus size={16} />
+                        写真を追加
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 基本情報の保存ボタン */}

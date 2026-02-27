@@ -499,6 +499,14 @@ export default function ClientSignupPage() {
               >
                 利用規約
               </button>
+              ・
+              <button
+                type="button"
+                onClick={() => window.open('/privacy', '_blank')}
+                className="text-[#F6AD55] hover:underline font-medium"
+              >
+                プライバシーポリシー
+              </button>
               に同意します
             </label>
           </div>

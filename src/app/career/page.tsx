@@ -53,6 +53,7 @@ import WorkExperienceForm from '@/components/personal/WorkExperienceForm';
 import AttendanceCalendar from '@/components/personal/AttendanceCalendar';
 import ShiftConfirmationView from '@/components/personal/ShiftConfirmationView';
 import ShiftAvailabilityForm from '@/components/personal/ShiftAvailabilityForm';
+import ScoutInboxSection from '@/components/personal/ScoutInboxSection';
 import { usePersonalData } from '@/hooks/usePersonalData';
 import { useCareerAccumulation } from '@/hooks/useCareerAccumulation';
 import type { CareerTimelineEvent } from '@/hooks/useCareerAccumulation';
@@ -1644,6 +1645,9 @@ export default function PersonalDashboardPage() {
             </div>
           )}
         </motion.div>
+
+        {/* ========== スカウト ========== */}
+        <ScoutInboxSection userId={user?.id} />
 
         {/* ========== 規定確認セクション ========== */}
         <CareerRegulationSection userId={user?.id} activeEmployments={activeEmployments} />

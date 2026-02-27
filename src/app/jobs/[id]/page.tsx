@@ -723,6 +723,12 @@ export default function JobDetailPage() {
               <Link href="/terms" className="hover:text-indigo-600 transition-colors">
                 利用規約
               </Link>
+              <Link href="/privacy" className="hover:text-indigo-600 transition-colors">
+                プライバシーポリシー
+              </Link>
+              <Link href="/recruitment-disclosure" className="hover:text-indigo-600 transition-colors">
+                職業紹介事業の情報開示
+              </Link>
             </nav>
             <p className="text-sm text-gray-400">
               &copy; {new Date().getFullYear()} Roots

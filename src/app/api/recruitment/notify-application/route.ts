@@ -55,10 +55,10 @@ export async function POST(request: Request) {
       .eq('id', jobPosting.facility_id as string)
       .single();
 
-    // 施設のオーナー/管理者のメールを取得
+    // 施設のオーナー/管理者の情報を取得
     const { data: owner } = await supabase
       .from('users')
-      .select('email')
+      .select('id, email')
       .eq('facility_id', jobPosting.facility_id as string)
       .in('role', ['admin', 'owner'])
       .limit(1)
@@ -122,6 +122,18 @@ export async function POST(request: Request) {
     if (sendError) {
       console.error('Resend error:', sendError);
       return NextResponse.json({ error: 'メール送信に失敗しました' }, { status: 500 });
+    }
+
+    // アプリ内通知を作成
+    if (owner?.id) {
+      await supabase.from('notifications').insert({
+        user_id: owner.id,
+        type: 'new_application',
+        title: `新しい応募: ${applicantName}`,
+        body: `${jobTitle}に新しい応募がありました`,
+        data: { applicationId, jobPostingId: jobPosting.id },
+        read: false,
+      });
     }
 
     return NextResponse.json({ success: true });

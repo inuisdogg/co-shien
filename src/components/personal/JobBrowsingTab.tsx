@@ -11,6 +11,7 @@ import {
   ApplicationStatus,
 } from '@/types';
 import { calculateMatchScore } from '@/lib/jobMatcher';
+import { geocodeAddress, haversineDistance, PREFECTURE_LIST, FACILITY_TYPES } from '@/lib/geocoding';
 import {
   Heart,
   Search,
@@ -31,7 +32,10 @@ import {
   Video,
   Banknote,
   ArrowUpDown,
+  SlidersHorizontal,
+  Zap,
 } from 'lucide-react';
+import FacilityReviewSection from '@/components/personal/FacilityReviewSection';
 
 // ================================================================
 // Props
@@ -49,7 +53,13 @@ type TabKey = 'recommended' | 'full_time' | 'part_time' | 'spot' | 'favorites' |
 
 type SortKey = 'recommended' | 'salary_high' | 'salary_low' | 'newest' | 'distance';
 
-type MappedJob = JobPosting & { facilityName?: string };
+type MappedJob = JobPosting & {
+  facilityName?: string;
+  averageRating?: number;
+  reviewCount?: number;
+  certificationStatus?: string;
+  facilityPhotos?: string[];
+};
 
 type MatchInfo = {
   score: number;
@@ -81,6 +91,7 @@ type RecruitmentMessage = {
   senderUserId: string;
   senderType: 'applicant' | 'facility';
   content: string;
+  readAt?: string;
   createdAt: string;
 };
 
@@ -197,56 +208,20 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 
 const DAYS_OF_WEEK = ['月', '火', '水', '木', '金', '土', '日'];
 
-/** 住所文字列から簡易的に緯度経度を推定（東京都の区レベル） */
-const AREA_COORDS: Record<string, { lat: number; lng: number }> = {
-  '世田谷': { lat: 35.6461, lng: 139.6530 },
-  '杉並': { lat: 35.6995, lng: 139.6365 },
-  '練馬': { lat: 35.7355, lng: 139.6517 },
-  '新宿': { lat: 35.6938, lng: 139.7035 },
-  '渋谷': { lat: 35.6640, lng: 139.6982 },
-  '中野': { lat: 35.7078, lng: 139.6638 },
-  '豊島': { lat: 35.7260, lng: 139.7163 },
-  '板橋': { lat: 35.7512, lng: 139.7092 },
-  '北区': { lat: 35.7528, lng: 139.7373 },
-  '足立': { lat: 35.7752, lng: 139.8045 },
-  '葛飾': { lat: 35.7436, lng: 139.8472 },
-  '江戸川': { lat: 35.7068, lng: 139.8684 },
-  '江東': { lat: 35.6729, lng: 139.8170 },
-  '墨田': { lat: 35.7106, lng: 139.8014 },
-  '台東': { lat: 35.7124, lng: 139.7803 },
-  '荒川': { lat: 35.7360, lng: 139.7835 },
-  '文京': { lat: 35.7081, lng: 139.7516 },
-  '千代田': { lat: 35.6940, lng: 139.7536 },
-  '中央': { lat: 35.6706, lng: 139.7718 },
-  '港区': { lat: 35.6581, lng: 139.7514 },
-  '品川': { lat: 35.6091, lng: 139.7301 },
-  '目黒': { lat: 35.6414, lng: 139.6982 },
-  '大田': { lat: 35.5613, lng: 139.7160 },
-};
-
-function getAreaCoords(location: string): { lat: number; lng: number } | null {
-  for (const [area, coords] of Object.entries(AREA_COORDS)) {
-    if (location.includes(area)) return coords;
-  }
-  return null;
-}
-
-function haversineDistance(
-  lat1: number, lng1: number,
-  lat2: number, lng2: number
-): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+/** Top 8 most common qualifications for filter chips */
+const FILTER_QUALIFICATION_OPTIONS: { code: string; label: string }[] = [
+  { code: 'nursery_teacher', label: '保育士' },
+  { code: 'child_instructor', label: '児童指導員' },
+  { code: 'pt', label: 'PT' },
+  { code: 'ot', label: 'OT' },
+  { code: 'st', label: 'ST' },
+  { code: 'social_worker', label: '社会福祉士' },
+  { code: 'nurse', label: '看護師' },
+  { code: 'child_dev_manager', label: '児童発達支援管理責任者' },
+];
 
 function mapJob(row: Record<string, unknown>): MappedJob {
+  const facility = row.facilities as Record<string, unknown> | null;
   return {
     id: row.id as string,
     facilityId: row.facility_id as string,
@@ -272,8 +247,11 @@ function mapJob(row: Record<string, unknown>): MappedJob {
     imageUrl: (row.image_url as string) || undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
-    facilityName:
-      (row.facilities as Record<string, unknown> | null)?.name as string | undefined,
+    facilityName: facility?.name as string | undefined,
+    averageRating: facility?.average_rating != null ? Number(facility.average_rating) : undefined,
+    reviewCount: facility?.review_count != null ? Number(facility.review_count) : undefined,
+    certificationStatus: (facility?.certification_status as string) || undefined,
+    facilityPhotos: Array.isArray(facility?.photos) ? (facility.photos as string[]) : undefined,
   };
 }
 
@@ -309,6 +287,7 @@ function mapMessage(row: Record<string, unknown>): RecruitmentMessage {
     senderUserId: row.sender_user_id as string,
     senderType: row.sender_type as RecruitmentMessage['senderType'],
     content: row.content as string,
+    readAt: (row.read_at as string) || undefined,
     createdAt: row.created_at as string,
   };
 }
@@ -391,6 +370,20 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
   const [prefEndTime, setPrefEndTime] = useState('');
   const [prefNotes, setPrefNotes] = useState('');
 
+  // ---- State: unread message badge ----
+  const [unreadTotal, setUnreadTotal] = useState(0);
+
+  // ---- State: quick apply ----
+  const [quickApplying, setQuickApplying] = useState(false);
+
+  // ---- State: filters ----
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterPrefecture, setFilterPrefecture] = useState('');
+  const [filterSalaryMin, setFilterSalaryMin] = useState('');
+  const [filterSalaryMax, setFilterSalaryMax] = useState('');
+  const [filterQualifications, setFilterQualifications] = useState<string[]>([]);
+  const [filterFacilityType, setFilterFacilityType] = useState('');
+
   // ---- State: geolocation for distance sort ----
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -404,7 +397,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     try {
       const { data, error } = await supabase
         .from('job_postings')
-        .select('*, facilities(id, name)')
+        .select('*, facilities(id, name, average_rating, review_count, certification_status, photos)')
         .eq('status', 'published')
         .order('published_at', { ascending: false });
 
@@ -537,6 +530,31 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     }
   }, []);
 
+  // Fetch unread message counts
+  const fetchUnreadCounts = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data: appData } = await supabase
+        .from('job_applications')
+        .select('id')
+        .eq('applicant_user_id', userId);
+
+      const appIds = (appData || []).map((a: Record<string, unknown>) => a.id as string);
+      if (appIds.length === 0) { setUnreadTotal(0); return; }
+
+      const { data: msgData } = await supabase
+        .from('recruitment_messages')
+        .select('id')
+        .in('job_application_id', appIds)
+        .neq('sender_user_id', userId)
+        .is('read_at', null);
+
+      setUnreadTotal((msgData || []).length);
+    } catch (err) {
+      console.error('Error fetching unread counts:', err);
+    }
+  }, [userId]);
+
   // Initial load
   useEffect(() => {
     fetchJobs();
@@ -544,8 +562,9 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       fetchFavorites();
       fetchApplications();
       fetchUserProfile();
+      fetchUnreadCounts();
     }
-  }, [fetchJobs, fetchFavorites, fetchApplications, fetchUserProfile, userId]);
+  }, [fetchJobs, fetchFavorites, fetchApplications, fetchUserProfile, fetchUnreadCounts, userId]);
 
   // Request geolocation when distance sort is selected
   useEffect(() => {
@@ -595,6 +614,25 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
   // Filtered & sorted jobs
   // ================================================================
 
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filterPrefecture) count++;
+    if (filterSalaryMin) count++;
+    if (filterSalaryMax) count++;
+    if (filterQualifications.length > 0) count++;
+    if (filterFacilityType) count++;
+    return count;
+  }, [filterPrefecture, filterSalaryMin, filterSalaryMax, filterQualifications, filterFacilityType]);
+
+  const clearAllFilters = useCallback(() => {
+    setFilterPrefecture('');
+    setFilterSalaryMin('');
+    setFilterSalaryMax('');
+    setFilterQualifications([]);
+    setFilterFacilityType('');
+  }, []);
+
   const filteredJobs = useMemo(() => {
     let jobs = [...allJobs];
 
@@ -628,6 +666,68 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         break;
     }
 
+    // ---- Advanced filters (applied BEFORE sort) ----
+
+    // Prefecture filter
+    if (filterPrefecture) {
+      jobs = jobs.filter((j) =>
+        (j.workLocation || '').includes(filterPrefecture)
+      );
+    }
+
+    // Facility type filter
+    // TODO: Facility type is on the facility object, not the job posting.
+    // Once facility type is available on the joined data, filter here:
+    // if (filterFacilityType) {
+    //   jobs = jobs.filter((j) => j.facilityType === filterFacilityType);
+    // }
+
+    // Salary range filter
+    if (filterSalaryMin || filterSalaryMax) {
+      jobs = jobs.filter((j) => {
+        const normalized = normalizeSalary(j);
+        if (normalized === 0) return true; // 応相談 — keep visible
+
+        // Convert filter inputs to annual equivalent for comparison
+        // For hourly salary types, use raw values; for monthly/annual use 万円 units
+        let filterMinAnnual = 0;
+        let filterMaxAnnual = Infinity;
+
+        if (filterSalaryMin) {
+          const minVal = parseFloat(filterSalaryMin);
+          if (!isNaN(minVal)) {
+            // If salary type is hourly, compare directly with hourly rate
+            // Otherwise, treat input as 万円 and convert to annual
+            if (j.salaryType === 'hourly') {
+              filterMinAnnual = minVal * 2000; // approximate annual
+            } else {
+              filterMinAnnual = minVal * 10000; // 万円 → 円 → annual
+            }
+          }
+        }
+
+        if (filterSalaryMax) {
+          const maxVal = parseFloat(filterSalaryMax);
+          if (!isNaN(maxVal)) {
+            if (j.salaryType === 'hourly') {
+              filterMaxAnnual = maxVal * 2000;
+            } else {
+              filterMaxAnnual = maxVal * 10000;
+            }
+          }
+        }
+
+        return normalized >= filterMinAnnual && normalized <= filterMaxAnnual;
+      });
+    }
+
+    // Qualifications filter (job must require at least one of the selected qualifications)
+    if (filterQualifications.length > 0) {
+      jobs = jobs.filter((j) =>
+        j.requiredQualifications.some((q) => filterQualifications.includes(q))
+      );
+    }
+
     // Sort
     switch (sortBy) {
       case 'recommended':
@@ -657,8 +757,8 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       case 'distance':
         if (userLocation) {
           jobs.sort((a, b) => {
-            const coordA = getAreaCoords(a.workLocation || '');
-            const coordB = getAreaCoords(b.workLocation || '');
+            const coordA = geocodeAddress(a.workLocation || '');
+            const coordB = geocodeAddress(b.workLocation || '');
             const distA = coordA ? haversineDistance(userLocation.lat, userLocation.lng, coordA.lat, coordA.lng) : 9999;
             const distB = coordB ? haversineDistance(userLocation.lat, userLocation.lng, coordB.lat, coordB.lng) : 9999;
             return distA - distB;
@@ -668,7 +768,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     }
 
     return jobs;
-  }, [allJobs, keyword, activeTab, sortBy, matchScores, favoriteIds, userLocation]);
+  }, [allJobs, keyword, activeTab, sortBy, matchScores, favoriteIds, userLocation, filterPrefecture, filterSalaryMin, filterSalaryMax, filterQualifications, filterFacilityType]);
 
   // ================================================================
   // Actions
@@ -796,6 +896,19 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         setAppMessages(
           (data || []).map((r) => mapMessage(r as Record<string, unknown>))
         );
+
+        // Mark messages from others as read
+        if (userId) {
+          await supabase
+            .from('recruitment_messages')
+            .update({ read_at: new Date().toISOString() })
+            .eq('job_application_id', app.id)
+            .neq('sender_user_id', userId)
+            .is('read_at', null);
+
+          // Refresh unread counts
+          fetchUnreadCounts();
+        }
       } catch (err) {
         console.error('Error fetching messages:', err);
         setAppMessages([]);
@@ -803,7 +916,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         setLoadingMessages(false);
       }
     },
-    []
+    [userId, fetchUnreadCounts]
   );
 
   const handleSendMessage = useCallback(async () => {
@@ -900,6 +1013,77 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       setSendingInquiry(false);
     }
   }, [userId, selectedJob, inquiryMessage, applications, fetchApplications]);
+
+  // Quick apply handler
+  const handleQuickApply = useCallback(async () => {
+    if (!userId || !selectedJob) return;
+    setQuickApplying(true);
+    try {
+      // 1. Check if user has a saved profile (name)
+      const { data: userData, error: userErr } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', userId)
+        .single();
+
+      if (userErr || !userData?.name) {
+        alert('プロフィール（氏名）を先に設定してください。');
+        setQuickApplying(false);
+        return;
+      }
+
+      // 2. Fetch saved work preferences from most recent application
+      let prefDaysVal: string | null = null;
+      let prefHoursVal: number | null = null;
+      let prefStartVal: string | null = null;
+      let prefEndVal: string | null = null;
+
+      const { data: recentApp } = await supabase
+        .from('job_applications')
+        .select('preferred_days, preferred_hours_per_week, preferred_start_time, preferred_end_time')
+        .eq('applicant_user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (recentApp && recentApp.length > 0) {
+        const prev = recentApp[0] as Record<string, unknown>;
+        prefDaysVal = (prev.preferred_days as string) || null;
+        prefHoursVal = prev.preferred_hours_per_week != null ? Number(prev.preferred_hours_per_week) : null;
+        prefStartVal = (prev.preferred_start_time as string) || null;
+        prefEndVal = (prev.preferred_end_time as string) || null;
+      }
+
+      // 3. Submit application with auto-generated cover message
+      const payload: Record<string, unknown> = {
+        job_posting_id: selectedJob.id,
+        applicant_user_id: userId,
+        status: 'applied',
+        cover_message: 'プロフィールを確認の上、ご検討ください。',
+      };
+      if (prefDaysVal) payload.preferred_days = prefDaysVal;
+      if (prefHoursVal) payload.preferred_hours_per_week = prefHoursVal;
+      if (prefStartVal) payload.preferred_start_time = prefStartVal;
+      if (prefEndVal) payload.preferred_end_time = prefEndVal;
+
+      const { error } = await supabase.from('job_applications').insert(payload);
+
+      if (error) {
+        console.error('Quick apply failed:', error);
+        return;
+      }
+
+      setApplySuccess(true);
+      fetchApplications();
+      // Auto-close after brief delay
+      setTimeout(() => {
+        setApplySuccess(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Error in quick apply:', err);
+    } finally {
+      setQuickApplying(false);
+    }
+  }, [userId, selectedJob, fetchApplications]);
 
   // Check if user already applied
   const hasApplied = useCallback(
@@ -1025,6 +1209,17 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="line-clamp-1">{job.facilityName}</span>
+            </div>
+          )}
+
+          {/* Facility rating */}
+          {job.averageRating && job.averageRating > 0 && (
+            <div className="flex items-center gap-1 text-xs text-amber-600">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span>{job.averageRating.toFixed(1)}</span>
+              {job.reviewCount != null && job.reviewCount > 0 && (
+                <span className="text-gray-400">({job.reviewCount}件)</span>
+              )}
             </div>
           )}
 
@@ -1192,6 +1387,27 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         {/* Image header */}
         {renderJobImage(job, 'h-[200px]')}
 
+        {/* Facility photo gallery */}
+        {job.facilityPhotos && job.facilityPhotos.length > 0 && (
+          <div className="px-4 pt-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-2">施設の写真</h2>
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {job.facilityPhotos.map((photoUrl, idx) => (
+                <div
+                  key={idx}
+                  className="flex-shrink-0 w-32 h-24 rounded-lg overflow-hidden"
+                >
+                  <img
+                    src={photoUrl}
+                    alt={`施設写真 ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div className="px-4 py-5 pb-32 space-y-5">
           {/* Badge + Title */}
@@ -1341,6 +1557,14 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
               </div>
             </div>
           )}
+
+          {/* Facility Reviews */}
+          <hr className="border-gray-200" />
+          <FacilityReviewSection
+            facilityId={job.facilityId}
+            userId={userId}
+            facilityName={job.facilityName}
+          />
         </div>
 
         {/* Fixed bottom bar */}
@@ -1363,14 +1587,33 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
               <CheckCircle2 className="h-4 w-4" />
               応募済み
             </div>
+          ) : applySuccess ? (
+            <div className="flex-1 rounded-xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-700 text-center flex items-center justify-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              応募完了
+            </div>
           ) : userId ? (
-            <button
-              onClick={() => setShowApplyModal(true)}
-              className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <Briefcase className="h-4 w-4" />
-              応募する
-            </button>
+            <div className="flex-1 flex gap-2">
+              <button
+                onClick={handleQuickApply}
+                disabled={quickApplying}
+                className="flex-1 rounded-xl bg-amber-500 px-3 py-3 text-sm font-bold text-white hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {quickApplying ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4" />
+                )}
+                <span className="text-xs">ワンクリック応募</span>
+              </button>
+              <button
+                onClick={() => setShowApplyModal(true)}
+                className="flex-1 rounded-xl bg-indigo-600 px-3 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Briefcase className="h-4 w-4" />
+                応募する
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => {
@@ -1863,6 +2106,12 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                           {formatTime(msg.createdAt)}
                         </p>
                       </div>
+                      {/* Read receipt for sent messages */}
+                      {isMe && msg.readAt && (
+                        <p className="text-[10px] text-gray-400 mt-0.5 mr-1 self-end">
+                          既読
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -1953,39 +2202,185 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${
+                className={`relative flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {tab.label}
+                {tab.key === 'applications' && unreadTotal > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-[10px] font-bold text-white px-1">
+                    {unreadTotal > 99 ? '99+' : unreadTotal}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* ========== Sort bar ========== */}
-      {isJobListTab && !loadingJobs && filteredJobs.length > 0 && (
-        <div className="bg-white border-b border-gray-100 px-4 py-2 flex items-center justify-between">
-          <p className="text-xs text-gray-500">
-            {filteredJobs.length} 件の求人
-          </p>
-          <div className="relative flex items-center gap-1.5">
-            <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className="appearance-none bg-transparent text-xs font-medium text-gray-700 pr-5 cursor-pointer focus:outline-none"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <ChevronRight className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 rotate-90 pointer-events-none" />
+      {/* ========== Sort bar + Filter button ========== */}
+      {isJobListTab && !loadingJobs && (
+        <div className="bg-white border-b border-gray-100">
+          <div className="px-4 py-2 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              {filteredJobs.length} 件の求人
+            </p>
+            <div className="flex items-center gap-2">
+              {/* Filter toggle button */}
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className={`relative inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                絞り込み
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Sort dropdown */}
+              <div className="relative flex items-center gap-1.5">
+                <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortKey)}
+                  className="appearance-none bg-transparent text-xs font-medium text-gray-700 pr-5 cursor-pointer focus:outline-none"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronRight className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 rotate-90 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* ========== Collapsible Filter Panel ========== */}
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              showFilters ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <div className="px-4 pb-4 pt-1 space-y-4 border-t border-gray-100">
+              {/* 都道府県 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  都道府県
+                </label>
+                <select
+                  value={filterPrefecture}
+                  onChange={(e) => setFilterPrefecture(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="">すべて</option>
+                  {PREFECTURE_LIST.map((pref) => (
+                    <option key={pref.code} value={pref.name}>
+                      {pref.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 施設種別 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  施設種別
+                </label>
+                <select
+                  value={filterFacilityType}
+                  onChange={(e) => setFilterFacilityType(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="">すべて</option>
+                  {Object.entries(FACILITY_TYPES).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 給与レンジ */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  給与レンジ（万円 ※時給の場合は円）
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={filterSalaryMin}
+                    onChange={(e) => setFilterSalaryMin(e.target.value)}
+                    placeholder="下限"
+                    min="0"
+                    className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <span className="text-sm text-gray-400">〜</span>
+                  <input
+                    type="number"
+                    value={filterSalaryMax}
+                    onChange={(e) => setFilterSalaryMax(e.target.value)}
+                    placeholder="上限"
+                    min="0"
+                    className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
+              </div>
+
+              {/* 必要資格 (multi-select chips) */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  必要資格
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {FILTER_QUALIFICATION_OPTIONS.map((q) => {
+                    const isSelected = filterQualifications.includes(q.code);
+                    return (
+                      <button
+                        key={q.code}
+                        type="button"
+                        onClick={() => {
+                          setFilterQualifications((prev) =>
+                            isSelected
+                              ? prev.filter((c) => c !== q.code)
+                              : [...prev, q.code]
+                          );
+                        }}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {q.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* クリア button */}
+              {activeFilterCount > 0 && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                    フィルターをクリア
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2031,16 +2426,19 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                   <>
                     <Briefcase className="h-10 w-10 text-gray-300 mb-3" />
                     <p className="text-sm font-medium text-gray-500">
-                      {keyword
+                      {keyword || activeFilterCount > 0
                         ? '条件に合う求人が見つかりませんでした'
                         : '現在公開中の求人はありません'}
                     </p>
-                    {keyword && (
+                    {(keyword || activeFilterCount > 0) && (
                       <button
-                        onClick={() => setKeyword('')}
+                        onClick={() => {
+                          setKeyword('');
+                          clearAllFilters();
+                        }}
                         className="mt-3 rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                       >
-                        検索をクリア
+                        検索・フィルターをクリア
                       </button>
                     )}
                   </>

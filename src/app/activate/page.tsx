@@ -1463,6 +1463,14 @@ function ActivatePageContent() {
                     >
                       利用規約
                     </button>
+                    ・
+                    <button
+                      type="button"
+                      onClick={() => window.open('/privacy', '_blank')}
+                      className="text-[#00c4cc] hover:underline"
+                    >
+                      プライバシーポリシー
+                    </button>
                     に同意します
                   </label>
                 </div>
