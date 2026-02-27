@@ -32,6 +32,9 @@ import {
   Calculator,
   Briefcase,
   Wallet,
+  MessageCircle,
+  ClipboardCheck,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -71,6 +74,8 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'upper-limit': 1,      // 上限管理
   'recruitment': 1,       // 採用・求人
   'cashflow': 1,           // 収支管理
+  'self-evaluation': 1,    // 自己評価
+  'billing': 1,             // 国保連請求
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
@@ -78,7 +83,7 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'government': 2,        // 行政連携
 
   // Phase 3: 外部連携・SaaS化
-  'chat': 3,              // チャット
+  'chat': 1,              // チャット
   'lead': 3,              // リード管理
 };
 
@@ -147,6 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'connect', label: '連絡会議', icon: Users2, permission: 'children' as const },
         { id: 'transport', label: '送迎管理', icon: Car, permission: 'schedule' as const },
         { id: 'upper-limit', label: '上限管理', icon: Calculator, permission: 'dashboard' as const },
+        { id: 'chat', label: 'チャット', icon: MessageCircle, permission: 'dashboard' as const },
       ],
     },
     {
@@ -175,6 +181,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'addition-settings', label: '加算・収益', icon: ListChecks, permission: 'dashboard' as const },
         { id: 'finance', label: '財務管理', icon: DollarSign, permission: 'dashboard' as const },
         { id: 'cashflow', label: '収支管理', icon: Wallet, permission: 'cashFlow' as const },
+        { id: 'billing', label: '国保連請求', icon: Receipt, permission: 'dashboard' as const },
       ],
     },
     {
@@ -186,6 +193,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'documents', label: '書類・監査', icon: FolderOpen, permission: 'children' as const },
         { id: 'regulations', label: '規定管理', icon: BookOpen, permission: 'staff' as const },
         { id: 'compliance', label: 'コンプライアンス', icon: Shield, permission: 'dashboard' as const },
+        { id: 'self-evaluation', label: '自己評価', icon: ClipboardCheck, permission: 'dashboard' as const },
       ],
     },
     {

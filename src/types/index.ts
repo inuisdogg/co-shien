@@ -2706,3 +2706,86 @@ export interface PLStatement {
   netIncome: number;
 }
 
+// 自己評価の種別
+export type SelfEvaluationType = 'self' | 'parent_survey';
+
+// 自己評価のステータス
+export type SelfEvaluationStatus = 'draft' | 'in_progress' | 'completed' | 'published';
+
+// 自己評価データ
+export type SelfEvaluation = {
+  id: string;
+  facilityId: string;
+  fiscalYear: string; // e.g. "2025"
+  evaluationType: SelfEvaluationType;
+  status: SelfEvaluationStatus;
+  responses: Record<string, any>;
+  summary?: string;
+  improvementPlan?: string;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// ==========================================
+// 国保連請求（Billing）
+// ==========================================
+
+// 請求ステータス
+export type BillingStatus = 'draft' | 'confirmed' | 'submitted' | 'paid';
+
+// 月次請求レコード
+export type BillingRecord = {
+  id: string;
+  facilityId: string;
+  childId: string;
+  yearMonth: string; // YYYY-MM
+  serviceType: string; // 児童発達支援 / 放課後等デイサービス
+  totalUnits: number;
+  unitPrice: number;
+  totalAmount: number;
+  copayAmount: number;       // 利用者負担額
+  insuranceAmount: number;   // 給付費（保険請求額）
+  upperLimitAmount: number;  // 上限月額
+  status: BillingStatus;
+  submittedAt?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // JOINで取得
+  childName?: string;
+};
+
+// 請求明細（日別）
+export type BillingDetail = {
+  id: string;
+  billingRecordId: string;
+  serviceDate: string; // YYYY-MM-DD
+  serviceCode?: string;
+  unitCount: number;
+  isAbsence: boolean;
+  absenceType?: string;
+  additions: BillingAddition[];
+  createdAt: string;
+};
+
+// 加算項目
+export type BillingAddition = {
+  code: string;
+  name: string;
+  units: number;
+};
+
+// サービスコードマスタ
+export type ServiceCode = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  baseUnits: number;
+  description?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  createdAt: string;
+};
+

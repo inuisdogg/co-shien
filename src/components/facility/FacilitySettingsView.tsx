@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck, AlertTriangle, FileText, ChevronRight, Bell, Shield, CheckCircle, Loader2, Camera, ImagePlus } from 'lucide-react';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck, AlertTriangle, FileText, ChevronRight, Bell, Shield, CheckCircle, Loader2, Camera, ImagePlus, Database, Download, AlertOctagon, Info } from 'lucide-react';
 import { normalizeAddress } from '@/lib/addressNormalizer';
 import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory, ChangeNotification, CHANGE_NOTIFICATION_TYPE_LABELS, CHANGE_NOTIFICATION_STATUS_CONFIG, CertificationStatus } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -16,12 +16,61 @@ import { useChangeNotifications, detectSettingsChanges, daysUntilDeadline, getDe
 import ChangeNotificationList from './ChangeNotificationList';
 import OperationsReviewWizard from './OperationsReviewWizard';
 // タブの種類
-type SettingsTab = 'basic' | 'operation' | 'change_notifications';
+type SettingsTab = 'basic' | 'operation' | 'change_notifications' | 'notification_preferences' | 'data_management';
 
-const SETTINGS_TABS: { id: SettingsTab; label: string; icon: 'building' | 'clock' | 'bell' }[] = [
+const SETTINGS_TABS: { id: SettingsTab; label: string; icon: 'building' | 'clock' | 'bell' | 'bellring' | 'database' }[] = [
   { id: 'basic', label: '基本情報', icon: 'building' },
   { id: 'operation', label: '営業・休日', icon: 'clock' },
   { id: 'change_notifications', label: '変更届', icon: 'bell' },
+  { id: 'notification_preferences', label: '通知設定', icon: 'bellring' },
+  { id: 'data_management', label: 'データ管理', icon: 'database' },
+];
+
+// 通知設定の型
+interface NotificationPreferences {
+  types: {
+    newApplication: boolean;   // 新規応募
+    newMessage: boolean;       // 新着メッセージ
+    scoutReply: boolean;       // スカウト返信
+    interviewConfirmed: boolean; // 面接確定
+    reviewPosted: boolean;     // レビュー投稿
+  };
+  channels: {
+    email: boolean;
+    push: boolean;
+  };
+  quietHours: {
+    enabled: boolean;
+    start: string; // HH:mm
+    end: string;   // HH:mm
+  };
+}
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  types: {
+    newApplication: true,
+    newMessage: true,
+    scoutReply: true,
+    interviewConfirmed: true,
+    reviewPosted: true,
+  },
+  channels: {
+    email: true,
+    push: true,
+  },
+  quietHours: {
+    enabled: false,
+    start: '22:00',
+    end: '07:00',
+  },
+};
+
+const NOTIFICATION_TYPE_LABELS: { key: keyof NotificationPreferences['types']; label: string; description: string }[] = [
+  { key: 'newApplication', label: '新規応募', description: '求人への新しい応募があった時' },
+  { key: 'newMessage', label: '新着メッセージ', description: '新しいチャットメッセージを受信した時' },
+  { key: 'scoutReply', label: 'スカウト返信', description: 'スカウトへの返信があった時' },
+  { key: 'interviewConfirmed', label: '面接確定', description: '面接日程が確定した時' },
+  { key: 'reviewPosted', label: 'レビュー投稿', description: '施設へのレビューが投稿された時' },
 ];
 
 const FacilitySettingsView: React.FC = () => {
@@ -52,6 +101,15 @@ const FacilitySettingsView: React.FC = () => {
   const [editingTimeSlotId, setEditingTimeSlotId] = useState<string | null>(null);
   const [isAddressLoading, setIsAddressLoading] = useState(false);
   const [showOperationsWizard, setShowOperationsWizard] = useState(false);
+
+  // データ管理（APPI）
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletionRequested, setDeletionRequested] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
+
+  // 通知設定
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [notificationSaved, setNotificationSaved] = useState(false);
 
   // 施設認証
   const [certificationNumber, setCertificationNumber] = useState('');
@@ -86,6 +144,28 @@ const FacilitySettingsView: React.FC = () => {
 
     fetchFacilityCode();
   }, [facility?.id]);
+
+  // 通知設定をlocalStorageから読み込み
+  useEffect(() => {
+    if (facility?.id) {
+      try {
+        const stored = localStorage.getItem(`notification_prefs_${facility.id}`);
+        if (stored) {
+          setNotificationPrefs(JSON.parse(stored));
+        }
+      } catch {
+        // パースエラーは無視
+      }
+    }
+  }, [facility?.id]);
+
+  // 通知設定を保存
+  const handleSaveNotificationPrefs = () => {
+    if (!facility?.id) return;
+    localStorage.setItem(`notification_prefs_${facility.id}`, JSON.stringify(notificationPrefs));
+    setNotificationSaved(true);
+    setTimeout(() => setNotificationSaved(false), 3000);
+  };
 
   // 認証申請
   const handleCertificationSubmit = async () => {
@@ -538,7 +618,7 @@ const FacilitySettingsView: React.FC = () => {
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {tab.icon === 'building' ? <Building2 size={16} /> : tab.icon === 'clock' ? <Clock size={16} /> : <Bell size={16} />}
+              {tab.icon === 'building' ? <Building2 size={16} /> : tab.icon === 'clock' ? <Clock size={16} /> : tab.icon === 'bellring' ? <Bell size={16} /> : tab.icon === 'database' ? <Database size={16} /> : <Bell size={16} />}
               {tab.label}
               {tab.id === 'change_notifications' && pendingCount > 0 && (
                 <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
@@ -1576,6 +1656,409 @@ const FacilitySettingsView: React.FC = () => {
             onUpdateStatus={updateNotificationStatus}
             onRefetch={refetchNotifications}
           />
+        )}
+
+        {/* ========== 通知設定タブ ========== */}
+        {activeTab === 'notification_preferences' && (
+          <>
+            {/* 通知種別 */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Bell size={20} className="mr-2 text-[#00c4cc]" />
+                通知の種類
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                受け取りたい通知の種類を選択してください。
+              </p>
+              <div className="space-y-3">
+                {NOTIFICATION_TYPE_LABELS.map((item) => (
+                  <label
+                    key={item.key}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  >
+                    <div className="flex-1 min-w-0 mr-4">
+                      <span className="font-bold text-sm text-gray-800">{item.label}</span>
+                      <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={notificationPrefs.types[item.key]}
+                      onClick={() =>
+                        setNotificationPrefs({
+                          ...notificationPrefs,
+                          types: {
+                            ...notificationPrefs.types,
+                            [item.key]: !notificationPrefs.types[item.key],
+                          },
+                        })
+                      }
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                        notificationPrefs.types[item.key] ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                          notificationPrefs.types[item.key] ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* 通知チャネル */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Settings size={20} className="mr-2 text-[#00c4cc]" />
+                通知方法
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                通知を受け取る方法を選択してください。
+              </p>
+              <div className="space-y-3">
+                <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <span className="font-bold text-sm text-gray-800">メール通知</span>
+                    <p className="text-xs text-gray-500 mt-0.5">登録されたメールアドレスに通知を送信します</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={notificationPrefs.channels.email}
+                    onClick={() =>
+                      setNotificationPrefs({
+                        ...notificationPrefs,
+                        channels: {
+                          ...notificationPrefs.channels,
+                          email: !notificationPrefs.channels.email,
+                        },
+                      })
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                      notificationPrefs.channels.email ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                        notificationPrefs.channels.email ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+                <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <span className="font-bold text-sm text-gray-800">プッシュ通知</span>
+                    <p className="text-xs text-gray-500 mt-0.5">ブラウザのプッシュ通知を受け取ります</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={notificationPrefs.channels.push}
+                    onClick={() =>
+                      setNotificationPrefs({
+                        ...notificationPrefs,
+                        channels: {
+                          ...notificationPrefs.channels,
+                          push: !notificationPrefs.channels.push,
+                        },
+                      })
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                      notificationPrefs.channels.push ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                        notificationPrefs.channels.push ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+            </div>
+
+            {/* おやすみ時間 */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Clock size={20} className="mr-2 text-[#00c4cc]" />
+                おやすみ時間
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                指定した時間帯は通知を送信しません。
+              </p>
+              <div className="space-y-4">
+                <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <span className="font-bold text-sm text-gray-800">おやすみ時間を有効にする</span>
+                    <p className="text-xs text-gray-500 mt-0.5">設定した時間帯に通知をミュートします</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={notificationPrefs.quietHours.enabled}
+                    onClick={() =>
+                      setNotificationPrefs({
+                        ...notificationPrefs,
+                        quietHours: {
+                          ...notificationPrefs.quietHours,
+                          enabled: !notificationPrefs.quietHours.enabled,
+                        },
+                      })
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                      notificationPrefs.quietHours.enabled ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                        notificationPrefs.quietHours.enabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+
+                {notificationPrefs.quietHours.enabled && (
+                  <div className="flex items-center gap-3 pl-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-600 block mb-1">開始</label>
+                      <select
+                        value={notificationPrefs.quietHours.start}
+                        onChange={(e) =>
+                          setNotificationPrefs({
+                            ...notificationPrefs,
+                            quietHours: {
+                              ...notificationPrefs.quietHours,
+                              start: e.target.value,
+                            },
+                          })
+                        }
+                        className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      >
+                        {Array.from({ length: 24 }, (_, i) => {
+                          const time = `${i.toString().padStart(2, '0')}:00`;
+                          return <option key={time} value={time}>{time}</option>;
+                        })}
+                      </select>
+                    </div>
+                    <span className="text-gray-400 mt-5">〜</span>
+                    <div>
+                      <label className="text-xs font-bold text-gray-600 block mb-1">終了</label>
+                      <select
+                        value={notificationPrefs.quietHours.end}
+                        onChange={(e) =>
+                          setNotificationPrefs({
+                            ...notificationPrefs,
+                            quietHours: {
+                              ...notificationPrefs.quietHours,
+                              end: e.target.value,
+                            },
+                          })
+                        }
+                        className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      >
+                        {Array.from({ length: 24 }, (_, i) => {
+                          const time = `${i.toString().padStart(2, '0')}:00`;
+                          return <option key={time} value={time}>{time}</option>;
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 保存ボタン */}
+            <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 shadow-lg p-4 z-10">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  {notificationSaved ? (
+                    <span className="text-[#00c4cc] font-bold flex items-center gap-1">
+                      <CheckCircle size={14} />
+                      通知設定を保存しました
+                    </span>
+                  ) : (
+                    '変更内容を保存してください'
+                  )}
+                </p>
+                <button
+                  onClick={handleSaveNotificationPrefs}
+                  className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white h-10 px-6 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-all min-w-[120px] justify-center"
+                >
+                  <Save size={16} />
+                  通知設定を保存
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ========== データ管理タブ ========== */}
+        {activeTab === 'data_management' && (
+          <>
+            {/* データエクスポート */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Download size={20} className="mr-2 text-[#00c4cc]" />
+                データエクスポート
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                個人情報保護法（APPI）に基づき、施設に関連する全データをJSON形式でエクスポートできます。
+              </p>
+              <button
+                onClick={async () => {
+                  setExportingData(true);
+                  try {
+                    // Mock data export
+                    const exportData = {
+                      exportedAt: new Date().toISOString(),
+                      facilityId: facility?.id || '',
+                      facilityName: settings.facilityName || '',
+                      children: [
+                        { note: 'この機能は現在モックデータを出力しています。実装完了後に実データが出力されます。' },
+                      ],
+                      usageRecords: [],
+                      staff: [],
+                      billing: [],
+                    };
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+                      type: 'application/json',
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    a.href = url;
+                    a.download = `facility-data-export-${timestamp}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  } catch (err) {
+                    console.error('データエクスポートに失敗しました:', err);
+                    alert('データエクスポートに失敗しました');
+                  } finally {
+                    setExportingData(false);
+                  }
+                }}
+                disabled={exportingData}
+                className="inline-flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+              >
+                <Download size={16} />
+                {exportingData ? 'エクスポート中...' : '全データをエクスポート'}
+              </button>
+            </div>
+
+            {/* データ削除リクエスト */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <AlertOctagon size={20} className="mr-2 text-red-500" />
+                データ削除リクエスト
+              </h3>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-red-800">この操作は取り消せません</p>
+                    <p className="text-sm text-red-700 mt-1">
+                      データ削除をリクエストすると、施設に関連する全てのデータが完全に削除されます。
+                      法定保持期間が経過したデータのみが削除対象となります。
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {deletionRequested ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={18} className="text-green-600" />
+                    <p className="text-sm font-bold text-green-800">
+                      削除リクエストを受け付けました。担当者が確認後、処理を開始します。
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 block mb-2">
+                      確認のため施設名を入力してください
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder={settings.facilityName || '施設名を入力'}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Store deletion request in localStorage (mock)
+                      const request = {
+                        facilityId: facility?.id || '',
+                        facilityName: settings.facilityName || '',
+                        requestedAt: new Date().toISOString(),
+                        status: 'pending',
+                      };
+                      localStorage.setItem(
+                        `deletion-request-${facility?.id}`,
+                        JSON.stringify(request)
+                      );
+                      setDeletionRequested(true);
+                      setDeleteConfirmText('');
+                    }}
+                    disabled={
+                      !deleteConfirmText ||
+                      deleteConfirmText !== (settings.facilityName || '')
+                    }
+                    className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 size={16} />
+                    削除リクエスト送信
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* データ保持期間 */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Info size={20} className="mr-2 text-[#00c4cc]" />
+                データ保持期間
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                法令に基づくデータの保持期間は以下の通りです。保持期間内のデータは削除リクエストの対象外となります。
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                      <FileText size={16} className="text-[#00c4cc]" />
+                    </div>
+                    <span className="text-sm font-bold text-gray-800">利用記録</span>
+                  </div>
+                  <span className="text-sm font-bold text-[#00c4cc]">5年</span>
+                </div>
+                <div className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                      <FileText size={16} className="text-[#00c4cc]" />
+                    </div>
+                    <span className="text-sm font-bold text-gray-800">請求データ</span>
+                  </div>
+                  <span className="text-sm font-bold text-[#00c4cc]">7年</span>
+                </div>
+                <div className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                      <Users size={16} className="text-[#00c4cc]" />
+                    </div>
+                    <span className="text-sm font-bold text-gray-800">スタッフ情報</span>
+                  </div>
+                  <span className="text-sm font-bold text-[#00c4cc]">退職後3年</span>
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
 

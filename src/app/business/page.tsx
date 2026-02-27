@@ -50,6 +50,9 @@ const TransportManagementView = dynamicImport(() => import('@/components/transpo
 const UpperLimitManagementView = dynamicImport(() => import('@/components/upper-limit/UpperLimitManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const RecruitmentView = dynamicImport(() => import('@/components/recruitment/RecruitmentView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const CashflowWizardView = dynamicImport(() => import('@/components/cashflow/CashflowWizardView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const BusinessChatView = dynamicImport(() => import('@/components/chat/BusinessChatView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const BillingView = dynamicImport(() => import('@/components/billing/BillingView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const SelfEvaluationView = dynamicImport(() => import('@/components/evaluation/SelfEvaluationView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 
 /**
  * Setup guide banner shown at top of dashboard when setup is incomplete.
@@ -447,6 +450,12 @@ export default function BusinessPage() {
         return <RecruitmentView />;
       case 'cashflow':
         return <CashflowWizardView />;
+      case 'chat':
+        return <BusinessChatView />;
+      case 'billing':
+        return <BillingView />;
+      case 'self-evaluation':
+        return <SelfEvaluationView />;
       default:
         return <DashboardView />;
     }
