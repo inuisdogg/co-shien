@@ -97,6 +97,13 @@ function mapApplication(row: Record<string, unknown>): JobApplication {
       : undefined,
     jobTitle: jobPosting ? (jobPosting.title as string) : undefined,
     jobType: jobPosting ? (jobPosting.job_type as JobApplication['jobType']) : undefined,
+    // 応募者希望条件
+    preferredDays: (row.preferred_days as string) || undefined,
+    preferredHoursPerWeek: row.preferred_hours_per_week != null ? Number(row.preferred_hours_per_week) : undefined,
+    preferredHourlyRate: row.preferred_hourly_rate != null ? Number(row.preferred_hourly_rate) : undefined,
+    preferredStartTime: (row.preferred_start_time as string) || undefined,
+    preferredEndTime: (row.preferred_end_time as string) || undefined,
+    preferredNotes: (row.preferred_notes as string) || undefined,
   };
 }
 

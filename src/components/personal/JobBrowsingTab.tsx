@@ -387,7 +387,6 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
   // ---- State: apply form work preferences ----
   const [prefDays, setPrefDays] = useState<string[]>([]);
   const [prefHoursPerWeek, setPrefHoursPerWeek] = useState('');
-  const [prefHourlyRate, setPrefHourlyRate] = useState('');
   const [prefStartTime, setPrefStartTime] = useState('');
   const [prefEndTime, setPrefEndTime] = useState('');
   const [prefNotes, setPrefNotes] = useState('');
@@ -748,7 +747,6 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         cover_message: applyMessage || null,
         preferred_days: prefDays.length > 0 ? prefDays.join(',') : null,
         preferred_hours_per_week: prefHoursPerWeek ? parseInt(prefHoursPerWeek, 10) : null,
-        preferred_hourly_rate: prefHourlyRate ? parseInt(prefHourlyRate, 10) : null,
         preferred_start_time: prefStartTime || null,
         preferred_end_time: prefEndTime || null,
         preferred_notes: prefNotes || null,
@@ -762,7 +760,6 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       setApplyMessage('');
       setPrefDays([]);
       setPrefHoursPerWeek('');
-      setPrefHourlyRate('');
       setPrefStartTime('');
       setPrefEndTime('');
       setPrefNotes('');
@@ -778,7 +775,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     } finally {
       setApplying(false);
     }
-  }, [userId, selectedJob, applyMessage, prefDays, prefHoursPerWeek, prefHourlyRate, prefStartTime, prefEndTime, prefNotes, fetchApplications]);
+  }, [userId, selectedJob, applyMessage, prefDays, prefHoursPerWeek, prefStartTime, prefEndTime, prefNotes, fetchApplications]);
 
   const openApplicationDetail = useCallback(
     async (app: ApplicationRow) => {
@@ -1482,45 +1479,24 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                     </div>
                   </div>
 
-                  {/* Hours per week + hourly rate */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        希望時間/週
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="1"
-                          max="60"
-                          value={prefHoursPerWeek}
-                          onChange={(e) => setPrefHoursPerWeek(e.target.value)}
-                          placeholder="20"
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                          時間
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        希望時給
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="800"
-                          step="50"
-                          value={prefHourlyRate}
-                          onChange={(e) => setPrefHourlyRate(e.target.value)}
-                          placeholder="1200"
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                          円
-                        </span>
-                      </div>
+                  {/* Hours per week */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      希望時間/週
+                    </label>
+                    <div className="relative w-1/2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={prefHoursPerWeek}
+                        onChange={(e) => setPrefHoursPerWeek(e.target.value)}
+                        placeholder="20"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        時間
+                      </span>
                     </div>
                   </div>
 

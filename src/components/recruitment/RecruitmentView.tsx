@@ -228,7 +228,7 @@ const INITIAL_FORM: JobPostingFormData = {
 // ================================================================
 
 export default function RecruitmentView() {
-  const { facility } = useAuth();
+  const { facility, user } = useAuth();
   const facilityId = facility?.id || '';
 
   const {
@@ -295,6 +295,12 @@ export default function RecruitmentView() {
   const [hireModalApp, setHireModalApp] = useState<JobApplication | null>(null);
   const [hireSalary, setHireSalary] = useState('');
   const [hireStartDate, setHireStartDate] = useState('');
+
+  // ---- Messaging state ----
+  const [appMessages, setAppMessages] = useState<{ id: string; senderType: string; content: string; createdAt: string }[]>([]);
+  const [facilityReply, setFacilityReply] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
   // ---- Tab 4: Placements state ----
   // (uses placements from hook)
@@ -1541,11 +1547,29 @@ export default function RecruitmentView() {
                     {col.items.map(app => (
                       <button
                         key={app.id}
-                        onClick={() => {
+                        onClick={async () => {
                           setSelectedApplication(app);
                           setShowApplicationDetail(true);
                           setInterviewNotesEdit(app.interviewNotes || '');
                           setRatingEdit(app.facilityRating || 0);
+                          // Fetch messages for this application
+                          setLoadingMessages(true);
+                          setAppMessages([]);
+                          try {
+                            const { supabase: sb } = await import('@/lib/supabase');
+                            const { data: msgs } = await sb
+                              .from('recruitment_messages')
+                              .select('id, sender_type, content, created_at')
+                              .eq('job_application_id', app.id)
+                              .order('created_at', { ascending: true });
+                            setAppMessages((msgs || []).map((m: Record<string, unknown>) => ({
+                              id: m.id as string,
+                              senderType: m.sender_type as string,
+                              content: m.content as string,
+                              createdAt: m.created_at as string,
+                            })));
+                          } catch { /* ignore */ }
+                          setLoadingMessages(false);
                         }}
                         className="w-full bg-white rounded-lg p-3 shadow-sm border border-gray-100 text-left hover:shadow-md transition-shadow"
                       >
@@ -1637,6 +1661,47 @@ export default function RecruitmentView() {
                     </div>
                   )}
 
+                  {/* Applicant Work Preferences */}
+                  {(selectedApplication.preferredDays || selectedApplication.preferredHoursPerWeek || selectedApplication.preferredStartTime || selectedApplication.preferredNotes) && (
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-700 mb-2">応募者の希望条件</h3>
+                      <div className="bg-indigo-50 rounded-xl p-4 space-y-2 text-sm">
+                        {selectedApplication.preferredDays && (
+                          <div className="flex items-start gap-2">
+                            <span className="text-gray-500 shrink-0">希望曜日:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {selectedApplication.preferredDays.split(',').map(day => (
+                                <span key={day} className="px-2 py-0.5 bg-white rounded-full text-xs font-medium text-indigo-700 border border-indigo-200">
+                                  {day}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {selectedApplication.preferredHoursPerWeek && (
+                          <div>
+                            <span className="text-gray-500">希望時間/週:</span>
+                            <span className="ml-1 font-medium">{selectedApplication.preferredHoursPerWeek}時間</span>
+                          </div>
+                        )}
+                        {(selectedApplication.preferredStartTime || selectedApplication.preferredEndTime) && (
+                          <div>
+                            <span className="text-gray-500">希望時間帯:</span>
+                            <span className="ml-1 font-medium">
+                              {selectedApplication.preferredStartTime || '--:--'} 〜 {selectedApplication.preferredEndTime || '--:--'}
+                            </span>
+                          </div>
+                        )}
+                        {selectedApplication.preferredNotes && (
+                          <div>
+                            <span className="text-gray-500">その他希望:</span>
+                            <p className="mt-0.5 text-gray-700 whitespace-pre-wrap">{selectedApplication.preferredNotes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Interview Notes */}
                   <div>
                     <h3 className="text-sm font-bold text-gray-700 mb-1">面接メモ</h3>
@@ -1665,6 +1730,107 @@ export default function RecruitmentView() {
                         </button>
                       ))}
                       <span className="ml-2 text-sm text-gray-500">{ratingEdit > 0 ? `${ratingEdit}/5` : '-'}</span>
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-700 mb-2">メッセージ</h3>
+                    {loadingMessages ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                      </div>
+                    ) : appMessages.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-2">メッセージはまだありません</p>
+                    ) : (
+                      <div className="space-y-2 max-h-[200px] overflow-y-auto bg-gray-50 rounded-lg p-3">
+                        {appMessages.map(msg => {
+                          const isFacility = msg.senderType === 'facility';
+                          return (
+                            <div key={msg.id} className={`flex ${isFacility ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${isFacility ? 'bg-[#00c4cc] text-white' : 'bg-white text-gray-800 border border-gray-200'}`}>
+                                {!isFacility && <p className="text-[10px] text-gray-500 mb-0.5">応募者</p>}
+                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                                <p className={`text-[10px] mt-0.5 ${isFacility ? 'text-white/70' : 'text-gray-400'}`}>
+                                  {new Date(msg.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* Reply input */}
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        type="text"
+                        value={facilityReply}
+                        onChange={e => setFacilityReply(e.target.value)}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter' && !e.shiftKey && facilityReply.trim() && selectedApplication) {
+                            e.preventDefault();
+                            setSendingReply(true);
+                            try {
+                              const { supabase: sb } = await import('@/lib/supabase');
+                              const { data: newMsg } = await sb
+                                .from('recruitment_messages')
+                                .insert({
+                                  job_application_id: selectedApplication.id,
+                                  sender_user_id: user?.id || '',
+                                  sender_type: 'facility',
+                                  content: facilityReply.trim(),
+                                })
+                                .select()
+                                .single();
+                              if (newMsg) {
+                                setAppMessages(prev => [...prev, {
+                                  id: (newMsg as Record<string, unknown>).id as string,
+                                  senderType: 'facility',
+                                  content: facilityReply.trim(),
+                                  createdAt: (newMsg as Record<string, unknown>).created_at as string,
+                                }]);
+                              }
+                              setFacilityReply('');
+                            } catch { /* ignore */ }
+                            setSendingReply(false);
+                          }
+                        }}
+                        placeholder="返信を入力..."
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!facilityReply.trim() || !selectedApplication) return;
+                          setSendingReply(true);
+                          try {
+                            const { supabase: sb } = await import('@/lib/supabase');
+                            const { data: newMsg } = await sb
+                              .from('recruitment_messages')
+                              .insert({
+                                job_application_id: selectedApplication.id,
+                                sender_user_id: user?.id || '',
+                                sender_type: 'facility',
+                                content: facilityReply.trim(),
+                              })
+                              .select()
+                              .single();
+                            if (newMsg) {
+                              setAppMessages(prev => [...prev, {
+                                id: (newMsg as Record<string, unknown>).id as string,
+                                senderType: 'facility',
+                                content: facilityReply.trim(),
+                                createdAt: (newMsg as Record<string, unknown>).created_at as string,
+                              }]);
+                            }
+                            setFacilityReply('');
+                          } catch { /* ignore */ }
+                          setSendingReply(false);
+                        }}
+                        disabled={sendingReply || !facilityReply.trim()}
+                        className="px-3 py-1.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-40"
+                      >
+                        {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
