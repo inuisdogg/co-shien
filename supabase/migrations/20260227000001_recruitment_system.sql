@@ -133,36 +133,60 @@ ALTER TABLE recruitment_messages ENABLE ROW LEVEL SECURITY;
 -- =============================================
 
 -- job_postings: 全ユーザーが閲覧可能、施設メンバーが管理可能
+DROP POLICY IF EXISTS "job_postings_select" ON job_postings;
+DROP POLICY IF EXISTS "job_postings_insert" ON job_postings;
+DROP POLICY IF EXISTS "job_postings_update" ON job_postings;
+DROP POLICY IF EXISTS "job_postings_delete" ON job_postings;
 CREATE POLICY "job_postings_select" ON job_postings FOR SELECT USING (true);
 CREATE POLICY "job_postings_insert" ON job_postings FOR INSERT WITH CHECK (true);
 CREATE POLICY "job_postings_update" ON job_postings FOR UPDATE USING (true);
 CREATE POLICY "job_postings_delete" ON job_postings FOR DELETE USING (true);
 
 -- spot_work_shifts: 全ユーザーが閲覧可能、施設メンバーが管理可能
+DROP POLICY IF EXISTS "spot_work_shifts_select" ON spot_work_shifts;
+DROP POLICY IF EXISTS "spot_work_shifts_insert" ON spot_work_shifts;
+DROP POLICY IF EXISTS "spot_work_shifts_update" ON spot_work_shifts;
+DROP POLICY IF EXISTS "spot_work_shifts_delete" ON spot_work_shifts;
 CREATE POLICY "spot_work_shifts_select" ON spot_work_shifts FOR SELECT USING (true);
 CREATE POLICY "spot_work_shifts_insert" ON spot_work_shifts FOR INSERT WITH CHECK (true);
 CREATE POLICY "spot_work_shifts_update" ON spot_work_shifts FOR UPDATE USING (true);
 CREATE POLICY "spot_work_shifts_delete" ON spot_work_shifts FOR DELETE USING (true);
 
 -- job_applications: 関連ユーザーが閲覧・管理可能
+DROP POLICY IF EXISTS "job_applications_select" ON job_applications;
+DROP POLICY IF EXISTS "job_applications_insert" ON job_applications;
+DROP POLICY IF EXISTS "job_applications_update" ON job_applications;
+DROP POLICY IF EXISTS "job_applications_delete" ON job_applications;
 CREATE POLICY "job_applications_select" ON job_applications FOR SELECT USING (true);
 CREATE POLICY "job_applications_insert" ON job_applications FOR INSERT WITH CHECK (true);
 CREATE POLICY "job_applications_update" ON job_applications FOR UPDATE USING (true);
 CREATE POLICY "job_applications_delete" ON job_applications FOR DELETE USING (true);
 
 -- placements: 関連ユーザーが閲覧・管理可能
+DROP POLICY IF EXISTS "placements_select" ON placements;
+DROP POLICY IF EXISTS "placements_insert" ON placements;
+DROP POLICY IF EXISTS "placements_update" ON placements;
+DROP POLICY IF EXISTS "placements_delete" ON placements;
 CREATE POLICY "placements_select" ON placements FOR SELECT USING (true);
 CREATE POLICY "placements_insert" ON placements FOR INSERT WITH CHECK (true);
 CREATE POLICY "placements_update" ON placements FOR UPDATE USING (true);
 CREATE POLICY "placements_delete" ON placements FOR DELETE USING (true);
 
 -- stripe_customers: 関連施設が閲覧・管理可能
+DROP POLICY IF EXISTS "stripe_customers_select" ON stripe_customers;
+DROP POLICY IF EXISTS "stripe_customers_insert" ON stripe_customers;
+DROP POLICY IF EXISTS "stripe_customers_update" ON stripe_customers;
+DROP POLICY IF EXISTS "stripe_customers_delete" ON stripe_customers;
 CREATE POLICY "stripe_customers_select" ON stripe_customers FOR SELECT USING (true);
 CREATE POLICY "stripe_customers_insert" ON stripe_customers FOR INSERT WITH CHECK (true);
 CREATE POLICY "stripe_customers_update" ON stripe_customers FOR UPDATE USING (true);
 CREATE POLICY "stripe_customers_delete" ON stripe_customers FOR DELETE USING (true);
 
 -- recruitment_messages: 関連ユーザーが閲覧・管理可能
+DROP POLICY IF EXISTS "recruitment_messages_select" ON recruitment_messages;
+DROP POLICY IF EXISTS "recruitment_messages_insert" ON recruitment_messages;
+DROP POLICY IF EXISTS "recruitment_messages_update" ON recruitment_messages;
+DROP POLICY IF EXISTS "recruitment_messages_delete" ON recruitment_messages;
 CREATE POLICY "recruitment_messages_select" ON recruitment_messages FOR SELECT USING (true);
 CREATE POLICY "recruitment_messages_insert" ON recruitment_messages FOR INSERT WITH CHECK (true);
 CREATE POLICY "recruitment_messages_update" ON recruitment_messages FOR UPDATE USING (true);
