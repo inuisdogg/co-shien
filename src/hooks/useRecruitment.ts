@@ -44,6 +44,7 @@ function mapJobPosting(row: Record<string, unknown>): JobPosting {
     updatedAt: row.updated_at as string,
     facilityName: (row.facility_name as string) || undefined,
     facilityAddress: (row.facility_address as string) || undefined,
+    imageUrl: (row.image_url as string) || undefined,
   };
 }
 
@@ -79,6 +80,9 @@ function mapApplication(row: Record<string, unknown>): JobApplication {
     resumeUrl: (row.resume_url as string) || undefined,
     interviewDate: (row.interview_date as string) || undefined,
     interviewNotes: (row.interview_notes as string) || undefined,
+    interviewFormat: (row.interview_format as JobApplication['interviewFormat']) || undefined,
+    interviewLocation: (row.interview_location as string) || undefined,
+    interviewMeetingUrl: (row.interview_meeting_url as string) || undefined,
     facilityRating: row.facility_rating != null ? Number(row.facility_rating) : undefined,
     facilityNotes: (row.facility_notes as string) || undefined,
     hiredAt: (row.hired_at as string) || undefined,

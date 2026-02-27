@@ -26,7 +26,6 @@ import {
   Send,
   UserPlus,
   LogIn,
-  Phone,
   AlertCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -61,7 +60,6 @@ type JobPosting = {
     id: string;
     name: string;
     address: string | null;
-    phone: string | null;
   } | null;
 };
 
@@ -166,7 +164,7 @@ export default function JobDetailPage() {
     try {
       const { data, error } = await supabase
         .from('job_postings')
-        .select('*, facilities(id, name, address, phone)')
+        .select('*, facilities(id, name, address)')
         .eq('id', jobId)
         .eq('status', 'published')
         .single();
@@ -650,12 +648,6 @@ export default function JobDetailPage() {
                       <div className="flex items-start gap-2">
                         <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
                         <span className="text-sm text-gray-700">{job.facilities.address}</span>
-                      </div>
-                    )}
-                    {job.facilities.phone && (
-                      <div className="flex items-start gap-2">
-                        <Phone className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
-                        <span className="text-sm text-gray-700">{job.facilities.phone}</span>
                       </div>
                     )}
                   </div>

@@ -2439,6 +2439,7 @@ export type JobPosting = {
   updatedAt: string;
   facilityName?: string;
   facilityAddress?: string;
+  imageUrl?: string;
 };
 
 export type SpotWorkShift = {
@@ -2466,6 +2467,9 @@ export type JobApplication = {
   resumeUrl?: string;
   interviewDate?: string;
   interviewNotes?: string;
+  interviewFormat?: 'in_person' | 'online' | 'phone';
+  interviewLocation?: string;
+  interviewMeetingUrl?: string;
   facilityRating?: number;
   facilityNotes?: string;
   hiredAt?: string;
@@ -2478,6 +2482,7 @@ export type JobApplication = {
   applicantQualifications?: string[];
   jobTitle?: string;
   jobType?: JobType;
+  facilityName?: string;
 };
 
 export type Placement = {
@@ -2499,5 +2504,12 @@ export type Placement = {
   updatedAt: string;
   workerName?: string;
   facilityName?: string;
+};
+
+export type JobFavorite = {
+  id: string;
+  userId: string;
+  jobPostingId: string;
+  createdAt: string;
 };
 
