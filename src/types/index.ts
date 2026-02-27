@@ -2796,3 +2796,185 @@ export type ServiceCode = {
   createdAt: string;
 };
 
+// ─── プラットフォーム管理 型定義 ───
+
+// 法人（拡張）
+export type CompanyExtended = {
+  id: string;
+  name: string;
+  companyType: 'corporation' | 'npo' | 'individual' | 'independent';
+  franchiseBrand?: string;
+  contactPersonName?: string;
+  contactPersonEmail?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  contractAmount?: number;
+  contractTier: 'basic' | 'standard' | 'premium';
+  monthlyFee?: number;
+  contractStatus: 'negotiating' | 'active' | 'suspended' | 'terminated';
+  address?: string;
+  phone?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // 集計値（JOINで取得）
+  facilityCount?: number;
+  totalRevenue?: number;
+  totalStaff?: number;
+  totalChildren?: number;
+};
+
+// プラットフォーム統計
+export type PlatformStats = {
+  totalCompanies: number;
+  totalFacilities: number;
+  totalStaff: number;
+  totalChildren: number;
+  totalMonthlyRevenue: number;
+  averageUtilizationRate: number;
+  // 前月比
+  companyGrowth: number;
+  facilityGrowth: number;
+  staffGrowth: number;
+  childrenGrowth: number;
+  revenueGrowth: number;
+};
+
+// 施設サマリー（一覧用）
+export type FacilitySummary = {
+  id: string;
+  name: string;
+  code: string;
+  companyId?: string;
+  companyName?: string;
+  franchiseOrIndependent?: string;
+  prefectureCode?: string;
+  cityCode?: string;
+  preRegistered: boolean;
+  verificationStatus?: string;
+  certificationStatus?: string;
+  averageRating?: number;
+  reviewCount?: number;
+  platformNotes?: string;
+  capacityTotal?: number;
+  serviceCategory?: string;
+  createdAt: string;
+  // 集計値
+  staffCount: number;
+  childrenCount: number;
+  monthlyRevenue: number;
+  utilizationRate: number;
+  additionCount: number;
+};
+
+// 施設ディープビュー
+export type FacilityDeepView = {
+  facility: FacilitySummary;
+  // 売上
+  billingRecords: {
+    childName: string;
+    serviceType: string;
+    totalUnits: number;
+    totalAmount: number;
+    copayAmount: number;
+    insuranceAmount: number;
+    status: string;
+  }[];
+  revenueBreakdown: {
+    baseRevenue: number;
+    additionRevenue: number;
+    totalRevenue: number;
+    copayTotal: number;
+  };
+  // スタッフ
+  staffList: {
+    id: string;
+    name: string;
+    role: string;
+    employmentType: string;
+    qualifications: string[];
+    startDate: string;
+  }[];
+  staffComposition: {
+    fulltime: number;
+    parttime: number;
+    qualified: number;
+    total: number;
+    fte: number; // 常勤換算
+  };
+  // 児童
+  childrenList: {
+    id: string;
+    name: string;
+    contractStatus: string;
+    grantDays?: number;
+    usageDaysThisMonth: number;
+  }[];
+  // 加算
+  activeAdditions: {
+    code: string;
+    name: string;
+    units: number;
+    isActive: boolean;
+  }[];
+  additionOpportunities: {
+    name: string;
+    estimatedRevenue: number;
+    gapDescription: string;
+  }[];
+  // 利用率
+  utilizationDetails: {
+    totalCapacityDays: number;
+    actualUsageDays: number;
+    rate: number;
+  };
+};
+
+// ベンチマークデータ
+export type BenchmarkMetric = {
+  metricName: string;
+  metricLabel: string;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  meanValue: number;
+  stdDev: number;
+  sampleSize: number;
+};
+
+// 施設ベンチマーク結果
+export type FacilityBenchmark = {
+  facilityId: string;
+  facilityName: string;
+  companyName?: string;
+  value: number;
+  percentile: number;
+  deviationScore: number; // 偏差値
+  rank: number;
+};
+
+// 戦略インサイト
+export type StrategicInsight = {
+  id: string;
+  facilityId: string;
+  facilityName: string;
+  companyName?: string;
+  type: 'addition_opportunity' | 'growth_potential' | 'risk_alert';
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  estimatedImpact?: number; // 推定インパクト（円/月）
+  metadata?: Record<string, unknown>;
+};
+
+// ベンチマーク指標キー
+export type BenchmarkMetricKey =
+  | 'revenue_per_child'
+  | 'staff_child_ratio'
+  | 'utilization_rate'
+  | 'addition_count'
+  | 'profit_margin'
+  | 'staff_retention'
+  | 'average_rating';
+

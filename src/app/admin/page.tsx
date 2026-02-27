@@ -330,6 +330,26 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* プラットフォームダッシュボードへの導線（ownerのみ） */}
+        {user?.role === 'owner' && (
+          <div className="bg-gradient-to-r from-cyan-600 to-cyan-700 rounded-xl shadow-sm p-6 mb-8 cursor-pointer hover:from-cyan-700 hover:to-cyan-800 transition-all"
+            onClick={() => router.push('/admin/platform')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">プラットフォームダッシュボード</h2>
+                  <p className="text-cyan-100 text-sm">全施設の売上・ベンチマーク・戦略インサイトを一覧</p>
+                </div>
+              </div>
+              <ExternalLink className="w-5 h-5 text-white/70" />
+            </div>
+          </div>
+        )}
+
         {/* 施設招待セクション */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
           <div className="p-6 border-b border-gray-100">
