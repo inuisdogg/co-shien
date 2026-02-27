@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       // 開発モード: APIキーがない場合はメール送信をスキップ
-      console.log('[DEV] 招待メール送信スキップ:', { participantEmail, meetingTitle });
       return NextResponse.json({ success: true, devMode: true });
     }
 

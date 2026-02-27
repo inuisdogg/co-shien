@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck, AlertTriangle, FileText, ChevronRight, Bell, Shield, CheckCircle, Loader2, Camera, ImagePlus, Database, Download, AlertOctagon, Info } from 'lucide-react';
+import { Settings, Save, Calendar, Clock, Users, Building2, Plus, Trash2, History, X, MapPin, Truck, Briefcase, UserCheck, AlertTriangle, FileText, ChevronRight, Bell, Shield, CheckCircle, Loader2, Camera, ImagePlus, Database, Download, AlertOctagon, Info, Globe, Copy, ExternalLink, Eye, Search } from 'lucide-react';
 import { normalizeAddress } from '@/lib/addressNormalizer';
 import { FacilitySettings, HolidayPeriod, BusinessHoursPeriod, FacilitySettingsHistory, ChangeNotification, CHANGE_NOTIFICATION_TYPE_LABELS, CHANGE_NOTIFICATION_STATUS_CONFIG, CertificationStatus } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -16,11 +16,12 @@ import { useChangeNotifications, detectSettingsChanges, daysUntilDeadline, getDe
 import ChangeNotificationList from './ChangeNotificationList';
 import OperationsReviewWizard from './OperationsReviewWizard';
 // タブの種類
-type SettingsTab = 'basic' | 'operation' | 'change_notifications' | 'notification_preferences' | 'data_management';
+type SettingsTab = 'basic' | 'operation' | 'change_notifications' | 'notification_preferences' | 'data_management' | 'homepage';
 
-const SETTINGS_TABS: { id: SettingsTab; label: string; icon: 'building' | 'clock' | 'bell' | 'bellring' | 'database' }[] = [
+const SETTINGS_TABS: { id: SettingsTab; label: string; icon: 'building' | 'clock' | 'bell' | 'bellring' | 'database' | 'globe' }[] = [
   { id: 'basic', label: '基本情報', icon: 'building' },
   { id: 'operation', label: '営業・休日', icon: 'clock' },
+  { id: 'homepage', label: 'ホームページ', icon: 'globe' },
   { id: 'change_notifications', label: '変更届', icon: 'bell' },
   { id: 'notification_preferences', label: '通知設定', icon: 'bellring' },
   { id: 'data_management', label: 'データ管理', icon: 'database' },
@@ -121,6 +122,11 @@ const FacilitySettingsView: React.FC = () => {
   const [facilityPhotos, setFacilityPhotos] = useState<string[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // ホームページ設定
+  const [homepageCopied, setHomepageCopied] = useState(false);
+  const [homepageSaving, setHomepageSaving] = useState(false);
+  const [homepageSaved, setHomepageSaved] = useState(false);
 
   // 最新の施設コード・認証情報・写真を取得
   useEffect(() => {
@@ -618,7 +624,7 @@ const FacilitySettingsView: React.FC = () => {
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {tab.icon === 'building' ? <Building2 size={16} /> : tab.icon === 'clock' ? <Clock size={16} /> : tab.icon === 'bellring' ? <Bell size={16} /> : tab.icon === 'database' ? <Database size={16} /> : <Bell size={16} />}
+              {tab.icon === 'building' ? <Building2 size={16} /> : tab.icon === 'clock' ? <Clock size={16} /> : tab.icon === 'globe' ? <Globe size={16} /> : tab.icon === 'bellring' ? <Bell size={16} /> : tab.icon === 'database' ? <Database size={16} /> : <Bell size={16} />}
               {tab.label}
               {tab.id === 'change_notifications' && pendingCount > 0 && (
                 <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
@@ -1890,6 +1896,256 @@ const FacilitySettingsView: React.FC = () => {
                   通知設定を保存
                 </button>
               </div>
+            </div>
+          </>
+        )}
+
+        {/* ========== ホームページタブ ========== */}
+        {activeTab === 'homepage' && (
+          <>
+            {/* プレビューリンク */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Globe size={20} className="mr-2 text-[#00c4cc]" />
+                施設ホームページ
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                施設の公開ページを自動生成します。保護者や利用検討者向けの情報発信にご活用ください。
+              </p>
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">あなたの施設ページ</p>
+                    <p className="text-sm font-mono text-[#00c4cc] font-bold truncate">
+                      /facilities/{currentFacilityCode || facility?.code || '...'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/facilities/${currentFacilityCode || facility?.code || ''}`;
+                        navigator.clipboard.writeText(url).then(() => {
+                          setHomepageCopied(true);
+                          setTimeout(() => setHomepageCopied(false), 2000);
+                        });
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      {homepageCopied ? (
+                        <>
+                          <CheckCircle size={14} className="text-green-500" />
+                          コピー済み
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          URLをコピー
+                        </>
+                      )}
+                    </button>
+                    <a
+                      href={`/facilities/${currentFacilityCode || facility?.code || ''}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-[#00c4cc] rounded-lg hover:bg-[#00b0b8] transition-colors"
+                    >
+                      <ExternalLink size={14} />
+                      プレビュー
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 公開設定 */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Eye size={20} className="mr-2 text-[#00c4cc]" />
+                公開設定
+              </h3>
+              <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200">
+                <div>
+                  <p className="text-sm font-bold text-gray-800">ホームページを公開する</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    オフにすると施設ページは非公開になります
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSettings({ ...settings, homepageEnabled: !settings.homepageEnabled })}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                    settings.homepageEnabled !== false ? 'bg-[#00c4cc]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm ${
+                      settings.homepageEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* キャッチコピー・紹介文 */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <FileText size={20} className="mr-2 text-[#00c4cc]" />
+                ページ内容
+              </h3>
+              <div className="space-y-5">
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-2">
+                    キャッチコピー
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.homepageTagline || ''}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 100) {
+                        setSettings({ ...settings, homepageTagline: e.target.value });
+                      }
+                    }}
+                    placeholder="例: お子さまの可能性を広げる支援を"
+                    maxLength={100}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                  />
+                  <p className="text-xs text-gray-400 mt-1 text-right">
+                    {(settings.homepageTagline || '').length} / 100文字
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-2">
+                    施設紹介文
+                  </label>
+                  <textarea
+                    value={settings.homepageDescription || ''}
+                    onChange={(e) => setSettings({ ...settings, homepageDescription: e.target.value })}
+                    placeholder="施設の特徴、療育方針、対象のお子さまなど、保護者に伝えたい情報を記載してください。"
+                    rows={6}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-2">
+                    カバー画像URL
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.homepageCoverImageUrl || ''}
+                    onChange={(e) => setSettings({ ...settings, homepageCoverImageUrl: e.target.value })}
+                    placeholder="https://example.com/cover.jpg"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    ヒーローエリアに表示される画像です。未設定の場合はグラデーションが表示されます。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* フォトギャラリー */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Camera size={20} className="mr-2 text-[#00c4cc]" />
+                フォトギャラリー
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                施設の写真URLを最大6枚まで登録できます。
+              </p>
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-400 w-6 text-center">{idx + 1}</span>
+                    <input
+                      type="text"
+                      value={(settings.homepagePhotos || [])[idx] || ''}
+                      onChange={(e) => {
+                        const newPhotos = [...(settings.homepagePhotos || [])];
+                        // Extend array if needed
+                        while (newPhotos.length <= idx) newPhotos.push('');
+                        newPhotos[idx] = e.target.value;
+                        // Trim trailing empty entries
+                        while (newPhotos.length > 0 && newPhotos[newPhotos.length - 1] === '') {
+                          newPhotos.pop();
+                        }
+                        setSettings({ ...settings, homepagePhotos: newPhotos });
+                      }}
+                      placeholder="https://example.com/photo.jpg"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                    />
+                    {(settings.homepagePhotos || [])[idx] && (
+                      <button
+                        onClick={() => {
+                          const newPhotos = [...(settings.homepagePhotos || [])];
+                          newPhotos.splice(idx, 1);
+                          setSettings({ ...settings, homepagePhotos: newPhotos });
+                        }}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                ヒント: 基本情報タブの施設写真も自動的にホームページに表示されます。
+              </p>
+            </div>
+
+            {/* SEOプレビュー */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center mb-4">
+                <Search size={20} className="mr-2 text-[#00c4cc]" />
+                SEOプレビュー
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Google検索結果でのイメージです。
+              </p>
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <p className="text-xs text-green-700 font-mono truncate mb-1">
+                  {typeof window !== 'undefined' ? window.location.origin : 'https://roots-app.jp'}/facilities/{currentFacilityCode || facility?.code || '...'}
+                </p>
+                <p className="text-[#1a0dab] text-base font-medium hover:underline cursor-pointer truncate">
+                  {settings.facilityName || '施設名'}{settings.homepageTagline ? ` - ${settings.homepageTagline}` : ''} | Roots
+                </p>
+                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                  {settings.homepageDescription
+                    ? settings.homepageDescription.slice(0, 160)
+                    : `${settings.facilityName || '施設名'}の施設情報、求人情報、アクセスなど。Rootsで詳細を確認できます。`}
+                </p>
+              </div>
+            </div>
+
+            {/* 保存ボタン */}
+            <div className="flex justify-end">
+              <button
+                onClick={async () => {
+                  setHomepageSaving(true);
+                  try {
+                    await updateFacilitySettings(settings, 'ホームページ設定を更新しました');
+                    setHomepageSaved(true);
+                    setTimeout(() => setHomepageSaved(false), 3000);
+                  } catch (error: any) {
+                    console.error('ホームページ設定の保存に失敗しました:', error);
+                    alert(`ホームページ設定の保存に失敗しました: ${error.message || '不明なエラー'}`);
+                  } finally {
+                    setHomepageSaving(false);
+                  }
+                }}
+                disabled={homepageSaving}
+                className="inline-flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-8 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {homepageSaving ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : homepageSaved ? (
+                  <CheckCircle size={16} />
+                ) : (
+                  <Save size={16} />
+                )}
+                {homepageSaving ? '保存中...' : homepageSaved ? '保存しました' : 'ホームページ設定を保存'}
+              </button>
             </div>
           </>
         )}

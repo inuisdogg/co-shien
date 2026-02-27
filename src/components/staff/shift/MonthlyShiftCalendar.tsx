@@ -356,7 +356,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
       const prevM = month === 1 ? 12 : month - 1;
       const prevY = month === 1 ? year - 1 : year;
       if (window.confirm(`${prevY}年${prevM}月のシフトを今月にコピーしますか？\n※前月シフトデータを読み込んでいない場合、コピーできません。`)) {
-        console.log('Copy from', prevY, prevM, 'to', year, month);
+        // Copy previous month's shifts to current month
       }
     }
   }, [year, month, onCopyPrevMonth, copyPreviewData]);

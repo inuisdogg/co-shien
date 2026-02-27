@@ -374,7 +374,7 @@ async function notifyFacilityAdmins(
 ): Promise<void> {
   // TODO: 通知サービスを実装
   // 事業所の管理者（admin、manager）に通知を送信
-  console.log(`事業所 ${facilityName} の管理者に通知: 実務経験証明依頼 ${requestId}`);
+  // TODO: 通知サービスが実装されたら、ここで管理者に通知を送信する
 }
 
 /**
@@ -382,7 +382,7 @@ async function notifyFacilityAdmins(
  */
 async function notifyRequester(userId: string, requestId: string): Promise<void> {
   // TODO: 通知サービスを実装
-  console.log(`ユーザー ${userId} に通知: 実務経験証明依頼 ${requestId} のステータス更新`);
+  // TODO: 通知サービスが実装されたら、ここで申請者に通知を送信する
 }
 
 

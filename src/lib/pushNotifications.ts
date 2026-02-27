@@ -99,7 +99,6 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
       { onConflict: 'id' }
     );
 
-    console.log('[Push] Subscription saved successfully');
     return subscription;
   } catch (error) {
     console.error('[Push] Subscription failed:', error);
@@ -124,7 +123,6 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
     // Remove all subscriptions for this user
     await supabase.from('push_subscriptions').delete().eq('user_id', userId);
 
-    console.log('[Push] Unsubscribed successfully');
   } catch (error) {
     console.error('[Push] Unsubscribe failed:', error);
   }

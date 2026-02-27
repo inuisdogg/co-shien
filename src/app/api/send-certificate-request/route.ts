@@ -89,12 +89,6 @@ export async function POST(req: NextRequest) {
 
     // 開発モードの場合はメール送信をスキップ
     if (isDevMode) {
-      console.log('=== 開発モード: メール送信スキップ ===');
-      console.log('宛先:', to);
-      console.log('件名:', subject);
-      console.log('署名URL:', signatureUrl);
-      console.log('===============================');
-
       return NextResponse.json({
         success: true,
         devMode: true,

@@ -104,9 +104,7 @@ export async function POST(request: NextRequest) {
           //       JSON.stringify({ title, body, data: { url: data?.url || '/', ...data }, tag: type })
           //     );
           //   }
-          console.log(
-            `[notifications/send] プッシュ通知対象: ${subscriptions.length}件のサブスクリプション (送信はTODO)`
-          );
+          // TODO: web-push送信の実装
         }
       }
     }
@@ -131,9 +129,7 @@ export async function POST(request: NextRequest) {
         // 既存の notify-application/notify-status-change/notify-match ルートの
         // パターンに従って実装する
         // 現時点ではDB通知のみ作成し、汎用メール送信は未実装
-        console.log(
-          `[notifications/send] メール通知対象: userId=${userId}, type=${type} (送信はTODO)`
-        );
+        // TODO: Resendを使ったメール送信の実装
       }
     }
 

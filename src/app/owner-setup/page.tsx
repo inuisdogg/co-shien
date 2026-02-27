@@ -53,7 +53,6 @@ export default function OwnerSetupPage() {
           .maybeSingle();
 
         if (configError) {
-          console.log('system_configテーブルの確認エラー:', configError);
           setAlreadySetup(false);
         } else if (config?.value === 'true') {
           setAlreadySetup(true);

@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      console.log('[DEV] 確定通知メール送信スキップ:', { participantEmail, meetingTitle });
       return NextResponse.json({ success: true, devMode: true });
     }
 

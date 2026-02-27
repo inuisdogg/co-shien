@@ -50,7 +50,6 @@ export async function POST(request: Request) {
           })
           .eq('id', placementId);
 
-        console.log(`Placement ${placementId} marked as paid`);
       } catch (dbErr) {
         console.error('Failed to update placement after payment:', dbErr);
         // Return 200 anyway so Stripe doesn't retry

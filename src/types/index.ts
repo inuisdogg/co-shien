@@ -106,6 +106,13 @@ export type FacilitySettings = {
   };
   // 勤怠設定
   prescribedWorkingHours?: number; // 1日の所定労働時間（分単位、例: 420 = 7時間）
+  // ホームページ設定
+  homepageEnabled?: boolean; // ホームページ公開フラグ
+  homepageTagline?: string; // キャッチコピー（最大100文字）
+  homepageDescription?: string; // 施設紹介文
+  homepageCoverImageUrl?: string; // カバー画像URL
+  homepagePhotos?: string[]; // フォトギャラリーURL配列
+  homepageTheme?: string; // テーマカラー（デフォルト: 'teal'）
   createdAt: string;
   updatedAt: string;
 };

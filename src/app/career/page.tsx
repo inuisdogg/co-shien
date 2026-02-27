@@ -1163,9 +1163,6 @@ export default function PersonalDashboardPage() {
                 }
               }
               
-              console.log('処理後のholidayPeriods:', holidayPeriods);
-              console.log('処理後のcustomHolidays:', customHolidays);
-              
               setFacilitySettings({
                 id: settingsData.id,
                 facilityId: settingsData.facility_id,

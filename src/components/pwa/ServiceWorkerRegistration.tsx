@@ -28,7 +28,6 @@ export default function ServiceWorkerRegistration() {
       updateViaCache: 'none',
     })
       .then((reg) => {
-        console.log('Service Worker registered:', reg);
         setRegistration(reg);
 
         // 更新を定期的にチェック（1時間ごと）
@@ -46,11 +45,9 @@ export default function ServiceWorkerRegistration() {
               if (newWorker.state === 'installed') {
                 if (navigator.serviceWorker.controller) {
                   // 既存のSWが動作中 → 更新が利用可能
-                  console.log('[SW] New version installed, update available');
                   setUpdateAvailable(true);
                 } else {
                   // 初回インストール
-                  console.log('[SW] Service Worker installed for the first time');
                 }
               }
             });
@@ -70,7 +67,7 @@ export default function ServiceWorkerRegistration() {
 
     // Service Workerの更新を検知
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[SW] Controller changed');
+      // Controller changed - new SW is active
     });
 
     // PWAインストールプロンプトの処理
@@ -111,7 +108,6 @@ export default function ServiceWorkerRegistration() {
 
     prompt.prompt();
     const { outcome } = await prompt.userChoice;
-    console.log('[PWA] Install prompt outcome:', outcome);
 
     deferredPromptRef.current = null;
     setShowInstallBanner(false);
