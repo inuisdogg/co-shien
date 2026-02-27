@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 let resend: Resend | null = null;
 function getResend(): Resend {
@@ -95,11 +96,11 @@ export async function POST(request: Request) {
 
         return `
           <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #818CF8;">
-            <h3 style="margin: 0 0 8px; font-size: 16px; color: #1f2937;">${job.title}</h3>
-            <p style="margin: 0 0 4px; font-size: 14px; color: #6b7280;">${facilityName}</p>
+            <h3 style="margin: 0 0 8px; font-size: 16px; color: #1f2937;">${escapeHtml(job.title as string)}</h3>
+            <p style="margin: 0 0 4px; font-size: 14px; color: #6b7280;">${escapeHtml(facilityName)}</p>
             <p style="margin: 0 0 4px; font-size: 14px;">
-              <span style="display: inline-block; background: #818CF8; color: white; font-size: 12px; padding: 2px 8px; border-radius: 4px;">${jobType}</span>
-              <span style="margin-left: 8px; color: #374151;">${salaryText}</span>
+              <span style="display: inline-block; background: #818CF8; color: white; font-size: 12px; padding: 2px 8px; border-radius: 4px;">${escapeHtml(jobType)}</span>
+              <span style="margin-left: 8px; color: #374151;">${escapeHtml(salaryText)}</span>
             </p>
             <a href="${baseUrl}/jobs/${job.id}" style="display: inline-block; margin-top: 8px; color: #818CF8; font-size: 14px; text-decoration: none;">
               詳細を見る &rarr;
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
               <h1 style="color: white; margin: 0; font-size: 24px;">おすすめ求人のご案内</h1>
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p style="font-size: 16px;">${user.name} 様</p>
+              <p style="font-size: 16px;">${escapeHtml(user.name)} 様</p>
               <p style="font-size: 16px;">あなたの資格・経験にマッチする求人が見つかりました。</p>
               <div style="margin: 20px 0;">
                 ${jobCardsHtml}

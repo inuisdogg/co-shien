@@ -84,7 +84,8 @@ export default function SignupPage() {
 
       // Supabase Authでサインアップ（メール認証を有効化、パスワードは後で設定）
       // 一時的なパスワードを生成（メール認証後に設定画面で変更）
-      const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+      const tempArray = crypto.getRandomValues(new Uint8Array(16));
+      const tempPassword = Array.from(tempArray, b => b.toString(36).padStart(2, '0')).join('').slice(0, 12) + 'A1!';
       const redirectUrl = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=business`
         : 'https://Roots.inu.co.jp/auth/callback?type=business';

@@ -226,7 +226,7 @@ export default function FacilityRegisterPage() {
         // 施設コードを自動発番（5桁）
         let isUnique = false;
         do {
-          newFacilityCode = Math.floor(10000 + Math.random() * 90000).toString();
+          newFacilityCode = String(10000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90000));
           const { data: existing } = await supabase
             .from('facilities')
             .select('id')
@@ -283,7 +283,7 @@ export default function FacilityRegisterPage() {
         // 施設コードを自動発番（5桁）
         let isUnique = false;
         do {
-          newFacilityCode = Math.floor(10000 + Math.random() * 90000).toString();
+          newFacilityCode = String(10000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90000));
           const { data: existing } = await supabase
             .from('facilities')
             .select('id')

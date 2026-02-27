@@ -47,9 +47,13 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // APIルート
+  // APIルート（認証は各ルートハンドラーで個別に処理）
   if (pathname.startsWith('/api/') || pathname === '/api') {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    // APIリクエストのセキュリティヘッダー
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    return response;
   }
 
   // Auth コールバック
@@ -123,6 +127,7 @@ export function middleware(req: NextRequest) {
       response.headers.set('X-Content-Type-Options', 'nosniff');
       response.headers.set('X-Frame-Options', 'DENY');
       response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+      response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://maps.googleapis.com;");
     }
 
     return response;

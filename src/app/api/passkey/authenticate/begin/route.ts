@@ -76,6 +76,15 @@ export async function POST(request: NextRequest) {
 
     const options = await generateAuthenticationOptions(opts);
 
+    // チャレンジをデータベースに保存（サーバーサイドで管理）
+    await supabase
+      .from('users')
+      .update({
+        passkey_challenge: options.challenge,
+        passkey_challenge_expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      })
+      .eq('id', userData.id);
+
     return NextResponse.json({
       ...options,
       userId: userData.id,
@@ -83,7 +92,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Passkey authenticate begin error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -12,12 +12,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       credential: credentialData,
-      challenge: expectedChallenge,
       facilityCode,
       loginId,
     } = body;
 
-    if (!credentialData || !loginId || !expectedChallenge) {
+    if (!credentialData || !loginId) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
@@ -25,10 +24,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 個人向けの場合、loginIdはメールアドレス
-    // usersテーブルからユーザーを検索
+    // usersテーブルからユーザーを検索 + サーバー側のチャレンジを取得
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, email')
+      .select('id, email, passkey_challenge, passkey_challenge_expires')
       .eq('email', loginId)
       .eq('account_status', 'active')
       .single();
@@ -37,6 +36,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
+      );
+    }
+
+    // サーバー側のチャレンジを検証
+    const expectedChallenge = userData.passkey_challenge;
+    if (!expectedChallenge) {
+      return NextResponse.json(
+        { error: 'No challenge found. Please start authentication again.' },
+        { status: 400 }
+      );
+    }
+
+    // チャレンジの有効期限を確認
+    if (userData.passkey_challenge_expires && new Date(userData.passkey_challenge_expires) < new Date()) {
+      await supabase
+        .from('users')
+        .update({ passkey_challenge: null, passkey_challenge_expires: null })
+        .eq('id', userData.id);
+      return NextResponse.json(
+        { error: 'Challenge expired. Please start authentication again.' },
+        { status: 400 }
       );
     }
 
@@ -160,6 +180,12 @@ export async function POST(request: NextRequest) {
       console.error('Passkey counter update error:', updateError);
       // カウンター更新の失敗は致命的ではないが、ログに記録
     }
+
+    // 使用済みチャレンジをクリア
+    await supabase
+      .from('users')
+      .update({ passkey_challenge: null, passkey_challenge_expires: null })
+      .eq('id', userData.id);
 
     return NextResponse.json({
       success: true,

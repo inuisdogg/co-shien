@@ -2637,3 +2637,72 @@ export type NotificationPreferences = {
   updatedAt: string;
 };
 
+// キャッシュフロー管理
+export interface CashflowEntry {
+  id: string;
+  facilityId: string;
+  yearMonth: string;
+  category: 'income' | 'expense';
+  subcategory: string;
+  itemName: string;
+  amount: number;
+  sortOrder: number;
+  notes?: string;
+  isTemplateItem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CashflowBalance {
+  id: string;
+  facilityId: string;
+  yearMonth: string;
+  openingBalance: number;
+}
+
+export interface PLStatement {
+  yearMonth: string;
+  income: {
+    benefits: number;       // 介護給付費収入
+    copay: number;          // 利用者負担金
+    additions: number;      // 加算収入
+    subsidy: number;        // 補助金・助成金
+    other: number;          // その他収入
+    total: number;
+  };
+  expenses: {
+    personnel: {
+      salary: number;       // 給与・賞与
+      socialInsurance: number; // 法定福利費
+      welfare: number;      // 福利厚生費
+      commuting: number;    // 通勤手当
+      total: number;
+    };
+    operations: {
+      meals: number;        // 給食費
+      materials: number;    // 教材費
+      utilities: number;    // 水道光熱費
+      rent: number;         // 賃借料
+      insurance: number;    // 保険料
+      vehicle: number;      // 車両関連費
+      total: number;
+    };
+    admin: {
+      communication: number; // 通信費
+      supplies: number;      // 消耗品費
+      repairs: number;       // 修繕費
+      outsourcing: number;   // 業務委託費
+      depreciation: number;  // 減価償却費
+      total: number;
+    };
+    other: {
+      loanRepayment: number; // 借入金返済
+      capex: number;         // 設備投資
+      misc: number;          // その他
+      total: number;
+    };
+    total: number;
+  };
+  netIncome: number;
+}
+

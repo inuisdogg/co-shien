@@ -45,7 +45,6 @@ export default function ClientLoginPage() {
             
             if (daysSinceSaved <= 30) {
               if (data.email) setEmail(data.email);
-              if (data.password) setPassword(data.password);
               setRememberMe(true);
             } else {
               localStorage.removeItem('savedLoginData');
@@ -104,7 +103,6 @@ export default function ClientLoginPage() {
       if (rememberMe) {
         const savedData = {
           email,
-          password,
           savedAt: new Date().toISOString(),
         };
         localStorage.setItem('savedLoginData', JSON.stringify(savedData));

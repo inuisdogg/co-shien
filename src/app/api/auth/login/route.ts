@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { verifyPassword, hashPassword, isLegacyHash } from '@/utils/password';
+import { rateLimit, rateLimitResponse } from '@/lib/rateLimiter';
 
 interface LoginRequest {
   facilityCode: string;
@@ -10,6 +11,14 @@ interface LoginRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // IPアドレスによるレート制限: 15分間に最大10回
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+    const ipLimit = rateLimit(`login:ip:${ip}`, 10, 15 * 60 * 1000);
+    if (!ipLimit.allowed) return rateLimitResponse(ipLimit.retryAfter!);
+
     const body: LoginRequest = await request.json();
     const { facilityCode, loginId, password } = body;
 
@@ -19,6 +28,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // メールアドレス/ログインIDによるレート制限: 1時間に最大5回
+    const emailLimit = rateLimit(`login:email:${loginId.toLowerCase()}`, 5, 60 * 60 * 1000);
+    if (!emailLimit.allowed) return rateLimitResponse(emailLimit.retryAfter!);
 
     const supabase = createServerSupabase();
     const isEmail = loginId.includes('@');

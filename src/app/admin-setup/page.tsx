@@ -66,17 +66,17 @@ export default function AdminSetupPage() {
           // 既にusersテーブルにユーザーが存在するか確認
           const { data: existingUser } = await supabase
             .from('users')
-            .select('id, name, email, password_hash')
+            .select('id, name, email, has_account')
             .eq('email', userEmail)
             .maybeSingle();
-          
+
           if (existingUser) {
             // 既存ユーザーの場合、情報を自動入力
             setAdminName(existingUser.name || userName);
             setAdminEmail(existingUser.email || userEmail);
             setExistingUserId(existingUser.id);
             // パスワードが既に設定されている場合は、パスワード入力不要
-            if (existingUser.password_hash) {
+            if (existingUser.has_account) {
               setHasExistingPassword(true);
             }
           } else {
@@ -229,7 +229,7 @@ export default function AdminSetupPage() {
       let facilityCode: string = '';
       let isUnique = false;
       do {
-        facilityCode = Math.floor(10000 + Math.random() * 90000).toString().padStart(5, '0');
+        facilityCode = String(10000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90000));
         // 重複チェック
         const { data: existingFacility } = await supabase
           .from('facilities')

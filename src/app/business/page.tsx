@@ -49,6 +49,7 @@ const FinanceView = dynamicImport(() => import('@/components/finance/FinanceView
 const TransportManagementView = dynamicImport(() => import('@/components/transport/TransportManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const UpperLimitManagementView = dynamicImport(() => import('@/components/upper-limit/UpperLimitManagementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const RecruitmentView = dynamicImport(() => import('@/components/recruitment/RecruitmentView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const CashflowWizardView = dynamicImport(() => import('@/components/cashflow/CashflowWizardView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 
 /**
  * Setup guide banner shown at top of dashboard when setup is incomplete.
@@ -444,6 +445,8 @@ export default function BusinessPage() {
         return <UpperLimitManagementView />;
       case 'recruitment':
         return <RecruitmentView />;
+      case 'cashflow':
+        return <CashflowWizardView />;
       default:
         return <DashboardView />;
     }

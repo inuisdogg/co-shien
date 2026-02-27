@@ -497,7 +497,7 @@ export function useStaffMaster(): UseStaffMasterReturn {
       setError(null);
 
       try {
-        const token = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const token = `inv-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').substring(0, 9)}`;
 
         const { error } = await supabase.from('staff_invitations').insert({
           facility_id: facility.id,

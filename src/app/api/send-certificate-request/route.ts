@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 // Resendインスタンスを遅延初期化
 let resend: Resend | null = null;
@@ -103,8 +104,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // メール本文にリンクを埋め込む（改行をHTMLに変換）
-    const bodyWithLink = body.replace(/\n/g, '<br>');
+    // メール本文にリンクを埋め込む（エスケープ後に改行をHTMLに変換）
+    const bodyWithLink = escapeHtml(body).replace(/\n/g, '<br>');
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@resend.dev';
 
     // HTMLメールを生成
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Send certificate request error:', error);
     return NextResponse.json(
-      { error: error.message || 'メール送信に失敗しました' },
+      { error: 'メール送信に失敗しました' },
       { status: 500 }
     );
   }

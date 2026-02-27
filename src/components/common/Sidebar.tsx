@@ -31,6 +31,7 @@ import {
   Car,
   Calculator,
   Briefcase,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
@@ -69,6 +70,7 @@ const MENU_PHASE_CONFIG: Record<string, FeaturePhase> = {
   'transport': 1,         // 送迎管理
   'upper-limit': 1,      // 上限管理
   'recruitment': 1,       // 採用・求人
+  'cashflow': 1,           // 収支管理
 
   // Phase 2: 請求・監査・経営
   'audit-preparation': 2, // 運営指導準備
@@ -172,6 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, permission: 'dashboard' as const },
         { id: 'addition-settings', label: '加算・収益', icon: ListChecks, permission: 'dashboard' as const },
         { id: 'finance', label: '財務管理', icon: DollarSign, permission: 'dashboard' as const },
+        { id: 'cashflow', label: '収支管理', icon: Wallet, permission: 'cashFlow' as const },
       ],
     },
     {
@@ -309,7 +312,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                   isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
-                <nav className="pl-2 pt-1 space-y-0.5">
+                <nav className="pl-2 pt-1 space-y-0.5" role="navigation" aria-label="メインメニュー">
                   {category.items.map((item) => {
                     const isActive = activeTab === item.id;
 
@@ -320,6 +323,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                             setActiveTab(item.id);
                             onClose?.();
                           }}
+                          role="menuitem"
+                          aria-current={isActive ? 'page' : undefined}
                           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 text-[13px] ${
                             isActive
                               ? `${isCareer ? 'bg-[#818CF8]/10 text-[#818CF8] border-l-[3px] border-[#818CF8]' : 'bg-[#00c4cc]/10 text-[#00c4cc] border-l-[3px] border-[#00c4cc]'} font-bold`

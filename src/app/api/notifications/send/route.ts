@@ -14,11 +14,16 @@
  * }
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { authenticateRequest, unauthorizedResponse } from '@/lib/apiAuth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // 認証チェック
+    const auth = await authenticateRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const {
       userId,
       type,

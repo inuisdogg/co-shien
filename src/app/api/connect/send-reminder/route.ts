@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,29 +31,29 @@ export async function POST(request: NextRequest) {
 
     const dateOptionsHtml = (dateOptions || [])
       .map((d: { date: string; startTime: string; endTime?: string }) =>
-        `<p style="margin:4px 0;">・${d.date} ${d.startTime}${d.endTime ? '〜' + d.endTime : ''}</p>`
+        `<p style="margin:4px 0;">・${escapeHtml(d.date)} ${escapeHtml(d.startTime)}${d.endTime ? '〜' + escapeHtml(d.endTime) : ''}</p>`
       )
       .join('');
 
     const { error } = await resend.emails.send({
       from: 'Roots <noreply@and-and.co.jp>',
       to: participantEmail,
-      subject: `【リマインダー】${meetingTitle} の日程回答をお願いします`,
+      subject: `【リマインダー】${escapeHtml(meetingTitle)} の日程回答をお願いします`,
       html: `
         <div style="max-width:600px;margin:0 auto;font-family:sans-serif;">
           <div style="background:#00c4cc;padding:24px;text-align:center;">
             <h1 style="color:white;font-size:20px;margin:0;">Roots 連絡会議</h1>
           </div>
           <div style="padding:32px 24px;">
-            <p>${participantName || organizationName}様</p>
-            <p>${facilityName}より連絡会議「${meetingTitle}」の日程回答をお願いしております。</p>
+            <p>${escapeHtml(participantName || organizationName)}様</p>
+            <p>${escapeHtml(facilityName)}より連絡会議「${escapeHtml(meetingTitle)}」の日程回答をお願いしております。</p>
             <p style="color:#e53e3e;font-weight:bold;">まだ日程のご回答をいただいておりません。お忙しいところ恐縮ですが、ご確認をお願いいたします。</p>
             <div style="margin:24px 0;">
               <p style="font-weight:bold;">候補日程:</p>
               ${dateOptionsHtml}
             </div>
             <div style="text-align:center;margin:32px 0;">
-              <a href="${respondUrl}" style="background:#00c4cc;color:white;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;display:inline-block;">
+              <a href="${escapeHtml(respondUrl)}" style="background:#00c4cc;color:white;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;display:inline-block;">
                 日程を回答する
               </a>
             </div>

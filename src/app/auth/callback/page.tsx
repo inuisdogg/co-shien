@@ -71,16 +71,16 @@ export default function AuthCallbackPage() {
                 // パスワードが設定されているか確認
                 const { data: userData } = await supabase
                   .from('users')
-                  .select('password_hash')
+                  .select('has_account')
                   .eq('id', user.id)
                   .single();
-                
-                if (!userData?.password_hash) {
+
+                if (!userData?.has_account) {
                   // パスワードが設定されていない場合は、パスワード設定ページへ
                   router.push('/login/reset-password?email=' + encodeURIComponent(user.email || ''));
                   return;
                 }
-                
+
                 await supabase
                   .from('users')
                   .update({
@@ -107,7 +107,7 @@ export default function AuthCallbackPage() {
                 // ローカルストレージにユーザー情報を保存
                 const { data: userData } = await supabase
                   .from('users')
-                  .select('*')
+                  .select('id, name, last_name, first_name, email, role, user_type')
                   .eq('id', user.id)
                   .single();
 
@@ -166,16 +166,16 @@ export default function AuthCallbackPage() {
                 // パスワードが設定されているか確認
                 const { data: userData } = await supabase
                   .from('users')
-                  .select('password_hash')
+                  .select('has_account')
                   .eq('id', data.user.id)
                   .single();
-                
-                if (!userData?.password_hash) {
+
+                if (!userData?.has_account) {
                   // パスワードが設定されていない場合は、パスワード設定ページへ
                   router.push('/login/reset-password?email=' + encodeURIComponent(data.user.email || ''));
                   return;
                 }
-                
+
                 await supabase
                   .from('users')
                   .update({
@@ -192,11 +192,11 @@ export default function AuthCallbackPage() {
                 // パスワードが設定されているか確認
                 const { data: userData } = await supabase
                   .from('users')
-                  .select('*')
+                  .select('id, name, last_name, first_name, email, role, user_type, has_account')
                   .eq('id', data.user.id)
                   .single();
 
-                if (!userData?.password_hash) {
+                if (!userData?.has_account) {
                   // パスワードが設定されていない場合は、パスワード設定ページへ
                   router.push('/login/reset-password?email=' + encodeURIComponent(data.user.email || ''));
                   return;

@@ -3640,8 +3640,10 @@ export default function PersonalDashboardPage() {
       {/* タブバー（画面下部） */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
         <div className="max-w-4xl mx-auto px-4">
-          <div className="flex items-center justify-around py-2">
+          <div className="flex items-center justify-around py-2" role="tablist" aria-label="メインナビゲーション">
             <button
+              role="tab"
+              aria-selected={activeTab === 'home'}
               onClick={() => setActiveTab('home')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
                 activeTab === 'home' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
@@ -3651,6 +3653,8 @@ export default function PersonalDashboardPage() {
               <span className="text-xs font-bold">ホーム</span>
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'jobs'}
               onClick={() => setActiveTab('jobs')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
                 activeTab === 'jobs' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
@@ -3660,6 +3664,8 @@ export default function PersonalDashboardPage() {
               <span className="text-xs font-bold">求人</span>
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'career'}
               onClick={() => setActiveTab('career')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
                 activeTab === 'career' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
@@ -3669,6 +3675,8 @@ export default function PersonalDashboardPage() {
               <span className="text-xs font-bold">キャリア</span>
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'work'}
               onClick={() => setActiveTab('work')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
                 activeTab === 'work' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
@@ -3678,6 +3686,8 @@ export default function PersonalDashboardPage() {
               <span className="text-xs font-bold">業務</span>
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'settings'}
               onClick={() => setActiveTab('settings')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
                 activeTab === 'settings' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'

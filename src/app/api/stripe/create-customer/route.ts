@@ -1,9 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createServerSupabase } from '@/lib/supabase-server';
+import { authenticateRequest, unauthorizedResponse, verifyFacilityOwnership, forbiddenResponse } from '@/lib/apiAuth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // 認証チェック
+    const auth = await authenticateRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const { facilityId, facilityName } = await request.json();
 
     if (!facilityId) {
@@ -12,6 +17,10 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // 施設の所有権を検証
+    const hasAccess = await verifyFacilityOwnership(auth.userId, facilityId);
+    if (!hasAccess) return forbiddenResponse('この施設の操作権限がありません');
 
     // Create Stripe customer
     const customer = await stripe.customers.create({

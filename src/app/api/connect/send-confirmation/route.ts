@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,33 +37,33 @@ export async function POST(request: NextRequest) {
     const resend = new Resend(apiKey);
 
     const locationHtml = location
-      ? `<p style="margin:8px 0;"><strong>場所:</strong> ${location}</p>`
+      ? `<p style="margin:8px 0;"><strong>場所:</strong> ${escapeHtml(location)}</p>`
       : '';
 
     const { error } = await resend.emails.send({
       from: 'Roots <noreply@and-and.co.jp>',
       to: participantEmail,
-      subject: `【Roots】日程が確定しました: ${meetingTitle}`,
+      subject: `【Roots】日程が確定しました: ${escapeHtml(meetingTitle)}`,
       html: `
         <div style="max-width:600px;margin:0 auto;font-family:sans-serif;">
           <div style="background:#00c4cc;padding:24px;text-align:center;">
             <h1 style="color:white;font-size:20px;margin:0;">Roots 連絡会議</h1>
           </div>
           <div style="padding:32px 24px;">
-            <p>${participantName || organizationName}様</p>
-            <p>連絡会議「<strong>${meetingTitle}</strong>」の日程が確定しました。</p>
+            <p>${escapeHtml(participantName || organizationName)}様</p>
+            <p>連絡会議「<strong>${escapeHtml(meetingTitle)}</strong>」の日程が確定しました。</p>
 
             <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:20px;margin:24px 0;text-align:center;">
               <p style="color:#15803d;font-size:14px;margin:0 0 8px;">確定日程</p>
               <p style="color:#166534;font-size:22px;font-weight:bold;margin:0;">
-                ${confirmedDate} ${confirmedTime || ''}
+                ${escapeHtml(confirmedDate)} ${escapeHtml(confirmedTime || '')}
               </p>
               ${locationHtml}
             </div>
 
             <p>ご出席をお待ちしております。</p>
             <p style="color:#999;font-size:12px;margin-top:24px;">
-              このメールは ${facilityName} より自動送信されています。
+              このメールは ${escapeHtml(facilityName)} より自動送信されています。
             </p>
           </div>
         </div>

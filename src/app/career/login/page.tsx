@@ -65,7 +65,6 @@ export default function CareerLoginPage() {
             // 30日以内なら読み込む
             if (daysSinceSaved <= 30) {
               if (data.email) setEmail(data.email);
-              if (data.password) setPassword(data.password);
               setRememberMe(true);
             } else {
               localStorage.removeItem('savedCareerLoginData');
@@ -128,7 +127,6 @@ export default function CareerLoginPage() {
       if (rememberMe) {
         const savedData = {
           email,
-          password,
           savedAt: new Date().toISOString(),
         };
         localStorage.setItem('savedCareerLoginData', JSON.stringify(savedData));

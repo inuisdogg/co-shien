@@ -92,17 +92,9 @@ export async function inviteStaff(
     } else {
       // 新規ユーザーを作成（仮登録状態）
       // 個人アカウントとして独立して存在（事業所に所属していない状態）
-      // UUIDを生成（ブラウザ環境とNode.js環境の両方に対応）
+      // UUIDを生成（暗号学的に安全な方法を使用）
       const generateUUID = () => {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-          return crypto.randomUUID();
-        }
-        // フォールバック: 簡易的なUUID v4生成
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-          const r = (Math.random() * 16) | 0;
-          const v = c === 'x' ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        });
+        return crypto.randomUUID();
       };
 
       // 後方互換性のため、usersテーブルのroleを設定

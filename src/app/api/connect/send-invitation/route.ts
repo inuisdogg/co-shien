@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,28 +31,28 @@ export async function POST(request: NextRequest) {
 
     const dateOptionsHtml = (dateOptions || [])
       .map((d: { date: string; startTime: string; endTime?: string }) =>
-        `<p style="margin:4px 0;">・${d.date} ${d.startTime}${d.endTime ? '〜' + d.endTime : ''}</p>`
+        `<p style="margin:4px 0;">・${escapeHtml(d.date)} ${escapeHtml(d.startTime)}${d.endTime ? '〜' + escapeHtml(d.endTime) : ''}</p>`
       )
       .join('');
 
     const { error } = await resend.emails.send({
       from: 'Roots <noreply@and-and.co.jp>',
       to: participantEmail,
-      subject: `【Roots】${facilityName}より連絡会議のご案内: ${meetingTitle}`,
+      subject: `【Roots】${escapeHtml(facilityName)}より連絡会議のご案内: ${escapeHtml(meetingTitle)}`,
       html: `
         <div style="max-width:600px;margin:0 auto;font-family:sans-serif;">
           <div style="background:#00c4cc;padding:24px;text-align:center;">
             <h1 style="color:white;font-size:20px;margin:0;">Roots 連絡会議</h1>
           </div>
           <div style="padding:32px 24px;">
-            <p>${participantName || organizationName}様</p>
-            <p>${facilityName}より、連絡会議「${meetingTitle}」にご招待されました。</p>
+            <p>${escapeHtml(participantName || organizationName)}様</p>
+            <p>${escapeHtml(facilityName)}より、連絡会議「${escapeHtml(meetingTitle)}」にご招待されました。</p>
             <p>下記の候補日程からご都合をお知らせください。</p>
             <div style="margin:24px 0;">
               ${dateOptionsHtml}
             </div>
             <div style="text-align:center;margin:32px 0;">
-              <a href="${respondUrl}" style="background:#00c4cc;color:white;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;display:inline-block;">
+              <a href="${escapeHtml(respondUrl)}" style="background:#00c4cc;color:white;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;display:inline-block;">
                 日程を回答する
               </a>
             </div>

@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { QUALIFICATION_CODES, type QualificationCode } from '@/types';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 let resend: Resend | null = null;
 function getResend(): Resend {
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     const { error: sendError } = await getResend().emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `【Roots】新規応募がありました - ${jobTitle}`,
+      subject: `【Roots】新規応募がありました - ${escapeHtml(jobTitle)}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -96,11 +97,11 @@ export async function POST(request: Request) {
               <h1 style="color: white; margin: 0; font-size: 24px;">新規応募のお知らせ</h1>
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p style="font-size: 16px;">求人「<strong>${jobTitle}</strong>」に新しい応募がありました。</p>
+              <p style="font-size: 16px;">求人「<strong>${escapeHtml(jobTitle)}</strong>」に新しい応募がありました。</p>
               <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #00c4cc;">
-                <p style="margin: 0 0 8px;"><strong>応募者:</strong> ${applicantName}</p>
-                <p style="margin: 0 0 8px;"><strong>保有資格:</strong> ${qualifications}</p>
-                <p style="margin: 0;"><strong>カバーメッセージ:</strong> ${coverPreview}</p>
+                <p style="margin: 0 0 8px;"><strong>応募者:</strong> ${escapeHtml(applicantName)}</p>
+                <p style="margin: 0 0 8px;"><strong>保有資格:</strong> ${escapeHtml(qualifications)}</p>
+                <p style="margin: 0;"><strong>カバーメッセージ:</strong> ${escapeHtml(coverPreview)}</p>
               </div>
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${baseUrl}/recruitment" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
                 </a>
               </div>
               <p style="font-size: 14px; color: #666; border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                ${facility?.name || '施設'} の採用管理画面からご確認ください。
+                ${escapeHtml(facility?.name || '施設')} の採用管理画面からご確認ください。
               </p>
             </div>
             <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">

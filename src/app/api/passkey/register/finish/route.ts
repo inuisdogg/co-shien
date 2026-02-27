@@ -12,7 +12,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       credential: credentialData,
-      challenge: expectedChallenge,
       facilityCode,
       loginId,
       userId,
@@ -25,10 +24,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ユーザーの存在確認
+    // ユーザーの存在確認 + サーバー側に保存したチャレンジを取得
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, email')
+      .select('id, email, passkey_challenge, passkey_challenge_expires')
       .eq('id', userId)
       .eq('account_status', 'active')
       .single();
@@ -37,6 +36,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
+      );
+    }
+
+    // サーバー側のチャレンジを検証
+    const expectedChallenge = userData.passkey_challenge;
+    if (!expectedChallenge) {
+      return NextResponse.json(
+        { error: 'No challenge found. Please start registration again.' },
+        { status: 400 }
+      );
+    }
+
+    // チャレンジの有効期限を確認
+    if (userData.passkey_challenge_expires && new Date(userData.passkey_challenge_expires) < new Date()) {
+      // 期限切れのチャレンジをクリア
+      await supabase
+        .from('users')
+        .update({ passkey_challenge: null, passkey_challenge_expires: null })
+        .eq('id', userId);
+      return NextResponse.json(
+        { error: 'Challenge expired. Please start registration again.' },
+        { status: 400 }
       );
     }
 
@@ -147,10 +168,16 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Passkey insert error:', insertError);
       return NextResponse.json(
-        { error: 'Failed to save passkey', details: insertError.message },
+        { error: 'Failed to save passkey' },
         { status: 500 }
       );
     }
+
+    // 使用済みチャレンジをクリア
+    await supabase
+      .from('users')
+      .update({ passkey_challenge: null, passkey_challenge_expires: null })
+      .eq('id', userId);
 
     return NextResponse.json({
       success: true,
@@ -159,7 +186,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Passkey register finish error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

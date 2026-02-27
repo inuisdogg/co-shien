@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { randomInt } from 'node:crypto';
+import { rateLimit, rateLimitResponse } from '@/lib/rateLimiter';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 // TODO: RESEND_API_KEY is NOT set in .env.local — emails will NOT send until configured.
 // Resendインスタンスを遅延初期化
@@ -22,14 +25,28 @@ function getResend(): Resend {
   return resend;
 }
 
-// 6桁のOTPを生成
+// 6桁のOTPを生成（暗号学的に安全な乱数を使用）
 function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 999999).toString();
 }
 
 export async function POST(req: NextRequest) {
   try {
+    // IPアドレスによるレート制限: 1時間に最大10回
+    const ip =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip') ||
+      'unknown';
+    const ipLimit = rateLimit(`otp:send:ip:${ip}`, 10, 60 * 60 * 1000);
+    if (!ipLimit.allowed) return rateLimitResponse(ipLimit.retryAfter!);
+
     const { email, lastName, firstName, birthDate, searchType } = await req.json();
+
+    // メールアドレスによるレート制限: 10分間に最大3回
+    if (email) {
+      const emailLimit = rateLimit(`otp:send:email:${email.toLowerCase().trim()}`, 3, 10 * 60 * 1000);
+      if (!emailLimit.allowed) return rateLimitResponse(emailLimit.retryAfter!);
+    }
 
     // Supabaseクライアントを作成
     const supabase = createClient(
@@ -156,7 +173,7 @@ export async function POST(req: NextRequest) {
           </div>
           <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; margin-bottom: 20px;">
-              ${userName} 様
+              ${escapeHtml(userName)} 様
             </p>
             <p style="font-size: 16px; margin-bottom: 20px;">
               ログインID確認のための認証コードをお送りします。
@@ -208,14 +225,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: '認証コードを送信しました',
       maskedEmail: maskedEmail,
-      userId: userData.id,
     });
   } catch (error: any) {
     console.error('OTP send error:', error);
     return NextResponse.json(
-      { error: error.message || 'OTP送信に失敗しました' },
+      { error: 'OTP送信に失敗しました' },
       { status: 500 }
     );
   }

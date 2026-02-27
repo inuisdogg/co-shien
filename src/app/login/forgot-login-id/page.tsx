@@ -30,7 +30,6 @@ export default function ForgotLoginIdPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [maskedEmail, setMaskedEmail] = useState('');
-  const [userId, setUserId] = useState('');
   const [loginId, setLoginId] = useState<string | null>(null);
 
   // ステップ1: ユーザー検索とOTP送信
@@ -59,7 +58,6 @@ export default function ForgotLoginIdPage() {
       }
 
       setMaskedEmail(data.maskedEmail);
-      setUserId(data.userId);
       setStep('otp');
     } catch (err: any) {
       setError(err.message || 'エラーが発生しました');
@@ -79,8 +77,12 @@ export default function ForgotLoginIdPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           code: otpCode,
+          searchType,
+          email: searchType === 'email' ? email : undefined,
+          lastName: searchType === 'name_birthday' ? lastName : undefined,
+          firstName: searchType === 'name_birthday' ? firstName : undefined,
+          birthDate: searchType === 'name_birthday' ? birthDate : undefined,
         }),
       });
 
@@ -376,7 +378,6 @@ export default function ForgotLoginIdPage() {
                 setBirthDate('');
                 setOtpCode('');
                 setLoginId(null);
-                setUserId('');
                 setMaskedEmail('');
                 setError('');
               }}

@@ -15,8 +15,6 @@ export const viewport: Viewport = {
   themeColor: '#F6AD55',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function ParentLayout({

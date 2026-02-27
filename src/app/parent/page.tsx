@@ -909,7 +909,7 @@ export default function ClientDashboardPage() {
 
         {/* タブナビゲーション */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-          <div className="flex overflow-x-auto p-1.5 gap-1">
+          <div className="flex overflow-x-auto p-1.5 gap-1" role="tablist" aria-label="ダッシュボードメニュー">
             {[
               { id: 'overview', label: '概要', icon: ClipboardList, phase: 1 },
               { id: 'facilities', label: '利用施設', icon: Building2, phase: 1 },
@@ -917,12 +917,17 @@ export default function ClientDashboardPage() {
               { id: 'messages', label: '連絡', icon: MessageSquare, phase: 3 },
             ].filter(tab => FEATURE_PHASE >= tab.phase).map((tab) => {
               const Icon = tab.icon;
+              const isSelected = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={isSelected}
+                  aria-controls={`tabpanel-${tab.id}`}
+                  id={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors whitespace-nowrap ${
-                    activeTab === tab.id
+                    isSelected
                       ? 'bg-[#FEF3E2] text-[#ED8936] font-bold rounded-lg'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg'
                   }`}
@@ -937,7 +942,7 @@ export default function ClientDashboardPage() {
           <div className="p-6">
             {/* 概要タブ */}
             {activeTab === 'overview' && (
-              <div className="space-y-6">
+              <div className="space-y-6" role="tabpanel" id="tabpanel-overview" aria-labelledby="tab-overview">
                 {/* クイックアクション */}
                 <div>
                   <div className="flex items-center gap-3 mb-4">
@@ -1268,7 +1273,7 @@ export default function ClientDashboardPage() {
 
             {/* 利用施設タブ */}
             {activeTab === 'facilities' && (
-              <div className="space-y-4">
+              <div className="space-y-4" role="tabpanel" id="tabpanel-facilities" aria-labelledby="tab-facilities">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-gray-800">利用施設一覧</h2>
                 </div>
@@ -1406,7 +1411,7 @@ export default function ClientDashboardPage() {
 
             {/* 利用実績タブ */}
             {activeTab === 'records' && (
-              <div className="space-y-4">
+              <div className="space-y-4" role="tabpanel" id="tabpanel-records" aria-labelledby="tab-records">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-gray-800">利用実績</h2>
                 </div>
@@ -1499,7 +1504,7 @@ export default function ClientDashboardPage() {
 
             {/* 連絡タブ */}
             {activeTab === 'messages' && (
-              <div className="space-y-4">
+              <div className="space-y-4" role="tabpanel" id="tabpanel-messages" aria-labelledby="tab-messages">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-lg font-bold text-gray-800">施設への連絡</h2>

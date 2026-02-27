@@ -19,7 +19,7 @@ export default function Error({
         <h2 className="text-2xl font-bold text-gray-800 mb-4">エラーが発生しました</h2>
         <button
           onClick={() => reset()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
         >
           再試行
         </button>

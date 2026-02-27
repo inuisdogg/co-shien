@@ -39,6 +39,8 @@ import ChildRegistrationWizard from './ChildRegistrationWizard';
 import FacilitySettingsEditor from './FacilitySettingsEditor';
 import ChildDocumentsManager from './ChildDocumentsManager';
 import InvitationModal from '@/components/common/InvitationModal';
+import AlertModal from '@/components/common/AlertModal';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface ChildrenViewProps {
   setActiveTab?: (tab: string) => void;
@@ -104,6 +106,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const [wizardMode, setWizardMode] = useState<'create' | 'edit'>('create');
   const [isFacilitySettingsOpen, setIsFacilitySettingsOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
+
+  // アラート・確認モーダル用の状態
+  const [alertModal, setAlertModal] = useState<{ message: string; type?: 'success' | 'error' | 'info' | 'warning' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   // 招待枠作成モーダル用の状態
   const [isInvitationSlotModalOpen, setIsInvitationSlotModalOpen] = useState(false);
@@ -262,7 +268,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       window.location.reload(); // 簡易的なリロード
     } catch (error: any) {
       console.error('契約ステータス更新エラー:', error);
-      alert('契約ステータスの更新に失敗しました: ' + error.message);
+      setAlertModal({ message: '契約ステータスの更新に失敗しました: ' + error.message, type: 'error' });
     }
   };
 
@@ -291,7 +297,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       }
     } catch (error: any) {
       console.error('契約日付更新エラー:', error);
-      alert('契約日付の更新に失敗しました: ' + error.message);
+      setAlertModal({ message: '契約日付の更新に失敗しました: ' + error.message, type: 'error' });
     }
   };
 
@@ -346,7 +352,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       });
     } catch (error: any) {
       console.error('利用パターン更新エラー:', error);
-      alert('利用パターンの更新に失敗しました: ' + error.message);
+      setAlertModal({ message: '利用パターンの更新に失敗しました: ' + error.message, type: 'error' });
     }
   };
 
@@ -381,7 +387,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       });
     } catch (error: any) {
       console.error('時間帯更新エラー:', error);
-      alert('時間帯の更新に失敗しました: ' + error.message);
+      setAlertModal({ message: '時間帯の更新に失敗しました: ' + error.message, type: 'error' });
     }
   };
 
@@ -425,14 +431,22 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       });
     } catch (error: any) {
       console.error('送迎設定更新エラー:', error);
-      alert('送迎設定の更新に失敗しました: ' + error.message);
+      setAlertModal({ message: '送迎設定の更新に失敗しました: ' + error.message, type: 'error' });
     }
   };
 
   // 招待をキャンセルする関数
-  const handleCancelInvitation = async (invitationId: string) => {
-    if (!confirm('この招待をキャンセルしますか？')) return;
+  const handleCancelInvitation = (invitationId: string) => {
+    setConfirmModal({
+      message: 'この招待をキャンセルしますか？',
+      onConfirm: () => {
+        setConfirmModal(null);
+        performCancelInvitation(invitationId);
+      },
+    });
+  };
 
+  const performCancelInvitation = async (invitationId: string) => {
     try {
       const { error } = await supabase
         .from('contract_invitations')
@@ -442,10 +456,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       if (error) throw error;
 
       setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
-      alert('招待をキャンセルしました');
+      setAlertModal({ message: '招待をキャンセルしました', type: 'success' });
     } catch (error: any) {
       console.error('招待キャンセルエラー:', error);
-      alert('招待のキャンセルに失敗しました');
+      setAlertModal({ message: '招待のキャンセルに失敗しました', type: 'error' });
     }
   };
 
@@ -474,23 +488,23 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   // 下書き保存
   const handleSaveDraft = () => {
     if (!formData.name.trim()) {
-      alert('児童名を入力してください');
+      setAlertModal({ message: '児童名を入力してください', type: 'warning' });
       return;
     }
     saveDraft(formData);
     setDrafts(getDrafts());
-    alert('下書きを保存しました');
+    setAlertModal({ message: '下書きを保存しました', type: 'success' });
   };
 
   // フォーム送信
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      alert('児童名を入力してください');
+      setAlertModal({ message: '児童名を入力してください', type: 'warning' });
       return;
     }
 
     if (!formData.birthDate) {
-      alert('生年月日を入力してください');
+      setAlertModal({ message: '生年月日を入力してください', type: 'warning' });
       return;
     }
 
@@ -514,10 +528,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       setFormData(initialFormData);
       setSelectedDraft(null);
       setSelectedChild(null);
-      alert('児童を登録しました');
+      setAlertModal({ message: '児童を登録しました', type: 'success' });
     } catch (error) {
       console.error('Error adding child:', error);
-      alert('児童の登録に失敗しました');
+      setAlertModal({ message: '児童の登録に失敗しました', type: 'error' });
     }
   };
 
@@ -556,10 +570,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const handleWizardComplete = async (data: ChildFormData) => {
     if (wizardMode === 'create') {
       await addChild(data);
-      alert('児童を登録しました');
+      setAlertModal({ message: '児童を登録しました', type: 'success' });
     } else if (selectedChild) {
       await updateChild({ ...selectedChild, ...data });
-      alert('児童情報を更新しました');
+      setAlertModal({ message: '児童情報を更新しました', type: 'success' });
     }
     setIsWizardOpen(false);
     setSelectedChild(null);

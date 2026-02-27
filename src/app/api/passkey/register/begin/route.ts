@@ -89,8 +89,14 @@ export async function POST(request: NextRequest) {
 
     const options = await generateRegistrationOptions(opts);
 
-    // チャレンジを一時的に保存（実際の実装では、セッションストアやRedisなどに保存）
-    // 今回は簡易版としてクライアントに返すのみ（セキュリティ上の理由で本番では改善が必要）
+    // チャレンジをデータベースに保存（サーバーサイドで管理）
+    await supabase
+      .from('users')
+      .update({
+        passkey_challenge: options.challenge,
+        passkey_challenge_expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      })
+      .eq('id', userId);
 
     return NextResponse.json(options);
   } catch (error: any) {

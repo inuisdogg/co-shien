@@ -10,9 +10,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-// 静的生成をスキップ
-export const dynamic = 'force-dynamic';
-
 export default function RecruitmentDisclosurePage() {
   const router = useRouter();
 

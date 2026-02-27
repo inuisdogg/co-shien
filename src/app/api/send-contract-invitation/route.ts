@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 // TODO: RESEND_API_KEY is NOT set in .env.local — emails will NOT send until configured.
 // Set RESEND_API_KEY in .env.local with a valid Resend API key to enable email delivery.
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: 'Roots <noreply@Roots.inu.co.jp>',
       to: email,
-      subject: `${facilityName}からの利用招待`,
+      subject: `${escapeHtml(facilityName)}からの利用招待`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -58,10 +59,10 @@ export async function POST(request: NextRequest) {
             </div>
             <div class="content">
               <h2>施設からの利用招待</h2>
-              <p>${facilityName}から、${childName}さんの施設利用に関する招待が届きました。</p>
+              <p>${escapeHtml(facilityName)}から、${escapeHtml(childName)}さんの施設利用に関する招待が届きました。</p>
               <p>以下のボタンから招待を確認・承認してください。<br>アカウントをお持ちでない方は、リンク先から新規登録ができます。</p>
               <div style="text-align: center;">
-                <a href="${invitationUrl}" class="button">招待を確認する</a>
+                <a href="${escapeHtml(invitationUrl)}" class="button">招待を確認する</a>
               </div>
               <p style="font-size: 12px; color: #6b7280; margin-top: 30px;">
                 このリンクは7日間有効です。<br>
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Send invitation error:', error);
     return NextResponse.json(
-      { error: 'メール送信に失敗しました', details: error.message },
+      { error: 'メール送信に失敗しました' },
       { status: 500 }
     );
   }

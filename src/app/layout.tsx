@@ -3,15 +3,17 @@
  */
 
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Noto_Sans_JP } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ServiceWorkerRegistration from '@/components/pwa/ServiceWorkerRegistration';
 
-const inter = Inter({ subsets: ['latin'] });
-
-// 全ページを動的レンダリングに設定（AuthProviderがコンテキストを使用するため）
-export const dynamic = 'force-dynamic';
+const notoSansJP = Noto_Sans_JP({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  display: 'swap',
+  preload: true,
+});
 
 export const metadata: Metadata = {
   title: 'Roots - 児童福祉施設向けSaaS',
@@ -31,8 +33,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   themeColor: '#00c4cc',
 };
 
@@ -43,7 +43,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body className={inter.className}>
+      <body className={notoSansJP.className}>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-gray-900 focus:rounded-lg focus:shadow-lg">
+          メインコンテンツへスキップ
+        </a>
         <ServiceWorkerRegistration />
         <AuthProvider>{children}</AuthProvider>
       </body>

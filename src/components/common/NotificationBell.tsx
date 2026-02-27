@@ -190,6 +190,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className="relative cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
         aria-label="通知"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
       >
         <Bell
           size={18}
@@ -197,7 +199,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
           style={{ color: isOpen ? color : '#6b7280' }}
         />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold px-1">
+          <span
+            className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold px-1"
+            aria-live="polite"
+            aria-label={`未読通知 ${unreadCount > 99 ? '99件以上' : `${unreadCount}件`}`}
+          >
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -205,7 +211,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
 
       {/* ドロップダウンパネル */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-100 z-50">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-100 z-50" role="menu" aria-label="通知一覧">
           {/* ヘッダー */}
           <div className="p-3 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-bold text-sm text-gray-900">通知</h3>
@@ -232,10 +238,13 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
               visibleNotifications.map((notification) => (
                 <div
                   key={notification.id}
+                  role="menuitem"
+                  tabIndex={0}
                   className={`p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${
                     !notification.read ? 'bg-blue-50/40' : ''
                   }`}
                   onClick={() => handleNotificationClick(notification)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNotificationClick(notification); } }}
                 >
                   <div className="flex items-start gap-2.5">
                     {/* 通知タイプアイコン */}

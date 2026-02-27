@@ -1,167 +1,131 @@
 /**
  * Service Worker Registration Component
  * PWA用のService Workerを登録し、更新を検知してユーザーに通知
+ * インストールプロンプトを表示
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 export default function ServiceWorkerRegistration() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const deferredPromptRef = useRef<any>(null);
 
   useEffect(() => {
     if (
-      typeof window !== 'undefined' &&
-      'serviceWorker' in navigator
+      typeof window === 'undefined' ||
+      !('serviceWorker' in navigator)
     ) {
-      // 既存のService Workerを全てアンインストール（強制クリーンアップ）
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister().then((success) => {
-            if (success) {
-              console.log('[SW] Unregistered old Service Worker');
-            }
-          });
-        }
-      }).then(() => {
-        // 既存のキャッシュを全て削除
-        if ('caches' in window) {
-          caches.keys().then((cacheNames) => {
-            return Promise.all(
-              cacheNames.map((cacheName) => {
-                console.log('[SW] Deleting cache:', cacheName);
-                return caches.delete(cacheName);
-              })
-            );
-          });
-        }
-      }).then(() => {
-        // 少し待ってから新しいService Workerを登録
-        return new Promise(resolve => setTimeout(resolve, 100));
-      }).then(() => {
-        // Service Workerを登録（キャッシュを無視して最新版を取得）
-        return navigator.serviceWorker.register('/sw.js', {
-          // スコープをルートに設定
-          scope: '/',
-          // 更新を強制（キャッシュを無視）- これにより、常に最新のSWファイルを取得
-          updateViaCache: 'none',
-        });
-      })
-        .then((reg) => {
-          console.log('Service Worker registered:', reg);
-          setRegistration(reg);
-
-          // 即座に更新をチェック
-          checkForUpdates(reg);
-
-          // ページロード時に必ず更新をチェック
-          window.addEventListener('focus', () => {
-            checkForUpdates(reg);
-          });
-
-          // 定期的に更新をチェック（5分ごと）- 頻繁すぎると問題が発生するため間隔を延長
-          const updateInterval = setInterval(() => {
-            checkForUpdates(reg);
-          }, 5 * 60 * 1000);
-
-          // クリーンアップ
-          return () => clearInterval(updateInterval);
-        })
-        .catch((error) => {
-          console.error('Service Worker registration failed:', error);
-        });
-
-      // Service Workerの更新を検知（自動リロードは削除）
-      // 自動リロードはユーザー体験を損なうため、ユーザーが明示的に更新ボタンを押した時のみリロード
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        // 新しいService Workerが制御を取得した時
-        console.log('[SW] Controller changed');
-        // 自動リロードは行わない（ユーザーが明示的に更新ボタンを押した時のみリロード）
-      });
-
-      // PWAインストールプロンプトの処理（オプション）
-      let deferredPrompt: any;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-      });
-    }
-  }, []);
-
-  // 更新が利用可能かチェック
-  const checkForUpdates = (reg: ServiceWorkerRegistration) => {
-    // 既に待機中のService Workerがある場合は再チェックしない
-    if (reg.waiting) {
       return;
     }
 
-    // キャッシュを無視して強制的に更新をチェック（ただし頻繁に呼ばれないように注意）
-    reg.update().then(() => {
-      // 更新されたService Workerが待機中かチェック
-      if (reg.waiting) {
-        console.log('[SW] Update available, waiting for user confirmation');
-        setUpdateAvailable(true);
-      }
-    }).catch((error) => {
-      console.error('[SW] Update check failed:', error);
+    // Service Workerを登録
+    navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    })
+      .then((reg) => {
+        console.log('Service Worker registered:', reg);
+        setRegistration(reg);
+
+        // 更新を定期的にチェック（1時間ごと）
+        const updateInterval = setInterval(() => {
+          reg.update().catch((error) => {
+            console.error('[SW] Update check failed:', error);
+          });
+        }, 60 * 60 * 1000);
+
+        // 新しいService Workerがインストールされた時
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  // 既存のSWが動作中 → 更新が利用可能
+                  console.log('[SW] New version installed, update available');
+                  setUpdateAvailable(true);
+                } else {
+                  // 初回インストール
+                  console.log('[SW] Service Worker installed for the first time');
+                }
+              }
+            });
+          }
+        });
+
+        // 既に待機中のSWがあるかチェック
+        if (reg.waiting) {
+          setUpdateAvailable(true);
+        }
+
+        return () => clearInterval(updateInterval);
+      })
+      .catch((error) => {
+        console.error('Service Worker registration failed:', error);
+      });
+
+    // Service Workerの更新を検知
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      console.log('[SW] Controller changed');
     });
 
-    // 新しいService Workerがインストールされた時（一度だけ実行）
-    if (!reg.installing && !reg.waiting) {
-      const handleUpdateFound = () => {
-        const newWorker = reg.installing;
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            console.log('[SW] New worker state:', newWorker.state);
-            if (newWorker.state === 'installed') {
-              if (navigator.serviceWorker.controller) {
-                // 既存のService Workerが動作している場合、更新が利用可能
-                console.log('[SW] New version installed, update available');
-                setUpdateAvailable(true);
-              } else {
-                // 初回インストール
-                console.log('[SW] Service Worker installed for the first time');
-              }
-            }
-          });
-        }
-      };
+    // PWAインストールプロンプトの処理
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+      setShowInstallBanner(true);
+    };
 
-      // 既にリスナーが登録されていない場合のみ追加
-      reg.addEventListener('updatefound', handleUpdateFound);
-    }
-  };
+    // インストール完了時にバナーを非表示
+    const handleAppInstalled = () => {
+      setShowInstallBanner(false);
+      deferredPromptRef.current = null;
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
 
   // 更新を適用
   const handleUpdate = () => {
     if (registration?.waiting) {
-      // 待機中のService Workerにメッセージを送信してスキップ
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
       setUpdateAvailable(false);
-      // ページをリロード（controllerchangeイベントでもリロードされるが、念のため）
       window.location.reload();
     }
   };
 
-  // PWAインストールプロンプトの処理（オプション）
-  useEffect(() => {
-    let deferredPrompt: any;
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      deferredPrompt = e;
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
+  // PWAインストール
+  const handleInstall = async () => {
+    const prompt = deferredPromptRef.current;
+    if (!prompt) return;
+
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    console.log('[PWA] Install prompt outcome:', outcome);
+
+    deferredPromptRef.current = null;
+    setShowInstallBanner(false);
+  };
+
+  // インストールバナーを閉じる
+  const dismissInstallBanner = () => {
+    setShowInstallBanner(false);
+  };
 
   return (
     <>
       {updateAvailable && (
-        <div className="fixed bottom-4 right-4 z-50 bg-white border-2 border-blue-500 rounded-lg shadow-lg p-4 max-w-sm">
+        <div className="fixed bottom-4 right-4 z-50 bg-white border-2 border-blue-500 rounded-lg shadow-lg p-4 max-w-sm" role="alert">
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <h3 className="font-bold text-gray-900 mb-1">新しいバージョンが利用可能です</h3>
@@ -193,8 +157,40 @@ export default function ServiceWorkerRegistration() {
           </div>
         </div>
       )}
+
+      {showInstallBanner && (
+        <div className="fixed bottom-4 left-4 z-50 bg-white border-2 border-teal-500 rounded-lg shadow-lg p-4 max-w-sm" role="alert">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900 mb-1">アプリをインストール</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                ホーム画面に追加して、すばやくアクセスできます。
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleInstall}
+                  className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors text-sm font-medium"
+                >
+                  インストール
+                </button>
+                <button
+                  onClick={dismissInstallBanner}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors text-sm"
+                >
+                  後で
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={dismissInstallBanner}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="閉じる"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-
-

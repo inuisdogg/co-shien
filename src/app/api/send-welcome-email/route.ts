@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 // TODO: RESEND_API_KEY is NOT set in .env.local — emails will NOT send until configured.
 // Resendインスタンスを遅延初期化（ビルド時エラー回避）
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
               <p style="font-size: 16px; margin-bottom: 20px;">
-                ${name} 様
+                ${escapeHtml(name)} 様
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
                 この度は、Roots（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
                 以下の情報でログインできます：
               </p>
               <ul style="font-size: 14px; margin-bottom: 20px; padding-left: 20px;">
-                <li>メールアドレス: <strong>${email}</strong></li>
+                <li>メールアドレス: <strong>${escapeHtml(email)}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
                 <a href="https://my.Roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
               <p style="font-size: 16px; margin-bottom: 20px;">
-                ${name} 様
+                ${escapeHtml(name)} 様
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
                 施設IDの発行が完了いたしました。
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
               <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #00c4cc;">
                 <p style="font-size: 14px; color: #666; margin: 0 0 10px 0; font-weight: bold;">あなたの施設ID</p>
                 <p style="font-size: 28px; color: #00c4cc; margin: 0; font-weight: bold; letter-spacing: 2px; font-family: monospace;">
-                  ${facilityCode}
+                  ${escapeHtml(facilityCode)}
                 </p>
                 <p style="font-size: 12px; color: #999; margin: 10px 0 0 0;">
                   ※ この施設IDは大切に保管してください。ログイン時に必要です。
@@ -122,8 +123,8 @@ export async function POST(req: NextRequest) {
                 以下の情報でログインできます：
               </p>
               <ul style="font-size: 14px; margin-bottom: 20px; padding-left: 20px;">
-                <li>施設ID: <strong>${facilityCode}</strong></li>
-                <li>メールアドレス: <strong>${email}</strong></li>
+                <li>施設ID: <strong>${escapeHtml(facilityCode)}</strong></li>
+                <li>メールアドレス: <strong>${escapeHtml(email)}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${baseUrl}/" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
               <p style="font-size: 16px; margin-bottom: 20px;">
-                ${name} 様
+                ${escapeHtml(name)} 様
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
                 この度は、Roots（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
               <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #00c4cc;">
                 <p style="font-size: 14px; color: #666; margin: 0 0 10px 0; font-weight: bold;">あなたの施設ID</p>
                 <p style="font-size: 28px; color: #00c4cc; margin: 0; font-weight: bold; letter-spacing: 2px; font-family: monospace;">
-                  ${facilityCode}
+                  ${escapeHtml(facilityCode)}
                 </p>
                 <p style="font-size: 12px; color: #999; margin: 10px 0 0 0;">
                   ※ この施設IDは大切に保管してください。ログイン時に必要です。
@@ -175,8 +176,8 @@ export async function POST(req: NextRequest) {
                 以下の情報でログインできます：
               </p>
               <ul style="font-size: 14px; margin-bottom: 20px; padding-left: 20px;">
-                <li>施設ID: <strong>${facilityCode}</strong></li>
-                <li>メールアドレス: <strong>${email}</strong></li>
+                <li>施設ID: <strong>${escapeHtml(facilityCode)}</strong></li>
+                <li>メールアドレス: <strong>${escapeHtml(email)}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${baseUrl}/" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
@@ -210,7 +211,7 @@ export async function POST(req: NextRequest) {
             </div>
             <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
               <p style="font-size: 16px; margin-bottom: 20px;">
-                ${name} 様
+                ${escapeHtml(name)} 様
               </p>
               <p style="font-size: 16px; margin-bottom: 20px;">
                 この度は、Roots（児童発達支援管理システム）にご登録いただき、誠にありがとうございます。
@@ -219,7 +220,7 @@ export async function POST(req: NextRequest) {
                 以下の情報でログインできます：
               </p>
               <ul style="font-size: 14px; margin-bottom: 20px; padding-left: 20px;">
-                <li>メールアドレス: <strong>${email}</strong></li>
+                <li>メールアドレス: <strong>${escapeHtml(email)}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
                 <a href="https://my.Roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
@@ -258,7 +259,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Send welcome email error:', error);
     return NextResponse.json(
-      { error: error.message || 'メール送信に失敗しました' },
+      { error: 'メール送信に失敗しました' },
       { status: 500 }
     );
   }
