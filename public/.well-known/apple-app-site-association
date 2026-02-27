@@ -1,0 +1,26 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.jp.co.inu.coshien.client",
+        "paths": ["/parent/*", "/login/*"]
+      },
+      {
+        "appID": "TEAMID.jp.co.inu.coshien.staff",
+        "paths": ["/career/*", "/personal/*"]
+      },
+      {
+        "appID": "TEAMID.jp.co.inu.coshien.facility",
+        "paths": ["/business/*", "/admin-setup/*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "TEAMID.jp.co.inu.coshien.client",
+      "TEAMID.jp.co.inu.coshien.staff",
+      "TEAMID.jp.co.inu.coshien.facility"
+    ]
+  }
+}

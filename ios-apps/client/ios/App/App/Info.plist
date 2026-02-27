@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>co-shien</string>
+        <string>Roots</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -47,5 +47,15 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>書類の撮影や施設写真のアップロードに使用します</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>写真の選択やアップロードに使用します</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>出退勤の位置確認に使用します</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>セキュアなログインに使用します</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

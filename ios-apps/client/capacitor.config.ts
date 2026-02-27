@@ -1,32 +1,28 @@
-import { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'jp.co.inu.coshien.client',
-  appName: 'roots',
+  appName: 'Roots',
   webDir: '../web-placeholder',
-  // ライブWEB方式: WEBサーバーから直接読み込む
-  // WEBを更新すればアプリも自動的に更新される
   server: {
-    url: 'https://roots.inu.co.jp/client',
+    url: 'https://roots.inu.co.jp/parent',
     cleartext: false,
-    // アプリ内でのナビゲーションを許可
-    allowNavigation: [
-      'roots.inu.co.jp',
-      '*.supabase.co',
-    ],
+    allowNavigation: ['roots.inu.co.jp', '*.supabase.co'],
   },
   ios: {
-    scheme: 'roots-client',
     contentInset: 'automatic',
+    allowsLinkPreview: true,
+    scrollEnabled: true,
+    backgroundColor: '#ffffff',
     preferredContentMode: 'mobile',
-    // ステータスバーの設定
-    backgroundColor: '#00c4cc',
   },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,
-      backgroundColor: '#00c4cc',
+      launchAutoHide: true,
+      backgroundColor: '#ffffff',
       showSpinner: false,
+      launchFadeOutDuration: 500,
     },
     StatusBar: {
       style: 'light',
@@ -34,7 +30,10 @@ const config: CapacitorConfig = {
     },
     Keyboard: {
       resize: 'body',
-      resizeOnFullScreen: true,
+      style: 'light',
+    },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
     },
   },
 };

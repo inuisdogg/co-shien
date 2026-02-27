@@ -357,7 +357,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
         })}
       </div>
 
-      <div className="mt-auto p-4 border-t border-gray-100">
+      <div className="mt-auto border-t border-gray-100" style={{ padding: `1rem 1rem calc(1rem + var(--safe-area-bottom, 0px)) 1rem` }}>
         <div className="flex items-center gap-3 px-2">
           <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
             <Building2 size={16} className="text-gray-500" />

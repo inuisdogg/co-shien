@@ -3635,7 +3635,7 @@ export default function PersonalDashboardPage() {
       )}
 
       {/* タブバー（画面下部） */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center justify-around py-2" role="tablist" aria-label="メインナビゲーション">
             <button
