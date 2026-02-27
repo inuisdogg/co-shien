@@ -51,7 +51,7 @@ const UpperLimitManagementView = dynamicImport(() => import('@/components/upper-
 const RecruitmentView = dynamicImport(() => import('@/components/recruitment/RecruitmentView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const CashflowWizardView = dynamicImport(() => import('@/components/cashflow/CashflowWizardView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const BusinessChatView = dynamicImport(() => import('@/components/chat/BusinessChatView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
-const BillingView = dynamicImport(() => import('@/components/billing/BillingView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const BillingWizardView = dynamicImport(() => import('@/components/billing/BillingWizardView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const SelfEvaluationView = dynamicImport(() => import('@/components/evaluation/SelfEvaluationView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 
 /**
@@ -453,7 +453,7 @@ export default function BusinessPage() {
       case 'chat':
         return <BusinessChatView />;
       case 'billing':
-        return <BillingView />;
+        return <BillingWizardView />;
       case 'self-evaluation':
         return <SelfEvaluationView />;
       default:
