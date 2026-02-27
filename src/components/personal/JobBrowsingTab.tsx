@@ -30,6 +30,7 @@ import {
   ExternalLink,
   Video,
   Banknote,
+  ArrowUpDown,
 } from 'lucide-react';
 
 // ================================================================
@@ -45,6 +46,8 @@ interface JobBrowsingTabProps {
 // ================================================================
 
 type TabKey = 'recommended' | 'full_time' | 'part_time' | 'spot' | 'favorites' | 'applications';
+
+type SortKey = 'recommended' | 'salary_high' | 'salary_low' | 'newest' | 'location';
 
 type MappedJob = JobPosting & { facilityName?: string };
 
@@ -172,6 +175,26 @@ function qualificationLabel(code: string): string {
   return (QUALIFICATION_CODES as Record<string, string>)[code] || code;
 }
 
+/** 給与を年収相当に正規化（ソート用） */
+function normalizeSalary(job: MappedJob): number {
+  const base = job.salaryMax || job.salaryMin || 0;
+  switch (job.salaryType) {
+    case 'annual': return base;
+    case 'monthly': return base * 12;
+    case 'daily': return base * 240;
+    case 'hourly': return base * 2000;
+    default: return base;
+  }
+}
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'recommended', label: 'おすすめ順' },
+  { key: 'salary_high', label: '給与が高い順' },
+  { key: 'salary_low', label: '給与が低い順' },
+  { key: 'newest', label: '新着順' },
+  { key: 'location', label: '勤務地順' },
+];
+
 function mapJob(row: Record<string, unknown>): MappedJob {
   return {
     id: row.id as string,
@@ -264,6 +287,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
   // ---- State: tabs & search ----
   const [activeTab, setActiveTab] = useState<TabKey>('recommended');
   const [keyword, setKeyword] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('recommended');
   const tabScrollRef = useRef<HTMLDivElement>(null);
 
   // ---- State: job data ----
@@ -508,14 +532,6 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
 
     // Tab-specific filters
     switch (activeTab) {
-      case 'recommended':
-        // Sort by match score descending, then show all
-        jobs = jobs.sort((a, b) => {
-          const sa = matchScores.get(a.id)?.score || 0;
-          const sb = matchScores.get(b.id)?.score || 0;
-          return sb - sa;
-        });
-        break;
       case 'full_time':
         jobs = jobs.filter((j) => j.jobType === 'full_time');
         break;
@@ -532,8 +548,39 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         break;
     }
 
+    // Sort
+    switch (sortBy) {
+      case 'recommended':
+        jobs.sort((a, b) => {
+          const sa = matchScores.get(a.id)?.score || 0;
+          const sb = matchScores.get(b.id)?.score || 0;
+          return sb - sa;
+        });
+        break;
+      case 'salary_high':
+        jobs.sort((a, b) => normalizeSalary(b) - normalizeSalary(a));
+        break;
+      case 'salary_low':
+        jobs.sort((a, b) => {
+          const sa = normalizeSalary(a) || Infinity;
+          const sb = normalizeSalary(b) || Infinity;
+          return sa - sb;
+        });
+        break;
+      case 'newest':
+        jobs.sort((a, b) => {
+          const da = a.publishedAt || a.createdAt || '';
+          const db = b.publishedAt || b.createdAt || '';
+          return db.localeCompare(da);
+        });
+        break;
+      case 'location':
+        jobs.sort((a, b) => (a.workLocation || 'ん').localeCompare(b.workLocation || 'ん', 'ja'));
+        break;
+    }
+
     return jobs;
-  }, [allJobs, keyword, activeTab, matchScores, favoriteIds]);
+  }, [allJobs, keyword, activeTab, sortBy, matchScores, favoriteIds]);
 
   // ================================================================
   // Actions
@@ -1569,6 +1616,30 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         </div>
       </div>
 
+      {/* ========== Sort bar ========== */}
+      {isJobListTab && !loadingJobs && filteredJobs.length > 0 && (
+        <div className="bg-white border-b border-gray-100 px-4 py-2 flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            {filteredJobs.length} 件の求人
+          </p>
+          <div className="relative flex items-center gap-1.5">
+            <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className="appearance-none bg-transparent text-xs font-medium text-gray-700 pr-5 cursor-pointer focus:outline-none"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <ChevronRight className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 rotate-90 pointer-events-none" />
+          </div>
+        </div>
+      )}
+
       {/* ========== Tab Content ========== */}
       <div className="px-4 py-4">
         {/* Recommended tab: show login teaser if no user */}
@@ -1627,10 +1698,6 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Results count */}
-                <p className="text-xs text-gray-500">
-                  {filteredJobs.length} 件の求人
-                </p>
                 {filteredJobs.map((job) => renderJobCard(job))}
               </div>
             )}
