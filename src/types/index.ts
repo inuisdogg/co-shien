@@ -2483,6 +2483,13 @@ export type JobApplication = {
   jobTitle?: string;
   jobType?: JobType;
   facilityName?: string;
+  // 応募者希望条件
+  preferredDays?: string;
+  preferredHoursPerWeek?: number;
+  preferredHourlyRate?: number;
+  preferredStartTime?: string;
+  preferredEndTime?: string;
+  preferredNotes?: string;
 };
 
 export type Placement = {

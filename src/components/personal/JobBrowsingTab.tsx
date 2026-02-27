@@ -47,7 +47,7 @@ interface JobBrowsingTabProps {
 
 type TabKey = 'recommended' | 'full_time' | 'part_time' | 'spot' | 'favorites' | 'applications';
 
-type SortKey = 'recommended' | 'salary_high' | 'salary_low' | 'newest' | 'location';
+type SortKey = 'recommended' | 'salary_high' | 'salary_low' | 'newest' | 'distance';
 
 type MappedJob = JobPosting & { facilityName?: string };
 
@@ -192,8 +192,59 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'salary_high', label: '給与が高い順' },
   { key: 'salary_low', label: '給与が低い順' },
   { key: 'newest', label: '新着順' },
-  { key: 'location', label: '勤務地順' },
+  { key: 'distance', label: '距離が近い順' },
 ];
+
+const DAYS_OF_WEEK = ['月', '火', '水', '木', '金', '土', '日'];
+
+/** 住所文字列から簡易的に緯度経度を推定（東京都の区レベル） */
+const AREA_COORDS: Record<string, { lat: number; lng: number }> = {
+  '世田谷': { lat: 35.6461, lng: 139.6530 },
+  '杉並': { lat: 35.6995, lng: 139.6365 },
+  '練馬': { lat: 35.7355, lng: 139.6517 },
+  '新宿': { lat: 35.6938, lng: 139.7035 },
+  '渋谷': { lat: 35.6640, lng: 139.6982 },
+  '中野': { lat: 35.7078, lng: 139.6638 },
+  '豊島': { lat: 35.7260, lng: 139.7163 },
+  '板橋': { lat: 35.7512, lng: 139.7092 },
+  '北区': { lat: 35.7528, lng: 139.7373 },
+  '足立': { lat: 35.7752, lng: 139.8045 },
+  '葛飾': { lat: 35.7436, lng: 139.8472 },
+  '江戸川': { lat: 35.7068, lng: 139.8684 },
+  '江東': { lat: 35.6729, lng: 139.8170 },
+  '墨田': { lat: 35.7106, lng: 139.8014 },
+  '台東': { lat: 35.7124, lng: 139.7803 },
+  '荒川': { lat: 35.7360, lng: 139.7835 },
+  '文京': { lat: 35.7081, lng: 139.7516 },
+  '千代田': { lat: 35.6940, lng: 139.7536 },
+  '中央': { lat: 35.6706, lng: 139.7718 },
+  '港区': { lat: 35.6581, lng: 139.7514 },
+  '品川': { lat: 35.6091, lng: 139.7301 },
+  '目黒': { lat: 35.6414, lng: 139.6982 },
+  '大田': { lat: 35.5613, lng: 139.7160 },
+};
+
+function getAreaCoords(location: string): { lat: number; lng: number } | null {
+  for (const [area, coords] of Object.entries(AREA_COORDS)) {
+    if (location.includes(area)) return coords;
+  }
+  return null;
+}
+
+function haversineDistance(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function mapJob(row: Record<string, unknown>): MappedJob {
   return {
@@ -326,6 +377,23 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // ---- State: inquiry modal ----
+  const [showInquiryModal, setShowInquiryModal] = useState(false);
+  const [inquiryMessage, setInquiryMessage] = useState('');
+  const [sendingInquiry, setSendingInquiry] = useState(false);
+  const [inquirySuccess, setInquirySuccess] = useState(false);
+
+  // ---- State: apply form work preferences ----
+  const [prefDays, setPrefDays] = useState<string[]>([]);
+  const [prefHoursPerWeek, setPrefHoursPerWeek] = useState('');
+  const [prefHourlyRate, setPrefHourlyRate] = useState('');
+  const [prefStartTime, setPrefStartTime] = useState('');
+  const [prefEndTime, setPrefEndTime] = useState('');
+  const [prefNotes, setPrefNotes] = useState('');
+
+  // ---- State: geolocation for distance sort ----
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // ================================================================
   // Data fetching
@@ -480,6 +548,19 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     }
   }, [fetchJobs, fetchFavorites, fetchApplications, fetchUserProfile, userId]);
 
+  // Request geolocation when distance sort is selected
+  useEffect(() => {
+    if (sortBy === 'distance' && !userLocation && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {
+          // Fallback: use Tokyo Station as default
+          setUserLocation({ lat: 35.6812, lng: 139.7671 });
+        }
+      );
+    }
+  }, [sortBy, userLocation]);
+
   // Fetch spot shifts when jobs are loaded
   useEffect(() => {
     const spotJobIds = allJobs
@@ -574,13 +655,21 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
           return db.localeCompare(da);
         });
         break;
-      case 'location':
-        jobs.sort((a, b) => (a.workLocation || 'ん').localeCompare(b.workLocation || 'ん', 'ja'));
+      case 'distance':
+        if (userLocation) {
+          jobs.sort((a, b) => {
+            const coordA = getAreaCoords(a.workLocation || '');
+            const coordB = getAreaCoords(b.workLocation || '');
+            const distA = coordA ? haversineDistance(userLocation.lat, userLocation.lng, coordA.lat, coordA.lng) : 9999;
+            const distB = coordB ? haversineDistance(userLocation.lat, userLocation.lng, coordB.lat, coordB.lng) : 9999;
+            return distA - distB;
+          });
+        }
         break;
     }
 
     return jobs;
-  }, [allJobs, keyword, activeTab, sortBy, matchScores, favoriteIds]);
+  }, [allJobs, keyword, activeTab, sortBy, matchScores, favoriteIds, userLocation]);
 
   // ================================================================
   // Actions
@@ -657,6 +746,12 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         applicant_user_id: userId,
         status: 'applied',
         cover_message: applyMessage || null,
+        preferred_days: prefDays.length > 0 ? prefDays.join(',') : null,
+        preferred_hours_per_week: prefHoursPerWeek ? parseInt(prefHoursPerWeek, 10) : null,
+        preferred_hourly_rate: prefHourlyRate ? parseInt(prefHourlyRate, 10) : null,
+        preferred_start_time: prefStartTime || null,
+        preferred_end_time: prefEndTime || null,
+        preferred_notes: prefNotes || null,
       });
 
       if (error) {
@@ -665,6 +760,12 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       }
       setApplySuccess(true);
       setApplyMessage('');
+      setPrefDays([]);
+      setPrefHoursPerWeek('');
+      setPrefHourlyRate('');
+      setPrefStartTime('');
+      setPrefEndTime('');
+      setPrefNotes('');
       // Refresh applications
       fetchApplications();
       // Auto-close after brief delay
@@ -677,7 +778,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     } finally {
       setApplying(false);
     }
-  }, [userId, selectedJob, applyMessage, fetchApplications]);
+  }, [userId, selectedJob, applyMessage, prefDays, prefHoursPerWeek, prefHourlyRate, prefStartTime, prefEndTime, prefNotes, fetchApplications]);
 
   const openApplicationDetail = useCallback(
     async (app: ApplicationRow) => {
@@ -744,6 +845,64 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       setSendingMessage(false);
     }
   }, [userId, selectedApplication, newMessage]);
+
+  // Handle inquiry message (問い合わせ)
+  const handleInquiry = useCallback(async () => {
+    if (!userId || !selectedJob || !inquiryMessage.trim()) return;
+    setSendingInquiry(true);
+    try {
+      // Check if application already exists for this job
+      const existingApp = applications.find((a) => a.jobPostingId === selectedJob.id);
+      let applicationId = existingApp?.id;
+
+      // If no application exists, create one as an inquiry
+      if (!applicationId) {
+        const { data: newApp, error: appError } = await supabase
+          .from('job_applications')
+          .insert({
+            job_posting_id: selectedJob.id,
+            applicant_user_id: userId,
+            status: 'applied',
+            cover_message: `【問い合わせ】${inquiryMessage.trim()}`,
+          })
+          .select()
+          .single();
+
+        if (appError || !newApp) {
+          console.error('Failed to create application for inquiry:', appError);
+          return;
+        }
+        applicationId = (newApp as Record<string, unknown>).id as string;
+        fetchApplications();
+      }
+
+      // Send the inquiry as a message
+      const { error: msgError } = await supabase
+        .from('recruitment_messages')
+        .insert({
+          job_application_id: applicationId,
+          sender_user_id: userId,
+          sender_type: 'applicant',
+          content: inquiryMessage.trim(),
+        });
+
+      if (msgError) {
+        console.error('Failed to send inquiry message:', msgError);
+        return;
+      }
+
+      setInquirySuccess(true);
+      setInquiryMessage('');
+      setTimeout(() => {
+        setShowInquiryModal(false);
+        setInquirySuccess(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Error sending inquiry:', err);
+    } finally {
+      setSendingInquiry(false);
+    }
+  }, [userId, selectedJob, inquiryMessage, applications, fetchApplications]);
 
   // Check if user already applied
   const hasApplied = useCallback(
@@ -1191,9 +1350,10 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-200 px-4 py-3 flex gap-3">
           <button
             onClick={() => {
-              // Navigate to Roots messaging - open inquiry
               if (userId) {
-                window.location.href = `/career?tab=messages&facilityId=${job.facilityId}`;
+                setShowInquiryModal(true);
+                setInquiryMessage('');
+                setInquirySuccess(false);
               }
             }}
             className="flex-1 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
@@ -1247,7 +1407,8 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
             }
           }}
         />
-        <div className="relative w-full max-w-md mx-4 mb-0 sm:mb-auto rounded-t-2xl sm:rounded-2xl bg-white p-6 shadow-xl">
+        <div className="relative w-full max-w-md mx-4 mb-0 sm:mb-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
           {applySuccess ? (
             <div className="text-center py-8">
               <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
@@ -1285,12 +1446,128 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 )}
               </div>
 
-              <div className="mb-6">
+              {/* Work preferences section */}
+              <div className="mb-4">
+                <h4 className="text-sm font-bold text-gray-900 mb-3">希望条件</h4>
+                <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  {/* Preferred days */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      希望曜日
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DAYS_OF_WEEK.map((day) => {
+                        const isSelected = prefDays.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              setPrefDays((prev) =>
+                                isSelected
+                                  ? prev.filter((d) => d !== day)
+                                  : [...prev, day]
+                              );
+                            }}
+                            className={`w-9 h-9 rounded-full text-xs font-bold transition-colors ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white border border-gray-300 text-gray-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Hours per week + hourly rate */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        希望時間/週
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={prefHoursPerWeek}
+                          onChange={(e) => setPrefHoursPerWeek(e.target.value)}
+                          placeholder="20"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          時間
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        希望時給
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="800"
+                          step="50"
+                          value={prefHourlyRate}
+                          onChange={(e) => setPrefHourlyRate(e.target.value)}
+                          placeholder="1200"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          円
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preferred time range */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      希望時間帯
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        value={prefStartTime}
+                        onChange={(e) => setPrefStartTime(e.target.value)}
+                        className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                      <span className="text-sm text-gray-400">〜</span>
+                      <input
+                        type="time"
+                        value={prefEndTime}
+                        onChange={(e) => setPrefEndTime(e.target.value)}
+                        className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      その他希望・備考
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={prefNotes}
+                      onChange={(e) => setPrefNotes(e.target.value)}
+                      placeholder="例: 子供の送迎があるため16時までに退勤希望"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   カバーメッセージ（任意）
                 </label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   value={applyMessage}
                   onChange={(e) => setApplyMessage(e.target.value)}
                   placeholder="志望動機やアピールポイントを記入してください..."
@@ -1316,6 +1593,103 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                     <Send className="h-4 w-4" />
                   )}
                   応募を送信
+                </button>
+              </div>
+            </>
+          )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ================================================================
+  // Inquiry Modal
+  // ================================================================
+
+  const renderInquiryModal = () => {
+    if (!showInquiryModal || !selectedJob) return null;
+
+    return (
+      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black/40"
+          onClick={() => {
+            if (!sendingInquiry) {
+              setShowInquiryModal(false);
+              setInquirySuccess(false);
+            }
+          }}
+        />
+        <div className="relative w-full max-w-md mx-4 mb-0 sm:mb-auto rounded-t-2xl sm:rounded-2xl bg-white p-6 shadow-xl">
+          {inquirySuccess ? (
+            <div className="text-center py-8">
+              <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-gray-900">問い合わせを送信しました</h3>
+              <p className="text-sm text-gray-500 mt-2">
+                施設からの回答を「応募状況」タブでご確認ください
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900">問い合わせ</h3>
+                <button
+                  onClick={() => setShowInquiryModal(false)}
+                  className="rounded-full p-1 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5 text-gray-400" />
+                </button>
+              </div>
+
+              <hr className="border-gray-200 mb-4" />
+
+              <div className="space-y-2 mb-4">
+                <div>
+                  <p className="text-xs text-gray-400">求人</p>
+                  <p className="text-sm font-medium text-gray-800">{selectedJob.title}</p>
+                </div>
+                {selectedJob.facilityName && (
+                  <div>
+                    <p className="text-xs text-gray-400">施設</p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {selectedJob.facilityName}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  メッセージ
+                </label>
+                <textarea
+                  rows={4}
+                  value={inquiryMessage}
+                  onChange={(e) => setInquiryMessage(e.target.value)}
+                  placeholder="勤務条件や職場環境について質問してみましょう..."
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowInquiryModal(false)}
+                  className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleInquiry}
+                  disabled={sendingInquiry || !inquiryMessage.trim()}
+                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {sendingInquiry ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  送信する
                 </button>
               </div>
             </>
@@ -1760,6 +2134,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       {/* ========== Modals ========== */}
       {selectedJob && renderJobDetailModal()}
       {showApplyModal && renderApplyModal()}
+      {showInquiryModal && renderInquiryModal()}
       {selectedApplication && renderApplicationDetailModal()}
     </div>
   );
