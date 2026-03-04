@@ -631,7 +631,7 @@ const BcpManagementPanel: React.FC = () => {
                       onClick={() => setPlanForm({ ...planForm, planType: key })}
                       className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${
                         planForm.planType === key
-                          ? 'border-[#00c4cc] bg-[#00c4cc]/5'
+                          ? 'border-primary bg-primary/5'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -649,7 +649,7 @@ const BcpManagementPanel: React.FC = () => {
                   type="text"
                   value={planForm.title}
                   onChange={(e) => setPlanForm({ ...planForm, title: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   placeholder="地震対応BCP計画"
                 />
               </div>
@@ -661,7 +661,7 @@ const BcpManagementPanel: React.FC = () => {
                   value={planForm.content}
                   onChange={(e) => setPlanForm({ ...planForm, content: e.target.value })}
                   rows={6}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   placeholder="計画の詳細内容..."
                 />
               </div>
@@ -674,7 +674,7 @@ const BcpManagementPanel: React.FC = () => {
                     type="date"
                     value={planForm.nextReviewDate}
                     onChange={(e) => setPlanForm({ ...planForm, nextReviewDate: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
                 <div>
@@ -683,7 +683,7 @@ const BcpManagementPanel: React.FC = () => {
                     <select
                       value={planForm.status}
                       onChange={(e) => setPlanForm({ ...planForm, status: e.target.value as PlanStatus })}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] appearance-none"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary appearance-none"
                     >
                       <option value="draft">下書き</option>
                       <option value="active">有効</option>
@@ -730,7 +730,7 @@ const BcpManagementPanel: React.FC = () => {
                   type="text"
                   value={contactForm.contactName}
                   onChange={(e) => setContactForm({ ...contactForm, contactName: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div>
@@ -739,7 +739,7 @@ const BcpManagementPanel: React.FC = () => {
                   type="text"
                   value={contactForm.role}
                   onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="施設長、防災担当 等"
                 />
               </div>
@@ -750,7 +750,7 @@ const BcpManagementPanel: React.FC = () => {
                     type="tel"
                     value={contactForm.phone}
                     onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
                 <div>
@@ -759,7 +759,7 @@ const BcpManagementPanel: React.FC = () => {
                     type="email"
                     value={contactForm.email}
                     onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
               </div>
@@ -770,7 +770,7 @@ const BcpManagementPanel: React.FC = () => {
                   min="0"
                   value={contactForm.priority}
                   onChange={(e) => setContactForm({ ...contactForm, priority: parseInt(e.target.value) || 0 })}
-                  className="w-20 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                  className="w-20 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
             </div>
@@ -809,7 +809,7 @@ const BcpManagementPanel: React.FC = () => {
                     type="date"
                     value={drillForm.date}
                     onChange={(e) => setDrillForm({ ...drillForm, date: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
                 <div>
@@ -819,7 +819,7 @@ const BcpManagementPanel: React.FC = () => {
                     min="0"
                     value={drillForm.participantsCount}
                     onChange={(e) => setDrillForm({ ...drillForm, participantsCount: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                     placeholder="0"
                   />
                 </div>
@@ -830,7 +830,7 @@ const BcpManagementPanel: React.FC = () => {
                   value={drillForm.description}
                   onChange={(e) => setDrillForm({ ...drillForm, description: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="訓練の概要..."
                 />
               </div>
@@ -840,7 +840,7 @@ const BcpManagementPanel: React.FC = () => {
                   value={drillForm.notes}
                   onChange={(e) => setDrillForm({ ...drillForm, notes: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="改善点・気付きなど..."
                 />
               </div>

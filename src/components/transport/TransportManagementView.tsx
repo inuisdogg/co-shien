@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Child, TransportCompletionRecord } from '@/types';
+import { Child, TransportCompletionRecord, TransportRouteStop } from '@/types';
 import {
   calculateOptimizedRoute,
   calculateArrivalTimes,
@@ -40,7 +40,9 @@ import {
   RouteResult,
   LatLng,
 } from '@/utils/googleMaps';
+import { useTransportSession } from '@/hooks/useTransportSession';
 import TransportAssignmentPanel from '@/components/schedule/TransportAssignmentPanel';
+import { useToast } from '@/components/ui/Toast';
 
 // ============================================================
 // Types
@@ -84,12 +86,20 @@ function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function parseDurationToSeconds(duration: string): number {
+  // "5分" or "1時間5分" format
+  const hourMatch = duration.match(/(\d+)\s*時間/);
+  const minMatch = duration.match(/(\d+)\s*分/);
+  return ((hourMatch ? parseInt(hourMatch[1]) : 0) * 3600) + ((minMatch ? parseInt(minMatch[1]) : 0) * 60);
+}
+
 // ============================================================
 // Main Component
 // ============================================================
 
 const TransportManagementView: React.FC = () => {
   const { facility, user } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   // Tab state
@@ -126,8 +136,28 @@ const TransportManagementView: React.FC = () => {
   const [calculating, setCalculating] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
 
-  // Navigation mode
-  const [isNavigating, setIsNavigating] = useState(false);
+  // リアルタイムセッション管理
+  const {
+    activeSession,
+    gpsStatus,
+    gpsError,
+    loading: sessionLoading,
+    startSession,
+    completeSession,
+    cancelSession,
+    markStopArrived,
+    skipStop,
+    loadActiveSession,
+  } = useTransportSession();
+
+  const isNavigating = activeSession?.status === 'active';
+
+  // リロード時にアクティブセッションを復帰
+  useEffect(() => {
+    if (facilityId) {
+      loadActiveSession(facilityId, mode);
+    }
+  }, [facilityId, mode, loadActiveSession]);
 
   // Loading
   const [loading, setLoading] = useState(true);
@@ -146,7 +176,7 @@ const TransportManagementView: React.FC = () => {
         .from('children')
         .select('*')
         .eq('facility_id', facilityId)
-        .eq('status', 'active');
+        .eq('contract_status', 'active');
       if (data) {
         const mapped: Child[] = data.map((row: Record<string, unknown>) => ({
           id: row.id as string,
@@ -242,17 +272,16 @@ const TransportManagementView: React.FC = () => {
     (async () => {
       const { data } = await supabase
         .from('facility_settings')
-        .select('settings')
+        .select('address, latitude, longitude')
         .eq('facility_id', facilityId)
         .single();
-      if (data?.settings) {
-        const s = data.settings as Record<string, unknown>;
-        const addr = (s.address as string) || '';
+      if (data) {
+        const addr = data.address || '';
         setFacilityAddress(addr);
-        if (s.latitude && s.longitude) {
+        if (data.latitude && data.longitude) {
           setFacilityLocation({
-            lat: Number(s.latitude),
-            lng: Number(s.longitude),
+            lat: Number(data.latitude),
+            lng: Number(data.longitude),
           });
         } else if (addr) {
           const loc = await geocodeAddress(addr);
@@ -396,10 +425,12 @@ const TransportManagementView: React.FC = () => {
         childName: c.childName,
       }));
 
-      // For pickup: facility is destination (picking up kids → bring to facility)
-      // For dropoff: facility is origin (leaving facility → drop off kids)
-      const origin = mode === 'pickup' ? facilityLocation : facilityLocation;
-      const destination = facilityLocation;
+      // For pickup: first child is origin, facility is destination
+      // For dropoff: facility is origin, last child is destination
+      const firstChildLocation = routableChildren[0]?.location;
+      const lastChildLocation = routableChildren[routableChildren.length - 1]?.location;
+      const origin = mode === 'pickup' ? (firstChildLocation || facilityLocation) : facilityLocation;
+      const destination = mode === 'pickup' ? facilityLocation : (lastChildLocation || facilityLocation);
 
       const result = await calculateOptimizedRoute(origin, waypoints, destination);
 
@@ -492,12 +523,17 @@ const TransportManagementView: React.FC = () => {
             };
 
       if (existing) {
-        await supabase
+        const { error } = await supabase
           .from('transport_completion_records')
           .update({ ...updateData, updated_at: now })
           .eq('id', existing.id);
+        if (error) {
+          console.error('送迎完了更新エラー:', error);
+          toast.error('送迎完了の更新に失敗しました');
+          return;
+        }
       } else {
-        await supabase.from('transport_completion_records').insert({
+        const { error } = await supabase.from('transport_completion_records').insert({
           facility_id: facilityId,
           date: today,
           schedule_id: child.scheduleId,
@@ -506,6 +542,11 @@ const TransportManagementView: React.FC = () => {
           created_at: now,
           updated_at: now,
         });
+        if (error) {
+          console.error('送迎完了記録エラー:', error);
+          toast.error('送迎完了の記録に失敗しました');
+          return;
+        }
       }
 
       await fetchCompletionRecords();
@@ -520,7 +561,7 @@ const TransportManagementView: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-[#00c4cc]" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -530,8 +571,8 @@ const TransportManagementView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#00c4cc]/10 rounded-lg flex items-center justify-center">
-            <Car className="w-5 h-5 text-[#00c4cc]" />
+          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+            <Car className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-gray-800">送迎管理</h2>
@@ -546,7 +587,7 @@ const TransportManagementView: React.FC = () => {
           onClick={() => setActiveTab('today')}
           className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
             activeTab === 'today'
-              ? 'bg-white text-[#00c4cc] shadow-sm'
+              ? 'bg-white text-primary shadow-sm'
               : 'text-gray-600 hover:text-gray-800'
           }`}
         >
@@ -559,7 +600,7 @@ const TransportManagementView: React.FC = () => {
           onClick={() => setActiveTab('assignment')}
           className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
             activeTab === 'assignment'
-              ? 'bg-white text-[#00c4cc] shadow-sm'
+              ? 'bg-white text-primary shadow-sm'
               : 'text-gray-600 hover:text-gray-800'
           }`}
         >
@@ -580,7 +621,7 @@ const TransportManagementView: React.FC = () => {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <div className="text-xs text-gray-500 mb-1">迎え</div>
               <div className="text-2xl font-bold text-[#006064]">{pickupCount}<span className="text-sm font-normal text-gray-400 ml-0.5">名</span></div>
-              <div className="text-xs text-[#00c4cc] mt-1">{completedPickup}名 完了</div>
+              <div className="text-xs text-primary mt-1">{completedPickup}名 完了</div>
             </div>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <div className="text-xs text-gray-500 mb-1">送り</div>
@@ -615,7 +656,7 @@ const TransportManagementView: React.FC = () => {
                 onClick={() => { setMode('pickup'); setRouteResult(null); setOptimizedStops([]); }}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                   mode === 'pickup'
-                    ? 'bg-[#00c4cc] text-white shadow-sm'
+                    ? 'bg-primary text-white shadow-sm'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
@@ -640,7 +681,7 @@ const TransportManagementView: React.FC = () => {
                 type="time"
                 value={departureTime}
                 onChange={(e) => setDepartureTime(e.target.value)}
-                className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
           </div>
@@ -651,7 +692,7 @@ const TransportManagementView: React.FC = () => {
               <button
                 onClick={calculateRoute}
                 disabled={calculating}
-                className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] disabled:bg-gray-300 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark disabled:bg-gray-300 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
               >
                 {calculating ? (
                   <>
@@ -681,19 +722,45 @@ const TransportManagementView: React.FC = () => {
 
                   {!isNavigating ? (
                     <button
-                      onClick={() => setIsNavigating(true)}
-                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+                      onClick={async () => {
+                        if (!facilityId) return;
+                        const stops = optimizedStops.length > 0 ? optimizedStops : transportChildren.map((c, i) => ({ ...c, order: i + 1 } as OptimizedStop));
+                        const routeStops: TransportRouteStop[] = stops.map((s) => ({
+                          order: s.order,
+                          childId: s.childId,
+                          childName: s.childName,
+                          address: s.address,
+                          lat: s.location?.lat || 0,
+                          lng: s.location?.lng || 0,
+                          etaSeconds: s.durationFromPrev ? parseDurationToSeconds(s.durationFromPrev) : undefined,
+                          scheduleId: s.scheduleId,
+                        }));
+                        await startSession({
+                          facilityId,
+                          mode,
+                          routeStops,
+                          driverStaffId: user?.id,
+                          totalDistanceMeters: routeResult?.totalDistance,
+                          totalDurationSeconds: routeResult?.totalDuration,
+                        });
+                      }}
+                      disabled={sessionLoading}
+                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50"
                     >
                       <Play className="w-4 h-4" />
-                      送迎スタート
+                      {sessionLoading ? '開始中...' : '送迎スタート'}
                     </button>
                   ) : (
                     <button
-                      onClick={() => setIsNavigating(false)}
+                      onClick={async () => {
+                        if (confirm('送迎を完了しますか？保護者に通知が送信されます。')) {
+                          await completeSession();
+                        }
+                      }}
                       className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
                     >
                       <Square className="w-4 h-4" />
-                      送迎終了
+                      送迎完了
                     </button>
                   )}
                 </>
@@ -717,6 +784,38 @@ const TransportManagementView: React.FC = () => {
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-red-800">{routeError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* GPS Status Indicator (送迎中のみ表示) */}
+          {isNavigating && (
+            <div className={`rounded-xl border p-3 flex items-center gap-3 ${
+              gpsStatus === 'tracking'
+                ? 'bg-green-50 border-green-200'
+                : gpsStatus === 'error'
+                ? 'bg-red-50 border-red-200'
+                : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                gpsStatus === 'tracking' ? 'bg-green-500 animate-pulse' : gpsStatus === 'error' ? 'bg-red-500' : 'bg-gray-400'
+              }`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-bold ${
+                  gpsStatus === 'tracking' ? 'text-green-700' : gpsStatus === 'error' ? 'text-red-700' : 'text-gray-600'
+                }`}>
+                  {gpsStatus === 'tracking' ? 'GPS追跡中' : gpsStatus === 'error' ? 'GPSエラー' : 'GPS待機中'}
+                </p>
+                {gpsError && <p className="text-xs text-red-600 mt-0.5">{gpsError}</p>}
+                {gpsStatus === 'tracking' && activeSession?.currentLatitude && (
+                  <p className="text-xs text-green-600 mt-0.5">
+                    {activeSession.currentLatitude.toFixed(5)}, {activeSession.currentLongitude?.toFixed(5)}
+                    {activeSession.currentSpeed != null && ` · ${Math.round(activeSession.currentSpeed * 3.6)}km/h`}
+                  </p>
+                )}
+              </div>
+              <div className="text-xs text-gray-500">
+                停車 {activeSession?.currentStopIndex || 0}/{activeSession?.routeStops.length || 0}
               </div>
             </div>
           )}
@@ -767,18 +866,22 @@ const TransportManagementView: React.FC = () => {
 
             {/* Optimized stops or plain list */}
             {(optimizedStops.length > 0 ? optimizedStops : transportChildren.map((c, i) => ({ ...c, order: i + 1 } as OptimizedStop))).map(
-              (stop) => {
+              (stop, idx) => {
                 const isCompleted = stop.completed;
                 const accentColor = mode === 'pickup' ? '#00c4cc' : '#f97316';
+                const isCurrentSessionStop = isNavigating && activeSession && idx === (activeSession.currentStopIndex || 0);
+                const isSessionPassed = isNavigating && activeSession && idx < (activeSession.currentStopIndex || 0);
 
                 return (
                   <div
                     key={`${stop.childId}-${stop.scheduleId}`}
                     className={`rounded-xl border shadow-sm transition-all ${
-                      isCompleted
+                      isSessionPassed || isCompleted
                         ? 'bg-gray-50 border-gray-200 opacity-70'
+                        : isCurrentSessionStop
+                        ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-400 ring-offset-1'
                         : 'bg-white border-gray-200 hover:shadow-md'
-                    } ${isNavigating && !isCompleted ? (mode === 'pickup' ? 'ring-2 ring-[#00c4cc] ring-offset-1' : 'ring-2 ring-orange-500 ring-offset-1') : ''}`}
+                    } ${isNavigating && !isCompleted && !isCurrentSessionStop && !isSessionPassed ? (mode === 'pickup' ? 'ring-1 ring-primary/30' : 'ring-1 ring-orange-300/30') : ''}`}
                   >
                     <div className="flex items-center gap-3 p-4">
                       {/* Order number */}
@@ -857,23 +960,47 @@ const TransportManagementView: React.FC = () => {
                             <MapPin className="w-4 h-4" />
                           </a>
                         )}
-                        <button
-                          onClick={() => toggleCompletion(stop)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            isCompleted
-                              ? 'text-green-600 bg-green-50 hover:bg-green-100'
-                              : 'text-gray-300 hover:text-green-500 hover:bg-green-50'
-                          }`}
-                          title={isCompleted ? '完了取消' : '完了にする'}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle2 className="w-5 h-5" />
-                          ) : (
-                            <Circle className="w-5 h-5" />
-                          )}
-                        </button>
+                        {!isNavigating && (
+                          <button
+                            onClick={() => toggleCompletion(stop)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isCompleted
+                                ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                                : 'text-gray-300 hover:text-green-500 hover:bg-green-50'
+                            }`}
+                            title={isCompleted ? '完了取消' : '完了にする'}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle2 className="w-5 h-5" />
+                            ) : (
+                              <Circle className="w-5 h-5" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
+
+                    {/* セッション中の到着/スキップボタン */}
+                    {isCurrentSessionStop && (
+                      <div className="flex items-center gap-2 px-4 pb-3 pt-0">
+                        <button
+                          onClick={async () => {
+                            await markStopArrived(idx);
+                            toggleCompletion(stop);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded-lg transition-colors"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          到着・完了
+                        </button>
+                        <button
+                          onClick={() => skipStop(idx)}
+                          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 text-sm px-3 py-2 rounded-lg transition-colors"
+                        >
+                          スキップ
+                        </button>
+                      </div>
+                    )}
 
                     {/* Arrow between stops */}
                     {!isCompleted && optimizedStops.length > 0 && stop.order < optimizedStops.length && (

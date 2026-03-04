@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { hashPassword } from '@/utils/password';
 
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
@@ -34,45 +35,46 @@ export default function ClientSignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+
+  const validateEmail = (value: string) => {
+    if (!value) return 'メールアドレスを入力してください';
+    if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/.test(value)) return '有効なメールアドレスを入力してください';
+    return '';
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) return 'パスワードを入力してください';
+    if (value.length < 8) return 'パスワードは8文字以上で入力してください';
+    return '';
+  };
+
+  const handleFieldBlur = (field: string, errorMsg: string) => {
+    setFieldErrors(prev => {
+      if (errorMsg) return { ...prev, [field]: errorMsg };
+      const { [field]: _, ...rest } = prev;
+      return rest;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
-    // バリデーション
-    if (formData.password !== formData.confirmPassword) {
-      setError('パスワードが一致しません');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('パスワードは6文字以上で入力してください');
-      return;
-    }
-
-    if (!formData.agreedToTerms) {
-      setError('利用規約に同意してください');
-      return;
-    }
-
-    if (!formData.lastName || !formData.firstName) {
-      setError('姓と名を入力してください');
-      return;
-    }
-
-    if (!formData.lastNameKana || !formData.firstNameKana) {
-      setError('姓と名のフリガナを入力してください');
-      return;
-    }
-
-    if (!formData.phone) {
-      setError('電話番号を入力してください');
-      return;
-    }
-
-    if (!formData.email) {
-      setError('メールアドレスを入力してください');
+    // 全フィールドのバリデーションを一括チェック
+    const errors: Record<string, string> = {};
+    if (!formData.lastName.trim() || !formData.firstName.trim()) errors.name = '姓と名を入力してください';
+    if (!formData.lastNameKana.trim() || !formData.firstNameKana.trim()) errors.kana = 'フリガナを入力してください';
+    if (!formData.phone.trim()) errors.phone = '電話番号を入力してください';
+    if (!formData.email.trim()) errors.email = 'メールアドレスを入力してください';
+    if (formData.password.length < 8) errors.password = 'パスワードは8文字以上で入力してください';
+    if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'パスワードが一致しません';
+    if (!formData.agreedToTerms) errors.terms = '利用規約に同意してください';
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError('入力内容に不備があります。各項目をご確認ください。');
       return;
     }
 
@@ -119,7 +121,7 @@ export default function ClientSignupPage() {
       // Supabase Authでサインアップ（メール認証を有効化）
       const redirectUrl = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=parent`
-        : 'https://Roots.inu.co.jp/auth/callback?type=parent';
+        : 'https://roots.inu.co.jp/auth/callback?type=parent';
 
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -148,6 +150,9 @@ export default function ClientSignupPage() {
         throw new Error('ユーザー作成に失敗しました');
       }
 
+      // パスワードをハッシュ化
+      const passwordHash = await hashPassword(formData.password);
+
       // usersテーブルにユーザー情報を保存
       const { error: userCreateError } = await supabase
         .from('users')
@@ -161,9 +166,10 @@ export default function ClientSignupPage() {
           phone: formData.phone,
           email: formData.email,
           login_id: formData.email,
-          user_type: 'client', // 利用者として登録
-          role: 'client', // roleもclientに
-          account_status: 'pending', // メール認証待ち
+          password_hash: passwordHash,
+          user_type: 'client',
+          role: 'client',
+          account_status: 'pending',
           has_account: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -193,7 +199,7 @@ export default function ClientSignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-client-light p-4">
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -213,7 +219,7 @@ export default function ClientSignupPage() {
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <div className="prose prose-sm max-w-none space-y-4 text-sm">
-                <p className="text-gray-500 mb-4">最終更新日: 2024年1月1日</p>
+                <p className="text-gray-500 mb-4">最終更新日: 2026年3月1日</p>
 
                 <section>
                   <h3 className="text-lg font-bold text-gray-800 mb-2">第1条（適用）</h3>
@@ -240,13 +246,35 @@ export default function ClientSignupPage() {
                 <section>
                   <h3 className="text-lg font-bold text-gray-800 mb-2">第3条（個人情報の取扱い）</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    当社は、本サービスの利用によって取得する個人情報については、当社「プライバシーポリシー」に従い適切に取り扱うものとします。
-                    お子様の情報については、保護者の同意のもとで管理され、施設との契約に基づいてのみ共有されます。
+                    当社は、本サービスの利用によって取得する個人情報については、日本国の個人情報保護法（APPI）に準拠し、当社「プライバシーポリシー」に従い適切に取り扱うものとします。
                   </p>
+                  <ol className="list-decimal list-inside space-y-2 text-gray-700 mt-2">
+                    <li>お子様の情報（氏名、生年月日、受給者証情報、健康情報等）については、保護者の同意のもとで管理され、利用契約を結んだ施設との間でのみ共有されます。</li>
+                    <li>当社は、ユーザーの個人情報を利用契約の終了後も法令で定める期間保存する場合があります。保存期間経過後は速やかに削除します。</li>
+                    <li>ユーザーは、当社が保有する自己の個人情報の開示、訂正、削除を請求することができます。請求は本サービス内の設定画面またはお問い合わせフォームより行うことができます。</li>
+                    <li>当社は、ユーザーの同意なく個人情報を第三者に提供することはありません。ただし、法令に基づく場合を除きます。</li>
+                  </ol>
                 </section>
 
                 <section>
-                  <h3 className="text-lg font-bold text-gray-800 mb-2">第4条（準拠法・裁判管轄）</h3>
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">第4条（サービスの提供・中断）</h3>
+                  <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                    <li>当社は、システムの保守、天災、その他やむを得ない事由により、事前の通知なくサービスの全部または一部を一時的に中断することがあります。</li>
+                    <li>当社は、サービス中断に起因するユーザーの損害について、当社に故意または重過失がある場合を除き、責任を負わないものとします。</li>
+                  </ol>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">第5条（退会・アカウント削除）</h3>
+                  <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                    <li>ユーザーは、本サービス内の設定画面またはお問い合わせにより、いつでもアカウントの削除を申請できます。</li>
+                    <li>アカウント削除後、当社はユーザーの個人情報を法令で定める保存義務期間を除き、速やかに削除します。</li>
+                    <li>アカウント削除に伴い、当該ユーザーに紐づく利用実績データは施設側で引き続き保管される場合があります。</li>
+                  </ol>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">第6条（準拠法・裁判管轄）</h3>
                   <ol className="list-decimal list-inside space-y-2 text-gray-700">
                     <li>本規約の解釈にあたっては、日本法を準拠法とします。</li>
                     <li>本サービスに関して紛争が生じた場合には、当社の本店所在地を管轄する裁判所を専属的合意管轄とします。</li>
@@ -262,7 +290,7 @@ export default function ClientSignupPage() {
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowTermsModal(false)}
-                className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                className="w-full bg-client hover:bg-client-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
               >
                 閉じる
               </button>
@@ -282,7 +310,7 @@ export default function ClientSignupPage() {
             priority
           />
           <div className="mb-3">
-            <span className="inline-block bg-[#F6AD55] text-white text-xs font-bold px-3 py-1.5 rounded-full">
+            <span className="inline-block bg-client text-white text-xs font-bold px-3 py-1.5 rounded-full">
               保護者の方はこちら
             </span>
           </div>
@@ -306,7 +334,7 @@ export default function ClientSignupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* お名前セクション */}
-          <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100">
+          <div className={`bg-gray-50/50 rounded-xl p-4 border ${fieldErrors.name ? 'border-red-400' : 'border-gray-100'}`}>
             <p className="text-xs font-bold text-gray-500 mb-3">お名前</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -319,7 +347,7 @@ export default function ClientSignupPage() {
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+                  className={`w-full px-4 py-3 border ${fieldErrors.name ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
                   placeholder="山田"
                   disabled={loading}
                 />
@@ -334,12 +362,13 @@ export default function ClientSignupPage() {
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+                  className={`w-full px-4 py-3 border ${fieldErrors.name ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
                   placeholder="太郎"
                   disabled={loading}
                 />
               </div>
             </div>
+            {fieldErrors.name && <p className="text-xs text-red-500 mt-1">{fieldErrors.name}</p>}
 
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div>
@@ -352,7 +381,7 @@ export default function ClientSignupPage() {
                   value={formData.lastNameKana}
                   onChange={(e) => setFormData({ ...formData, lastNameKana: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+                  className={`w-full px-4 py-3 border ${fieldErrors.kana ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
                   placeholder="ヤマダ"
                   disabled={loading}
                 />
@@ -367,12 +396,13 @@ export default function ClientSignupPage() {
                   value={formData.firstNameKana}
                   onChange={(e) => setFormData({ ...formData, firstNameKana: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+                  className={`w-full px-4 py-3 border ${fieldErrors.kana ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
                   placeholder="タロウ"
                   disabled={loading}
                 />
               </div>
             </div>
+            {fieldErrors.kana && <p className="text-xs text-red-500 mt-1">{fieldErrors.kana}</p>}
           </div>
 
           <div>
@@ -385,10 +415,11 @@ export default function ClientSignupPage() {
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+              className={`w-full px-4 py-3 border ${fieldErrors.phone ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
               placeholder="090-1234-5678"
               disabled={loading}
             />
+            {fieldErrors.phone && <p className="text-xs text-red-500 mt-1">{fieldErrors.phone}</p>}
           </div>
 
           <div>
@@ -399,15 +430,14 @@ export default function ClientSignupPage() {
               id="email"
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, email: e.target.value }); if (fieldErrors.email) handleFieldBlur('email', ''); }}
+              onBlur={() => handleFieldBlur('email', validateEmail(formData.email))}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+              className={`w-full px-4 py-3 border ${fieldErrors.email ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
               placeholder="example@email.com"
               disabled={loading}
             />
-            <p className="text-xs text-gray-400 mt-1.5">
-              このメールアドレスがログインIDになります
-            </p>
+            {fieldErrors.email ? <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p> : <p className="text-xs text-gray-400 mt-1.5">このメールアドレスがログインIDになります</p>}
           </div>
 
           <div>
@@ -419,11 +449,12 @@ export default function ClientSignupPage() {
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => { setFormData({ ...formData, password: e.target.value }); if (fieldErrors.password) handleFieldBlur('password', ''); }}
+                onBlur={() => handleFieldBlur('password', validatePassword(formData.password))}
                 required
-                minLength={6}
-                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
-                placeholder="6文字以上のパスワード"
+                minLength={8}
+                className={`w-full px-4 py-3 pr-12 border ${fieldErrors.password ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
+                placeholder="8文字以上のパスワード"
                 disabled={loading}
               />
               <button
@@ -444,6 +475,7 @@ export default function ClientSignupPage() {
                 )}
               </button>
             </div>
+            {fieldErrors.password && <p className="text-xs text-red-500 mt-1">{fieldErrors.password}</p>}
           </div>
 
           <div>
@@ -457,8 +489,8 @@ export default function ClientSignupPage() {
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
-                minLength={6}
-                className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+                minLength={8}
+                className={`w-full px-4 py-3 pr-12 border ${fieldErrors.confirmPassword ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
                 placeholder="もう一度パスワードを入力"
                 disabled={loading}
               />
@@ -480,22 +512,23 @@ export default function ClientSignupPage() {
                 )}
               </button>
             </div>
+            {fieldErrors.confirmPassword && <p className="text-xs text-red-500 mt-1">{fieldErrors.confirmPassword}</p>}
           </div>
 
-          <div className="flex items-start bg-gray-50 rounded-lg p-3 border border-gray-100">
+          <div className={`flex items-center min-h-[44px] bg-gray-50 rounded-lg p-3 border ${fieldErrors.terms ? 'border-red-400' : 'border-gray-100'}`}>
             <input
               type="checkbox"
               id="terms"
               checked={formData.agreedToTerms}
               onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
-              className="mt-0.5 mr-3 w-5 h-5 accent-[#F6AD55]"
+              className="w-5 h-5 mr-3 accent-client cursor-pointer"
               disabled={loading}
             />
             <label htmlFor="terms" className="text-sm text-gray-700">
               <button
                 type="button"
                 onClick={() => setShowTermsModal(true)}
-                className="text-[#F6AD55] hover:underline font-medium"
+                className="text-client hover:underline font-medium"
               >
                 利用規約
               </button>
@@ -503,18 +536,19 @@ export default function ClientSignupPage() {
               <button
                 type="button"
                 onClick={() => window.open('/privacy', '_blank')}
-                className="text-[#F6AD55] hover:underline font-medium"
+                className="text-client hover:underline font-medium"
               >
                 プライバシーポリシー
               </button>
               に同意します
             </label>
           </div>
+          {fieldErrors.terms && <p className="text-xs text-red-500 mt-1">{fieldErrors.terms}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg text-base"
+            className="w-full bg-client hover:bg-client-dark text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg text-base"
           >
             {loading ? '登録中...' : 'アカウントを作成する'}
           </button>
@@ -525,7 +559,7 @@ export default function ClientSignupPage() {
             既にアカウントをお持ちの方は{' '}
             <button
               onClick={() => router.push('/parent/login')}
-              className="text-[#F6AD55] hover:underline font-bold"
+              className="text-client hover:underline font-bold"
             >
               ログイン
             </button>

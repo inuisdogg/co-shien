@@ -25,7 +25,8 @@ import {
   Truck,
   MessageSquare,
 } from 'lucide-react';
-import { UsageRecordFormData, UsageRecord, ScheduleItem } from '@/types';
+import { UsageRecordFormData, UsageRecord, ScheduleItem, ResolvedSlotInfo } from '@/types';
+import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
 
 interface UsageRecordFormProps {
   scheduleItem: ScheduleItem;
@@ -33,6 +34,7 @@ interface UsageRecordFormProps {
   onSave: (data: UsageRecordFormData) => void;
   onDelete?: () => void;
   onCopyPrevious?: () => Partial<UsageRecordFormData> | undefined;
+  resolvedSlots?: ResolvedSlotInfo[];
 }
 
 // 実施加算の定義（詳細記録が必要なもの）
@@ -139,7 +141,7 @@ const IMPLEMENTATION_ADDITIONS: ImplementationAddition[] = [
     name: '家族支援加算(I)',
     units: '200-300単位',
     icon: MessageSquare,
-    color: 'text-[#00c4cc] bg-[#00c4cc]/5 border-[#00c4cc]/20',
+    color: 'text-primary bg-primary/5 border-primary/20',
     requiredFields: [
       { id: 'support_type', label: '支援形態', type: 'select', options: ['居宅訪問(1h以上)', '居宅訪問(1h未満)', 'オンライン'], required: true },
       { id: 'content', label: '相談援助内容', type: 'textarea', placeholder: '実施した相談援助の内容', required: true },
@@ -152,7 +154,7 @@ const IMPLEMENTATION_ADDITIONS: ImplementationAddition[] = [
     name: '家族支援加算(II)',
     units: '60-80単位',
     icon: MessageSquare,
-    color: 'text-[#00c4cc] bg-[#00c4cc]/5 border-[#00c4cc]/20',
+    color: 'text-primary bg-primary/5 border-primary/20',
     requiredFields: [
       { id: 'support_type', label: '実施形態', type: 'select', options: ['対面', 'オンライン'], required: true },
       { id: 'participant_count', label: '参加家族数', type: 'text', placeholder: '例: 5家族' },
@@ -201,7 +203,7 @@ const IMPLEMENTATION_ADDITIONS: ImplementationAddition[] = [
     name: '保育・教育等移行支援加算',
     units: '500単位/回',
     icon: Target,
-    color: 'text-[#00c4cc] bg-[#00c4cc]/5 border-[#00c4cc]/20',
+    color: 'text-primary bg-primary/5 border-primary/20',
     requiredFields: [
       { id: 'type', label: '支援種別', type: 'select', options: ['退所前調整（2回まで）', '退所後訪問相談（1回）'], required: true },
       { id: 'destination', label: '移行先', type: 'text', placeholder: '保育所、学校名など', required: true },
@@ -240,7 +242,9 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
   onSave,
   onDelete,
   onCopyPrevious,
+  resolvedSlots: resolvedSlotsProp,
 }) => {
+  const defaultSlots = resolvedSlotsProp || resolveTimeSlots([]);
   const [formData, setFormData] = useState<ExtendedFormData>(() => ({
     scheduleId: scheduleItem.id,
     childId: scheduleItem.childId,
@@ -430,7 +434,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* ヘッダー: 日付と児童名 */}
-      <div className="bg-gradient-to-r from-[#00c4cc]/10 to-white px-6 py-4 border-b border-gray-100">
+      <div className="bg-gradient-to-r from-primary/10 to-white px-6 py-4 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-gray-800">{scheduleItem.childName}</h3>
@@ -442,14 +446,14 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                 return `${y}年${m}月${d}日(${days[date.getDay()]})`;
               })()}
               {' '}
-              {scheduleItem.slot === 'AM' ? '午前' : '午後'}
+              {slotDisplayName(defaultSlots, scheduleItem.slot)}
             </p>
           </div>
           {onCopyPrevious && !initialData && (
             <button
               type="button"
               onClick={handleCopyPrevious}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#00c4cc] bg-[#00c4cc]/10 hover:bg-[#00c4cc]/20 rounded-lg transition-colors border border-[#00c4cc]/20"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors border border-primary/20"
             >
               <ClipboardCheck className="w-3.5 h-3.5" />
               前回のコピー
@@ -471,7 +475,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                   onClick={() => setActiveStep(step.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
                     activeStep === step.id
-                      ? 'bg-[#00c4cc] text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-sm'
                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                   }`}
                 >
@@ -502,7 +506,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                     onClick={() => setFormData((prev) => ({ ...prev, serviceStatus: status as any }))}
                     className={`flex-1 h-12 px-4 rounded-xl text-sm font-medium transition-all ${
                       formData.serviceStatus === status
-                        ? 'bg-[#00c4cc] text-white shadow-sm'
+                        ? 'bg-primary text-white shadow-sm'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                     }`}
                   >
@@ -515,7 +519,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
             {/* 送迎セクション */}
             <div className="bg-gray-50 rounded-xl p-5 space-y-4 border border-gray-100">
               <div className="flex items-center gap-2 text-gray-700">
-                <Car className="w-5 h-5 text-[#00c4cc]" />
+                <Car className="w-5 h-5 text-primary" />
                 <span className="font-bold">送迎</span>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -529,7 +533,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                         onClick={() => setFormData((prev) => ({ ...prev, pickup: value as any }))}
                         className={`flex-1 h-12 rounded-xl text-sm font-medium transition-all ${
                           formData.pickup === value
-                            ? 'bg-[#00c4cc] text-white'
+                            ? 'bg-primary text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                         }`}
                       >
@@ -543,7 +547,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                         type="checkbox"
                         checked={formData.pickupSamePremises}
                         onChange={(e) => setFormData((prev) => ({ ...prev, pickupSamePremises: e.target.checked }))}
-                        className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
+                        className="w-4 h-4 text-primary rounded border-gray-300"
                       />
                       <span className="text-xs text-gray-600">同一敷地内</span>
                     </label>
@@ -559,7 +563,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                         onClick={() => setFormData((prev) => ({ ...prev, dropoff: value as any }))}
                         className={`flex-1 h-12 rounded-xl text-sm font-medium transition-all ${
                           formData.dropoff === value
-                            ? 'bg-[#00c4cc] text-white'
+                            ? 'bg-primary text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                         }`}
                       >
@@ -573,7 +577,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                         type="checkbox"
                         checked={formData.dropoffSamePremises}
                         onChange={(e) => setFormData((prev) => ({ ...prev, dropoffSamePremises: e.target.checked }))}
-                        className="w-4 h-4 text-[#00c4cc] rounded border-gray-300"
+                        className="w-4 h-4 text-primary rounded border-gray-300"
                       />
                       <span className="text-xs text-gray-600">同一敷地内</span>
                     </label>
@@ -583,7 +587,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
             </div>
 
             <div className="flex justify-end">
-              <button type="button" onClick={() => setActiveStep(2)} className="px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
+              <button type="button" onClick={() => setActiveStep(2)} className="px-6 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
             </div>
           </>
         )}
@@ -593,7 +597,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
           <>
             <div className="bg-gray-50 rounded-xl p-5 space-y-5 border border-gray-100">
               <div className="flex items-center gap-2 text-gray-700">
-                <Clock className="w-5 h-5 text-[#00c4cc]" />
+                <Clock className="w-5 h-5 text-primary" />
                 <span className="font-bold">時間設定</span>
               </div>
 
@@ -602,14 +606,14 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                 <div className="flex items-center gap-3">
                   <input
                     type="time"
-                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base"
                     value={formData.plannedStartTime || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, plannedStartTime: e.target.value }))}
                   />
                   <span className="text-gray-400 text-lg">〜</span>
                   <input
                     type="time"
-                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base"
                     value={formData.plannedEndTime || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, plannedEndTime: e.target.value }))}
                   />
@@ -619,19 +623,19 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-600">実績時間</label>
-                  <button type="button" onClick={reflectPlannedTime} className="text-xs text-[#00c4cc] hover:underline font-medium">計画時間を反映</button>
+                  <button type="button" onClick={reflectPlannedTime} className="text-xs text-primary hover:underline font-medium">計画時間を反映</button>
                 </div>
                 <div className="flex items-center gap-3">
                   <input
                     type="time"
-                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base"
                     value={formData.actualStartTime || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, actualStartTime: e.target.value }))}
                   />
                   <span className="text-gray-400 text-lg">〜</span>
                   <input
                     type="time"
-                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-base"
+                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base"
                     value={formData.actualEndTime || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, actualEndTime: e.target.value }))}
                   />
@@ -648,7 +652,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                       onClick={() => setFormData((prev) => ({ ...prev, timeCategory: option.value }))}
                       className={`h-12 px-3 rounded-xl text-xs font-medium transition-all text-left ${
                         formData.timeCategory === option.value
-                          ? 'bg-[#00c4cc]/10 text-[#00c4cc] border-2 border-[#00c4cc]'
+                          ? 'bg-primary/10 text-primary border-2 border-primary'
                           : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                       }`}
                     >
@@ -671,7 +675,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                       onClick={() => setFormData((prev) => ({ ...prev, provisionForm: value }))}
                       className={`h-12 rounded-xl text-sm font-medium transition-all ${
                         formData.provisionForm === value
-                          ? 'bg-[#00c4cc]/10 text-[#00c4cc] border-2 border-[#00c4cc]'
+                          ? 'bg-primary/10 text-primary border-2 border-primary'
                           : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                       }`}
                     >
@@ -690,7 +694,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                       onClick={() => setFormData((prev) => ({ ...prev, instructionForm: value }))}
                       className={`h-12 rounded-xl text-sm font-medium transition-all ${
                         formData.instructionForm === value
-                          ? 'bg-[#00c4cc]/10 text-[#00c4cc] border-2 border-[#00c4cc]'
+                          ? 'bg-primary/10 text-primary border-2 border-primary'
                           : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                       }`}
                     >
@@ -703,7 +707,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
 
             <div className="flex justify-between">
               <button type="button" onClick={() => setActiveStep(1)} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-bold rounded-lg transition-colors">← 戻る</button>
-              <button type="button" onClick={() => setActiveStep(3)} className="px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
+              <button type="button" onClick={() => setActiveStep(3)} className="px-6 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
             </div>
           </>
         )}
@@ -714,10 +718,10 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <div className="px-5 py-4 flex items-center justify-between bg-white">
                 <div className="flex items-center gap-2">
-                  <ClipboardCheck className="w-5 h-5 text-[#00c4cc]" />
+                  <ClipboardCheck className="w-5 h-5 text-primary" />
                   <span className="font-bold text-gray-700">実施加算</span>
                   {formData.addonItems.length > 0 && (
-                    <span className="px-2 py-0.5 bg-[#00c4cc]/10 text-[#00c4cc] text-xs rounded-full font-bold">
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full font-bold">
                       {formData.addonItems.length}件選択中
                     </span>
                   )}
@@ -744,7 +748,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                               type="button"
                               onClick={() => toggleAddition(addition.id)}
                               className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
-                                isSelected ? 'bg-[#00c4cc] text-white' : 'border-2 border-gray-300 hover:border-gray-400'
+                                isSelected ? 'bg-primary text-white' : 'border-2 border-gray-300 hover:border-gray-400'
                               }`}
                             >
                               {isSelected && <Check className="w-3.5 h-3.5" />}
@@ -786,7 +790,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                                     </label>
                                     {field.type === 'textarea' ? (
                                       <textarea
-                                        className="w-full h-12 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] resize-none"
+                                        className="w-full h-12 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                                         rows={2}
                                         placeholder={field.placeholder}
                                         value={detail[field.id] || ''}
@@ -794,7 +798,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                                       />
                                     ) : field.type === 'select' ? (
                                       <select
-                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                         value={detail[field.id] || ''}
                                         onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
                                       >
@@ -806,7 +810,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                                     ) : (
                                       <input
                                         type={field.type}
-                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                         placeholder={field.placeholder}
                                         value={detail[field.id] || ''}
                                         onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
@@ -827,7 +831,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
 
             <div className="flex justify-between">
               <button type="button" onClick={() => setActiveStep(2)} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-bold rounded-lg transition-colors">← 戻る</button>
-              <button type="button" onClick={() => setActiveStep(4)} className="px-6 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
+              <button type="button" onClick={() => setActiveStep(4)} className="px-6 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-lg transition-colors">次へ →</button>
             </div>
           </>
         )}
@@ -839,18 +843,18 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
             {formData.serviceStatus !== '欠席(加算なし)' && (
               <div className="bg-gray-50 rounded-xl p-5 space-y-4 border border-gray-100">
                 <div className="flex items-center gap-2 text-gray-700">
-                  <FileText className="w-5 h-5 text-[#00c4cc]" />
+                  <FileText className="w-5 h-5 text-primary" />
                   <span className="font-bold">支援記録</span>
                 </div>
 
                 {/* 支援内容 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    <FileText className="w-3.5 h-3.5 text-primary" />
                     支援内容
                   </label>
                   <textarea
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm resize-none"
                     rows={4}
                     placeholder="本日実施した支援の内容を記録してください"
                     value={formData.supportRecord || ''}
@@ -861,11 +865,11 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                 {/* 本日の支援目標 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
-                    <Target className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    <Target className="w-3.5 h-3.5 text-primary" />
                     本日の支援目標
                   </label>
                   <textarea
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm resize-none"
                     rows={2}
                     placeholder="個別支援計画に基づく本日の目標"
                     value={formData.supportGoal || ''}
@@ -876,11 +880,11 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                 {/* 児童の様子 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
-                    <Heart className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    <Heart className="w-3.5 h-3.5 text-primary" />
                     児童の様子
                   </label>
                   <textarea
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm resize-none"
                     rows={2}
                     placeholder="児童の体調・気分・反応等"
                     value={formData.childCondition || ''}
@@ -891,11 +895,11 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                 {/* 特記事項・引継ぎ */}
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-[#00c4cc]" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-primary" />
                     特記事項・引継ぎ
                   </label>
                   <textarea
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm resize-none"
                     rows={2}
                     placeholder="次回への引継ぎ事項等"
                     value={formData.specialNotes || ''}
@@ -908,7 +912,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">メモ</label>
               <textarea
-                className="w-full h-24 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-sm resize-none"
+                className="w-full h-24 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm resize-none"
                 placeholder="自由にメモを記録できます"
                 value={formData.memo || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, memo: e.target.value }))}
@@ -929,7 +933,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                     onClick={() => setFormData((prev) => ({ ...prev, billingTarget: value as any }))}
                     className={`flex-1 h-12 rounded-xl text-sm font-medium transition-all ${
                       formData.billingTarget === value
-                        ? value === '請求する' ? 'bg-[#00c4cc] text-white' : 'bg-orange-500 text-white'
+                        ? value === '請求する' ? 'bg-primary text-white' : 'bg-orange-500 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                     }`}
                   >
@@ -947,7 +951,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
             {/* 確認サマリー */}
             <div className="bg-gray-50 rounded-xl p-5 space-y-3 border border-gray-100">
               <h4 className="font-bold text-gray-700 text-sm flex items-center gap-2">
-                <Check className="w-4 h-4 text-[#00c4cc]" />
+                <Check className="w-4 h-4 text-primary" />
                 入力内容の確認
               </h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
@@ -1006,7 +1010,7 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
           type="button"
           onClick={handleSubmit}
           disabled={isSaving}
-          className="flex items-center gap-2 px-8 py-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-xl transition-colors disabled:opacity-50 shadow-md active:shadow-sm"
+          className="flex items-center gap-2 px-8 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl transition-colors disabled:opacity-50 shadow-md active:shadow-sm"
         >
           {isSaving ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

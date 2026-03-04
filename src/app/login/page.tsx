@@ -21,7 +21,7 @@ export default function LoginPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8] to-[#6366F1]">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-personal to-personal-dark">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
     </div>
   );

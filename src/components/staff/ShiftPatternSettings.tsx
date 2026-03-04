@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ShiftPattern } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 interface ShiftPatternSettingsProps {
   facilityId: string;
@@ -55,6 +56,7 @@ const defaultFormData: PatternFormData = {
 };
 
 export default function ShiftPatternSettings({ facilityId }: ShiftPatternSettingsProps) {
+  const { toast } = useToast();
   const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
   // パターン追加
   const handleAdd = async () => {
     if (!formData.name.trim()) {
-      alert('パターン名を入力してください');
+      toast.warning('パターン名を入力してください');
       return;
     }
 
@@ -132,7 +134,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
       fetchPatterns();
     } catch (error) {
       console.error('パターン追加エラー:', error);
-      alert('追加に失敗しました');
+      toast.error('追加に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -165,7 +167,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
       fetchPatterns();
     } catch (error) {
       console.error('パターン更新エラー:', error);
-      alert('更新に失敗しました');
+      toast.error('更新に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -186,7 +188,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
       fetchPatterns();
     } catch (error) {
       console.error('パターン削除エラー:', error);
-      alert('削除に失敗しました');
+      toast.error('削除に失敗しました');
     }
   };
 
@@ -226,7 +228,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="例: 早番"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
 
@@ -241,7 +243,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
             onChange={(e) => setFormData({ ...formData, shortName: e.target.value.slice(0, 2) })}
             placeholder="例: 早"
             maxLength={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
       </div>
@@ -253,7 +255,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
           id="isDayOff"
           checked={formData.isDayOff}
           onChange={(e) => setFormData({ ...formData, isDayOff: e.target.checked })}
-          className="w-4 h-4 text-[#00c4cc] rounded focus:ring-[#00c4cc]"
+          className="w-4 h-4 text-primary rounded focus:ring-primary"
         />
         <label htmlFor="isDayOff" className="text-sm text-gray-700">
           休日/公休パターン（時間設定なし）
@@ -269,7 +271,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
               type="time"
               value={formData.startTime}
               onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
           <div>
@@ -278,7 +280,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
               type="time"
               value={formData.endTime}
               onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
           <div>
@@ -289,7 +291,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
               onChange={(e) => setFormData({ ...formData, breakMinutes: parseInt(e.target.value) || 0 })}
               min={0}
               max={180}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
         </div>
@@ -326,7 +328,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
           type="button"
           onClick={isEdit ? handleUpdate : handleAdd}
           disabled={isSaving || !formData.name.trim()}
-          className="px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
         >
           {isSaving ? '保存中...' : (isEdit ? '更新' : '追加')}
         </button>
@@ -337,7 +339,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -350,7 +352,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
         {!showAddForm && !editingId && (
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#00c4cc] text-white text-sm font-bold rounded-lg hover:bg-[#00b0b8] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-dark transition-colors"
           >
             <Plus className="w-4 h-4" />
             パターン追加
@@ -412,7 +414,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => startEdit(pattern)}
-                      className="p-2 text-gray-400 hover:text-[#00c4cc] hover:bg-gray-100 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>

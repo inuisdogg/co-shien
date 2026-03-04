@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     const jobTitle = jobPosting.title as string;
     const applicantName = applicant.name as string;
     const facilityName = facility?.name || '施設';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.Roots.inu.co.jp';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://roots.inu.co.jp';
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'Roots <noreply@and-and.co.jp>';
 
     // ステータスに応じたメッセージ

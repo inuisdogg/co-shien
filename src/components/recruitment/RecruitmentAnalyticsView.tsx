@@ -195,7 +195,7 @@ export default function RecruitmentAnalyticsView({ facilityId }: RecruitmentAnal
   if (loading && totalStatusCount === 0) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-[#00c4cc] mr-2" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
         <span className="text-gray-500">分析データを読み込み中...</span>
       </div>
     );
@@ -208,7 +208,7 @@ export default function RecruitmentAnalyticsView({ facilityId }: RecruitmentAnal
       {/* ============================================================ */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <BarChart3 className="w-6 h-6 text-[#00c4cc]" />
+          <BarChart3 className="w-6 h-6 text-primary" />
           <h2 className="text-lg font-bold text-gray-800">採用分析ダッシュボード</h2>
         </div>
 
@@ -220,7 +220,7 @@ export default function RecruitmentAnalyticsView({ facilityId }: RecruitmentAnal
               onClick={() => setSelectedPreset(preset.key)}
               className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                 selectedPreset === preset.key
-                  ? 'bg-[#00c4cc] text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -422,7 +422,7 @@ export default function RecruitmentAnalyticsView({ facilityId }: RecruitmentAnal
                   <div className="w-full flex justify-center" style={{ height: '140px' }}>
                     <div className="relative w-full max-w-[40px] flex items-end">
                       <div
-                        className="w-full bg-[#00c4cc] rounded-t-md transition-all duration-500 hover:bg-[#0d9488]"
+                        className="w-full bg-primary rounded-t-md transition-all duration-500 hover:bg-primary-dark"
                         style={{
                           height: `${Math.max(heightPct, 2)}%`,
                         }}
@@ -526,10 +526,10 @@ export default function RecruitmentAnalyticsView({ facilityId }: RecruitmentAnal
             {/* Response rate */}
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-xs text-gray-500 mb-1">返信率</p>
-              <p className="text-xl font-bold text-[#00c4cc]">{metrics.scoutResponseRate}%</p>
+              <p className="text-xl font-bold text-primary">{metrics.scoutResponseRate}%</p>
               <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#00c4cc] rounded-full transition-all duration-500"
+                  className="h-full bg-primary rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(metrics.scoutResponseRate, 100)}%` }}
                 />
               </div>

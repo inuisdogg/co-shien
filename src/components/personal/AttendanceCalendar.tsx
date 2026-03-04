@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getJapaneseHolidays } from '@/utils/japaneseHolidays';
+import { useToast } from '@/components/ui/Toast';
 import { ShiftPattern, StaffLeaveSettings } from '@/types';
 
 interface FacilitySettings {
@@ -138,6 +139,7 @@ export default function AttendanceCalendar({
   facilitySettings: propFacilitySettings,
   onClose,
 }: AttendanceCalendarProps) {
+  const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
@@ -652,7 +654,7 @@ export default function AttendanceCalendar({
   // 休暇申請処理
   const handleLeaveSubmit = async () => {
     if (!leaveFormData.start_date || !leaveFormData.end_date) {
-      alert('日付を選択してください');
+      toast.warning('日付を選択してください');
       return;
     }
 
@@ -684,7 +686,7 @@ export default function AttendanceCalendar({
 
       if (error) throw error;
 
-      alert('休暇申請を送信しました');
+      toast.success('休暇申請を送信しました');
       setIsLeaveModalOpen(false);
       setLeaveFormData({
         request_type: 'paid_leave',
@@ -714,7 +716,7 @@ export default function AttendanceCalendar({
       }
     } catch (error) {
       console.error('休暇申請エラー:', error);
-      alert('休暇申請に失敗しました');
+      toast.error('休暇申請に失敗しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -765,7 +767,7 @@ export default function AttendanceCalendar({
   const handleAttendanceSubmit = async () => {
     if (!selectedDate) return;
     if (!attendanceFormData.start_time) {
-      alert('勤務開始時間を入力してください');
+      toast.warning('勤務開始時間を入力してください');
       return;
     }
 
@@ -864,7 +866,7 @@ export default function AttendanceCalendar({
         if (error) throw error;
       }
 
-      alert('勤怠を保存しました');
+      toast.success('勤怠を保存しました');
       setIsAttendanceModalOpen(false);
 
       // データを再取得
@@ -889,7 +891,7 @@ export default function AttendanceCalendar({
       }
     } catch (error) {
       console.error('勤怠保存エラー:', error);
-      alert('勤怠の保存に失敗しました');
+      toast.error('勤怠の保存に失敗しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -901,9 +903,9 @@ export default function AttendanceCalendar({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* ヘッダー */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-[#00c4cc]/5 to-transparent">
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-primary/5 to-transparent">
         <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-[#00c4cc]" />
+          <Calendar className="w-5 h-5 text-primary" />
           <h3 className="font-bold text-gray-800">勤怠カレンダー</h3>
           <span className="text-sm text-gray-500">- {facilityName}</span>
         </div>
@@ -947,15 +949,15 @@ export default function AttendanceCalendar({
           <span className="text-gray-600">
             {shiftStats.hasShifts ? (
               <>
-                シフト予定: <span className="font-bold text-[#00c4cc]">{shiftStats.scheduledShiftDays}</span>日
+                シフト予定: <span className="font-bold text-primary">{shiftStats.scheduledShiftDays}</span>日
               </>
             ) : (
               <>
-                所定出勤: <span className="font-bold text-[#00c4cc]">{shiftStats.prescribedWorkDays}</span>日
+                所定出勤: <span className="font-bold text-primary">{shiftStats.prescribedWorkDays}</span>日
               </>
             )}
             <span className="text-gray-400 mx-1">|</span>
-            所定労働: <span className="font-bold text-[#00c4cc]">{shiftStats.scheduledWorkHours}:{String(shiftStats.scheduledWorkMinutesRemainder).padStart(2, '0')}</span>
+            所定労働: <span className="font-bold text-primary">{shiftStats.scheduledWorkHours}:{String(shiftStats.scheduledWorkMinutesRemainder).padStart(2, '0')}</span>
           </span>
           {leaveSettings?.paidLeaveEnabled && (
             <span className="text-gray-500">
@@ -1041,14 +1043,14 @@ export default function AttendanceCalendar({
                   className={`
                     aspect-square border-t border-l border-gray-100 p-1 cursor-pointer
                     hover:bg-gray-50 transition-colors relative
-                    ${isToday ? 'bg-[#00c4cc]/5' : ''}
+                    ${isToday ? 'bg-primary/5' : ''}
                     ${isHoliday ? 'bg-gray-50' : ''}
                   `}
                 >
                   {/* 日付 */}
                   <div className={`
                     text-xs font-bold mb-0.5
-                    ${isToday ? 'text-[#00c4cc]' : ''}
+                    ${isToday ? 'text-primary' : ''}
                     ${dayOfWeek === 0 || isJapaneseHoliday ? 'text-red-500' : ''}
                     ${dayOfWeek === 6 && !isJapaneseHoliday ? 'text-blue-500' : ''}
                     ${isRegularHoliday && dayOfWeek !== 0 && dayOfWeek !== 6 ? 'text-gray-400' : ''}
@@ -1123,7 +1125,7 @@ export default function AttendanceCalendar({
 
                   {/* 今日マーカー */}
                   {isToday && (
-                    <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#00c4cc]" />
+                    <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
                   )}
                 </div>
               );
@@ -1234,7 +1236,7 @@ export default function AttendanceCalendar({
           <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                <CalendarPlus className="w-5 h-5 text-[#00c4cc]" />
+                <CalendarPlus className="w-5 h-5 text-primary" />
                 休暇申請
               </h3>
               <button
@@ -1251,7 +1253,7 @@ export default function AttendanceCalendar({
                 <select
                   value={leaveFormData.request_type}
                   onChange={(e) => setLeaveFormData({ ...leaveFormData, request_type: e.target.value as LeaveRequest['request_type'] })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {/* 欠勤は常に表示 */}
                   <option value="absence">欠勤</option>
@@ -1271,7 +1273,7 @@ export default function AttendanceCalendar({
                 {/* 残日数表示 */}
                 {leaveFormData.request_type === 'paid_leave' || leaveFormData.request_type === 'half_day_am' || leaveFormData.request_type === 'half_day_pm' ? (
                   <p className="text-xs text-gray-500 mt-1">
-                    有給残日数: <span className="font-bold text-[#00c4cc]">{leaveSettings?.paidLeaveDays || 0}</span>日
+                    有給残日数: <span className="font-bold text-primary">{leaveSettings?.paidLeaveDays || 0}</span>日
                   </p>
                 ) : leaveFormData.request_type === 'special_leave' ? (
                   <p className="text-xs text-gray-500 mt-1">
@@ -1288,7 +1290,7 @@ export default function AttendanceCalendar({
                     type="date"
                     value={leaveFormData.start_date}
                     onChange={(e) => setLeaveFormData({ ...leaveFormData, start_date: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -1297,7 +1299,7 @@ export default function AttendanceCalendar({
                     type="date"
                     value={leaveFormData.end_date}
                     onChange={(e) => setLeaveFormData({ ...leaveFormData, end_date: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -1310,7 +1312,7 @@ export default function AttendanceCalendar({
                   onChange={(e) => setLeaveFormData({ ...leaveFormData, reason: e.target.value })}
                   placeholder="休暇の理由を入力してください"
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
 
@@ -1325,7 +1327,7 @@ export default function AttendanceCalendar({
                 <button
                   onClick={handleLeaveSubmit}
                   disabled={isSubmitting}
-                  className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg transition-colors disabled:opacity-50"
                 >
                   {isSubmitting ? '送信中...' : '申請する'}
                 </button>
@@ -1357,10 +1359,10 @@ export default function AttendanceCalendar({
             <div className="p-4 space-y-3">
               <button
                 onClick={openAttendanceModal}
-                className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-[#00c4cc]/5 hover:border-[#00c4cc] transition-colors"
+                className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-primary/5 hover:border-primary transition-colors"
               >
-                <div className="w-10 h-10 rounded-full bg-[#00c4cc]/10 flex items-center justify-center">
-                  <ClipboardEdit className="w-5 h-5 text-[#00c4cc]" />
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <ClipboardEdit className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left">
                   <div className="font-bold text-gray-800">勤怠登録</div>
@@ -1390,7 +1392,7 @@ export default function AttendanceCalendar({
           <div className="bg-white rounded-xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
               <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                <ClipboardEdit className="w-5 h-5 text-[#00c4cc]" />
+                <ClipboardEdit className="w-5 h-5 text-primary" />
                 勤怠登録
               </h3>
               <button
@@ -1416,7 +1418,7 @@ export default function AttendanceCalendar({
               {/* 出退勤時間 */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                  <Clock className="w-4 h-4 text-[#00c4cc]" />
+                  <Clock className="w-4 h-4 text-primary" />
                   勤務時間
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1429,7 +1431,7 @@ export default function AttendanceCalendar({
                       type="time"
                       value={attendanceFormData.start_time}
                       onChange={(e) => setAttendanceFormData({ ...attendanceFormData, start_time: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-lg font-mono"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-lg font-mono"
                     />
                   </div>
                   <div>
@@ -1441,7 +1443,7 @@ export default function AttendanceCalendar({
                       type="time"
                       value={attendanceFormData.end_time}
                       onChange={(e) => setAttendanceFormData({ ...attendanceFormData, end_time: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] text-lg font-mono"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-lg font-mono"
                     />
                   </div>
                 </div>
@@ -1511,7 +1513,7 @@ export default function AttendanceCalendar({
                   onChange={(e) => setAttendanceFormData({ ...attendanceFormData, memo: e.target.value })}
                   placeholder="備考があれば入力してください"
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
 
@@ -1526,7 +1528,7 @@ export default function AttendanceCalendar({
                 <button
                   onClick={handleAttendanceSubmit}
                   disabled={isSubmitting}
-                  className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <Save className="w-4 h-4" />
                   {isSubmitting ? '保存中...' : '保存する'}

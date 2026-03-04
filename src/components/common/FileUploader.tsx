@@ -183,7 +183,7 @@ export default function FileUploader({
                 href={currentFile.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-[#00c4cc] hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 ファイルを開く
               </a>
@@ -213,8 +213,8 @@ export default function FileUploader({
         className={`
           border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all
           ${isDragging
-            ? 'border-[#00c4cc] bg-[#00c4cc]/5'
-            : 'border-gray-300 hover:border-[#00c4cc] hover:bg-gray-50'
+            ? 'border-primary bg-primary/5'
+            : 'border-gray-300 hover:border-primary hover:bg-gray-50'
           }
           ${uploading ? 'pointer-events-none opacity-70' : ''}
         `}
@@ -230,18 +230,18 @@ export default function FileUploader({
 
         {uploading ? (
           <div className="space-y-3">
-            <Loader2 className="w-10 h-10 text-[#00c4cc] mx-auto animate-spin" />
+            <Loader2 className="w-10 h-10 text-primary mx-auto animate-spin" />
             <p className="text-sm text-gray-600">アップロード中...</p>
             <div className="w-full bg-gray-200 rounded-full h-2 max-w-xs mx-auto">
               <div
-                className="bg-[#00c4cc] h-2 rounded-full transition-all duration-300"
+                className="bg-primary h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
           </div>
         ) : (
           <div className="space-y-2">
-            <Upload className={`w-10 h-10 mx-auto ${isDragging ? 'text-[#00c4cc]' : 'text-gray-400'}`} />
+            <Upload className={`w-10 h-10 mx-auto ${isDragging ? 'text-primary' : 'text-gray-400'}`} />
             <p className="text-sm font-medium text-gray-700">{label}</p>
             <p className="text-xs text-gray-500">
               ドラッグ&ドロップ または クリックして選択

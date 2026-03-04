@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -46,21 +46,157 @@ import {
 import { supabase } from '@/lib/supabase';
 import { User as UserType, EmploymentRecord, FacilitySettings, WorkToolId, QUALIFICATION_CODES, type QualificationCode } from '@/types';
 import JobBrowsingTab from '@/components/personal/JobBrowsingTab';
+import ProfileEditSection from '@/components/personal/ProfileEditSection';
+import type { ProfileData } from '@/components/personal/ProfileEditSection';
 import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays';
+import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
 import { getBizBaseUrl } from '@/utils/domain';
-import { Shield, Download, Loader2, Eye, TrendingUp, GraduationCap, Hash, ChevronDown, ChevronUp } from 'lucide-react';
+import { Shield, Download, Loader2, Eye, TrendingUp, GraduationCap, Hash, ChevronDown, ChevronUp, FolderOpen, Fingerprint, Trash2, Bus, UserCheck } from 'lucide-react';
 import WorkExperienceForm from '@/components/personal/WorkExperienceForm';
 import AttendanceCalendar from '@/components/personal/AttendanceCalendar';
 import ShiftConfirmationView from '@/components/personal/ShiftConfirmationView';
 import ShiftAvailabilityForm from '@/components/personal/ShiftAvailabilityForm';
+import TransportStatusWidget from '@/components/transport/TransportStatusWidget';
 import ScoutInboxSection from '@/components/personal/ScoutInboxSection';
-import { usePersonalData } from '@/hooks/usePersonalData';
+import { usePersonalData, type FacilityWorkData } from '@/hooks/usePersonalData';
 import { useCareerAccumulation } from '@/hooks/useCareerAccumulation';
 import type { CareerTimelineEvent } from '@/hooks/useCareerAccumulation';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useToast } from '@/components/ui/Toast';
+
+const DEFAULT_SLOTS = resolveTimeSlots([]);
 
 // 運営管理画面へのアクセスリンクコンポーネント
+function PasskeySection({ userId, userEmail }: { userId?: string; userEmail?: string }) {
+  const [passkeys, setPasskeys] = useState<Array<{ id: string; device_name: string; created_at: string; last_used_at: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [supported, setSupported] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+      setSupported(true);
+    }
+    fetchPasskeys();
+  }, [userId]);
+
+  const fetchPasskeys = async () => {
+    if (!userId) { setLoading(false); return; }
+    try {
+      const { data } = await supabase
+        .from('passkeys')
+        .select('id, device_name, created_at, last_used_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      setPasskeys(data || []);
+    } catch {}
+    setLoading(false);
+  };
+
+  const handleRegister = async () => {
+    if (!userId || !userEmail) return;
+    setRegistering(true);
+    setMessage('');
+    try {
+      const { startRegistration } = await import('@simplewebauthn/browser');
+      const beginRes = await fetch('/api/passkey/register/begin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId: userEmail, userId }),
+      });
+      if (!beginRes.ok) throw new Error('登録を開始できませんでした');
+      const options = await beginRes.json();
+      const credential = await startRegistration({ optionsJSON: options });
+      const finishRes = await fetch('/api/passkey/register/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential, loginId: userEmail, userId }),
+      });
+      if (!finishRes.ok) throw new Error('登録に失敗しました');
+      setMessage('パスキーを登録しました');
+      fetchPasskeys();
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError') {
+        setMessage('登録がキャンセルされました');
+      } else {
+        setMessage(err.message || '登録に失敗しました');
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleDelete = async (passkeyId: string) => {
+    if (!confirm('このパスキーを削除しますか？')) return;
+    await supabase.from('passkeys').delete().eq('id', passkeyId);
+    fetchPasskeys();
+  };
+
+  if (!supported) return null;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <Fingerprint className="w-5 h-5 text-personal" />
+        パスキー（生体認証）
+      </h3>
+      <p className="text-xs text-gray-500 mb-3">Face ID・指紋認証でパスワードなしログインできます</p>
+
+      {message && (
+        <div className={`text-sm px-3 py-2 rounded-lg mb-3 ${message.includes('失敗') || message.includes('キャンセル') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+          {message}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-4">
+          <div className="w-5 h-5 border-2 border-personal border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          {passkeys.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {passkeys.map(pk => (
+                <div key={pk.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-bold text-gray-700">{pk.device_name || 'デバイス'}</p>
+                    <p className="text-xs text-gray-400">
+                      登録: {new Date(pk.created_at).toLocaleDateString('ja-JP')}
+                      {pk.last_used_at && ` ・ 最終使用: ${new Date(pk.last_used_at).toLocaleDateString('ja-JP')}`}
+                    </p>
+                  </div>
+                  <button onClick={() => handleDelete(pk.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
+                    <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={handleRegister}
+            disabled={registering}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-personal hover:bg-personal-dark text-white font-bold rounded-lg transition-colors text-sm disabled:opacity-50"
+          >
+            {registering ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                登録中...
+              </>
+            ) : (
+              <>
+                <Fingerprint className="w-4 h-4" />
+                {passkeys.length > 0 ? '別のデバイスを追加' : 'パスキーを登録'}
+              </>
+            )}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function AdminAccessLink({ userId }: { userId?: string }) {
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState(false);
@@ -99,7 +235,7 @@ function AdminAccessLink({ userId }: { userId?: string }) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-[#818CF8] to-[#6366F1] rounded-xl shadow-sm p-4">
+    <div className="bg-gradient-to-r from-personal to-personal-dark rounded-xl shadow-sm p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
@@ -112,12 +248,264 @@ function AdminAccessLink({ userId }: { userId?: string }) {
         </div>
         <button
           onClick={() => router.push('/admin')}
-          className="flex items-center gap-2 py-2 px-4 bg-white hover:bg-gray-100 text-[#818CF8] font-bold rounded-lg transition-colors text-sm"
+          className="flex items-center gap-2 py-2 px-4 bg-white hover:bg-gray-100 text-personal font-bold rounded-lg transition-colors text-sm"
         >
           <Shield className="w-4 h-4" />
           開く
         </button>
       </div>
+    </div>
+  );
+}
+
+// ========== スタッフ書類閲覧セクション ==========
+function StaffDocumentsSection({ userId, facilities }: { userId: string; facilities: FacilityWorkData[] }) {
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [docSearch, setDocSearch] = useState('');
+  const [docSortDesc, setDocSortDesc] = useState(true);
+  const [docCategory, setDocCategory] = useState<'all' | 'salary' | 'contract' | 'other'>('all');
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+
+  const DOC_TYPES: Record<string, string> = {
+    payslip: '給与明細',
+    employment_contract: '雇用契約書',
+    withholding_tax: '源泉徴収票',
+    wage_notice: '賃金通知書',
+    social_insurance: '社会保険関連',
+    year_end_adjustment: '年末調整',
+    other: 'その他',
+  };
+
+  const DOC_ICONS: Record<string, string> = {
+    payslip: '💰', employment_contract: '📝', withholding_tax: '🧾',
+    wage_notice: '💵', social_insurance: '🏥', year_end_adjustment: '📋', other: '📄',
+  };
+
+  const SALARY_TYPES = ['payslip', 'withholding_tax', 'wage_notice', 'year_end_adjustment'];
+  const CONTRACT_TYPES = ['employment_contract', 'social_insurance'];
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'salary': return '給与関係';
+      case 'contract': return '雇用契約関係';
+      case 'other': return 'その他';
+      default: return '';
+    }
+  };
+
+  const getDocCategory = (docType: string): string => {
+    if (SALARY_TYPES.includes(docType)) return 'salary';
+    if (CONTRACT_TYPES.includes(docType)) return 'contract';
+    return 'other';
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from('staff_documents')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (!cancelled && data) {
+          const facilityMap = new Map(facilities.map(f => [f.facilityId, f.facilityName]));
+          setDocuments(data.map((d: any) => ({
+            ...d,
+            facilityName: facilityMap.get(d.facility_id) || '不明な施設',
+          })));
+        }
+      } catch (err) {
+        // silently ignore
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [userId, facilities]);
+
+  const handleView = async (doc: any) => {
+    // 既読にする
+    if (!doc.is_read) {
+      await supabase
+        .from('staff_documents')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', doc.id);
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, is_read: true, read_at: new Date().toISOString() } : d));
+    }
+    // ダウンロード
+    const { data } = await supabase.storage.from('documents').createSignedUrl(doc.file_url, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  // Filter by search term
+  let filtered = documents;
+  if (docSearch.trim()) {
+    const kw = docSearch.toLowerCase();
+    filtered = filtered.filter(d =>
+      (d.title || '').toLowerCase().includes(kw) ||
+      (DOC_TYPES[d.document_type] || d.document_type || '').toLowerCase().includes(kw) ||
+      (d.facilityName || '').toLowerCase().includes(kw)
+    );
+  }
+
+  // Filter by category
+  if (docCategory !== 'all') {
+    filtered = filtered.filter(d => getDocCategory(d.document_type) === docCategory);
+  }
+
+  // Sort
+  filtered = [...filtered].sort((a, b) => {
+    const dateA = new Date(a.created_at).getTime();
+    const dateB = new Date(b.created_at).getTime();
+    return docSortDesc ? dateB - dateA : dateA - dateB;
+  });
+
+  // Group by category for display
+  const groupedDocs = filtered.reduce<Record<string, any[]>>((acc, doc) => {
+    const cat = getDocCategory(doc.document_type);
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(doc);
+    return acc;
+  }, {});
+
+  const unreadCount = documents.filter(d => !d.is_read).length;
+  const categoryOrder = ['salary', 'contract', 'other'] as const;
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-personal" /></div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {unreadCount > 0 && (
+        <div className="bg-personal/10 border border-personal/30 rounded-xl px-4 py-3 flex items-center gap-2">
+          <Bell className="w-5 h-5 text-personal" />
+          <span className="text-sm font-bold text-personal">{unreadCount}件の未読書類があります</span>
+        </div>
+      )}
+
+      {/* 検索 */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={docSearch}
+          onChange={(e) => setDocSearch(e.target.value)}
+          placeholder="書類名・種類で検索..."
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal bg-white"
+        />
+        {docSearch && (
+          <button onClick={() => setDocSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+            <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+          </button>
+        )}
+      </div>
+
+      {/* カテゴリフィルター + ソート */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {(['all', 'salary', 'contract', 'other'] as const).map((cat) => {
+            const count = cat === 'all'
+              ? documents.length
+              : documents.filter(d => getDocCategory(d.document_type) === cat).length;
+            const label = cat === 'all' ? 'すべて' : getCategoryLabel(cat);
+            return (
+              <button
+                key={cat}
+                onClick={() => setDocCategory(cat)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                  docCategory === cat ? 'bg-personal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {label} ({count})
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => setDocSortDesc(!docSortDesc)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
+        >
+          {docSortDesc ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+          {docSortDesc ? '新しい順' : '古い順'}
+        </button>
+      </div>
+
+      {/* 書類一覧（カテゴリ別） */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-12">
+          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">{docSearch ? '検索結果が見つかりません' : '書類はまだありません'}</p>
+          <p className="text-gray-400 text-xs mt-1">{docSearch ? '別のキーワードで検索してみてください' : '施設から書類が配布されるとここに表示されます'}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {categoryOrder.map((cat) => {
+            const docs = groupedDocs[cat];
+            if (!docs || docs.length === 0) return null;
+            const isCollapsed = collapsedCategories.has(cat);
+            return (
+              <div key={cat} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <button
+                  onClick={() => toggleCategory(cat)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4 text-personal" />
+                    <span className="text-sm font-bold text-gray-800">{getCategoryLabel(cat)}</span>
+                    <span className="text-xs text-gray-400">({docs.length})</span>
+                  </div>
+                  {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
+                </button>
+                {!isCollapsed && (
+                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                    {docs.map((doc: any) => (
+                      <button
+                        key={doc.id}
+                        onClick={() => handleView(doc)}
+                        className="w-full p-4 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl flex-shrink-0">{DOC_ICONS[doc.document_type] || '📄'}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-800 truncate">{doc.title}</span>
+                              {!doc.is_read && (
+                                <span className="flex-shrink-0 w-2 h-2 bg-personal rounded-full" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                              <span>{doc.facilityName}</span>
+                              <span>{DOC_TYPES[doc.document_type] || doc.document_type}</span>
+                              {doc.target_year && <span>{doc.target_year}年{doc.target_month}月</span>}
+                            </div>
+                          </div>
+                          <Download className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -133,11 +521,12 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
       setLoading(false);
       return;
     }
+    let cancelled = false;
     const fetchRegulations = async () => {
       setLoading(true);
       try {
         const facilityIds = activeEmployments.map(e => e.facilityId).filter(Boolean);
-        if (facilityIds.length === 0) { setLoading(false); return; }
+        if (facilityIds.length === 0) { if (!cancelled) setLoading(false); return; }
 
         const { data: regs } = await supabase
           .from('company_regulations')
@@ -145,7 +534,7 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
           .in('facility_id', facilityIds)
           .eq('is_published', true);
 
-        if (!regs || regs.length === 0) { setRegulations([]); setLoading(false); return; }
+        if (!regs || regs.length === 0) { if (!cancelled) { setRegulations([]); setLoading(false); } return; }
 
         const { data: acks } = await supabase
           .from('regulation_acknowledgments')
@@ -165,14 +554,15 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
             acknowledged: ackedIds.has(r.id),
           };
         });
-        setRegulations(result);
+        if (!cancelled) setRegulations(result);
       } catch (e) {
         // silently ignore
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchRegulations();
+    return () => { cancelled = true; };
   }, [userId, activeEmployments]);
 
   const handleAcknowledge = async (regId: string, facilityId: string) => {
@@ -199,11 +589,11 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <FileText className="w-5 h-5 text-[#818CF8]" />
+          <FileText className="w-5 h-5 text-personal" />
           <h2 className="text-lg font-bold text-gray-800">規定確認</h2>
         </div>
         <div className="flex items-center justify-center py-6">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-personal" />
         </div>
       </div>
     );
@@ -217,10 +607,10 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
       className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
     >
       <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-        <FileText className="w-5 h-5 text-[#818CF8]" />
+        <FileText className="w-5 h-5 text-personal" />
         規定確認
         {unacknowledged.length > 0 && (
-          <span className="bg-[#818CF8] text-white text-xs px-2 py-0.5 rounded-full font-bold">
+          <span className="bg-personal text-white text-xs px-2 py-0.5 rounded-full font-bold">
             {unacknowledged.length}
           </span>
         )}
@@ -235,7 +625,7 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
           {unacknowledged.map((reg) => (
             <div
               key={reg.id}
-              className="flex items-center justify-between p-3 bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-lg"
+              className="flex items-center justify-between p-3 bg-personal/5 border border-personal/20 rounded-lg"
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-gray-800 truncate">{reg.title}</p>
@@ -244,7 +634,7 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
               <button
                 onClick={() => handleAcknowledge(reg.id, reg.facilityId)}
                 disabled={acknowledging === reg.id}
-                className="ml-3 px-4 py-2 bg-[#818CF8] text-white text-xs font-bold rounded-lg hover:bg-[#6366F1] transition-colors disabled:opacity-50 shrink-0"
+                className="ml-3 px-4 py-2 bg-personal text-white text-xs font-bold rounded-lg hover:bg-personal-dark transition-colors disabled:opacity-50 shrink-0"
               >
                 {acknowledging === reg.id ? '処理中...' : '確認する'}
               </button>
@@ -266,11 +656,12 @@ function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: str
       setLoading(false);
       return;
     }
+    let cancelled = false;
     const fetchQualifications = async () => {
       setLoading(true);
       try {
         const facilityIds = activeEmployments.map(e => e.facilityId).filter(Boolean);
-        if (facilityIds.length === 0) { setLoading(false); return; }
+        if (facilityIds.length === 0) { if (!cancelled) setLoading(false); return; }
 
         const { data } = await supabase
           .from('staff_qualifications')
@@ -280,7 +671,7 @@ function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: str
           .not('expiry_date', 'is', null)
           .order('expiry_date', { ascending: true });
 
-        if (data) {
+        if (!cancelled && data) {
           const todayMs = new Date().setHours(0, 0, 0, 0);
           setQualifications(
             data.map((q: any) => {
@@ -298,21 +689,22 @@ function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: str
       } catch (e) {
         // silently ignore
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchQualifications();
+    return () => { cancelled = true; };
   }, [userId, activeEmployments]);
 
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Award className="w-5 h-5 text-[#818CF8]" />
+          <Award className="w-5 h-5 text-personal" />
           <h2 className="text-lg font-bold text-gray-800">資格期限通知</h2>
         </div>
         <div className="flex items-center justify-center py-6">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-personal" />
         </div>
       </div>
     );
@@ -328,7 +720,7 @@ function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: str
       className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
     >
       <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-        <Award className="w-5 h-5 text-[#818CF8]" />
+        <Award className="w-5 h-5 text-personal" />
         資格期限通知
       </h2>
       {qualifications.length === 0 ? (
@@ -397,11 +789,12 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
       setLoading(false);
       return;
     }
+    let cancelled = false;
     const fetchBalances = async () => {
       setLoading(true);
       try {
         const facilityIds = activeEmployments.map(e => e.facilityId).filter(Boolean);
-        if (facilityIds.length === 0) { setLoading(false); return; }
+        if (facilityIds.length === 0) { if (!cancelled) setLoading(false); return; }
 
         const { data } = await supabase
           .from('paid_leave_balances')
@@ -409,7 +802,7 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
           .eq('user_id', userId)
           .in('facility_id', facilityIds);
 
-        if (data) {
+        if (!cancelled && data) {
           setBalances(
             data.map((b: any) => {
               const emp = activeEmployments.find(e => e.facilityId === b.facility_id);
@@ -425,21 +818,22 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
       } catch (e) {
         // silently ignore
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchBalances();
+    return () => { cancelled = true; };
   }, [userId, activeEmployments]);
 
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Calendar className="w-5 h-5 text-[#818CF8]" />
+          <Calendar className="w-5 h-5 text-personal" />
           <h2 className="text-lg font-bold text-gray-800">有給残日数</h2>
         </div>
         <div className="flex items-center justify-center py-6">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-personal" />
         </div>
       </div>
     );
@@ -453,7 +847,7 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
       className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
     >
       <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-        <Calendar className="w-5 h-5 text-[#818CF8]" />
+        <Calendar className="w-5 h-5 text-personal" />
         有給残日数
       </h2>
       {balances.length === 0 ? (
@@ -473,12 +867,12 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
                   <span className="text-xs text-gray-500">{b.usedDays}日消化 / {b.totalDays}日付与</span>
                 </div>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-3xl font-bold text-[#818CF8]">{b.remainingDays}</span>
+                  <span className="text-3xl font-bold text-personal">{b.remainingDays}</span>
                   <span className="text-sm text-gray-500">日残り</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
-                    className="bg-[#818CF8] h-2 rounded-full transition-all"
+                    className="bg-personal h-2 rounded-full transition-all"
                     style={{ width: `${Math.min(usageRate, 100)}%` }}
                   />
                 </div>
@@ -501,15 +895,59 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
 
 // RecommendedJobsSection は JobBrowsingTab に移行済み
 
+// 時間帯に応じた挨拶を返すヘルパー
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 6 && hour <= 10) return 'おはようございます';
+  if (hour >= 11 && hour <= 17) return 'お疲れさまです';
+  return 'お疲れさまです。今日も一日ありがとうございました';
+}
+
+// リアルタイム経過時間表示コンポーネント
+function WorkedTimeDisplay({ clockIn, clockOut, status }: { clockIn?: string; clockOut?: string; status: string }) {
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    if (!clockIn) return;
+
+    const calcElapsed = () => {
+      const start = new Date(clockIn).getTime();
+      const end = clockOut ? new Date(clockOut).getTime() : Date.now();
+      const diffMin = Math.floor((end - start) / 60000);
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      return `${h}時間${m}分`;
+    };
+
+    setElapsed(calcElapsed());
+
+    if (status === 'working' || status === 'on_break') {
+      const timer = setInterval(() => setElapsed(calcElapsed()), 60000);
+      return () => clearInterval(timer);
+    }
+    return undefined;
+  }, [clockIn, clockOut, status]);
+
+  if (!clockIn || !elapsed) return null;
+
+  const label = status === 'completed' ? '勤務時間' : '経過';
+
+  return (
+    <span className="text-xs text-teal-700 font-medium ml-2">
+      {label}: {elapsed}
+    </span>
+  );
+}
 
 export default function PersonalDashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [user, setUser] = useState<UserType | null>(null);
   const [activeEmployments, setActiveEmployments] = useState<EmploymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [currentFacility, setCurrentFacility] = useState<EmploymentRecord | null>(null);
-  const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'career' | 'work' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'work' | 'career' | 'docs' | 'settings'>('home');
 
 
   // 通知・アクション用の状態
@@ -558,12 +996,39 @@ export default function PersonalDashboardPage() {
   const [shiftAvailabilityFacility, setShiftAvailabilityFacility] = useState<{ id: string; name: string } | null>(null);
   const [facilitySettings, setFacilitySettings] = useState<Partial<FacilitySettings> | null>(null);
 
+  // 管理画面アクセス権限の判定
+  const bizAccessFacility = useMemo(() => {
+    return activeEmployments.find((emp: any) =>
+      emp.isMaster === true ||
+      emp.role === '管理者' ||
+      emp.role === 'マネージャー'
+    ) || null;
+  }, [activeEmployments]);
+  const hasBizAccess = !!bizAccessFacility;
+
+  // 管理画面への遷移（facilityIdクエリパラメータで施設指定）
+  const navigateToBusiness = () => {
+    if (!bizAccessFacility) return;
+    const fid = (bizAccessFacility as any).facility_id || (bizAccessFacility as any).facilityId;
+    if (!fid) return;
+    router.push(`/business?facilityId=${fid}`);
+  };
+
   // 本日の利用予定児童（業務タブ用）
   const [todaySchedules, setTodaySchedules] = useState<Record<string, { childId: string; childName: string; slot: string }[]>>({});
   const [loadingSchedules, setLoadingSchedules] = useState(false);
 
   // 施設お知らせ（業務タブ用）
   const [facilityAnnouncements, setFacilityAnnouncements] = useState<Record<string, { id: string; title: string; message: string; createdAt: string }[]>>({});
+
+  // ホームタブ: 施設アコーディオン開閉状態
+  const [expandedFacilities, setExpandedFacilities] = useState<Set<string>>(new Set());
+
+  // ホームタブ: 今日のシフト（施設ごと: 誰が出勤予定か）
+  const [todayStaffShifts, setTodayStaffShifts] = useState<Record<string, { staffId: string; staffName: string; startTime: string | null; endTime: string | null; patternName: string | null }[]>>({});
+
+  // ホームタブ: 今日の送迎担当（施設ごと）
+  const [todayTransport, setTodayTransport] = useState<Record<string, { id: string; mode: 'pickup' | 'dropoff'; driverName: string | null; attendantName: string | null; status: string }[]>>({});
 
   // キャリアタブ用の状態
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -723,7 +1188,7 @@ export default function PersonalDashboardPage() {
       pdf.save(fileName);
     } catch (error) {
       console.error('PDF生成エラー:', error);
-      alert('PDF生成に失敗しました');
+      toast.error('PDF生成に失敗しました');
     } finally {
       setGeneratingPDF(null);
     }
@@ -755,7 +1220,7 @@ export default function PersonalDashboardPage() {
       pdf.save(fileName);
     } catch (error) {
       console.error('PDF生成エラー:', error);
-      alert('PDF生成に失敗しました');
+      toast.error('PDF生成に失敗しました');
     } finally {
       setGeneratingPDF(null);
     }
@@ -791,7 +1256,7 @@ export default function PersonalDashboardPage() {
 
     } catch (error) {
       console.error('写真アップロードエラー:', error);
-      alert('写真のアップロードに失敗しました');
+      toast.error('写真のアップロードに失敗しました');
     } finally {
       setUploadingPhoto(false);
     }
@@ -809,7 +1274,7 @@ export default function PersonalDashboardPage() {
       const filePath = `${user.id}/resumes/${timestamp}_${safeFileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('profile-photos')
+        .from('documents')
         .upload(filePath, file, { upsert: false });
 
       if (uploadError) throw uploadError;
@@ -843,7 +1308,7 @@ export default function PersonalDashboardPage() {
       setShowResumeUploadConfirm(true);
     } catch (error) {
       console.error('履歴書アップロードエラー:', error);
-      alert('履歴書のアップロードに失敗しました');
+      toast.error('履歴書のアップロードに失敗しました');
     } finally {
       setUploadingResume(false);
       // inputをリセット
@@ -905,7 +1370,7 @@ export default function PersonalDashboardPage() {
       setShowResumePreview(false);
     } catch (error) {
       console.error('PDF生成エラー:', error);
-      alert('PDF生成に失敗しました');
+      toast.error('PDF生成に失敗しました');
     } finally {
       setGeneratingPDF(null);
     }
@@ -937,7 +1402,7 @@ export default function PersonalDashboardPage() {
       pdf.save(fileName);
     } catch (error) {
       console.error('PDF生成エラー:', error);
-      alert('PDF生成に失敗しました');
+      toast.error('PDF生成に失敗しました');
     } finally {
       setGeneratingExport(null);
     }
@@ -969,7 +1434,7 @@ export default function PersonalDashboardPage() {
       pdf.save(fileName);
     } catch (error) {
       console.error('PDF生成エラー:', error);
-      alert('PDF生成に失敗しました');
+      toast.error('PDF生成に失敗しました');
     } finally {
       setGeneratingExport(null);
     }
@@ -1287,9 +1752,9 @@ export default function PersonalDashboardPage() {
     fetchNotifications();
   }, [user?.id, activeEmployments]);
 
-  // 業務タブ：本日の利用予定児童とお知らせを取得
+  // ホームタブ：本日の利用予定児童とお知らせを取得
   useEffect(() => {
-    if (activeTab !== 'work' || personalFacilities.length === 0) return;
+    if ((activeTab !== 'home' && activeTab !== 'work') || personalFacilities.length === 0) return;
 
     const fetchTodaySchedulesAndAnnouncements = async () => {
       setLoadingSchedules(true);
@@ -1351,6 +1816,139 @@ export default function PersonalDashboardPage() {
     fetchTodaySchedulesAndAnnouncements();
   }, [activeTab, personalFacilities]);
 
+  // ホームタブ: 今日のシフト担当 + 送迎担当を取得
+  useEffect(() => {
+    if ((activeTab !== 'home' && activeTab !== 'work') || personalFacilities.length === 0) return;
+    let cancelled = false;
+
+    const fetchTodayShiftsAndTransport = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const facilityIds = personalFacilities.map(f => f.facilityId);
+
+      try {
+        // 今日のシフトを取得（全スタッフ）
+        const { data: shiftData } = await supabase
+          .from('shifts')
+          .select('staff_id, facility_id, start_time, end_time, has_shift, shift_pattern_id, shift_patterns(name)')
+          .in('facility_id', facilityIds)
+          .eq('date', today)
+          .eq('has_shift', true);
+
+        if (!cancelled && shiftData) {
+          // staff_id → 名前を解決
+          const staffIds = [...new Set(shiftData.map((s: any) => s.staff_id).filter(Boolean))];
+          const normalIds = staffIds.filter(id => !id.startsWith('emp-'));
+          const empIds = staffIds.filter(id => id.startsWith('emp-')).map(id => id.replace('emp-', ''));
+          const nameMap: Record<string, string> = {};
+
+          if (normalIds.length > 0) {
+            const { data: staffRows } = await supabase.from('staff').select('id, name').in('id', normalIds);
+            staffRows?.forEach((s: any) => { nameMap[s.id] = s.name; });
+          }
+          if (empIds.length > 0) {
+            const { data: empRows } = await supabase
+              .from('employment_records')
+              .select('id, users!inner(last_name, first_name)')
+              .in('id', empIds);
+            empRows?.forEach((r: any) => {
+              nameMap[`emp-${r.id}`] = `${r.users?.last_name || ''}${r.users?.first_name || ''}`;
+            });
+          }
+
+          const grouped: Record<string, typeof todayStaffShifts[string]> = {};
+          shiftData.forEach((s: any) => {
+            if (!grouped[s.facility_id]) grouped[s.facility_id] = [];
+            grouped[s.facility_id].push({
+              staffId: s.staff_id,
+              staffName: nameMap[s.staff_id] || s.staff_id,
+              startTime: s.start_time || null,
+              endTime: s.end_time || null,
+              patternName: (s.shift_patterns as any)?.name || null,
+            });
+          });
+          if (!cancelled) setTodayStaffShifts(grouped);
+        }
+
+        // 今日の送迎セッションを取得
+        const { data: transportData } = await supabase
+          .from('transport_sessions')
+          .select('id, mode, status, driver_staff_id, attendant_staff_id')
+          .in('facility_id', facilityIds)
+          .eq('date', today)
+          .in('status', ['preparing', 'active', 'completed']);
+
+        if (!cancelled && transportData && transportData.length > 0) {
+          // ドライバー・添乗員の名前を解決
+          const allIds = [...new Set([
+            ...transportData.map((t: any) => t.driver_staff_id),
+            ...transportData.map((t: any) => t.attendant_staff_id),
+          ].filter(Boolean))];
+          const tNormalIds = allIds.filter(id => !id.startsWith('emp-'));
+          const tEmpIds = allIds.filter(id => id.startsWith('emp-')).map(id => id.replace('emp-', ''));
+          const tNameMap: Record<string, string> = {};
+
+          if (tNormalIds.length > 0) {
+            const { data: staffRows } = await supabase.from('staff').select('id, name').in('id', tNormalIds);
+            staffRows?.forEach((s: any) => { tNameMap[s.id] = s.name; });
+          }
+          if (tEmpIds.length > 0) {
+            const { data: empRows } = await supabase
+              .from('employment_records')
+              .select('id, users!inner(last_name, first_name)')
+              .in('id', tEmpIds);
+            empRows?.forEach((r: any) => {
+              tNameMap[`emp-${r.id}`] = `${r.users?.last_name || ''}${r.users?.first_name || ''}`;
+            });
+          }
+
+          // 施設IDを取得するために再度クエリ（transport_sessionsにfacility_idあり）
+          const { data: transportWithFacility } = await supabase
+            .from('transport_sessions')
+            .select('id, mode, status, driver_staff_id, attendant_staff_id, facility_id')
+            .in('facility_id', facilityIds)
+            .eq('date', today)
+            .in('status', ['preparing', 'active', 'completed']);
+
+          if (!cancelled && transportWithFacility) {
+            const grouped: Record<string, typeof todayTransport[string]> = {};
+            transportWithFacility.forEach((t: any) => {
+              if (!grouped[t.facility_id]) grouped[t.facility_id] = [];
+              grouped[t.facility_id].push({
+                id: t.id,
+                mode: t.mode,
+                driverName: t.driver_staff_id ? (tNameMap[t.driver_staff_id] || null) : null,
+                attendantName: t.attendant_staff_id ? (tNameMap[t.attendant_staff_id] || null) : null,
+                status: t.status,
+              });
+            });
+            if (!cancelled) setTodayTransport(grouped);
+          }
+        }
+      } catch (err) {
+        console.error('シフト・送迎データ取得エラー:', err);
+      }
+    };
+
+    fetchTodayShiftsAndTransport();
+    return () => { cancelled = true; };
+  }, [activeTab, personalFacilities]);
+
+  // 施設アコーディオン開閉（初期: 最初の施設を開く）
+  useEffect(() => {
+    if (personalFacilities.length > 0 && expandedFacilities.size === 0) {
+      setExpandedFacilities(new Set([personalFacilities[0].facilityId]));
+    }
+  }, [personalFacilities]);
+
+  const toggleFacilityExpand = (facilityId: string) => {
+    setExpandedFacilities(prev => {
+      const next = new Set(prev);
+      if (next.has(facilityId)) next.delete(facilityId);
+      else next.add(facilityId);
+      return next;
+    });
+  };
+
   // ログアウト処理
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -1365,7 +1963,7 @@ export default function PersonalDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#818CF8]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-personal" />
       </div>
     );
   }
@@ -1382,7 +1980,7 @@ export default function PersonalDashboardPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Image src="/logo.svg" alt="Roots" width={120} height={32} className="h-8 w-auto object-contain" priority />
-              <span className="text-xs font-bold px-2 py-1 rounded bg-[#818CF8] text-white">
+              <span className="text-xs font-bold px-2 py-1 rounded bg-personal text-white">
                 キャリア
               </span>
             </div>
@@ -1406,12 +2004,12 @@ export default function PersonalDashboardPage() {
               <button
                 onClick={() => photoInputRef.current?.click()}
                 disabled={uploadingPhoto}
-                className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-[#818CF8] hover:border-[#6366F1] transition-colors group"
+                className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-personal hover:border-personal-dark transition-colors group"
               >
                 {profilePhotoUrl ? (
                   <img src={profilePhotoUrl} alt="プロフィール写真" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-[#818CF8] flex items-center justify-center">
+                  <div className="w-full h-full bg-personal flex items-center justify-center">
                     <User className="w-8 h-8 text-white" />
                   </div>
                 )}
@@ -1432,6 +2030,7 @@ export default function PersonalDashboardPage() {
                 className="hidden"
               />
               <div>
+                <p className="text-xs text-gray-400">{getTimeGreeting()}</p>
                 <h1 className="text-2xl font-bold text-gray-800">
                   {user.lastName && user.firstName
                     ? `${user.lastName} ${user.firstName}`
@@ -1455,222 +2054,71 @@ export default function PersonalDashboardPage() {
 
       {/* タブコンテンツ */}
       {activeTab === 'home' && (
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4 pb-24">
+        {/* 日付 */}
+        <h2 className="text-lg font-bold text-gray-800">
+          {new Date().toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}
+        </h2>
 
-        {/* アカウント状態表示 */}
+        {/* オーナー */}
         {user?.role === 'owner' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-lg shadow-sm p-4 text-white"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold">プラットフォームオーナー</p>
-                <p className="text-sm text-white/70">Rootsの全体管理権限を持っています</p>
-              </div>
-              <button
-                onClick={() => router.push('/admin')}
-                className="bg-white/20 hover:bg-white/30 text-white text-sm font-bold px-4 py-2 rounded-md transition-colors"
-              >
-                管理画面
-              </button>
-            </div>
-          </motion.div>
+          <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white flex items-center gap-3">
+            <Shield className="w-5 h-5" />
+            <span className="flex-1 font-bold text-sm">プラットフォーム管理</span>
+            <button onClick={() => router.push('/admin')} className="bg-white/20 hover:bg-white/30 text-sm font-bold px-3 py-1.5 rounded-lg transition-colors">管理画面</button>
+          </div>
         )}
-
-        {/* 運営管理画面へのアクセス（施設発行権限がある場合のみ） */}
         <AdminAccessLink userId={user?.id} />
 
-        {/* 所属施設一覧 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
-        >
-          <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-[#818CF8]" />
-            所属施設
-          </h2>
-          {personalFacilities.length > 0 ? (
-            <div className="space-y-2">
-              {personalFacilities.map((facility) => (
-                <div
-                  key={facility.facilityId}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#818CF8]/10 rounded-lg flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-[#818CF8]" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-800">{facility.facilityName}</p>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="bg-[#818CF8]/10 text-[#818CF8] px-2 py-0.5 rounded font-bold">
-                          {facility.employmentRecord.role || 'スタッフ'}
-                        </span>
-                        <span>{facility.employmentRecord.employmentType || '常勤'}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">施設コード</p>
-                    <p className="text-sm font-mono text-gray-600">{facility.facilityCode || '-'}</p>
+        {/* 通知 */}
+        {!loadingNotifications && notifications.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2">
+            <Bell className="w-4 h-4 text-red-500" />
+            <span className="text-sm font-bold text-red-700">{notifications.length}件の通知</span>
+          </div>
+        )}
+
+        {/* 所属施設 — タップで業務タブへ */}
+        {personalFacilities.length > 0 ? personalFacilities.map((facility) => {
+          const status = facility.todayAttendance?.status || 'not_started';
+          return (
+            <motion.div
+              key={`home-${facility.facilityId}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => setActiveTab('work')}
+              className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 cursor-pointer hover:border-personal/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center shrink-0">
+                  <Building2 className="w-5 h-5 text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 truncate">{facility.facilityName}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-personal/10 text-personal">
+                      {facility.employmentRecord.role || 'スタッフ'}
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                      status === 'completed' ? 'bg-gray-200 text-gray-600' :
+                      status === 'working' ? 'bg-teal-100 text-teal-700' :
+                      status === 'on_break' ? 'bg-amber-100 text-amber-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {status === 'completed' ? '退勤済' : status === 'working' ? '勤務中' : status === 'on_break' ? '休憩中' : '未出勤'}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6">
-              <Building2 className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-              <p className="text-sm text-gray-500">所属施設がありません</p>
-              <p className="text-xs text-gray-400 mt-1">施設から招待を受けると、ここに表示されます</p>
-            </div>
-          )}
-        </motion.div>
-
-        {/* 通知・アクションセンター */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
-        >
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-[#818CF8]" />
-            通知・アクション
-          </h2>
-
-          {loadingNotifications ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="text-center py-8">
-              <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-sm text-gray-500">新しい通知はありません</p>
-              <p className="text-xs text-gray-400 mt-1">施設からのお知らせや依頼があればここに表示されます</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {notifications.map((notification) => {
-                // 通知タイプに応じたスタイルを設定
-                const getNotificationStyle = () => {
-                  switch (notification.type) {
-                    case 'qualification_expiry':
-                      return {
-                        bgColor: 'bg-yellow-50',
-                        borderColor: 'border-yellow-200',
-                        iconColor: 'text-yellow-600',
-                        icon: AlertCircle,
-                      };
-                    case 'experience_request':
-                      return {
-                        bgColor: 'bg-blue-50',
-                        borderColor: 'border-blue-200',
-                        iconColor: 'text-blue-600',
-                        icon: Bell,
-                      };
-                    case 'leave_response':
-                    case 'expense_response':
-                      return {
-                        bgColor: 'bg-green-50',
-                        borderColor: 'border-green-200',
-                        iconColor: 'text-green-600',
-                        icon: CheckCircle,
-                      };
-                    case 'facility_announcement':
-                    default:
-                      return {
-                        bgColor: 'bg-purple-50',
-                        borderColor: 'border-purple-200',
-                        iconColor: 'text-[#818CF8]',
-                        icon: Bell,
-                      };
-                  }
-                };
-
-                const style = getNotificationStyle();
-                const IconComponent = style.icon;
-
-                return (
-                  <div
-                    key={notification.id}
-                    className={`${style.bgColor} border ${style.borderColor} rounded-lg p-4`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <IconComponent className={`w-5 h-5 ${style.iconColor} mt-0.5`} />
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-bold text-gray-800 mb-1">
-                            {notification.title}
-                          </p>
-                          {notification.facilityName && (
-                            <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded">
-                              {notification.facilityName}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-600">
-                          {notification.message}
-                        </p>
-                        {notification.actionLabel && notification.actionUrl && (
-                          <button
-                            onClick={() => router.push(notification.actionUrl!)}
-                            className="mt-2 text-xs text-[#818CF8] hover:underline"
-                          >
-                            {notification.actionLabel} →
-                          </button>
-                        )}
-                        <p className="text-xs text-gray-400 mt-2">
-                          {new Date(notification.createdAt).toLocaleDateString('ja-JP', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </motion.div>
-
-        {/* ========== スカウト ========== */}
-        <ScoutInboxSection userId={user?.id} />
-
-        {/* ========== 規定確認セクション ========== */}
-        <CareerRegulationSection userId={user?.id} activeEmployments={activeEmployments} />
-
-        {/* ========== 資格期限通知セクション ========== */}
-        <CareerQualificationAlerts userId={user?.id} activeEmployments={activeEmployments} />
-
-        {/* ========== 有給残日数表示セクション ========== */}
-        <CareerPaidLeaveBalance userId={user?.id} activeEmployments={activeEmployments} />
-
-        {/* ========== 求人への誘導 ========== */}
-        <div className="mt-6">
-          <button
-            onClick={() => setActiveTab('jobs')}
-            className="w-full bg-gradient-to-r from-[#818CF8]/10 to-[#6366F1]/10 border border-[#818CF8]/20 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow"
-          >
-            <div className="w-10 h-10 bg-[#818CF8] rounded-lg flex items-center justify-center shrink-0">
-              <Search className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-sm font-bold text-gray-800">求人を探す</p>
-              <p className="text-xs text-gray-500">あなたにぴったりの求人をチェック</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+              </div>
+            </motion.div>
+          );
+        }) : (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+            <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">所属施設がありません</p>
+          </div>
+        )}
       </div>
       )}
 
@@ -1722,9 +2170,189 @@ export default function PersonalDashboardPage() {
         />
       )}
 
-      {activeTab === 'jobs' && (
-        <div className="pb-24">
-          <JobBrowsingTab userId={user?.id} />
+      {activeTab === 'work' && (
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-4 pb-24">
+          {/* 施設アコーディオン */}
+          {personalFacilities.length > 0 ? personalFacilities.map((facility) => {
+            const isExpanded = expandedFacilities.has(facility.facilityId);
+            const attendance = facility.todayAttendance;
+            const status = attendance?.status || 'not_started';
+            const schedules = todaySchedules[facility.facilityId] || [];
+            const shifts = todayStaffShifts[facility.facilityId] || [];
+            const transports = todayTransport[facility.facilityId] || [];
+            const role = facility.employmentRecord.role || 'スタッフ';
+            const canManage = role === '管理者' || role === 'マネージャー';
+
+            return (
+              <motion.div
+                key={`work-${facility.facilityId}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+              >
+                {/* ヘッダー（タップで開閉） */}
+                <button
+                  onClick={() => toggleFacilityExpand(facility.facilityId)}
+                  className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-teal-600" />
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900 truncate">{facility.facilityName}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-personal/10 text-personal shrink-0">{role}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        status === 'completed' ? 'bg-gray-200 text-gray-600' :
+                        status === 'working' ? 'bg-teal-100 text-teal-700' :
+                        status === 'on_break' ? 'bg-amber-100 text-amber-700' :
+                        'bg-gray-100 text-gray-500'
+                      }`}>
+                        {status === 'completed' ? '退勤済' : status === 'working' ? '勤務中' : status === 'on_break' ? '休憩中' : '未出勤'}
+                      </span>
+                      {attendance?.startTime && (
+                        <span className="text-[11px] text-gray-400">{attendance.startTime}{attendance.endTime && ` → ${attendance.endTime}`}</span>
+                      )}
+                    </div>
+                  </div>
+                  {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400 shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />}
+                </button>
+
+                {/* 展開コンテンツ */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100">
+                    {/* 出勤・退勤ボタン */}
+                    <div className="px-4 py-3 bg-gradient-to-r from-teal-50/50 to-cyan-50/50">
+                      {status === 'not_started' && (
+                        <button onClick={() => clockIn(facility.facilityId)} className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+                          <PlayCircle className="w-4 h-4" /> 出勤する
+                        </button>
+                      )}
+                      {status === 'working' && (
+                        <div className="flex gap-2">
+                          <button onClick={() => startBreak(facility.facilityId)} className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+                            <Coffee className="w-4 h-4" /> 休憩
+                          </button>
+                          <button onClick={() => clockOut(facility.facilityId)} className="flex-1 py-2.5 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg text-sm transition-colors">退勤する</button>
+                        </div>
+                      )}
+                      {status === 'on_break' && (
+                        <button onClick={() => endBreak(facility.facilityId)} className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-sm transition-colors">休憩終了</button>
+                      )}
+                      {status === 'completed' && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-500">お疲れさまでした</span>
+                          {attendance?.startTime && (
+                            <WorkedTimeDisplay clockIn={attendance.startTime} clockOut={attendance.endTime} status={status} />
+                          )}
+                        </div>
+                      )}
+                      {status === 'working' && attendance?.startTime && (
+                        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                          <span>出勤: {attendance.startTime}</span>
+                          <WorkedTimeDisplay clockIn={attendance.startTime} clockOut={attendance.endTime} status={status} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* アクションボタン */}
+                    <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100">
+                      <button
+                        onClick={() => { setShiftConfirmationFacilityId(facility.facilityId); setShowShiftConfirmation(true); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-700 transition-colors"
+                      >
+                        <ClipboardList className="w-3.5 h-3.5" /> シフト確認
+                      </button>
+                      <button
+                        onClick={() => { setCurrentFacility(facility.employmentRecord); setShowAttendanceCalendar(true); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-700 transition-colors"
+                      >
+                        <Calendar className="w-3.5 h-3.5" /> 勤怠
+                      </button>
+                      {canManage && (
+                        <button
+                          onClick={() => {
+                            localStorage.setItem('selectedFacility', JSON.stringify({ id: facility.facilityId, name: facility.facilityName, code: facility.facilityCode, role }));
+                            localStorage.setItem('facility', JSON.stringify({ id: facility.facilityId, name: facility.facilityName, code: facility.facilityCode, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+                            window.location.href = `/business?facilityId=${facility.facilityId}`;
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-personal/10 hover:bg-personal/20 rounded-lg text-xs font-bold text-personal transition-colors"
+                        >
+                          <Briefcase className="w-3.5 h-3.5" /> 管理画面
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 今日のシフト */}
+                    {shifts.length > 0 && (
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <h4 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" /> 本日の出勤スタッフ（{shifts.length}名）
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {shifts.map((s) => (
+                            <span key={s.staffId} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg text-xs text-gray-700">
+                              <UserCheck className="w-3 h-3 text-teal-500" />
+                              {s.staffName}
+                              {s.startTime && <span className="text-gray-400">{s.startTime.slice(0, 5)}{s.endTime && `~${s.endTime.slice(0, 5)}`}</span>}
+                              {!s.startTime && s.patternName && <span className="text-gray-400">{s.patternName}</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 送迎 */}
+                    {transports.length > 0 && (
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <h4 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1.5">
+                          <Bus className="w-3.5 h-3.5" /> 送迎
+                        </h4>
+                        <div className="space-y-1.5">
+                          {transports.map((t) => (
+                            <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 bg-gray-50 rounded-lg text-xs">
+                              <span className={`font-bold px-1.5 py-0.5 rounded ${t.mode === 'pickup' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                                {t.mode === 'pickup' ? '迎え' : '送り'}
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'completed' ? 'bg-gray-200 text-gray-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {t.status === 'active' ? '進行中' : t.status === 'completed' ? '完了' : '準備中'}
+                              </span>
+                              {t.driverName && <span className="text-gray-700">運転: <b>{t.driverName}</b></span>}
+                              {t.attendantName && <span className="text-gray-700">添乗: <b>{t.attendantName}</b></span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 利用予定児童 */}
+                    {schedules.length > 0 && (
+                      <div className="px-4 py-3">
+                        <h4 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" /> 利用予定（{schedules.length}名）
+                        </h4>
+                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                          {schedules.map((child: any, idx: number) => (
+                            <div key={`${child.childId}-${child.slot}-${idx}`} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
+                              <span className="text-xs text-gray-800">{child.childName}</span>
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{slotDisplayName(DEFAULT_SLOTS, child.slot)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            );
+          }) : (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">所属施設がありません</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1738,25 +2366,25 @@ export default function PersonalDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#818CF8]" />
+              <TrendingUp className="w-5 h-5 text-personal" />
               キャリアサマリー
             </h2>
             <p className="text-xs text-gray-500 mb-4">出勤・研修・資格データから自動で集計されます</p>
 
             {careerAccumulationLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#818CF8]" />
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-personal" />
               </div>
             ) : (
               <>
                 {/* 統計カード */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                   {/* 在籍日数 */}
-                  <div className="bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-xl p-4 text-center">
+                  <div className="bg-personal/5 border border-personal/20 rounded-xl p-4 text-center">
                     <div className="flex items-center justify-center mb-2">
-                      <Calendar className="w-5 h-5 text-[#818CF8]" />
+                      <Calendar className="w-5 h-5 text-personal" />
                     </div>
-                    <p className="text-2xl font-bold text-[#818CF8]">
+                    <p className="text-2xl font-bold text-personal">
                       {tenureList.length > 0 ? tenureList[0].totalDays.toLocaleString() : 0}
                     </p>
                     <p className="text-xs text-gray-600 font-bold mt-1">在籍日数</p>
@@ -1810,15 +2438,15 @@ export default function PersonalDashboardPage() {
                 {timelineEvents.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-[#818CF8]" />
+                      <Clock className="w-4 h-4 text-personal" />
                       キャリアタイムライン
                     </h3>
-                    <div className="relative pl-6 border-l-2 border-[#818CF8]/30">
+                    <div className="relative pl-6 border-l-2 border-personal/30">
                       {(showFullTimeline ? timelineEvents : timelineEvents.slice(0, 5)).map((event: CareerTimelineEvent) => {
                         const getEventStyle = () => {
                           switch (event.type) {
                             case 'employment_start':
-                              return { dotColor: 'bg-[#818CF8]', icon: Building2, label: '入社' };
+                              return { dotColor: 'bg-personal', icon: Building2, label: '入社' };
                             case 'employment_end':
                               return { dotColor: 'bg-gray-400', icon: Building2, label: '退社' };
                             case 'qualification':
@@ -1846,7 +2474,7 @@ export default function PersonalDashboardPage() {
                                   {new Date(event.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}
                                 </span>
                                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                                  event.type === 'employment_start' ? 'bg-[#818CF8]/10 text-[#818CF8]' :
+                                  event.type === 'employment_start' ? 'bg-personal/10 text-personal' :
                                   event.type === 'qualification' ? 'bg-amber-100 text-amber-700' :
                                   event.type === 'training' ? 'bg-blue-100 text-blue-700' :
                                   event.type === 'certificate_issued' ? 'bg-green-100 text-green-700' :
@@ -1865,7 +2493,7 @@ export default function PersonalDashboardPage() {
                     {timelineEvents.length > 5 && (
                       <button
                         onClick={() => setShowFullTimeline(!showFullTimeline)}
-                        className="mt-3 flex items-center gap-1 text-sm text-[#818CF8] hover:text-[#6366F1] font-bold mx-auto"
+                        className="mt-3 flex items-center gap-1 text-sm text-personal hover:text-personal-dark font-bold mx-auto"
                       >
                         {showFullTimeline ? (
                           <>
@@ -1888,10 +2516,10 @@ export default function PersonalDashboardPage() {
                   <div>
                     <button
                       onClick={() => setShowAnnualDetails(!showAnnualDetails)}
-                      className="w-full flex items-center justify-between text-sm font-bold text-gray-700 mb-3 hover:text-[#818CF8] transition-colors"
+                      className="w-full flex items-center justify-between text-sm font-bold text-gray-700 mb-3 hover:text-personal transition-colors"
                     >
                       <span className="flex items-center gap-2">
-                        <Hash className="w-4 h-4 text-[#818CF8]" />
+                        <Hash className="w-4 h-4 text-personal" />
                         年度別キャリアサマリー
                       </span>
                       {showAnnualDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -1921,7 +2549,7 @@ export default function PersonalDashboardPage() {
                               </div>
                               {summary.roleChanges.length > 0 && (
                                 <div className="flex items-center gap-1">
-                                  <TrendingUp className="w-3 h-3 text-[#818CF8]" />
+                                  <TrendingUp className="w-3 h-3 text-personal" />
                                   <span className="text-gray-600">役職:</span>
                                   <span className="font-bold text-gray-800 truncate">{summary.roleChanges[0]}</span>
                                 </div>
@@ -1944,7 +2572,7 @@ export default function PersonalDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
-              <Download className="w-5 h-5 text-[#818CF8]" />
+              <Download className="w-5 h-5 text-personal" />
               書類ワンクリック出力
             </h2>
             <p className="text-xs text-gray-500 mb-4">蓄積されたキャリアデータから各種書類をPDFで出力できます</p>
@@ -1953,13 +2581,13 @@ export default function PersonalDashboardPage() {
               {/* 履歴書 */}
               <button
                 onClick={() => setShowResumePreview(true)}
-                className="flex items-center gap-3 p-4 bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-xl hover:bg-[#818CF8]/10 transition-colors text-left group"
+                className="flex items-center gap-3 p-4 bg-personal/5 border border-personal/20 rounded-xl hover:bg-personal/10 transition-colors text-left group"
               >
-                <div className="w-10 h-10 bg-[#818CF8] rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-personal rounded-lg flex items-center justify-center flex-shrink-0">
                   <FileText className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-[#818CF8]">履歴書</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-personal">履歴書</p>
                   <p className="text-xs text-gray-500">プレビュー・編集してPDF出力</p>
                 </div>
               </button>
@@ -1968,9 +2596,9 @@ export default function PersonalDashboardPage() {
               <button
                 onClick={generateCVPDF}
                 disabled={generatingPDF !== null}
-                className="flex items-center gap-3 p-4 bg-[#818CF8]/5 border border-[#818CF8]/20 rounded-xl hover:bg-[#818CF8]/10 transition-colors text-left group disabled:opacity-50"
+                className="flex items-center gap-3 p-4 bg-personal/5 border border-personal/20 rounded-xl hover:bg-personal/10 transition-colors text-left group disabled:opacity-50"
               >
-                <div className="w-10 h-10 bg-[#818CF8] rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-personal rounded-lg flex items-center justify-center flex-shrink-0">
                   {generatingPDF === 'cv' ? (
                     <Loader2 className="w-5 h-5 text-white animate-spin" />
                   ) : (
@@ -1978,7 +2606,7 @@ export default function PersonalDashboardPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-[#818CF8]">職務経歴書</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-personal">職務経歴書</p>
                   <p className="text-xs text-gray-500">職歴・資格から自動生成</p>
                 </div>
               </button>
@@ -2047,7 +2675,7 @@ export default function PersonalDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-[#818CF8]" />
+              <Upload className="w-5 h-5 text-personal" />
               既存の履歴書をアップロード
             </h2>
             <p className="text-xs text-gray-500 mb-4">お手持ちの履歴書PDFをアップロードして保管できます</p>
@@ -2055,17 +2683,17 @@ export default function PersonalDashboardPage() {
             {/* アップロードエリア */}
             <div
               onClick={() => resumeFileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 hover:border-[#818CF8] rounded-xl p-6 text-center cursor-pointer transition-colors group"
+              className="border-2 border-dashed border-gray-300 hover:border-personal rounded-xl p-6 text-center cursor-pointer transition-colors group"
             >
               {uploadingResume ? (
                 <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="w-8 h-8 text-[#818CF8] animate-spin" />
+                  <Loader2 className="w-8 h-8 text-personal animate-spin" />
                   <p className="text-sm text-gray-600">アップロード中...</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 bg-[#818CF8]/10 rounded-full flex items-center justify-center group-hover:bg-[#818CF8]/20 transition-colors">
-                    <Upload className="w-6 h-6 text-[#818CF8]" />
+                  <div className="w-12 h-12 bg-personal/10 rounded-full flex items-center justify-center group-hover:bg-personal/20 transition-colors">
+                    <Upload className="w-6 h-6 text-personal" />
                   </div>
                   <p className="text-sm font-bold text-gray-700">クリックしてファイルを選択</p>
                   <p className="text-xs text-gray-400">PDF, 画像ファイル対応</p>
@@ -2087,7 +2715,7 @@ export default function PersonalDashboardPage() {
                 {uploadedResumes.map((resume) => (
                   <div key={resume.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 min-w-0">
-                      <FileText className="w-5 h-5 text-[#818CF8] flex-shrink-0" />
+                      <FileText className="w-5 h-5 text-personal flex-shrink-0" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{resume.fileName}</p>
                         <p className="text-xs text-gray-400">
@@ -2100,13 +2728,13 @@ export default function PersonalDashboardPage() {
                       onClick={async (e) => {
                         e.preventDefault();
                         const { data } = supabase.storage
-                          .from('profile-photos')
+                          .from('documents')
                           .getPublicUrl(resume.filePath);
                         if (data?.publicUrl) {
                           window.open(data.publicUrl, '_blank');
                         }
                       }}
-                      className="text-xs text-[#818CF8] hover:text-[#6366F1] font-bold flex-shrink-0"
+                      className="text-xs text-personal hover:text-personal-dark font-bold flex-shrink-0"
                     >
                       <Eye className="w-4 h-4" />
                     </a>
@@ -2139,7 +2767,7 @@ export default function PersonalDashboardPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowResumeUploadConfirm(false)}
-                    className="flex-1 py-2 px-4 bg-[#818CF8] text-white font-bold rounded-lg hover:bg-[#6366F1] transition-colors text-sm"
+                    className="flex-1 py-2 px-4 bg-personal text-white font-bold rounded-lg hover:bg-personal-dark transition-colors text-sm"
                   >
                     プロフィールを編集
                   </button>
@@ -2162,13 +2790,13 @@ export default function PersonalDashboardPage() {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <User className="w-5 h-5 text-[#818CF8]" />
+                <User className="w-5 h-5 text-personal" />
                 基本プロフィール
               </h2>
               {!isEditingProfile && (
                 <button
                   onClick={() => setIsEditingProfile(true)}
-                  className="flex items-center gap-1 text-sm text-[#818CF8] hover:text-[#6366F1] font-bold"
+                  className="flex items-center gap-1 text-sm text-personal hover:text-personal-dark font-bold"
                 >
                   <Edit className="w-4 h-4" />
                   編集
@@ -2177,705 +2805,105 @@ export default function PersonalDashboardPage() {
             </div>
 
             {isEditingProfile ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">氏名 <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">姓</label>
-                      <input
-                        type="text"
-                        value={profileData.lastName}
-                        onChange={(e) => {
-                          const lastName = e.target.value;
-                          setProfileData({
-                            ...profileData,
-                            lastName,
-                            name: `${lastName} ${profileData.firstName}`.trim()
-                          });
-                        }}
-                        placeholder="山田"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">名</label>
-                      <input
-                        type="text"
-                        value={profileData.firstName}
-                        onChange={(e) => {
-                          const firstName = e.target.value;
-                          setProfileData({
-                            ...profileData,
-                            firstName,
-                            name: `${profileData.lastName} ${firstName}`.trim()
-                          });
-                        }}
-                        placeholder="太郎"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">フリガナ</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">セイ</label>
-                      <input
-                        type="text"
-                        value={profileData.lastNameKana}
-                        onChange={(e) => {
-                          const lastNameKana = e.target.value;
-                          setProfileData({
-                            ...profileData,
-                            lastNameKana,
-                            nameKana: `${lastNameKana} ${profileData.firstNameKana}`.trim()
-                          });
-                        }}
-                        placeholder="ヤマダ"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">メイ</label>
-                      <input
-                        type="text"
-                        value={profileData.firstNameKana}
-                        onChange={(e) => {
-                          const firstNameKana = e.target.value;
-                          setProfileData({
-                            ...profileData,
-                            firstNameKana,
-                            nameKana: `${profileData.lastNameKana} ${firstNameKana}`.trim()
-                          });
-                        }}
-                        placeholder="タロウ"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">メールアドレス（ログインID）</label>
-                  <input
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                    placeholder="ログインIDとして使用されます"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">生年月日</label>
-                  <input
-                    type="date"
-                    value={profileData.birthDate}
-                    onChange={(e) => setProfileData({ ...profileData, birthDate: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">住所</label>
-                  <input
-                    type="text"
-                    value={profileData.address}
-                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">電話番号</label>
-                  <input
-                    type="tel"
-                    value={profileData.phone}
-                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">性別</label>
-                  <select
-                    value={profileData.gender}
-                    onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                  >
-                    <option value="">選択してください</option>
-                    <option value="男性">男性</option>
-                    <option value="女性">女性</option>
-                    <option value="その他">その他</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">マイナンバー</label>
-                  <input
-                    type="text"
-                    value={profileData.myNumber}
-                    onChange={(e) => setProfileData({ ...profileData, myNumber: e.target.value })}
-                    placeholder="12桁のマイナンバー"
-                    maxLength={12}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">配偶者</label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="hasSpouse"
-                          checked={profileData.hasSpouse}
-                          onChange={(e) => {
-                            setProfileData({ 
-                              ...profileData, 
-                              hasSpouse: true,
-                              spouseName: profileData.spouseName || '' // 既存の値があれば保持
-                            });
-                          }}
-                          className="w-4 h-4 text-[#818CF8]"
-                        />
-                        <span className="text-sm">有</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="hasSpouse"
-                          checked={!profileData.hasSpouse}
-                          onChange={(e) => {
-                            setProfileData({ 
-                              ...profileData, 
-                              hasSpouse: false,
-                              spouseName: '' // 無を選択した場合は空にする
-                            });
-                          }}
-                          className="w-4 h-4 text-[#818CF8]"
-                        />
-                        <span className="text-sm">無</span>
-                      </label>
-                    </div>
-                    {profileData.hasSpouse && (
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">配偶者氏名</label>
-                        <input
-                          type="text"
-                          value={profileData.spouseName}
-                          onChange={(e) => setProfileData({ ...profileData, spouseName: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">基礎年金番号</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">記号（4桁）</label>
-                      <input
-                        type="text"
-                        value={profileData.basicPensionSymbol}
-                        onChange={(e) => setProfileData({ ...profileData, basicPensionSymbol: e.target.value })}
-                        maxLength={4}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">番号（6桁）</label>
-                      <input
-                        type="text"
-                        value={profileData.basicPensionNumber}
-                        onChange={(e) => setProfileData({ ...profileData, basicPensionNumber: e.target.value })}
-                        maxLength={6}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-                {/* 現在の所属事業所での契約内容 */}
-                <div className="mt-6 pt-6 border-t border-gray-300">
-                  <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-[#818CF8]" />
-                    現在の所属事業所での契約内容
-                  </h3>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">雇用保険</label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="employmentInsurance"
-                          value="joined"
-                          checked={profileData.employmentInsuranceStatus === 'joined'}
-                          onChange={(e) => setProfileData({ ...profileData, employmentInsuranceStatus: e.target.value as any })}
-                          className="w-4 h-4 text-[#818CF8]"
-                        />
-                        <span className="text-sm">加入</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="employmentInsurance"
-                          value="not_joined"
-                          checked={profileData.employmentInsuranceStatus === 'not_joined'}
-                          onChange={(e) => setProfileData({ ...profileData, employmentInsuranceStatus: e.target.value as any })}
-                          className="w-4 h-4 text-[#818CF8]"
-                        />
-                        <span className="text-sm">非加入</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="employmentInsurance"
-                          value="first_time"
-                          checked={profileData.employmentInsuranceStatus === 'first_time'}
-                          onChange={(e) => setProfileData({ ...profileData, employmentInsuranceStatus: e.target.value as any })}
-                          className="w-4 h-4 text-[#818CF8]"
-                        />
-                        <span className="text-sm">初めて加入</span>
-                      </label>
-                    </div>
-                    {profileData.employmentInsuranceStatus === 'joined' && (
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">雇用保険番号（被保険者番号）</label>
-                        <input
-                          type="text"
-                          value={profileData.employmentInsuranceNumber}
-                          onChange={(e) => {
-                            // ハイフンを含む形式（4桁-6桁-1桁）を許可
-                            const value = e.target.value.replace(/[^\d-]/g, '');
-                            setProfileData({ ...profileData, employmentInsuranceNumber: value });
-                          }}
-                          placeholder="例: 1234-567890-1"
-                          maxLength={13}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">4桁-6桁-1桁の形式で入力してください</p>
-                      </div>
-                    )}
-                    {profileData.employmentInsuranceStatus === 'first_time' && (
-                      <div className="space-y-2">
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">前職の名（旧姓の場合）</label>
-                          <input
-                            type="text"
-                            value={profileData.previousName}
-                            onChange={(e) => setProfileData({ ...profileData, previousName: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">前職の退職日</label>
-                          <input
-                            type="date"
-                            value={profileData.previousRetirementDate}
-                            onChange={(e) => setProfileData({ ...profileData, previousRetirementDate: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">社会保険</label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="socialInsurance"
-                        value="joined"
-                        checked={profileData.socialInsuranceStatus === 'joined'}
-                        onChange={(e) => setProfileData({ ...profileData, socialInsuranceStatus: e.target.value as any })}
-                        className="w-4 h-4 text-[#818CF8]"
-                      />
-                      <span className="text-sm">加入</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="socialInsurance"
-                        value="not_joined"
-                        checked={profileData.socialInsuranceStatus === 'not_joined'}
-                        onChange={(e) => setProfileData({ ...profileData, socialInsuranceStatus: e.target.value as any })}
-                        className="w-4 h-4 text-[#818CF8]"
-                      />
-                      <span className="text-sm">非加入</span>
-                    </label>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">扶養家族</label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="hasDependents"
-                          checked={profileData.hasDependents}
-                          onChange={(e) => setProfileData({ ...profileData, hasDependents: true })}
-                          className="w-4 h-4 text-[#818CF8]"
-                        />
-                        <span className="text-sm">有</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="hasDependents"
-                          checked={!profileData.hasDependents}
-                          onChange={(e) => setProfileData({ ...profileData, hasDependents: false, dependents: [] })}
-                          className="w-4 h-4 text-[#818CF8]"
-                        />
-                        <span className="text-sm">無</span>
-                      </label>
-                    </div>
-                    {profileData.hasDependents && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">人数</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={profileData.dependentCount}
-                            onChange={(e) => {
-                              const count = parseInt(e.target.value) || 0;
-                              const currentDependents = profileData.dependents;
-                              const newDependents = Array.from({ length: count }, (_, i) => 
-                                currentDependents[i] || {
-                                  id: Date.now().toString() + i,
-                                  name: '',
-                                  furigana: '',
-                                  relationship: '',
-                                  birthDate: '',
-                                  gender: 'male' as const,
-                                  occupation: '',
-                                  annualIncome: '',
-                                  notWorking: false,
-                                  notWorkingReason: '',
-                                  myNumber: '',
-                                }
-                              );
-                              setProfileData({ ...profileData, dependentCount: count, dependents: newDependents });
-                            }}
-                            className="w-24 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent"
-                          />
-                          <span className="ml-2 text-sm text-gray-600">人</span>
-                        </div>
-                        {profileData.dependents.map((dependent, index) => (
-                          <div key={dependent.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
-                            <h4 className="text-sm font-bold text-gray-700">扶養家族 {index + 1}</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">続柄</label>
-                                <input
-                                  type="text"
-                                  value={dependent.relationship}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].relationship = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  placeholder="例：妻、子"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">生年月日</label>
-                                <input
-                                  type="date"
-                                  value={dependent.birthDate}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].birthDate = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">フリガナ</label>
-                                <input
-                                  type="text"
-                                  value={dependent.furigana}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].furigana = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">氏名</label>
-                                <input
-                                  type="text"
-                                  value={dependent.name}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].name = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">性別</label>
-                              <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2">
-                                  <input
-                                    type="radio"
-                                    name={`dependent-gender-${index}`}
-                                    checked={dependent.gender === 'male'}
-                                    onChange={() => {
-                                      const updated = [...profileData.dependents];
-                                      updated[index].gender = 'male';
-                                      setProfileData({ ...profileData, dependents: updated });
-                                    }}
-                                    className="w-4 h-4 text-[#818CF8]"
-                                  />
-                                  <span className="text-sm">男</span>
-                                </label>
-                                <label className="flex items-center gap-2">
-                                  <input
-                                    type="radio"
-                                    name={`dependent-gender-${index}`}
-                                    checked={dependent.gender === 'female'}
-                                    onChange={() => {
-                                      const updated = [...profileData.dependents];
-                                      updated[index].gender = 'female';
-                                      setProfileData({ ...profileData, dependents: updated });
-                                    }}
-                                    className="w-4 h-4 text-[#818CF8]"
-                                  />
-                                  <span className="text-sm">女</span>
-                                </label>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">職業</label>
-                                <input
-                                  type="text"
-                                  value={dependent.occupation}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].occupation = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">収入（年収）</label>
-                                <input
-                                  type="text"
-                                  value={dependent.annualIncome}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].annualIncome = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  placeholder="円"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="flex items-center gap-2 mb-2">
-                                <input
-                                  type="checkbox"
-                                  checked={dependent.notWorking}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].notWorking = e.target.checked;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  className="w-4 h-4 text-[#818CF8]"
-                                />
-                                <span className="text-xs text-gray-600">働いていない場合</span>
-                              </label>
-                              {dependent.notWorking && (
-                                <select
-                                  value={dependent.notWorkingReason}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].notWorkingReason = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                >
-                                  <option value="">選択してください</option>
-                                  <option value="preschooler">未就学児</option>
-                                  <option value="elementary">小学生</option>
-                                  <option value="junior_high">中学生</option>
-                                  <option value="high_school">高校生</option>
-                                  <option value="university">大学生</option>
-                                  <option value="other">その他</option>
-                                </select>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">マイナンバー</label>
-                              <input
-                                type="text"
-                                value={dependent.myNumber}
-                                onChange={(e) => {
-                                  const updated = [...profileData.dependents];
-                                  updated[index].myNumber = e.target.value.replace(/\D/g, '').slice(0, 12);
-                                  setProfileData({ ...profileData, dependents: updated });
-                                }}
-                                maxLength={12}
-                                placeholder="12桁"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                              />
-                            </div>
-                            {index > 0 && (
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">別居の場合は住所を明記</label>
-                                <input
-                                  type="text"
-                                  value={dependent.separateAddress || ''}
-                                  onChange={(e) => {
-                                    const updated = [...profileData.dependents];
-                                    updated[index].separateAddress = e.target.value;
-                                    setProfileData({ ...profileData, dependents: updated });
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={async () => {
-                      if (!user) {
-                        alert('ユーザー情報が取得できませんでした');
-                        return;
-                      }
-
-                      try {
-                        // Supabaseのusersテーブルを更新
-                        // genderが空文字の場合はnullに変換
-                        // facility_idは更新しない（既存の値を使用）
-                        const updateData: any = {
-                          name: profileData.name,
-                          last_name: profileData.lastName || null,
-                          first_name: profileData.firstName || null,
-                          name_kana: profileData.nameKana || null,
-                          last_name_kana: profileData.lastNameKana || null,
-                          first_name_kana: profileData.firstNameKana || null,
-                          email: profileData.email || null,
-                          birth_date: profileData.birthDate || null,
-                          address: profileData.address || null,
-                          phone: profileData.phone || null,
-                          gender: profileData.gender || null, // 空文字の場合はnull
-                          education: profileData.education || null,
-                          spouse_name: profileData.spouseName || null,
-                          my_number: profileData.myNumber || null,
-                          basic_pension_symbol: profileData.basicPensionSymbol || null,
-                          basic_pension_number: profileData.basicPensionNumber || null,
-                          employment_insurance_status: profileData.employmentInsuranceStatus,
-                          employment_insurance_number: profileData.employmentInsuranceNumber || null,
-                          previous_retirement_date: profileData.previousRetirementDate || null,
-                          previous_name: profileData.previousName || null,
-                          social_insurance_status: profileData.socialInsuranceStatus,
-                          has_dependents: profileData.hasDependents,
-                          dependent_count: profileData.dependentCount,
-                          dependents: profileData.dependents || [],
-                          updated_at: new Date().toISOString(),
-                        };
-
-                        // facility_idは更新しない（既存の値を使用して制約違反を回避）
-                        const { error } = await supabase
-                          .from('users')
-                          .update(updateData)
-                          .eq('id', user.id);
-
-                        if (error) {
-                          console.error('プロフィール保存エラー:', error);
-                          alert('プロフィールの保存に失敗しました: ' + error.message);
-                          return;
-                        }
-
-                        // localStorageのユーザー情報も更新
-                        const updatedUser: UserType = {
-                          ...user,
-                          name: profileData.name,
-                          email: profileData.email,
-                          birthDate: profileData.birthDate,
-                          phone: profileData.phone,
-                          gender: (profileData.gender === 'male' || profileData.gender === 'female' || profileData.gender === 'other') 
-                            ? profileData.gender 
-                            : undefined,
-                        };
-                        localStorage.setItem('user', JSON.stringify(updatedUser));
-                        setUser(updatedUser);
-
-                        setIsEditingProfile(false);
-                        alert('プロフィールを保存しました');
-                      } catch (err) {
-                        console.error('プロフィール保存エラー:', err);
-                        alert('プロフィールの保存に失敗しました');
-                      }
-                    }}
-                    className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => {
-                      // 編集をキャンセルする場合は元のデータを復元
-                      const storedUser = localStorage.getItem('user');
-                      if (storedUser) {
-                        const userData = JSON.parse(storedUser);
-                        setProfileData({
-                          name: userData.name || '',
-                          lastName: userData.lastName || userData.last_name || '',
-                          firstName: userData.firstName || userData.first_name || '',
-                          nameKana: userData.nameKana || userData.name_kana || '',
-                          lastNameKana: userData.lastNameKana || userData.last_name_kana || '',
-                          firstNameKana: userData.firstNameKana || userData.first_name_kana || '',
-                          email: userData.email || '',
-                          birthDate: userData.birth_date || '',
-                          address: userData.address || '',
-                          phone: userData.phone || '',
-                          gender: userData.gender || '',
-                          education: userData.education || '',
-                          hasSpouse: !!userData.spouse_name,
-                          spouseName: userData.spouse_name || '',
-                          myNumber: userData.my_number || '',
-                          basicPensionSymbol: userData.basic_pension_symbol || '',
-                          basicPensionNumber: userData.basic_pension_number || '',
-                          employmentInsuranceStatus: userData.employment_insurance_status || 'joined',
-                          employmentInsuranceNumber: userData.employment_insurance_number || '',
-                          previousRetirementDate: userData.previous_retirement_date || '',
-                          previousName: userData.previous_name || '',
-                          socialInsuranceStatus: userData.social_insurance_status || 'joined',
-                          hasDependents: userData.has_dependents || false,
-                          dependentCount: userData.dependent_count || 0,
-                          dependents: userData.dependents || [],
-                        });
-                      }
-                      setIsEditingProfile(false);
-                    }}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors font-bold"
-                  >
-                    キャンセル
-                  </button>
-                </div>
-              </div>
+              <ProfileEditSection
+                profileData={profileData as ProfileData}
+                onProfileDataChange={setProfileData as (data: ProfileData) => void}
+                onSave={async () => {
+                  if (!user) {
+                    toast.error('ユーザー情報が取得できませんでした');
+                    return;
+                  }
+                  try {
+                    const updateData: any = {
+                      name: profileData.name,
+                      last_name: profileData.lastName || null,
+                      first_name: profileData.firstName || null,
+                      name_kana: profileData.nameKana || null,
+                      last_name_kana: profileData.lastNameKana || null,
+                      first_name_kana: profileData.firstNameKana || null,
+                      email: profileData.email || null,
+                      birth_date: profileData.birthDate || null,
+                      address: profileData.address || null,
+                      phone: profileData.phone || null,
+                      gender: profileData.gender || null,
+                      education: profileData.education || null,
+                      spouse_name: profileData.spouseName || null,
+                      my_number: profileData.myNumber || null,
+                      basic_pension_symbol: profileData.basicPensionSymbol || null,
+                      basic_pension_number: profileData.basicPensionNumber || null,
+                      employment_insurance_status: profileData.employmentInsuranceStatus,
+                      employment_insurance_number: profileData.employmentInsuranceNumber || null,
+                      previous_retirement_date: profileData.previousRetirementDate || null,
+                      previous_name: profileData.previousName || null,
+                      social_insurance_status: profileData.socialInsuranceStatus,
+                      has_dependents: profileData.hasDependents,
+                      dependent_count: profileData.dependentCount,
+                      dependents: profileData.dependents || [],
+                      updated_at: new Date().toISOString(),
+                    };
+                    const { error } = await supabase
+                      .from('users')
+                      .update(updateData)
+                      .eq('id', user.id);
+                    if (error) {
+                      console.error('プロフィール保存エラー:', error);
+                      toast.error('プロフィールの保存に失敗しました: ' + error.message);
+                      return;
+                    }
+                    const updatedUser: UserType = {
+                      ...user,
+                      name: profileData.name,
+                      email: profileData.email,
+                      birthDate: profileData.birthDate,
+                      phone: profileData.phone,
+                      gender: (profileData.gender === 'male' || profileData.gender === 'female' || profileData.gender === 'other')
+                        ? profileData.gender
+                        : undefined,
+                    };
+                    localStorage.setItem('user', JSON.stringify(updatedUser));
+                    setUser(updatedUser);
+                    setIsEditingProfile(false);
+                    toast.success('プロフィールを保存しました');
+                  } catch (err) {
+                    console.error('プロフィール保存エラー:', err);
+                    toast.error('プロフィールの保存に失敗しました');
+                  }
+                }}
+                onCancel={() => {
+                  const storedUser = localStorage.getItem('user');
+                  if (storedUser) {
+                    const userData = JSON.parse(storedUser);
+                    setProfileData({
+                      name: userData.name || '',
+                      lastName: userData.lastName || userData.last_name || '',
+                      firstName: userData.firstName || userData.first_name || '',
+                      nameKana: userData.nameKana || userData.name_kana || '',
+                      lastNameKana: userData.lastNameKana || userData.last_name_kana || '',
+                      firstNameKana: userData.firstNameKana || userData.first_name_kana || '',
+                      email: userData.email || '',
+                      birthDate: userData.birth_date || '',
+                      address: userData.address || '',
+                      phone: userData.phone || '',
+                      gender: userData.gender || '',
+                      education: userData.education || '',
+                      hasSpouse: !!userData.spouse_name,
+                      spouseName: userData.spouse_name || '',
+                      myNumber: userData.my_number || '',
+                      basicPensionSymbol: userData.basic_pension_symbol || '',
+                      basicPensionNumber: userData.basic_pension_number || '',
+                      employmentInsuranceStatus: userData.employment_insurance_status || 'joined',
+                      employmentInsuranceNumber: userData.employment_insurance_number || '',
+                      previousRetirementDate: userData.previous_retirement_date || '',
+                      previousName: userData.previous_name || '',
+                      socialInsuranceStatus: userData.social_insurance_status || 'joined',
+                      hasDependents: userData.has_dependents || false,
+                      dependentCount: userData.dependent_count || 0,
+                      dependents: userData.dependents || [],
+                    });
+                  }
+                  setIsEditingProfile(false);
+                }}
+              />
             ) : (
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
@@ -2933,7 +2961,7 @@ export default function PersonalDashboardPage() {
                   <>
                     <div className="mt-6 pt-6 border-t border-gray-300">
                       <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <Building2 className="w-5 h-5 text-[#818CF8]" />
+                        <Building2 className="w-5 h-5 text-personal" />
                         現在の所属事業所での契約内容
                       </h3>
                     </div>
@@ -2982,7 +3010,7 @@ export default function PersonalDashboardPage() {
             {/* 実務経験のサマリー */}
             <div className="mt-6 pt-6 border-t border-gray-200">
               <h3 className="text-sm font-bold text-gray-700 mb-3">実務経験のサマリー</h3>
-              <div className="bg-[#818CF8]/5 rounded-lg p-4 border border-[#818CF8]/20">
+              <div className="bg-personal/5 rounded-lg p-4 border border-personal/20">
                 <div className="text-sm text-gray-600">
                   <div className="flex items-center justify-between mb-2">
                     <span>所属企業別</span>
@@ -2990,7 +3018,7 @@ export default function PersonalDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span>累計経験</span>
-                    <span className="font-bold text-[#818CF8]">計算中...</span>
+                    <span className="font-bold text-personal">計算中...</span>
                   </div>
                 </div>
               </div>
@@ -3005,7 +3033,7 @@ export default function PersonalDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Award className="w-5 h-5 text-[#818CF8]" />
+              <Award className="w-5 h-5 text-personal" />
               保有資格
             </h2>
 
@@ -3022,7 +3050,7 @@ export default function PersonalDashboardPage() {
                         status: 'not_registered',
                       }]);
                     }}
-                    className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
+                    className="px-4 py-2 bg-personal text-white rounded-md hover:bg-personal-dark transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
                   >
                     <Plus className="w-4 h-4" />
                     資格を追加
@@ -3042,7 +3070,7 @@ export default function PersonalDashboardPage() {
                             ));
                           }}
                           placeholder="資格名を入力（例：保育士、社会福祉士）"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal focus:border-transparent text-sm"
                         />
                       </div>
                       <button
@@ -3105,7 +3133,7 @@ export default function PersonalDashboardPage() {
                       status: 'not_registered',
                     }]);
                   }}
-                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#818CF8] hover:bg-[#818CF8]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-personal hover:bg-personal/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   資格を追加
@@ -3123,7 +3151,7 @@ export default function PersonalDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-[#818CF8]" />
+              <Briefcase className="w-5 h-5 text-personal" />
               職歴（実務経験証明書）
             </h2>
             <p className="text-xs text-gray-500 mb-4">
@@ -3143,7 +3171,7 @@ export default function PersonalDashboardPage() {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#818CF8]" />
+              <FileText className="w-5 h-5 text-personal" />
               学歴
             </h2>
 
@@ -3161,7 +3189,7 @@ export default function PersonalDashboardPage() {
                         degree: '',
                       }]);
                     }}
-                    className="px-4 py-2 bg-[#818CF8] text-white rounded-md hover:bg-[#6366F1] transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
+                    className="px-4 py-2 bg-personal text-white rounded-md hover:bg-personal-dark transition-colors font-bold text-sm flex items-center gap-2 mx-auto"
                   >
                     <Plus className="w-4 h-4" />
                     学歴を追加
@@ -3181,7 +3209,7 @@ export default function PersonalDashboardPage() {
                               item.id === edu.id ? { ...item, schoolName: e.target.value } : item
                             ));
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal focus:border-transparent text-sm"
                         />
                       </div>
                       <div>
@@ -3194,7 +3222,7 @@ export default function PersonalDashboardPage() {
                               item.id === edu.id ? { ...item, graduationDate: e.target.value } : item
                             ));
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal focus:border-transparent text-sm"
                         />
                       </div>
                       <div>
@@ -3208,7 +3236,7 @@ export default function PersonalDashboardPage() {
                             ));
                           }}
                           placeholder="例：高等学校卒業"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8] focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal focus:border-transparent text-sm"
                         />
                       </div>
                     </div>
@@ -3233,7 +3261,7 @@ export default function PersonalDashboardPage() {
                       degree: '',
                     }]);
                   }}
-                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-[#818CF8] hover:bg-[#818CF8]/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-personal hover:bg-personal/5 transition-colors text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   学歴を追加
@@ -3241,352 +3269,45 @@ export default function PersonalDashboardPage() {
               )}
             </div>
           </motion.div>
+
+          {/* ========== スカウト ========== */}
+          <ScoutInboxSection userId={user?.id} />
+
+          {/* ========== 規定確認セクション ========== */}
+          <CareerRegulationSection userId={user?.id} activeEmployments={activeEmployments} />
+
+          {/* ========== 資格期限通知セクション ========== */}
+          <CareerQualificationAlerts userId={user?.id} activeEmployments={activeEmployments} />
+
+          {/* ========== 有給残日数表示セクション ========== */}
+          <CareerPaidLeaveBalance userId={user?.id} activeEmployments={activeEmployments} />
+
+          {/* ========== 求人への誘導 ========== */}
+          <div className="mt-6">
+            <button
+              onClick={() => setActiveTab('work')}
+              className="w-full bg-gradient-to-r from-personal/10 to-personal-dark/10 border border-personal/20 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow"
+            >
+              <div className="w-10 h-10 bg-personal rounded-lg flex items-center justify-center shrink-0">
+                <Search className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-bold text-gray-800">求人を探す</p>
+                <p className="text-xs text-gray-500">あなたにぴったりの求人をチェック</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
         </div>
       )}
 
-      {activeTab === 'work' && (
-        <div className="max-w-lg mx-auto px-4 py-6 pb-24">
-          {personalFacilities.length > 0 ? (
-            <div className="space-y-8">
-              {/* 勤怠打刻エリア */}
-              {personalFacilities.map((facility) => {
-                const attendance = facility.todayAttendance;
-                const status = attendance?.status || 'not_started';
-
-                return (
-                  <div key={facility.facilityId}>
-                    {/* 施設名とステータス */}
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-900">{facility.facilityName}</h2>
-                        <p className="text-sm text-gray-500">{facility.employmentRecord.role}</p>
-                      </div>
-                      <span className={`text-sm font-medium ${
-                        status === 'completed' ? 'text-gray-500' :
-                        status === 'working' ? 'text-[#818CF8]' :
-                        status === 'on_break' ? 'text-amber-600' :
-                        'text-gray-400'
-                      }`}>
-                        {status === 'completed' ? '退勤済' :
-                         status === 'working' ? '勤務中' :
-                         status === 'on_break' ? '休憩中' :
-                         '未出勤'}
-                      </span>
-                    </div>
-
-                    {/* 打刻時間表示 */}
-                    {attendance?.startTime && (
-                      <div className="flex items-center gap-6 mb-6 text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#818CF8]"></div>
-                          <span className="text-gray-600">出勤</span>
-                          <span className="font-mono font-medium text-gray-900">{attendance.startTime}</span>
-                        </div>
-                        {attendance.breakStartTime && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                            <span className="text-gray-600">休憩</span>
-                            <span className="font-mono font-medium text-gray-900">
-                              {attendance.breakStartTime}{attendance.breakEndTime && `〜${attendance.breakEndTime}`}
-                            </span>
-                          </div>
-                        )}
-                        {attendance.endTime && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                            <span className="text-gray-600">退勤</span>
-                            <span className="font-mono font-medium text-gray-900">{attendance.endTime}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 勤怠ボタン */}
-                    <div className="grid grid-cols-4 gap-3">
-                      {/* 出勤 */}
-                      <button
-                        type="button"
-                        onClick={() => clockIn(facility.facilityId)}
-                        disabled={status !== 'not_started'}
-                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
-                          status !== 'not_started'
-                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
-                            : 'bg-white border-[#818CF8] text-[#818CF8] hover:bg-[#818CF8] hover:text-white active:scale-95'
-                        } ${status === 'working' || status === 'on_break' || status === 'completed' ? 'bg-[#818CF8]/10 border-[#818CF8] text-[#818CF8]' : ''}`}
-                      >
-                        <PlayCircle className="w-8 h-8" strokeWidth={1.5} />
-                        <span className="text-xs font-bold">出勤</span>
-                      </button>
-
-                      {/* 休憩開始 */}
-                      <button
-                        type="button"
-                        onClick={() => startBreak(facility.facilityId)}
-                        disabled={status !== 'working'}
-                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
-                          status !== 'working'
-                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
-                            : 'bg-white border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white active:scale-95'
-                        } ${status === 'on_break' ? 'bg-amber-500/10 border-amber-500 text-amber-500' : ''}`}
-                      >
-                        <Coffee className="w-8 h-8" strokeWidth={1.5} />
-                        <span className="text-xs font-bold">休憩</span>
-                      </button>
-
-                      {/* 休憩終了 */}
-                      <button
-                        type="button"
-                        onClick={() => endBreak(facility.facilityId)}
-                        disabled={status !== 'on_break'}
-                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
-                          status !== 'on_break'
-                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
-                            : 'bg-white border-green-500 text-green-500 hover:bg-green-500 hover:text-white active:scale-95'
-                        }`}
-                      >
-                        <PlayCircle className="w-8 h-8" strokeWidth={1.5} />
-                        <span className="text-xs font-bold">再開</span>
-                      </button>
-
-                      {/* 退勤 */}
-                      <button
-                        type="button"
-                        onClick={() => clockOut(facility.facilityId)}
-                        disabled={status !== 'working' && status !== 'on_break'}
-                        className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition-all shadow-sm ${
-                          status !== 'working' && status !== 'on_break'
-                            ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
-                            : 'bg-white border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white active:scale-95'
-                        } ${status === 'completed' ? 'bg-gray-100 border-gray-400 text-gray-400' : ''}`}
-                      >
-                        <PauseCircle className="w-8 h-8" strokeWidth={1.5} />
-                        <span className="text-xs font-bold">退勤</span>
-                      </button>
-                    </div>
-
-                    {/* 区切り線 */}
-                    <div className="border-t border-gray-100 my-8"></div>
-
-                    {/* クイックアクセス */}
-                    <div className="grid grid-cols-3 gap-3">
-                      {/* シフト */}
-                      <button
-                        onClick={() => {
-                          setShiftConfirmationFacilityId(facility.facilityId);
-                          setShowShiftConfirmation(true);
-                        }}
-                        className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
-                      >
-                        <Calendar className="w-6 h-6" strokeWidth={1.5} />
-                        <span className="text-xs font-medium">シフト</span>
-                      </button>
-
-                      {/* 勤怠カレンダー */}
-                      <button
-                        onClick={async () => {
-                          const employmentWithFacility = {
-                            ...facility.employmentRecord,
-                            facilityName: facility.facilityName,
-                            facilityCode: facility.facilityCode,
-                          };
-                          setCurrentFacility(employmentWithFacility);
-                          const { data: settings } = await supabase
-                            .from('facilities')
-                            .select('*')
-                            .eq('id', facility.facilityId)
-                            .single();
-                          if (settings) {
-                            setFacilitySettings({
-                              regularHolidays: settings.regular_holidays || [0],
-                              customHolidays: settings.custom_holidays || [],
-                              includeHolidays: settings.include_holidays || false,
-                              holidayPeriods: settings.holiday_periods || [],
-                            });
-                          }
-                          setShowAttendanceCalendar(true);
-                        }}
-                        className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
-                      >
-                        <Calendar className="w-6 h-6" strokeWidth={1.5} />
-                        <span className="text-xs font-medium">勤怠カレンダー</span>
-                      </button>
-
-                      {/* 施設管理（権限を持つスタッフのみ） */}
-                      {(facility.employmentRecord.role === '管理者' ||
-                        facility.employmentRecord.permissions?.facilityManagement === true
-                      ) && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              const { data: facilityData, error } = await supabase
-                                .from('facilities')
-                                .select('*')
-                                .eq('id', facility.facilityId)
-                                .single();
-                              if (!error && facilityData) {
-                                localStorage.setItem('selectedFacility', JSON.stringify({
-                                  id: facility.facilityId,
-                                  name: facility.facilityName,
-                                  code: facility.facilityCode,
-                                  role: facility.employmentRecord.role,
-                                  facilityId: facility.facilityId,
-                                  facilityName: facility.facilityName,
-                                  facilityCode: facility.facilityCode,
-                                  permissions: facility.employmentRecord.permissions || {},
-                                }));
-                                localStorage.setItem('facility', JSON.stringify({
-                                  id: facilityData.id,
-                                  name: facilityData.name,
-                                  code: facilityData.code || '',
-                                  createdAt: facilityData.created_at || new Date().toISOString(),
-                                  updatedAt: facilityData.updated_at || new Date().toISOString(),
-                                }));
-                                window.location.href = '/business';
-                              }
-                            } catch (err) {
-                              console.error('施設情報の取得エラー:', err);
-                            }
-                          }}
-                          className="flex flex-col items-center gap-2 py-3 px-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#818CF8] hover:text-[#818CF8] hover:bg-[#818CF8]/5 transition-all shadow-sm active:scale-95"
-                        >
-                          <Building2 className="w-6 h-6" strokeWidth={1.5} />
-                          <span className="text-xs font-medium">管理</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 区切り線 */}
-                    <div className="border-t border-gray-100 my-8"></div>
-
-                    {/* 本日の利用予定児童一覧 */}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-5 h-5 text-gray-700" strokeWidth={1.5} />
-                          <h3 className="font-bold text-gray-900 text-sm">本日の利用予定児童</h3>
-                        </div>
-                        <span className="text-xs text-gray-500">
-                          {new Date().toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}
-                        </span>
-                      </div>
-                      <div className="px-4 py-3">
-                        {loadingSchedules ? (
-                          <div className="flex items-center justify-center py-4">
-                            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-                          </div>
-                        ) : (todaySchedules[facility.facilityId] || []).length > 0 ? (
-                          <>
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-2xl font-bold text-gray-900">
-                                {todaySchedules[facility.facilityId].length}
-                              </span>
-                              <span className="text-sm text-gray-500">名</span>
-                              <div className="flex items-center gap-2 ml-auto text-xs text-gray-500">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100">
-                                  AM {todaySchedules[facility.facilityId].filter(s => s.slot === 'AM').length}名
-                                </span>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100">
-                                  PM {todaySchedules[facility.facilityId].filter(s => s.slot === 'PM').length}名
-                                </span>
-                              </div>
-                            </div>
-                            <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                              {todaySchedules[facility.facilityId].map((child, idx) => (
-                                <div key={`${child.childId}-${child.slot}-${idx}`} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50">
-                                  <span className="text-sm text-gray-800">{child.childName}</span>
-                                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                    child.slot === 'AM' ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-600'
-                                  }`}>
-                                    {child.slot}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center py-4">
-                            <p className="text-sm text-gray-400">本日の利用予定はありません</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 連絡帳ショートカット */}
-                    <button
-                      onClick={async () => {
-                        try {
-                          const { data: facilityData, error } = await supabase
-                            .from('facilities')
-                            .select('*')
-                            .eq('id', facility.facilityId)
-                            .single();
-                          if (!error && facilityData) {
-                            localStorage.setItem('selectedFacility', JSON.stringify({
-                              id: facility.facilityId,
-                              name: facility.facilityName,
-                              code: facility.facilityCode,
-                              role: facility.employmentRecord.role,
-                              facilityId: facility.facilityId,
-                              facilityName: facility.facilityName,
-                              facilityCode: facility.facilityCode,
-                              permissions: facility.employmentRecord.permissions || {},
-                            }));
-                            localStorage.setItem('facility', JSON.stringify({
-                              id: facilityData.id,
-                              name: facilityData.name,
-                              code: facilityData.code || '',
-                              createdAt: facilityData.created_at || new Date().toISOString(),
-                              updatedAt: facilityData.updated_at || new Date().toISOString(),
-                            }));
-                            window.location.href = '/business?tab=daily-log';
-                          }
-                        } catch (err) {
-                          console.error('施設情報の取得エラー:', err);
-                        }
-                      }}
-                      className="w-full mt-3 flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:border-gray-300 hover:bg-gray-50 transition-all active:scale-[0.98]"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <ClipboardList className="w-5 h-5 text-gray-700" strokeWidth={1.5} />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className="text-sm font-bold text-gray-900">連絡帳</p>
-                        <p className="text-xs text-gray-500">本日の連絡帳を記入・確認する</p>
-                      </div>
-                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    </button>
-
-                    {/* 施設お知らせ */}
-                    {(facilityAnnouncements[facility.facilityId] || []).length > 0 && (
-                      <div className="mt-3 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-                          <Megaphone className="w-5 h-5 text-gray-700" strokeWidth={1.5} />
-                          <h3 className="font-bold text-gray-900 text-sm">お知らせ</h3>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {facilityAnnouncements[facility.facilityId].map((announcement) => (
-                            <div key={announcement.id} className="px-4 py-3">
-                              <p className="text-sm font-medium text-gray-900">{announcement.title}</p>
-                              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{announcement.message}</p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {new Date(announcement.createdAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" strokeWidth={1.5} />
-              <h3 className="text-base font-medium text-gray-800 mb-2">所属施設がありません</h3>
-              <p className="text-gray-400 text-sm">施設から招待を受けると表示されます</p>
-            </div>
-          )}
+      {activeTab === 'docs' && (
+        <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
+          <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-personal" />
+            書類
+          </h2>
+          <StaffDocumentsSection userId={user?.id || ''} facilities={personalFacilities} />
         </div>
       )}
 
@@ -3597,7 +3318,7 @@ export default function PersonalDashboardPage() {
           {/* アカウント設定 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
             <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <User className="w-5 h-5 text-[#818CF8]" />
+              <User className="w-5 h-5 text-personal" />
               アカウント
             </h3>
             <div className="space-y-2 text-sm">
@@ -3615,6 +3336,9 @@ export default function PersonalDashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* パスキー管理 */}
+          <PasskeySection userId={user?.id} userEmail={user?.email} />
 
           {/* 運営管理画面へのアクセス（施設発行権限がある場合のみ） */}
           <AdminAccessLink userId={user?.id} />
@@ -3643,7 +3367,7 @@ export default function PersonalDashboardPage() {
               aria-selected={activeTab === 'home'}
               onClick={() => setActiveTab('home')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'home' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
+                activeTab === 'home' ? 'text-personal' : 'text-gray-600 hover:text-personal'
               }`}
             >
               <Briefcase className="w-6 h-6" />
@@ -3651,21 +3375,21 @@ export default function PersonalDashboardPage() {
             </button>
             <button
               role="tab"
-              aria-selected={activeTab === 'jobs'}
-              onClick={() => setActiveTab('jobs')}
+              aria-selected={activeTab === 'work'}
+              onClick={() => setActiveTab('work')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'jobs' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
+                activeTab === 'work' ? 'text-personal' : 'text-gray-600 hover:text-personal'
               }`}
             >
-              <Search className="w-6 h-6" />
-              <span className="text-xs font-bold">求人</span>
+              <ClipboardList className="w-6 h-6" />
+              <span className="text-xs font-bold">業務</span>
             </button>
             <button
               role="tab"
               aria-selected={activeTab === 'career'}
               onClick={() => setActiveTab('career')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'career' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
+                activeTab === 'career' ? 'text-personal' : 'text-gray-600 hover:text-personal'
               }`}
             >
               <Award className="w-6 h-6" />
@@ -3673,21 +3397,21 @@ export default function PersonalDashboardPage() {
             </button>
             <button
               role="tab"
-              aria-selected={activeTab === 'work'}
-              onClick={() => setActiveTab('work')}
-              className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'work' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
+              aria-selected={activeTab === 'docs'}
+              onClick={() => setActiveTab('docs')}
+              className={`flex flex-col items-center gap-1 p-2 transition-colors relative ${
+                activeTab === 'docs' ? 'text-personal' : 'text-gray-600 hover:text-personal'
               }`}
             >
-              <FileText className="w-6 h-6" />
-              <span className="text-xs font-bold">業務</span>
+              <FolderOpen className="w-6 h-6" />
+              <span className="text-xs font-bold">書類</span>
             </button>
             <button
               role="tab"
               aria-selected={activeTab === 'settings'}
               onClick={() => setActiveTab('settings')}
               className={`flex flex-col items-center gap-1 p-2 transition-colors ${
-                activeTab === 'settings' ? 'text-[#818CF8]' : 'text-gray-600 hover:text-[#818CF8]'
+                activeTab === 'settings' ? 'text-personal' : 'text-gray-600 hover:text-personal'
               }`}
             >
               <Settings className="w-6 h-6" />
@@ -3706,7 +3430,7 @@ export default function PersonalDashboardPage() {
             className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
           >
             {/* ヘッダー */}
-            <div className="bg-gradient-to-r from-[#818CF8] to-[#6366F1] text-white px-6 py-4 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-personal to-personal-dark text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6" />
                 <h2 className="text-xl font-bold">履歴書プレビュー</h2>
@@ -3715,7 +3439,7 @@ export default function PersonalDashboardPage() {
                 <button
                   onClick={generateFromPreview}
                   disabled={generatingPDF === 'resume'}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#818CF8] font-bold rounded-md hover:bg-white/90 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-personal font-bold rounded-md hover:bg-white/90 transition-colors disabled:opacity-50"
                 >
                   {generatingPDF === 'resume' ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -3754,7 +3478,7 @@ export default function PersonalDashboardPage() {
                     type="checkbox"
                     checked={usePhotoInResume}
                     onChange={(e) => setUsePhotoInResume(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#818CF8] focus:ring-[#818CF8]"
+                    className="w-4 h-4 rounded text-personal focus:ring-personal"
                   />
                   <span className="text-sm text-gray-700">履歴書に掲載する</span>
                 </label>
@@ -3810,7 +3534,7 @@ export default function PersonalDashboardPage() {
                             onBlur={() => setEditingField(null)}
                             onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                             autoFocus
-                            className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none"
+                            className="w-full px-2 py-1 border border-personal rounded focus:outline-none"
                             placeholder="例: 渋谷駅"
                           />
                         ) : (
@@ -3832,7 +3556,7 @@ export default function PersonalDashboardPage() {
                             onBlur={() => setEditingField(null)}
                             onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                             autoFocus
-                            className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none"
+                            className="w-full px-2 py-1 border border-personal rounded focus:outline-none"
                             placeholder="例: 約30分"
                           />
                         ) : (
@@ -3900,7 +3624,7 @@ export default function PersonalDashboardPage() {
                         onBlur={() => setEditingField(null)}
                         autoFocus
                         rows={3}
-                        className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none resize-none"
+                        className="w-full px-2 py-1 border border-personal rounded focus:outline-none resize-none"
                         placeholder="志望動機を入力してください"
                       />
                     ) : (
@@ -3925,7 +3649,7 @@ export default function PersonalDashboardPage() {
                         onBlur={() => setEditingField(null)}
                         autoFocus
                         rows={2}
-                        className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none resize-none"
+                        className="w-full px-2 py-1 border border-personal rounded focus:outline-none resize-none"
                       />
                     ) : (
                       <span className="whitespace-pre-wrap">{resumeEditData.personalRequests}</span>
@@ -3948,7 +3672,7 @@ export default function PersonalDashboardPage() {
                         onBlur={() => setEditingField(null)}
                         onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                         autoFocus
-                        className="w-full px-2 py-1 border border-[#818CF8] rounded focus:outline-none"
+                        className="w-full px-2 py-1 border border-personal rounded focus:outline-none"
                       />
                     ) : (
                       <span>{resumeEditData.healthStatus}</span>

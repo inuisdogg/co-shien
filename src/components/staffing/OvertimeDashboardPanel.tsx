@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   AlertTriangle,
   Clock,
@@ -296,7 +297,7 @@ export default function OvertimeDashboardPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -306,7 +307,7 @@ export default function OvertimeDashboardPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Clock className="w-6 h-6 text-[#00c4cc]" />
+          <Clock className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">残業・36協定管理</h1>
         </div>
         <button
@@ -600,7 +601,7 @@ export default function OvertimeDashboardPanel() {
               <button
                 onClick={saveAgreement}
                 disabled={saving}
-                className="flex-1 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {saving ? '保存中...' : '保存'}

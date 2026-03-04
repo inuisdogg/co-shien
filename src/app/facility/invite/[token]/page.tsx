@@ -175,7 +175,7 @@ export default function FacilityInvitePage() {
       if (!email.trim()) {
         throw new Error('メールアドレスを入力してください');
       }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/;
       if (!emailRegex.test(email.trim())) {
         throw new Error('正しいメールアドレスを入力してください');
       }
@@ -249,9 +249,9 @@ export default function FacilityInvitePage() {
   // ローディング
   if (step === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8] to-[#6366F1] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-personal to-personal-dark p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#818CF8] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-personal mx-auto mb-4"></div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">招待を確認中...</h2>
           <p className="text-gray-600">しばらくお待ちください</p>
         </div>
@@ -262,7 +262,7 @@ export default function FacilityInvitePage() {
   // 無効なトークン
   if (step === 'invalid') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8] to-[#6366F1] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-personal to-personal-dark p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-red-600" />
@@ -285,7 +285,7 @@ export default function FacilityInvitePage() {
   // 登録完了
   if (step === 'complete') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8] to-[#6366F1] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-personal to-personal-dark p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
@@ -300,7 +300,7 @@ export default function FacilityInvitePage() {
           </div>
           <button
             onClick={() => router.push(`/business?facilityId=${facility?.id}`)}
-            className="w-full bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-personal hover:bg-personal-dark text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
           >
             施設管理画面へ
             <ArrowRight className="w-5 h-5" />
@@ -312,7 +312,7 @@ export default function FacilityInvitePage() {
 
   // アカウント作成フォーム
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8] to-[#6366F1] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-personal to-personal-dark p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-6">
           <Image
@@ -322,13 +322,13 @@ export default function FacilityInvitePage() {
             height={50}
             className="h-12 w-auto mx-auto mb-4"
           />
-          <div className="w-14 h-14 bg-[#818CF8]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Building2 className="w-7 h-7 text-[#818CF8]" />
+          <div className="w-14 h-14 bg-personal/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building2 className="w-7 h-7 text-personal" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">施設管理者として登録</h1>
           {facility && (
-            <div className="mt-3 bg-[#818CF8]/10 rounded-lg px-4 py-2 inline-block">
-              <p className="text-[#818CF8] font-bold">{facility.name}</p>
+            <div className="mt-3 bg-personal/10 rounded-lg px-4 py-2 inline-block">
+              <p className="text-personal font-bold">{facility.name}</p>
             </div>
           )}
         </div>
@@ -351,7 +351,7 @@ export default function FacilityInvitePage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal"
               placeholder="山田 太郎"
               disabled={loading}
             />
@@ -367,7 +367,7 @@ export default function FacilityInvitePage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal"
               placeholder="yamada@example.com"
               disabled={loading}
             />
@@ -383,7 +383,7 @@ export default function FacilityInvitePage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal"
               placeholder="8文字以上"
               disabled={loading}
             />
@@ -399,7 +399,7 @@ export default function FacilityInvitePage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#818CF8]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-personal"
               placeholder="パスワードを再入力"
               disabled={loading}
             />
@@ -408,7 +408,7 @@ export default function FacilityInvitePage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-personal hover:bg-personal-dark text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? '登録中...' : 'アカウントを作成して施設を管理'}
           </button>
@@ -419,7 +419,7 @@ export default function FacilityInvitePage() {
             既にアカウントをお持ちの方は{' '}
             <button
               onClick={() => router.push(`/login?redirect=/facility/invite/${token}`)}
-              className="text-[#818CF8] hover:underline font-bold"
+              className="text-personal hover:underline font-bold"
             >
               ログイン
             </button>

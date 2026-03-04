@@ -70,7 +70,7 @@ type JobPosting = {
 /* ------------------------------------------------------------------ */
 
 const JOB_TYPE_CONFIG = {
-  full_time: { label: '正社員', color: 'bg-indigo-100 text-indigo-700' },
+  full_time: { label: '正社員', color: 'bg-indigo-100 text-personal-dark' },
   part_time: { label: 'パート・アルバイト', color: 'bg-emerald-100 text-emerald-700' },
   spot: { label: 'スポット', color: 'bg-amber-100 text-amber-700' },
 } as const;
@@ -269,7 +269,7 @@ export default function JobsPageClient() {
                 type="checkbox"
                 checked={selectedTypes.has(key)}
                 onChange={() => toggleType(key)}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 rounded border-gray-300 text-personal focus:ring-personal"
               />
               <span className="text-sm text-gray-700">{label}</span>
             </label>
@@ -287,7 +287,7 @@ export default function JobsPageClient() {
                 type="checkbox"
                 checked={selectedQualifications.has(code)}
                 onChange={() => toggleQual(code)}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 rounded border-gray-300 text-personal focus:ring-personal"
               />
               <span className="text-sm text-gray-700">{name}</span>
             </label>
@@ -335,7 +335,7 @@ export default function JobsPageClient() {
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-lg transition-transform group-hover:scale-105">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-personal text-white font-bold text-lg transition-transform group-hover:scale-105">
               R
             </div>
             <span className="text-xl font-bold text-gray-900">Roots</span>
@@ -350,13 +350,13 @@ export default function JobsPageClient() {
             </Link>
             <Link
               href="/tools"
-              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-personal transition-colors"
             >
               ツール
             </Link>
             <Link
               href="/career"
-              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-personal px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-personal-dark hover:shadow-md active:scale-[0.98]"
             >
               Rootsに登録
               <ArrowRight className="h-4 w-4" />
@@ -368,7 +368,7 @@ export default function JobsPageClient() {
       {/* ============================================================ */}
       {/*  Hero                                                        */}
       {/* ============================================================ */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#818CF8] to-[#6366F1]">
+      <section className="relative overflow-hidden bg-gradient-to-br from-personal to-personal-dark">
         <div className="absolute inset-0 -z-0">
           <div className="absolute -top-32 right-0 h-[500px] w-[500px] rounded-full bg-white/5 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-[400px] w-[400px] rounded-full bg-white/5 blur-3xl" />
@@ -412,7 +412,7 @@ export default function JobsPageClient() {
               </div>
               <button
                 onClick={() => {/* filters are reactive */}}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-indigo-700 active:scale-[0.98]"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-personal px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-personal-dark active:scale-[0.98]"
               >
                 <Search className="h-4 w-4" />
                 検索
@@ -429,7 +429,7 @@ export default function JobsPageClient() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <p className="text-sm font-medium text-gray-600">
             現在{' '}
-            <span className="font-bold text-indigo-600">{totalPublished}</span>{' '}
+            <span className="font-bold text-personal">{totalPublished}</span>{' '}
             件の求人掲載中
             {hasActiveFilters && (
               <span className="ml-2 text-gray-400">
@@ -483,7 +483,7 @@ export default function JobsPageClient() {
                 <FilterContent />
                 <button
                   onClick={() => setMobileFilterOpen(false)}
-                  className="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                  className="mt-6 w-full rounded-xl bg-personal px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-personal-dark"
                 >
                   結果を表示（{filteredJobs.length}件）
                 </button>
@@ -559,13 +559,13 @@ export default function JobsPageClient() {
                       </div>
 
                       {/* Title */}
-                      <h3 className="mt-2 text-base font-bold text-gray-900 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                      <h3 className="mt-2 text-base font-bold text-gray-900 line-clamp-2 group-hover:text-personal transition-colors">
                         {job.title}
                       </h3>
 
                       {/* Salary */}
                       {salary && (
-                        <div className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-indigo-600">
+                        <div className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-personal">
                           <Banknote className="h-4 w-4" />
                           {salary}
                         </div>
@@ -630,7 +630,7 @@ export default function JobsPageClient() {
       {/* ============================================================ */}
       {/*  CTA Banner                                                  */}
       {/* ============================================================ */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-16 sm:py-20">
+      <section className="relative overflow-hidden bg-gradient-to-br from-personal via-personal-dark to-personal-dark py-16 sm:py-20">
         <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full bg-white/5" />
         <div className="absolute -bottom-16 -right-16 h-56 w-56 rounded-full bg-white/5" />
 
@@ -647,7 +647,7 @@ export default function JobsPageClient() {
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
               href="/career"
-              className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-indigo-700 shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-personal-dark shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
             >
               無料で登録する
               <ArrowRight className="h-5 w-5" />
@@ -670,31 +670,31 @@ export default function JobsPageClient() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-personal text-white font-bold text-sm">
                 R
               </div>
               <span className="text-lg font-bold text-gray-900">Roots</span>
             </Link>
             <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-              <Link href="/jobs" className="hover:text-indigo-600 transition-colors">
+              <Link href="/jobs" className="hover:text-personal transition-colors">
                 求人一覧
               </Link>
-              <Link href="/jobs/spot" className="hover:text-indigo-600 transition-colors">
+              <Link href="/jobs/spot" className="hover:text-personal transition-colors">
                 スポットワーク
               </Link>
-              <Link href="/career" className="hover:text-indigo-600 transition-colors">
+              <Link href="/career" className="hover:text-personal transition-colors">
                 キャリアプラットフォーム
               </Link>
-              <Link href="/tools" className="hover:text-indigo-600 transition-colors">
+              <Link href="/tools" className="hover:text-personal transition-colors">
                 無料ツール
               </Link>
-              <Link href="/terms" className="hover:text-indigo-600 transition-colors">
+              <Link href="/terms" className="hover:text-personal transition-colors">
                 利用規約
               </Link>
-              <Link href="/privacy" className="hover:text-indigo-600 transition-colors">
+              <Link href="/privacy" className="hover:text-personal transition-colors">
                 プライバシーポリシー
               </Link>
-              <Link href="/recruitment-disclosure" className="hover:text-indigo-600 transition-colors">
+              <Link href="/recruitment-disclosure" className="hover:text-personal transition-colors">
                 職業紹介事業の情報開示
               </Link>
             </nav>

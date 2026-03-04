@@ -6,13 +6,28 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CalendarDays, X, Plus, Trash2, Car, Calendar, RotateCcw, Zap, ClipboardList, Settings, AlertTriangle, Inbox, CheckCircle, XCircle } from 'lucide-react';
-import { TimeSlot, ScheduleItem, Child, FacilityTimeSlot } from '@/types';
+import { TimeSlot, ScheduleItem, Child } from '@/types';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import SlotAssignmentPanel from './SlotAssignmentPanel';
 import TransportAssignmentPanel from './TransportAssignmentPanel';
+import { useToast } from '@/components/ui/Toast';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
+import { resolveTimeSlots, slotDisplayName, expandSlotKeys } from '@/utils/slotResolver';
+
+// スロット表示用カラーパレット（displayOrder順に割り当て）
+const SLOT_COLORS = [
+  { bg: 'bg-[#e0f7fa]', text: 'text-[#006064]', border: 'border-[#b2ebf2]', bar: 'bg-primary', barBg: 'bg-white/50' },
+  { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-100', bar: 'bg-orange-500', barBg: 'bg-white/50' },
+  { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-100', bar: 'bg-purple-500', barBg: 'bg-white/50' },
+  { bg: 'bg-emerald-50', text: 'text-emerald-900', border: 'border-emerald-100', bar: 'bg-emerald-500', barBg: 'bg-white/50' },
+  { bg: 'bg-rose-50', text: 'text-rose-900', border: 'border-rose-100', bar: 'bg-rose-500', barBg: 'bg-white/50' },
+];
+
+function getSlotColor(index: number) {
+  return SLOT_COLORS[index % SLOT_COLORS.length];
+}
 
 // 利用申請の型
 type UsageRequestItem = {
@@ -32,6 +47,7 @@ type UsageRequestItem = {
 };
 
 const ScheduleView: React.FC = () => {
+  const { toast } = useToast();
   const {
     schedules,
     children,
@@ -104,7 +120,8 @@ const ScheduleView: React.FC = () => {
   const handleApproveAll = async (request: UsageRequestItem) => {
     setProcessingRequestId(request.id);
     try {
-      const response = request.requested_dates.map(d => ({ date: d.date, approved: true }));
+      const requestedDates = request.requested_dates || [];
+      const response = requestedDates.map(d => ({ date: d.date, approved: true }));
 
       // usage_requestsを更新
       await supabase
@@ -117,15 +134,16 @@ const ScheduleView: React.FC = () => {
         .eq('id', request.id);
 
       // 承認された日程をスケジュールに追加
-      for (const dateItem of request.requested_dates) {
+      for (const dateItem of requestedDates) {
         const child = children.find(c => c.id === request.child_id);
         if (!child) continue;
 
-        const slots: TimeSlot[] = dateItem.slot === 'full'
-          ? ['AM', 'PM']
-          : dateItem.slot === 'am'
-          ? ['AM']
-          : ['PM'];
+        // 'full'/'終日' → 全スロット展開、'am'/'pm' → レガシーマッピング、それ以外 → そのまま
+        const slotValue = dateItem.slot === 'full' ? '終日'
+          : dateItem.slot === 'am' ? (resolvedSlots[0]?.key || 'AM')
+          : dateItem.slot === 'pm' ? (resolvedSlots[1]?.key || resolvedSlots[0]?.key || 'PM')
+          : dateItem.slot;
+        const slots: TimeSlot[] = expandSlotKeys(resolvedSlots, slotValue);
 
         for (const slot of slots) {
           // 重複チェック
@@ -149,7 +167,7 @@ const ScheduleView: React.FC = () => {
       setUsageRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (err) {
       console.error('Error approving request:', err);
-      alert('承認処理に失敗しました');
+      toast.error('承認処理に失敗しました');
     } finally {
       setProcessingRequestId(null);
     }
@@ -159,7 +177,7 @@ const ScheduleView: React.FC = () => {
   const handleRejectAll = async (request: UsageRequestItem, notes?: string) => {
     setProcessingRequestId(request.id);
     try {
-      const response = request.requested_dates.map(d => ({ date: d.date, approved: false }));
+      const response = (request.requested_dates || []).map(d => ({ date: d.date, approved: false }));
 
       await supabase
         .from('usage_requests')
@@ -174,7 +192,7 @@ const ScheduleView: React.FC = () => {
       setUsageRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (err) {
       console.error('Error rejecting request:', err);
-      alert('却下処理に失敗しました');
+      toast.error('却下処理に失敗しました');
     } finally {
       setProcessingRequestId(null);
     }
@@ -207,78 +225,46 @@ const ScheduleView: React.FC = () => {
     setIsPlanningModalOpen(true);
   };
 
-  const [newBooking, setNewBooking] = useState({
+  const [newBooking, setNewBooking] = useState<{
+    childId: string;
+    date: string;
+    slots: Record<string, boolean>;
+    pickup: boolean;
+    dropoff: boolean;
+  }>({
     childId: '',
     date: '',
-    slots: { AM: false, PM: false } as { AM: boolean; PM: boolean },
+    slots: {},
     pickup: false,
     dropoff: false,
   });
 
-  // 時間枠が設定されているかチェック
-  const hasTimeSlots = timeSlots.length > 0;
+  // 施設設定から動的時間枠を解決（デフォルトAM/PMフォールバックあり）
+  const resolvedSlots = useMemo(
+    () => resolveTimeSlots(timeSlots, facilitySettings),
+    [timeSlots, facilitySettings]
+  );
 
-  // 施設設定から受け入れ人数を取得（リアクティブに更新される）
-  // timeSlots（施設設定の時間枠）があればそこから定員を取得、なければデフォルト値
-  const capacity = useMemo(() => {
-    if (timeSlots.length >= 2) {
-      // 時間枠が2つ以上あれば、displayOrder順でAM/PMに対応させる
-      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
-      return {
-        AM: sorted[0]?.capacity || 0,
-        PM: sorted[1]?.capacity || 0,
-      };
-    } else if (timeSlots.length === 1) {
-      // 1枠のみの場合
-      return {
-        AM: timeSlots[0].capacity || 0,
-        PM: 0,
-      };
-    }
-    // 未設定の場合はデフォルト（0 = 未設定を示す）
-    return facilitySettings.capacity || { AM: 0, PM: 0 };
-  }, [timeSlots, facilitySettings.capacity]);
+  // 時間枠が利用可能か（resolvedSlotsはデフォルトAM/PMを常に返すのでDB未設定でも動作する）
+  const hasTimeSlots = resolvedSlots.length > 0;
 
-  // 時間枠の名前と時間を取得
+  // SlotAssignmentPanel用のレガシー形式 slotInfo / legacyCapacity を構築
   const slotInfo = useMemo(() => {
-    if (timeSlots.length >= 2) {
-      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
-      return {
-        AM: {
-          name: sorted[0]?.name || '午前',
-          startTime: sorted[0]?.startTime || '09:00',
-          endTime: sorted[0]?.endTime || '12:00',
-        },
-        PM: {
-          name: sorted[1]?.name || '午後',
-          startTime: sorted[1]?.startTime || '13:00',
-          endTime: sorted[1]?.endTime || '18:00',
-        },
-      };
-    } else if (timeSlots.length === 1) {
-      return {
-        AM: {
-          name: timeSlots[0].name || '終日',
-          startTime: timeSlots[0].startTime || '09:00',
-          endTime: timeSlots[0].endTime || '18:00',
-        },
-        PM: null,
-      };
-    }
-    // デフォルト
+    const am = resolvedSlots[0];
+    const pm = resolvedSlots.length >= 2 ? resolvedSlots[1] : null;
     return {
-      AM: {
-        name: '午前',
-        startTime: facilitySettings.businessHours?.AM?.start || '09:00',
-        endTime: facilitySettings.businessHours?.AM?.end || '12:00',
-      },
-      PM: {
-        name: '午後',
-        startTime: facilitySettings.businessHours?.PM?.start || '13:00',
-        endTime: facilitySettings.businessHours?.PM?.end || '18:00',
-      },
+      AM: am
+        ? { name: am.name, startTime: am.startTime, endTime: am.endTime }
+        : { name: '午前', startTime: '09:00', endTime: '12:00' },
+      PM: pm ? { name: pm.name, startTime: pm.startTime, endTime: pm.endTime } : null,
     };
-  }, [timeSlots, facilitySettings.businessHours]);
+  }, [resolvedSlots]);
+
+  const legacyCapacity = useMemo(() => {
+    const am = resolvedSlots[0];
+    const pm = resolvedSlots.length >= 2 ? resolvedSlots[1] : null;
+    return { AM: am?.capacity ?? 0, PM: pm?.capacity ?? 0 };
+  }, [resolvedSlots]);
 
   // 当月の日付を生成
   const monthDates = useMemo(() => {
@@ -338,7 +324,8 @@ const ScheduleView: React.FC = () => {
     const baseDate = new Date(currentDate);
     const currentDay = baseDate.getDay();
     const startOfWeek = new Date(baseDate);
-    startOfWeek.setDate(baseDate.getDate() - currentDay + 1); // 月曜日を開始日とする
+    const offset = currentDay === 0 ? -6 : 1 - currentDay;
+    startOfWeek.setDate(baseDate.getDate() + offset); // 月曜日を開始日とする
 
     // 日付をYYYY-MM-DD形式に変換するヘルパー関数（タイムゾーン問題を回避）
     const formatDate = (date: Date): string => {
@@ -390,7 +377,7 @@ const ScheduleView: React.FC = () => {
     
     // 期間設定がある場合は、その期間の定休日をチェック
     if (matchedPeriod) {
-      if (matchedPeriod.regularHolidays.includes(dayOfWeek)) {
+      if (matchedPeriod.regularHolidays?.includes(dayOfWeek)) {
         return true;
       }
     } else {
@@ -440,16 +427,17 @@ const ScheduleView: React.FC = () => {
       // 休業日は除外
       if (isHoliday(dateStr)) continue;
       
-      const amCount = schedules.filter((s) => s.date === dateStr && s.slot === 'AM').length;
-      const pmCount = schedules.filter((s) => s.date === dateStr && s.slot === 'PM').length;
-      
       // ユニーク利用児童数を集計
       schedules
         .filter((s) => s.date === dateStr)
         .forEach((s) => uniqueChildren.add(s.childId));
 
-      totalCapacity += capacity.AM + capacity.PM;
-      totalUsed += amCount + pmCount;
+      // 各スロットの利用数と定員を動的に集計
+      for (const slot of resolvedSlots) {
+        const slotCount = schedules.filter((s) => s.date === dateStr && s.slot === slot.key).length;
+        totalCapacity += slot.capacity;
+        totalUsed += slotCount;
+      }
     }
 
     return {
@@ -458,7 +446,7 @@ const ScheduleView: React.FC = () => {
       utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
       uniqueChildrenCount: uniqueChildren.size,
     };
-  }, [schedules, currentDate, capacity, isHoliday]);
+  }, [schedules, currentDate, resolvedSlots, isHoliday]);
 
   // 週間カレンダーの統計を計算
   const weeklyStats = useMemo(() => {
@@ -470,15 +458,15 @@ const ScheduleView: React.FC = () => {
       // 休業日チェック（isHoliday関数を使用）
       if (isHoliday(d.date)) return;
       
-      const amCount = schedules.filter((s) => s.date === d.date && s.slot === 'AM').length;
-      const pmCount = schedules.filter((s) => s.date === d.date && s.slot === 'PM').length;
-      
       schedules
         .filter((s) => s.date === d.date)
         .forEach((s) => uniqueChildren.add(s.childId));
 
-      totalCapacity += capacity.AM + capacity.PM;
-      totalUsed += amCount + pmCount;
+      for (const slot of resolvedSlots) {
+        const slotCount = schedules.filter((s) => s.date === d.date && s.slot === slot.key).length;
+        totalCapacity += slot.capacity;
+        totalUsed += slotCount;
+      }
     });
 
     return {
@@ -487,7 +475,7 @@ const ScheduleView: React.FC = () => {
       utilization: totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0,
       uniqueChildrenCount: uniqueChildren.size,
     };
-  }, [schedules, weekDates, capacity, isHoliday]);
+  }, [schedules, weekDates, resolvedSlots, isHoliday]);
 
   // 選択された日付と時間帯に基づいて児童をソート（基本利用設定がその曜日のその時間になっている子を優先）
   // 重複を除去してユニークな児童のみを表示
@@ -516,9 +504,10 @@ const ScheduleView: React.FC = () => {
       const aTimeSlot = a.patternTimeSlots?.[dayOfWeek];
       const bTimeSlot = b.patternTimeSlots?.[dayOfWeek];
       
-      const selectedSlot = newBooking.slots.AM ? 'AM' : (newBooking.slots.PM ? 'PM' : null);
-      const aMatchesSlot = selectedSlot ? (aTimeSlot === selectedSlot || aTimeSlot === 'AMPM') : false;
-      const bMatchesSlot = selectedSlot ? (bTimeSlot === selectedSlot || bTimeSlot === 'AMPM') : false;
+      // 選択されている最初のスロットキーを取得
+      const selectedSlot = resolvedSlots.find(s => newBooking.slots[s.key])?.key || null;
+      const aMatchesSlot = selectedSlot ? (aTimeSlot === selectedSlot || aTimeSlot === 'AMPM' || aTimeSlot === '終日') : false;
+      const bMatchesSlot = selectedSlot ? (bTimeSlot === selectedSlot || bTimeSlot === 'AMPM' || bTimeSlot === '終日') : false;
       
       // 優先順位: 1. 基本利用設定がある + 時間帯が一致, 2. 基本利用設定がある, 3. その他
       if (aHasPattern && aMatchesSlot && !(bHasPattern && bMatchesSlot)) return -1;
@@ -542,10 +531,14 @@ const ScheduleView: React.FC = () => {
   const handleOpenLegacyModal = (date: string, slot?: TimeSlot) => {
     setSelectedDateForBooking(date);
     setSelectedSlotForBooking(slot || null);
+    const initialSlots: Record<string, boolean> = {};
+    for (const s of resolvedSlots) {
+      initialSlots[s.key] = slot ? s.key === slot : false;
+    }
     setNewBooking({
       childId: '',
       date,
-      slots: slot ? { AM: slot === 'AM', PM: slot === 'PM' } : { AM: false, PM: false },
+      slots: initialSlots,
       pickup: false,
       dropoff: false,
     });
@@ -564,10 +557,10 @@ const ScheduleView: React.FC = () => {
     setIsBulkProcessing(true);
     try {
       const result = await bulkRegisterFromPatterns(year, month);
-      alert(`一括登録が完了しました。\n追加: ${result.added}件\nスキップ: ${result.skipped}件`);
+      toast.success(`一括登録が完了しました。\n追加: ${result.added}件\nスキップ: ${result.skipped}件`);
     } catch (error) {
       console.error('Error in bulk register:', error);
-      alert('一括登録に失敗しました。もう一度お試しください。');
+      toast.error('一括登録に失敗しました。もう一度お試しください。');
     } finally {
       setIsBulkProcessing(false);
     }
@@ -585,10 +578,10 @@ const ScheduleView: React.FC = () => {
     setIsBulkProcessing(true);
     try {
       const deleted = await resetMonthSchedules(year, month);
-      alert(`${deleted}件の予約を削除しました。`);
+      toast.success(`${deleted}件の予約を削除しました。`);
     } catch (error) {
       console.error('Error in month reset:', error);
-      alert('リセットに失敗しました。もう一度お試しください。');
+      toast.error('リセットに失敗しました。もう一度お試しください。');
     } finally {
       setIsBulkProcessing(false);
     }
@@ -602,11 +595,12 @@ const ScheduleView: React.FC = () => {
   // 予約を追加
   const handleAddBooking = async () => {
     if (!newBooking.childId) {
-      alert('児童を選択してください');
+      toast.warning('児童を選択してください');
       return;
     }
-    if (!newBooking.slots.AM && !newBooking.slots.PM) {
-      alert('午前または午後のいずれかを選択してください');
+    const selectedSlotKeys = resolvedSlots.filter(s => newBooking.slots[s.key]).map(s => s.key);
+    if (selectedSlotKeys.length === 0) {
+      toast.warning('時間帯を選択してください');
       return;
     }
     const child = children.find((c) => c.id === newBooking.childId);
@@ -616,51 +610,42 @@ const ScheduleView: React.FC = () => {
     const existingSchedules = schedules.filter(
       (s) => s.childId === newBooking.childId && s.date === newBooking.date
     );
-    
-    if (newBooking.slots.AM && existingSchedules.some((s) => s.slot === 'AM')) {
-      alert(`${child.name}さんは${newBooking.date}の午前中に既に予約が登録されています。`);
-      return;
-    }
-    if (newBooking.slots.PM && existingSchedules.some((s) => s.slot === 'PM')) {
-      alert(`${child.name}さんは${newBooking.date}の午後に既に予約が登録されています。`);
-      return;
+
+    for (const slotKey of selectedSlotKeys) {
+      if (existingSchedules.some((s) => s.slot === slotKey)) {
+        const name = slotDisplayName(resolvedSlots, slotKey);
+        toast.warning(`${child.name}さんは${newBooking.date}の${name}に既に予約が登録されています。`);
+        return;
+      }
     }
 
     try {
       // 選択された時間帯ごとにスケジュールを追加
-      if (newBooking.slots.AM) {
+      for (const slotKey of selectedSlotKeys) {
         await addSchedule({
           date: newBooking.date,
           childId: child.id,
           childName: child.name,
-          slot: 'AM',
-          hasPickup: newBooking.pickup,
-          hasDropoff: newBooking.dropoff,
-        });
-      }
-      if (newBooking.slots.PM) {
-        await addSchedule({
-          date: newBooking.date,
-          childId: child.id,
-          childName: child.name,
-          slot: 'PM',
+          slot: slotKey,
           hasPickup: newBooking.pickup,
           hasDropoff: newBooking.dropoff,
         });
       }
 
-      alert(`${child.name}さんの予約を追加しました`);
+      toast.success(`${child.name}さんの予約を追加しました`);
       setIsModalOpen(false);
+      const resetSlots: Record<string, boolean> = {};
+      for (const s of resolvedSlots) resetSlots[s.key] = false;
       setNewBooking({
         childId: '',
         date: '',
-        slots: { AM: false, PM: false },
+        slots: resetSlots,
         pickup: false,
         dropoff: false,
       });
     } catch (error) {
       console.error('Error adding booking:', error);
-      alert('予約の追加に失敗しました。もう一度お試しください。');
+      toast.error('予約の追加に失敗しました。もう一度お試しください。');
     }
   };
 
@@ -670,7 +655,7 @@ const ScheduleView: React.FC = () => {
     // 実績登録済みの場合は削除不可
     const hasUsageRecord = !!getUsageRecordByScheduleId(item.id);
     if (hasUsageRecord) {
-      alert('実績登録済みのため削除できません。\n業務日誌から実績を削除してください。');
+      toast.warning('実績登録済みのため削除できません。\n業務日誌から実績を削除してください。');
       return;
     }
     if (confirm(`${item.childName}さんの予約を削除しますか？`)) {
@@ -678,7 +663,7 @@ const ScheduleView: React.FC = () => {
         await deleteSchedule(item.id);
       } catch (error) {
         console.error('Error deleting schedule:', error);
-        alert('予約の削除に失敗しました。もう一度お試しください。');
+        toast.error('予約の削除に失敗しました。もう一度お試しください。');
       }
     }
   };
@@ -703,7 +688,7 @@ const ScheduleView: React.FC = () => {
           onClick={() => setScheduleTab('reservation')}
           className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
             scheduleTab === 'reservation'
-              ? 'text-[#00c4cc] border-[#00c4cc] bg-white'
+              ? 'text-primary border-primary bg-white'
               : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
@@ -714,7 +699,7 @@ const ScheduleView: React.FC = () => {
           onClick={() => setScheduleTab('transport')}
           className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
             scheduleTab === 'transport'
-              ? 'text-[#00c4cc] border-[#00c4cc] bg-white'
+              ? 'text-primary border-primary bg-white'
               : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
@@ -742,7 +727,7 @@ const ScheduleView: React.FC = () => {
                 onClick={() => setViewFormat('month')}
                 className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
                   viewFormat === 'month'
-                    ? 'bg-white text-[#00c4cc] shadow-sm'
+                    ? 'bg-white text-primary shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -752,7 +737,7 @@ const ScheduleView: React.FC = () => {
                 onClick={() => setViewFormat('week')}
                 className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded transition-all ${
                   viewFormat === 'week'
-                    ? 'bg-white text-[#00c4cc] shadow-sm'
+                    ? 'bg-white text-primary shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -781,7 +766,7 @@ const ScheduleView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setCurrentDate(new Date())}
-                  className="ml-2 px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors shadow-sm"
+                  className="ml-2 px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors shadow-sm"
                 >
                   本日
                 </button>
@@ -808,7 +793,7 @@ const ScheduleView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setCurrentDate(new Date())}
-                  className="ml-2 px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors shadow-sm"
+                  className="ml-2 px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors shadow-sm"
                 >
                   本日
                 </button>
@@ -830,7 +815,7 @@ const ScheduleView: React.FC = () => {
                 <button
                   onClick={handleBulkRegister}
                   disabled={isBulkProcessing}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-md text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Zap className="w-3.5 h-3.5" />
                   パターン一括登録
@@ -897,7 +882,7 @@ const ScheduleView: React.FC = () => {
           {/* 読み込み中 */}
           {loadingTimeSlots && (
             <div className="flex items-center justify-center h-full min-h-[400px]">
-              <div className="animate-spin w-8 h-8 border-4 border-[#00c4cc] border-t-transparent rounded-full"></div>
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
             </div>
           )}
 
@@ -921,33 +906,31 @@ const ScheduleView: React.FC = () => {
               <div className="grid grid-cols-7 gap-1">
                 {monthDates.map((dateInfo, index) => {
                   const isHolidayDay = isHoliday(dateInfo.date);
-                  const amCount = schedules.filter(
-                    (s) => s.date === dateInfo.date && s.slot === 'AM'
-                  ).length;
-                  const pmCount = schedules.filter(
-                    (s) => s.date === dateInfo.date && s.slot === 'PM'
-                  ).length;
-                  const amUtilization = capacity.AM > 0 ? Math.round((amCount / capacity.AM) * 100) : 0;
-                  const pmUtilization = capacity.PM > 0 ? Math.round((pmCount / capacity.PM) * 100) : 0;
-                  
-                  // 送迎予定枠の人数を計算
-                  const amPickupCount = schedules.filter(
-                    (s) => s.date === dateInfo.date && s.slot === 'AM' && s.hasPickup
-                  ).length;
-                  const amDropoffCount = schedules.filter(
-                    (s) => s.date === dateInfo.date && s.slot === 'AM' && s.hasDropoff
-                  ).length;
-                  const pmPickupCount = schedules.filter(
-                    (s) => s.date === dateInfo.date && s.slot === 'PM' && s.hasPickup
-                  ).length;
-                  const pmDropoffCount = schedules.filter(
-                    (s) => s.date === dateInfo.date && s.slot === 'PM' && s.hasDropoff
-                  ).length;
+
+                  // 各スロットの利用数・送迎数を動的に計算
+                  const slotStats = resolvedSlots.map((slot, si) => {
+                    const count = schedules.filter(
+                      (s) => s.date === dateInfo.date && s.slot === slot.key
+                    ).length;
+                    const cap = slot.capacity;
+                    const utilization = cap > 0 ? Math.round((count / cap) * 100) : 0;
+                    const pickupCount = schedules.filter(
+                      (s) => s.date === dateInfo.date && s.slot === slot.key && s.hasPickup
+                    ).length;
+                    const dropoffCount = schedules.filter(
+                      (s) => s.date === dateInfo.date && s.slot === slot.key && s.hasDropoff
+                    ).length;
+                    return { slot, count, cap, utilization, pickupCount, dropoffCount, colorIndex: si };
+                  });
+
+                  const allFull = slotStats.every(s => s.utilization >= 100);
+                  const anyHigh = slotStats.some(s => s.utilization >= 80);
+
                   // 今日の日付をYYYY-MM-DD形式で取得（タイムゾーン問題を回避）
                   const today = new Date();
                   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                   const isToday = dateInfo.date === todayStr;
-                  
+
                   // ユニーク利用児童数
                   const uniqueChildrenForDay = new Set(
                     schedules.filter((s) => s.date === dateInfo.date).map((s) => s.childId)
@@ -961,12 +944,12 @@ const ScheduleView: React.FC = () => {
                           ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
                           : !dateInfo.isCurrentMonth
                           ? 'bg-gray-50 opacity-40 border-gray-200 cursor-pointer hover:bg-gray-100'
-                          : amUtilization >= 100 && pmUtilization >= 100
+                          : allFull
                           ? 'bg-red-50/30 border-red-200 cursor-pointer hover:bg-red-50/50'
-                          : (amUtilization >= 80 || pmUtilization >= 80)
+                          : anyHigh
                           ? 'bg-amber-50/30 border-amber-200 cursor-pointer hover:bg-amber-50/50'
                           : 'bg-white border-gray-200 cursor-pointer hover:bg-gray-50 hover:shadow-sm'
-                      } ${isToday ? 'ring-2 ring-[#00c4cc] shadow-md' : ''}`}
+                      } ${isToday ? 'ring-2 ring-primary shadow-md' : ''}`}
                       onClick={() => !isHolidayDay && handleDateClick(dateInfo.date)}
                     >
                       <div className="flex justify-between items-center mb-1">
@@ -974,7 +957,7 @@ const ScheduleView: React.FC = () => {
                           <div
                             className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-bold leading-tight ${
                               isToday
-                                ? 'bg-[#00c4cc] text-white'
+                                ? 'bg-primary text-white'
                                 : !dateInfo.isCurrentMonth
                                 ? 'text-gray-400'
                                 : 'text-gray-700'
@@ -988,7 +971,7 @@ const ScheduleView: React.FC = () => {
                                 e.stopPropagation();
                                 openPlanningModal(dateInfo.date);
                               }}
-                              className="p-0.5 text-gray-400 hover:text-[#00c4cc] hover:bg-gray-100 rounded transition-colors"
+                              className="p-0.5 text-gray-400 hover:text-primary hover:bg-gray-100 rounded transition-colors"
                               title="日別計画"
                             >
                               <ClipboardList className="w-3.5 h-3.5" />
@@ -1010,66 +993,39 @@ const ScheduleView: React.FC = () => {
                       </div>
                       {!isHolidayDay ? (
                         <div className="flex flex-col gap-1 mt-1">
-                          {/* 午前（第1枠） */}
-                          <div className="bg-[#e0f7fa] rounded px-1.5 py-1">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-[#006064] text-[10px] sm:text-[11px] leading-tight">{slotInfo.AM.name}</span>
-                              <span className="text-[#006064] font-bold text-[10px] sm:text-[11px] leading-tight">
-                                {amCount}/{capacity.AM}
-                              </span>
-                            </div>
-                            {(amPickupCount > 0 || amDropoffCount > 0) && (
-                              <div className="flex items-center gap-1 mb-1">
-                                <Car className="w-3 h-3 text-[#006064]" />
-                                <span className="text-[9px] sm:text-[10px] text-[#006064] leading-tight">
-                                  送迎: 迎{amPickupCount} 送{amDropoffCount}
-                                </span>
+                          {slotStats.map(({ slot, count, cap, utilization, pickupCount, dropoffCount, colorIndex }) => {
+                            const color = getSlotColor(colorIndex);
+                            return (
+                              <div key={slot.key} className={`${color.bg} rounded px-1.5 py-1`}>
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className={`font-bold ${color.text} text-[10px] sm:text-[11px] leading-tight`}>{slot.name}</span>
+                                  <span className={`${color.text} font-bold text-[10px] sm:text-[11px] leading-tight`}>
+                                    {count}/{cap}
+                                  </span>
+                                </div>
+                                {(pickupCount > 0 || dropoffCount > 0) && (
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <Car className={`w-3 h-3 ${color.text}`} />
+                                    <span className={`text-[9px] sm:text-[10px] ${color.text} leading-tight`}>
+                                      送迎: 迎{pickupCount} 送{dropoffCount}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className={`w-full ${color.barBg} rounded-full h-1`}>
+                                  <div
+                                    className={`h-1 rounded-full ${
+                                      utilization >= 100
+                                        ? 'bg-red-500'
+                                        : utilization >= 80
+                                        ? 'bg-orange-400'
+                                        : color.bar
+                                    }`}
+                                    style={{ width: `${Math.min(utilization, 100)}%` }}
+                                  />
+                                </div>
                               </div>
-                            )}
-                            <div className="w-full bg-white/50 rounded-full h-1">
-                              <div
-                                className={`h-1 rounded-full ${
-                                  amUtilization >= 100
-                                    ? 'bg-red-500'
-                                    : amUtilization >= 80
-                                    ? 'bg-orange-400'
-                                    : 'bg-[#00c4cc]'
-                                }`}
-                                style={{ width: `${Math.min(amUtilization, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          {/* 午後（第2枠） */}
-                          {slotInfo.PM && (
-                          <div className="bg-orange-50 rounded px-1.5 py-1">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-orange-900 text-[10px] sm:text-[11px] leading-tight">{slotInfo.PM.name}</span>
-                              <span className="text-orange-900 font-bold text-[10px] sm:text-[11px] leading-tight">
-                                {pmCount}/{capacity.PM}
-                              </span>
-                            </div>
-                            {(pmPickupCount > 0 || pmDropoffCount > 0) && (
-                              <div className="flex items-center gap-1 mb-1">
-                                <Car className="w-3 h-3 text-orange-900" />
-                                <span className="text-[9px] sm:text-[10px] text-orange-900 leading-tight">
-                                  送迎: 迎{pmPickupCount} 送{pmDropoffCount}
-                                </span>
-                              </div>
-                            )}
-                            <div className="w-full bg-white/50 rounded-full h-1">
-                              <div
-                                className={`h-1 rounded-full ${
-                                  pmUtilization >= 100
-                                    ? 'bg-red-500'
-                                    : pmUtilization >= 80
-                                    ? 'bg-orange-400'
-                                    : 'bg-orange-500'
-                                }`}
-                                style={{ width: `${Math.min(pmUtilization, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          )}
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="text-[10px] text-red-600 text-center mt-2 leading-tight">
@@ -1110,140 +1066,78 @@ const ScheduleView: React.FC = () => {
                   );
                 })}
               </div>
-              {/* AM Row */}
-              <div className="flex border-b border-gray-200 min-h-[120px]">
-                <div className="w-16 sm:w-20 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                  <div className="text-xs sm:text-sm font-bold text-gray-600">{slotInfo.AM.name}</div>
-                  <div className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">定員{capacity.AM}</div>
-                </div>
-                {weekDates.map((d, i) => {
-                  const items = schedules.filter((s) => s.date === d.date && s.slot === 'AM');
-                  const isHolidayDay = isHoliday(d.date);
-                  return (
-                    <div
-                      key={i}
-                      className={`flex-1 p-1 border-r border-gray-100 transition-colors ${
-                        isHolidayDay
-                          ? 'bg-red-50 cursor-not-allowed opacity-60'
-                          : 'bg-white hover:bg-gray-50 cursor-pointer'
-                      }`}
-                      onClick={() => !isHolidayDay && handleDateClick(d.date, 'AM')}
-                    >
-                      {isHolidayDay ? (
-                        <div className="text-[11px] sm:text-xs text-red-600 text-center mt-2 leading-tight">休業</div>
-                      ) : (
-                        items.map((item) => {
-                          const hasRecord = getUsageRecordByScheduleId(item.id) !== undefined;
-                          return (
-                            <div
-                              key={item.id}
-                              className={`mb-1 border rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm font-medium shadow-sm group relative transition-colors cursor-pointer ${
-                                hasRecord
-                                  ? 'bg-green-50 border-green-200 text-green-900 hover:border-green-300'
-                                  : 'bg-[#e0f7fa] border-[#b2ebf2] text-[#006064] hover:border-[#00c4cc]'
-                              }`}
-                              onClick={(e) => handleScheduleItemClick(item, e)}
-                            >
-                              <div className="font-bold truncate text-xs sm:text-sm leading-tight">{item.childName}</div>
-                              {hasRecord && (
-                                <div className="text-[10px] sm:text-xs text-green-700 mt-0.5 leading-tight">実績登録済</div>
-                              )}
-                              <div className="flex gap-1 mt-1">
-                                {item.hasPickup && (
-                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
-                                    hasRecord
-                                      ? 'bg-white/80 text-green-700 border-green-200'
-                                      : 'bg-white/80 text-[#006064] border-[#b2ebf2]'
-                                  }`}>
-                                    迎
-                                  </span>
-                                )}
-                                {item.hasDropoff && (
-                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
-                                    hasRecord
-                                      ? 'bg-white/80 text-green-700 border-green-200'
-                                      : 'bg-white/80 text-[#006064] border-[#b2ebf2]'
-                                  }`}>
-                                    送
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
+              {/* Dynamic slot rows */}
+              {resolvedSlots.map((slot, si) => {
+                const color = getSlotColor(si);
+                const isLastRow = si === resolvedSlots.length - 1;
+                return (
+                  <div key={slot.key} className={`flex ${isLastRow ? 'min-h-[200px]' : 'border-b border-gray-200 min-h-[120px]'}`}>
+                    <div className="w-16 sm:w-20 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
+                      <div className="text-xs sm:text-sm font-bold text-gray-600">{slot.name}</div>
+                      <div className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">定員{slot.capacity}</div>
                     </div>
-                  );
-                })}
-              </div>
-              {/* PM Row */}
-              {slotInfo.PM && (
-              <div className="flex min-h-[200px]">
-                <div className="w-16 sm:w-20 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col justify-center text-center p-1">
-                  <div className="text-xs sm:text-sm font-bold text-gray-600">{slotInfo.PM.name}</div>
-                  <div className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">定員{capacity.PM}</div>
-                </div>
-                {weekDates.map((d, i) => {
-                  const items = schedules.filter((s) => s.date === d.date && s.slot === 'PM');
-                  const isHolidayDay = isHoliday(d.date);
-                  return (
-                    <div
-                      key={i}
-                      className={`flex-1 p-1 border-r border-gray-100 transition-colors ${
-                        isHolidayDay
-                          ? 'bg-red-50 cursor-not-allowed opacity-60'
-                          : 'bg-white hover:bg-gray-50 cursor-pointer'
-                      }`}
-                      onClick={() => !isHolidayDay && handleDateClick(d.date, 'PM')}
-                    >
-                      {isHolidayDay ? (
-                        <div className="text-[11px] sm:text-xs text-red-600 text-center mt-2 leading-tight">休業</div>
-                      ) : (
-                        items.map((item) => {
-                          const hasRecord = getUsageRecordByScheduleId(item.id) !== undefined;
-                          return (
-                            <div
-                              key={item.id}
-                              className={`mb-1 border rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm shadow-sm group relative transition-colors cursor-pointer ${
-                                hasRecord
-                                  ? 'bg-green-50 border-green-200 text-green-900 hover:border-green-300'
-                                  : 'bg-orange-50 border-orange-100 text-orange-900 hover:border-orange-300'
-                              }`}
-                              onClick={(e) => handleScheduleItemClick(item, e)}
-                            >
-                              <div className="font-bold truncate text-xs sm:text-sm leading-tight">{item.childName}</div>
-                              {hasRecord && (
-                                <div className="text-[10px] sm:text-xs text-green-700 mt-0.5 leading-tight">実績登録済</div>
-                              )}
-                              <div className="flex gap-1 mt-1">
-                                {item.hasPickup && (
-                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
+                    {weekDates.map((d, i) => {
+                      const items = schedules.filter((s) => s.date === d.date && s.slot === slot.key);
+                      const isHolidayDay = isHoliday(d.date);
+                      return (
+                        <div
+                          key={i}
+                          className={`flex-1 p-1 border-r border-gray-100 transition-colors ${
+                            isHolidayDay
+                              ? 'bg-red-50 cursor-not-allowed opacity-60'
+                              : 'bg-white hover:bg-gray-50 cursor-pointer'
+                          }`}
+                          onClick={() => !isHolidayDay && handleDateClick(d.date, slot.key)}
+                        >
+                          {isHolidayDay ? (
+                            <div className="text-[11px] sm:text-xs text-red-600 text-center mt-2 leading-tight">休業</div>
+                          ) : (
+                            items.map((item) => {
+                              const hasRecord = getUsageRecordByScheduleId(item.id) !== undefined;
+                              return (
+                                <div
+                                  key={item.id}
+                                  className={`mb-1 border rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm font-medium shadow-sm group relative transition-colors cursor-pointer ${
                                     hasRecord
-                                      ? 'bg-white/80 text-green-700 border-green-200'
-                                      : 'bg-white/80 text-orange-600 border-orange-100'
-                                  }`}>
-                                    迎
-                                  </span>
-                                )}
-                                {item.hasDropoff && (
-                                  <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
-                                    hasRecord
-                                      ? 'bg-white/80 text-green-700 border-green-200'
-                                      : 'bg-white/80 text-orange-600 border-orange-100'
-                                  }`}>
-                                    送
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              )}
+                                      ? 'bg-green-50 border-green-200 text-green-900 hover:border-green-300'
+                                      : `${color.bg} ${color.border} ${color.text} hover:border-gray-400`
+                                  }`}
+                                  onClick={(e) => handleScheduleItemClick(item, e)}
+                                >
+                                  <div className="font-bold truncate text-xs sm:text-sm leading-tight">{item.childName}</div>
+                                  {hasRecord && (
+                                    <div className="text-[10px] sm:text-xs text-green-700 mt-0.5 leading-tight">実績登録済</div>
+                                  )}
+                                  <div className="flex gap-1 mt-1">
+                                    {item.hasPickup && (
+                                      <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
+                                        hasRecord
+                                          ? 'bg-white/80 text-green-700 border-green-200'
+                                          : `bg-white/80 ${color.text} ${color.border}`
+                                      }`}>
+                                        迎
+                                      </span>
+                                    )}
+                                    {item.hasDropoff && (
+                                      <span className={`px-1 rounded-[2px] text-[10px] sm:text-xs font-bold border leading-tight ${
+                                        hasRecord
+                                          ? 'bg-white/80 text-green-700 border-green-200'
+                                          : `bg-white/80 ${color.text} ${color.border}`
+                                      }`}>
+                                        送
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1255,7 +1149,7 @@ const ScheduleView: React.FC = () => {
           <div className="bg-white rounded-xl w-full max-w-sm max-h-[80vh] shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 flex-shrink-0">
               <h3 className="font-bold text-base text-gray-800 flex items-center">
-                <Plus size={18} className="mr-2 text-[#00c4cc]" />
+                <Plus size={18} className="mr-2 text-primary" />
                 利用予定を追加
               </h3>
               <button
@@ -1269,7 +1163,7 @@ const ScheduleView: React.FC = () => {
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">児童を選択</label>
                 <select
-                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] transition-all"
+                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                   value={newBooking.childId}
                   onChange={(e) => {
                     const selectedChildId = e.target.value;
@@ -1300,7 +1194,7 @@ const ScheduleView: React.FC = () => {
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">利用日</label>
                 <input
                   type="date"
-                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc]"
+                  className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-primary"
                   value={newBooking.date}
                   onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
                 />
@@ -1309,50 +1203,29 @@ const ScheduleView: React.FC = () => {
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">時間帯</label>
                 <div className="space-y-2">
-                  <label className="flex items-center space-x-3 cursor-pointer group p-2 rounded-md border border-gray-200 hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={newBooking.slots.AM}
-                      onChange={(e) =>
-                        setNewBooking({
-                          ...newBooking,
-                          slots: { ...newBooking.slots, AM: e.target.checked },
-                        })
-                      }
-                      className="accent-[#00c4cc] w-4 h-4"
-                    />
-                    <div className="flex-1">
-                      <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
-                        {slotInfo.AM.name}
-                      </span>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {slotInfo.AM.startTime} ～ {slotInfo.AM.endTime}
-                      </p>
-                    </div>
-                  </label>
-                  {slotInfo.PM && (
-                  <label className="flex items-center space-x-3 cursor-pointer group p-2 rounded-md border border-gray-200 hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={newBooking.slots.PM}
-                      onChange={(e) =>
-                        setNewBooking({
-                          ...newBooking,
-                          slots: { ...newBooking.slots, PM: e.target.checked },
-                        })
-                      }
-                      className="accent-[#00c4cc] w-4 h-4"
-                    />
-                    <div className="flex-1">
-                      <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
-                        {slotInfo.PM.name}
-                      </span>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {slotInfo.PM.startTime} ～ {slotInfo.PM.endTime}
-                      </p>
-                    </div>
-                  </label>
-                  )}
+                  {resolvedSlots.map((slot) => (
+                    <label key={slot.key} className="flex items-center space-x-3 cursor-pointer group p-2 rounded-md border border-gray-200 hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={!!newBooking.slots[slot.key]}
+                        onChange={(e) =>
+                          setNewBooking({
+                            ...newBooking,
+                            slots: { ...newBooking.slots, [slot.key]: e.target.checked },
+                          })
+                        }
+                        className="accent-primary w-4 h-4"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
+                          {slot.name}
+                        </span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {slot.startTime} ～ {slot.endTime}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
 
@@ -1374,7 +1247,7 @@ const ScheduleView: React.FC = () => {
                           type="checkbox"
                           checked={newBooking.pickup}
                           onChange={(e) => setNewBooking({ ...newBooking, pickup: e.target.checked })}
-                          className="accent-[#00c4cc] w-4 h-4"
+                          className="accent-primary w-4 h-4"
                         />
                         <div>
                           <span className="text-sm text-gray-700 font-medium">お迎え</span>
@@ -1388,7 +1261,7 @@ const ScheduleView: React.FC = () => {
                           type="checkbox"
                           checked={newBooking.dropoff}
                           onChange={(e) => setNewBooking({ ...newBooking, dropoff: e.target.checked })}
-                          className="accent-[#00c4cc] w-4 h-4"
+                          className="accent-primary w-4 h-4"
                         />
                         <div>
                           <span className="text-sm text-gray-700 font-medium">お送り</span>
@@ -1412,7 +1285,7 @@ const ScheduleView: React.FC = () => {
               </button>
               <button
                 onClick={handleAddBooking}
-                className="flex-1 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg text-sm transition-all"
+                className="flex-1 py-2 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg text-sm transition-all"
               >
                 登録する
               </button>
@@ -1427,9 +1300,11 @@ const ScheduleView: React.FC = () => {
           date={selectedDateForSlotPanel}
           schedules={schedules}
           childList={children}
-          capacity={capacity}
+          capacity={legacyCapacity}
           slotInfo={slotInfo}
+          resolvedSlots={resolvedSlots}
           transportCapacity={facilitySettings.transportCapacity || { pickup: 4, dropoff: 4 }}
+          transportVehicles={facilitySettings.transportVehicles || []}
           onClose={() => {
             setIsSlotPanelOpen(false);
             setSelectedDateForSlotPanel('');
@@ -1442,6 +1317,8 @@ const ScheduleView: React.FC = () => {
               slot: data.slot,
               hasPickup: data.hasPickup,
               hasDropoff: data.hasDropoff,
+              pickupMethod: data.pickupMethod,
+              dropoffMethod: data.dropoffMethod,
             });
           }}
           onDeleteSchedule={deleteSchedule}
@@ -1449,6 +1326,42 @@ const ScheduleView: React.FC = () => {
           onUpdateTransport={updateScheduleTransport}
           getUsageRecordByScheduleId={getUsageRecordByScheduleId}
           onScheduleItemClick={handleScheduleItemClickFromPanel}
+          onBulkRegisterDay={async (dayDate: string) => {
+            const [y, m, d] = dayDate.split('-').map(Number);
+            const dateObj = new Date(y, m - 1, d);
+            const dayOfWeek = dateObj.getDay();
+            const existingIds = new Set(
+              schedules.filter(s => s.date === dayDate).map(s => `${s.childId}-${s.slot}`)
+            );
+            let added = 0;
+            let skipped = 0;
+            for (const child of children) {
+              if (!child.patternDays?.includes(dayOfWeek)) continue;
+              const timeSlot = child.patternTimeSlots?.[dayOfWeek];
+              if (!timeSlot) continue;
+              const slotsToAdd: TimeSlot[] = expandSlotKeys(resolvedSlots, timeSlot);
+              const tp = child.transportPattern?.[dayOfWeek];
+              for (const slot of slotsToAdd) {
+                const key = `${child.id}-${slot}`;
+                if (existingIds.has(key)) { skipped++; continue; }
+                try {
+                  await addSchedule({
+                    date: dayDate,
+                    childId: child.id,
+                    childName: child.name,
+                    slot,
+                    hasPickup: child.needsPickup || !!tp?.pickup,
+                    hasDropoff: child.needsDropoff || !!tp?.dropoff,
+                    pickupMethod: tp?.pickup || null,
+                    dropoffMethod: tp?.dropoff || null,
+                  });
+                  existingIds.add(key);
+                  added++;
+                } catch { skipped++; }
+              }
+            }
+            return { added, skipped };
+          }}
         />
       )}
 
@@ -1494,7 +1407,7 @@ const ScheduleView: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1 mb-3">
-                      {request.requested_dates.map((d, idx) => (
+                      {(request.requested_dates || []).map((d, idx) => (
                         <span key={idx} className="text-[10px] bg-white border border-gray-200 rounded px-2 py-0.5">
                           {d.date.split('-')[1]}/{d.date.split('-')[2]}
                           ({d.slot === 'am' ? '午前' : d.slot === 'pm' ? '午後' : '終日'})
@@ -1535,9 +1448,9 @@ const ScheduleView: React.FC = () => {
 
       {/* 一括処理中オーバーレイ */}
       {isBulkProcessing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
           <div className="bg-white rounded-lg px-8 py-6 shadow-xl">
-            <div className="animate-spin w-8 h-8 border-3 border-[#00c4cc] border-t-transparent rounded-full mx-auto mb-3" />
+            <div className="animate-spin w-8 h-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-3" />
             <p className="text-gray-700 font-bold">処理中...</p>
           </div>
         </div>

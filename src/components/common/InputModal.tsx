@@ -63,6 +63,9 @@ const InputModal: React.FC<InputModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity"
       onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="input-modal-title"
     >
       <div
         className="relative w-full max-w-md mx-4 bg-white rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 p-6"
@@ -71,11 +74,12 @@ const InputModal: React.FC<InputModalProps> = ({
         <button
           onClick={onCancel}
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="閉じる"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <h3 className="text-lg font-bold text-gray-800 mb-4">{title}</h3>
+        <h3 id="input-modal-title" className="text-lg font-bold text-gray-800 mb-4">{title}</h3>
 
         {multiline ? (
           <textarea
@@ -84,7 +88,7 @@ const InputModal: React.FC<InputModalProps> = ({
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
           />
         ) : (
           <input
@@ -94,7 +98,7 @@ const InputModal: React.FC<InputModalProps> = ({
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder={placeholder}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         )}
 
@@ -107,7 +111,7 @@ const InputModal: React.FC<InputModalProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            className="px-5 py-2 bg-[#00c4cc] text-white text-sm font-medium rounded-lg hover:bg-[#00b0b8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:ring-offset-2"
+            className="px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             送信
           </button>

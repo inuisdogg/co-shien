@@ -104,6 +104,15 @@ export default function PortalPage() {
       role: facility.role,
     }));
 
+    // AuthContextが参照する facility も同時にセット（これがないとデータフックが古い施設を参照する）
+    localStorage.setItem('facility', JSON.stringify({
+      id: facility.id,
+      name: facility.name,
+      code: facility.code,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+
     if (mode === 'biz') {
       // Bizモードへ（管理者向け）
       window.location.href = `/business?facilityId=${facility.id}`;
@@ -122,14 +131,14 @@ export default function PortalPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#00c4cc]/90 to-[#00b0b8] p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/90 to-primary-dark p-4">
       <div className="max-w-2xl mx-auto">
         {/* ヘッダー */}
         <div className="flex justify-between items-center mb-8 pt-4">
@@ -173,14 +182,14 @@ export default function PortalPage() {
           {facilities.length > 0 && (
             <div className="mb-8">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-[#00c4cc]" />
+                <Building2 className="w-5 h-5 text-primary" />
                 所属施設
               </h2>
               <div className="space-y-3">
                 {facilities.map((facility) => (
                   <div
                     key={facility.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-[#00c4cc] transition-colors"
+                    className="border border-gray-200 rounded-lg p-4 hover:border-primary transition-colors"
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -196,10 +205,10 @@ export default function PortalPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {(facility.role === '管理者' || facility.role === 'admin') && (
+                      {(facility.role === '管理者' || facility.role === 'admin' || facility.role === 'マネージャー') && (
                         <button
                           onClick={() => selectFacility(facility, 'biz')}
-                          className="flex-1 flex items-center justify-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold h-10 px-4 rounded-lg transition-colors text-sm min-w-[120px]"
+                          className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold h-10 px-4 rounded-lg transition-colors text-sm min-w-[120px]"
                         >
                           <Briefcase className="w-4 h-4" />
                           施設管理
@@ -207,7 +216,7 @@ export default function PortalPage() {
                       )}
                       <button
                         onClick={() => selectFacility(facility, 'personal')}
-                        className="flex-1 flex items-center justify-center gap-2 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold h-10 px-4 rounded-lg transition-colors text-sm min-w-[120px]"
+                        className="flex-1 flex items-center justify-center gap-2 bg-personal hover:bg-personal-dark text-white font-bold h-10 px-4 rounded-lg transition-colors text-sm min-w-[120px]"
                       >
                         <User className="w-4 h-4" />
                         キャリア
@@ -236,7 +245,7 @@ export default function PortalPage() {
             <div className="space-y-3">
               <button
                 onClick={() => router.push('/facility/register')}
-                className="w-full flex items-center justify-center gap-3 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-4 px-6 rounded-md transition-colors"
+                className="w-full flex items-center justify-center gap-3 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-md transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 施設を新規作成（管理者として）

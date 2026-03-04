@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       (facilities || []).map((f) => [f.id, f.name as string])
     );
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.Roots.inu.co.jp';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://roots.inu.co.jp';
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'Roots <noreply@and-and.co.jp>';
 
     // 求人カードHTMLを生成

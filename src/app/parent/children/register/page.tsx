@@ -230,7 +230,7 @@ export default function ChildRegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-client-light p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,7 +283,7 @@ export default function ChildRegisterPage() {
             <button
               type="button"
               onClick={() => toggleSection('basic')}
-              className="w-full px-4 py-3 flex items-center justify-between bg-[#FEF3E2] text-orange-800 font-bold"
+              className="w-full px-4 py-3 flex items-center justify-between bg-client-light text-orange-800 font-bold"
             >
               <span>基本情報</span>
               {expandedSections.basic ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -299,7 +299,7 @@ export default function ChildRegisterPage() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="山田 花子"
                     disabled={loading}
                   />
@@ -313,7 +313,7 @@ export default function ChildRegisterPage() {
                     type="text"
                     value={formData.nameKana}
                     onChange={(e) => setFormData({ ...formData, nameKana: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="ヤマダ ハナコ"
                     disabled={loading}
                   />
@@ -329,7 +329,7 @@ export default function ChildRegisterPage() {
                       value={formData.birthDate}
                       onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                       disabled={loading}
                     />
                   </div>
@@ -360,7 +360,7 @@ export default function ChildRegisterPage() {
                           value={option.value}
                           checked={formData.gender === option.value}
                           onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
-                          className="text-[#F6AD55] focus:ring-[#F6AD55]"
+                          className="text-client focus:ring-client"
                           disabled={loading}
                         />
                         <span className="text-sm text-gray-700">{option.label}</span>
@@ -377,7 +377,7 @@ export default function ChildRegisterPage() {
             <button
               type="button"
               onClick={() => toggleSection('certificate')}
-              className="w-full px-4 py-3 flex items-center justify-between bg-[#FEF3E2] text-orange-800 font-bold"
+              className="w-full px-4 py-3 flex items-center justify-between bg-client-light text-orange-800 font-bold"
             >
               <span>受給者証情報</span>
               {expandedSections.certificate ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -392,7 +392,7 @@ export default function ChildRegisterPage() {
                     type="text"
                     value={formData.beneficiaryNumber}
                     onChange={(e) => setFormData({ ...formData, beneficiaryNumber: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="10桁の番号"
                     disabled={loading}
                   />
@@ -409,7 +409,7 @@ export default function ChildRegisterPage() {
                     type="number"
                     value={formData.grantDays}
                     onChange={(e) => setFormData({ ...formData, grantDays: e.target.value ? parseInt(e.target.value) : '' })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="例: 23"
                     min="0"
                     max="31"
@@ -440,7 +440,7 @@ export default function ChildRegisterPage() {
                     type="text"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="東京都渋谷区..."
                     disabled={loading}
                   />
@@ -454,7 +454,7 @@ export default function ChildRegisterPage() {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="090-1234-5678"
                     disabled={loading}
                   />
@@ -468,7 +468,7 @@ export default function ChildRegisterPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="example@email.com"
                     disabled={loading}
                   />
@@ -497,7 +497,7 @@ export default function ChildRegisterPage() {
                     type="text"
                     value={formData.doctorName}
                     onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="山田 太郎 先生"
                     disabled={loading}
                   />
@@ -511,7 +511,7 @@ export default function ChildRegisterPage() {
                     type="text"
                     value={formData.doctorClinic}
                     onChange={(e) => setFormData({ ...formData, doctorClinic: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="〇〇クリニック"
                     disabled={loading}
                   />
@@ -540,7 +540,7 @@ export default function ChildRegisterPage() {
                     type="text"
                     value={formData.schoolName}
                     onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="〇〇幼稚園"
                     disabled={loading}
                   />
@@ -569,7 +569,7 @@ export default function ChildRegisterPage() {
                     value={formData.characteristics}
                     onChange={(e) => setFormData({ ...formData, characteristics: e.target.value })}
                     rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                     placeholder="アレルギー、配慮が必要な点、得意なこと、苦手なことなど"
                     disabled={loading}
                   />
@@ -583,7 +583,7 @@ export default function ChildRegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-client hover:bg-client-dark text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '登録中...' : 'お子様を登録する'}
             </button>

@@ -52,7 +52,7 @@ export default function MonthlyRevenueTab({
       {/* 入力パラメータ */}
       <div className="bg-gray-50 rounded-lg p-4">
         <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center gap-2">
-          <PieChart size={16} className="text-[#00c4cc]" />
+          <PieChart size={16} className="text-primary" />
           シミュレーション条件
         </h3>
 
@@ -69,7 +69,7 @@ export default function MonthlyRevenueTab({
               max={50}
               value={simulationParams.childCount}
               onChange={(e) => setSimulationParams({ childCount: parseInt(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary"
             />
           </div>
 
@@ -85,7 +85,7 @@ export default function MonthlyRevenueTab({
               max={31}
               value={simulationParams.averageUsageDays}
               onChange={(e) => setSimulationParams({ averageUsageDays: parseInt(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary"
             />
           </div>
 
@@ -101,7 +101,7 @@ export default function MonthlyRevenueTab({
               max={2000}
               value={simulationParams.baseUnits}
               onChange={(e) => setSimulationParams({ baseUnits: parseInt(e.target.value) || 700 })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function MonthlyRevenueTab({
             <select
               value={simulationParams.regionGrade}
               onChange={(e) => setSimulationParams({ regionGrade: parseInt(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary"
             >
               {REGION_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>
@@ -133,7 +133,7 @@ export default function MonthlyRevenueTab({
             <select
               value={simulationParams.percentAdditions}
               onChange={(e) => setSimulationParams({ percentAdditions: parseFloat(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary"
             >
               {TREATMENT_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>
@@ -149,10 +149,10 @@ export default function MonthlyRevenueTab({
       {simulationResult && (
         <>
           {/* 合計売上 */}
-          <div className="bg-gradient-to-r from-[#00c4cc]/10 to-[#00c4cc]/5 rounded-lg p-6">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg p-6">
             <div className="text-center">
               <div className="text-sm text-gray-600 mb-2">月間見込み売上</div>
-              <div className="text-4xl font-bold text-[#00c4cc]">
+              <div className="text-4xl font-bold text-primary">
                 ¥{simulationResult.totalRevenue.toLocaleString()}
               </div>
               <div className="text-sm text-gray-500 mt-2">
@@ -164,7 +164,7 @@ export default function MonthlyRevenueTab({
           {/* 内訳 */}
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center gap-2">
-              <TrendingUp size={16} className="text-[#00c4cc]" />
+              <TrendingUp size={16} className="text-primary" />
               売上内訳
             </h3>
 
@@ -228,7 +228,7 @@ export default function MonthlyRevenueTab({
               <p className="mt-1">
                 = ({simulationParams.baseUnits} + {simulationResult.selectedAdditions.filter(a => a.isEligible).reduce((sum, a) => sum + a.units, 0)}) × {simulationParams.childCount * simulationParams.averageUsageDays} × {unitRate} × (1 + {simulationParams.percentAdditions / 100})
               </p>
-              <p className="mt-1 text-[#00c4cc] font-bold">
+              <p className="mt-1 text-primary font-bold">
                 = ¥{simulationResult.totalRevenue.toLocaleString()}
               </p>
             </div>

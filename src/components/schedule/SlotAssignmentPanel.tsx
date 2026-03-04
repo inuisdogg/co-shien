@@ -1,27 +1,21 @@
 /**
  * スロット割り当てパネル
- * 日付クリック時に開くフルスクリーンモーダル
- * 児童を各時間枠に割り当てる
- * 左側に児童一覧（曜日パターン優先）、右側に午前・午後の枠（送迎エリア含む）を表示
+ * 日付クリック時に開くモーダル
+ * カードグリッド＋送迎グループ表示
  */
 
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { X, Plus, Trash2, Car, Calendar, AlertTriangle, Search, ArrowRight, ArrowLeft, Users } from 'lucide-react';
-import { TimeSlot, ScheduleItem, Child, UsageRecord } from '@/types';
-import ChildCard from './ChildCard';
+import { X, Plus, Trash2, Calendar, AlertTriangle, Users, Zap } from 'lucide-react';
+import { TimeSlot, ScheduleItem, Child, UsageRecord, ResolvedSlotInfo, TransportVehicle } from '@/types';
 import ChildPickerPopup, { SelectedChildWithTransport } from './ChildPickerPopup';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
+import { useToast } from '@/components/ui/Toast';
+import { resolveTimeSlots, slotDisplayName, expandSlotKeys } from '@/utils/slotResolver';
 
-// ドロップターゲットの種類
-type DropTarget = {
-  slot: TimeSlot;
-  transport: 'pickup' | 'none' | 'dropoff' | 'both';
-};
-
-// 時間枠情報の型
-interface SlotInfoType {
+// レガシー時間枠情報の型（後方互換性のため維持）
+interface LegacySlotInfoType {
   AM: { name: string; startTime: string; endTime: string };
   PM: { name: string; startTime: string; endTime: string } | null;
 }
@@ -30,9 +24,11 @@ interface SlotAssignmentPanelProps {
   date: string;
   schedules: ScheduleItem[];
   childList: Child[];
-  capacity: { AM: number; PM: number };
-  slotInfo?: SlotInfoType;
+  capacity: Record<string, number>;
+  slotInfo?: LegacySlotInfoType;
+  resolvedSlots?: ResolvedSlotInfo[];
   transportCapacity?: { pickup: number; dropoff: number };
+  transportVehicles?: TransportVehicle[];
   onClose: () => void;
   onAddSchedule: (data: {
     date: string;
@@ -41,12 +37,53 @@ interface SlotAssignmentPanelProps {
     slot: TimeSlot;
     hasPickup: boolean;
     hasDropoff: boolean;
+    pickupMethod?: string | null;
+    dropoffMethod?: string | null;
   }) => Promise<void>;
   onDeleteSchedule: (id: string) => Promise<void>;
   onMoveSchedule: (id: string, newSlot: TimeSlot) => Promise<void>;
-  onUpdateTransport?: (id: string, hasPickup: boolean, hasDropoff: boolean) => Promise<void>;
+  onUpdateTransport?: (id: string, hasPickup: boolean, hasDropoff: boolean, pickupMethod?: string | null, dropoffMethod?: string | null) => Promise<void>;
   getUsageRecordByScheduleId: (scheduleId: string) => UsageRecord | undefined;
   onScheduleItemClick: (item: ScheduleItem) => void;
+  onBulkRegisterDay?: (date: string) => Promise<{ added: number; skipped: number }>;
+}
+
+// 送迎方法の表示名を取得
+function getTransportLabel(method: string | null | undefined, vehicles: TransportVehicle[]): string {
+  if (!method) return '';
+  if (method === 'walk') return '徒歩';
+  const vehicle = vehicles.find(v => v.id === method);
+  return vehicle ? vehicle.name : method;
+}
+
+// 送迎バッジの短縮表示
+function getTransportBadge(method: string | null | undefined, vehicles: TransportVehicle[]): string {
+  if (!method) return '';
+  if (method === 'walk') return '🚶';
+  const vehicle = vehicles.find(v => v.id === method);
+  if (vehicle) {
+    // "1号車" → "🚐1"
+    const match = vehicle.name.match(/(\d+)/);
+    return match ? `🚐${match[1]}` : '🚐';
+  }
+  return '🚐';
+}
+
+// 送迎方法のサイクル切替（なし→徒歩→vehicle-1→vehicle-2→...→なし）
+function cycleTransportMethod(current: string | null | undefined, vehicles: TransportVehicle[]): string | null {
+  const options: (string | null)[] = [null, 'walk', ...vehicles.map(v => v.id)];
+  const currentIdx = options.indexOf(current || null);
+  const nextIdx = (currentIdx + 1) % options.length;
+  return options[nextIdx];
+}
+
+// 送迎グループの決定（pickup_method優先で分類）
+function getTransportGroup(schedule: ScheduleItem): string {
+  // pickupMethodが設定されている場合はそれを使う
+  if (schedule.pickupMethod) return schedule.pickupMethod;
+  // 後方互換: has_pickup=true but no method → 'legacy-pickup'
+  if (schedule.hasPickup) return 'legacy-pickup';
+  return 'none';
 }
 
 export default function SlotAssignmentPanel({
@@ -54,11 +91,10 @@ export default function SlotAssignmentPanel({
   schedules,
   childList,
   capacity,
-  slotInfo = {
-    AM: { name: '午前', startTime: '09:00', endTime: '12:00' },
-    PM: { name: '午後', startTime: '13:00', endTime: '18:00' },
-  },
+  slotInfo,
+  resolvedSlots: resolvedSlotsProp,
   transportCapacity = { pickup: 3, dropoff: 3 },
+  transportVehicles = [],
   onClose,
   onAddSchedule,
   onDeleteSchedule,
@@ -66,13 +102,42 @@ export default function SlotAssignmentPanel({
   onUpdateTransport,
   getUsageRecordByScheduleId,
   onScheduleItemClick,
+  onBulkRegisterDay,
 }: SlotAssignmentPanelProps) {
+  const { toast } = useToast();
   const [pickerSlot, setPickerSlot] = useState<TimeSlot | null>(null);
-  const [draggedItem, setDraggedItem] = useState<ScheduleItem | null>(null);
-  const [draggedChild, setDraggedChild] = useState<Child | null>(null);
-  const [dragOverTarget, setDragOverTarget] = useState<DropTarget | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [childSearchQuery, setChildSearchQuery] = useState('');
+
+  // 動的スロット解決
+  const slots: ResolvedSlotInfo[] = useMemo(() => {
+    if (resolvedSlotsProp && resolvedSlotsProp.length > 0) {
+      return resolvedSlotsProp;
+    }
+    const legacySlots: ResolvedSlotInfo[] = [];
+    if (slotInfo) {
+      legacySlots.push({
+        key: 'AM',
+        name: slotInfo.AM.name,
+        startTime: slotInfo.AM.startTime,
+        endTime: slotInfo.AM.endTime,
+        capacity: capacity['AM'] ?? 10,
+        displayOrder: 1,
+      });
+      if (slotInfo.PM) {
+        legacySlots.push({
+          key: 'PM',
+          name: slotInfo.PM.name,
+          startTime: slotInfo.PM.startTime,
+          endTime: slotInfo.PM.endTime,
+          capacity: capacity['PM'] ?? 10,
+          displayOrder: 2,
+        });
+      }
+    } else {
+      return resolveTimeSlots([], { capacity: capacity as Record<string, number> });
+    }
+    return legacySlots;
+  }, [resolvedSlotsProp, slotInfo, capacity]);
 
   // 日付情報
   const dateInfo = useMemo(() => {
@@ -80,100 +145,50 @@ export default function SlotAssignmentPanel({
     const d = new Date(year, month - 1, day);
     const dayOfWeek = d.getDay();
     const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-    return {
-      year,
-      month,
-      day,
-      dayOfWeek,
-      dayName: dayNames[dayOfWeek],
-      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-    };
+    return { year, month, day, dayOfWeek, dayName: dayNames[dayOfWeek], isWeekend: dayOfWeek === 0 || dayOfWeek === 6 };
   }, [date]);
 
-  // この日のスケジュールをスロット別に分類
+  // スロット別スケジュール
   const schedulesBySlot = useMemo(() => {
     const daySchedules = schedules.filter(s => s.date === date);
-    return {
-      AM: daySchedules.filter(s => s.slot === 'AM'),
-      PM: daySchedules.filter(s => s.slot === 'PM'),
-    };
-  }, [schedules, date]);
+    const grouped: Record<string, ScheduleItem[]> = {};
+    for (const slot of slots) {
+      grouped[slot.key] = daySchedules.filter(s => s.slot === slot.key);
+    }
+    return grouped;
+  }, [schedules, date, slots]);
 
-  // 既に登録済みの児童ID（全スロット合計）
-  const registeredChildIds = useMemo(() => {
-    return [...schedulesBySlot.AM, ...schedulesBySlot.PM].map(s => s.childId);
-  }, [schedulesBySlot]);
-
-  // 送迎の集計
-  const transportStats = useMemo(() => {
-    const amPickup = schedulesBySlot.AM.filter(s => s.hasPickup).length;
-    const amDropoff = schedulesBySlot.AM.filter(s => s.hasDropoff).length;
-    const pmPickup = schedulesBySlot.PM.filter(s => s.hasPickup).length;
-    const pmDropoff = schedulesBySlot.PM.filter(s => s.hasDropoff).length;
-
-    return {
-      AM: { pickup: amPickup, dropoff: amDropoff },
-      PM: { pickup: pmPickup, dropoff: pmDropoff },
-      total: {
-        pickup: amPickup + pmPickup,
-        dropoff: amDropoff + pmDropoff,
-      },
-    };
-  }, [schedulesBySlot]);
+  const allDaySchedules = useMemo(() => Object.values(schedulesBySlot).flat(), [schedulesBySlot]);
+  const registeredChildIds = useMemo(() => allDaySchedules.map(s => s.childId), [allDaySchedules]);
 
   // パターン一致判定
   const isPatternMatch = useCallback((child: Child, slot: TimeSlot) => {
     if (!child.patternDays?.includes(dateInfo.dayOfWeek)) return false;
     const timeSlot = child.patternTimeSlots?.[dateInfo.dayOfWeek];
-    return timeSlot === slot || timeSlot === 'AMPM';
+    return timeSlot === slot || timeSlot === 'AMPM' || timeSlot === 'ALL';
   }, [dateInfo.dayOfWeek]);
 
-  // 曜日パターン設定済みの児童（未登録のみ）
-  const patternChildren = useMemo(() => {
-    const registeredIds = [...schedulesBySlot.AM, ...schedulesBySlot.PM].map(s => s.childId);
-    return childList.filter(c =>
-      !registeredIds.includes(c.id) &&
-      c.patternDays?.includes(dateInfo.dayOfWeek)
-    ).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  }, [childList, schedulesBySlot, dateInfo.dayOfWeek]);
-
-  // その他の児童（未登録のみ）
-  const otherChildren = useMemo(() => {
-    const registeredIds = [...schedulesBySlot.AM, ...schedulesBySlot.PM].map(s => s.childId);
-    let filtered = childList.filter(c =>
-      !registeredIds.includes(c.id) &&
-      !c.patternDays?.includes(dateInfo.dayOfWeek)
-    );
-
-    if (childSearchQuery.trim()) {
-      const query = childSearchQuery.trim().toLowerCase();
-      filtered = filtered.filter(
-        c =>
-          c.name.toLowerCase().includes(query) ||
-          c.nameKana?.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  }, [childList, schedulesBySlot, dateInfo.dayOfWeek, childSearchQuery]);
-
-  // 児童追加（送迎オプション付き）
+  // 児童追加
   const handleAddChildrenWithTransport = async (children: SelectedChildWithTransport[], slot: TimeSlot) => {
     setProcessing(true);
     try {
-      for (const { childId, hasPickup, hasDropoff } of children) {
-        const child = childList.find(c => c.id === childId);
+      for (const item of children) {
+        const child = childList.find(c => c.id === item.childId);
         if (!child) continue;
-
         await onAddSchedule({
           date,
           childId: child.id,
           childName: child.name,
           slot,
-          hasPickup,
-          hasDropoff,
+          hasPickup: item.hasPickup || !!item.pickupMethod,
+          hasDropoff: item.hasDropoff || !!item.dropoffMethod,
+          pickupMethod: item.pickupMethod,
+          dropoffMethod: item.dropoffMethod,
         });
       }
+      toast.success(`${children.length}名を登録しました`);
+    } catch {
+      toast.error('登録に失敗しました。もう一度お試しください。');
     } finally {
       setProcessing(false);
       setPickerSlot(null);
@@ -191,97 +206,57 @@ export default function SlotAssignmentPanel({
     }
   };
 
-  // ドラッグ開始（登録済みスケジュールから）
-  const handleDragStart = (item: ScheduleItem) => {
-    const hasRecord = getUsageRecordByScheduleId(item.id);
-    if (hasRecord) return;
-    setDraggedItem(item);
-    setDraggedChild(null);
-  };
-
-  // ドラッグ開始（左側の児童リストから）
-  const handleChildDragStart = (child: Child) => {
-    setDraggedChild(child);
-    setDraggedItem(null);
-  };
-
-  // ドラッグ終了
-  const handleDragEnd = () => {
-    setDraggedItem(null);
-    setDraggedChild(null);
-    setDragOverTarget(null);
-  };
-
-  // ドロップ処理
-  const handleDrop = async (target: DropTarget) => {
-    const { slot, transport } = target;
-    const hasPickup = transport === 'pickup' || transport === 'both';
-    const hasDropoff = transport === 'dropoff' || transport === 'both';
-
-    if (draggedItem) {
-      // 既存スケジュールの移動/更新
-      setProcessing(true);
-      try {
-        // スロット移動が必要な場合
-        if (draggedItem.slot !== slot) {
-          await onMoveSchedule(draggedItem.id, slot);
-        }
-        // 送迎設定の更新
-        if (onUpdateTransport) {
-          await onUpdateTransport(draggedItem.id, hasPickup, hasDropoff);
-        } else {
-          // onUpdateTransportがない場合は、削除して再登録
-          const child = childList.find(c => c.id === draggedItem.childId);
-          if (child && (draggedItem.hasPickup !== hasPickup || draggedItem.hasDropoff !== hasDropoff)) {
-            await onDeleteSchedule(draggedItem.id);
-            await onAddSchedule({
-              date,
-              childId: child.id,
-              childName: child.name,
-              slot,
-              hasPickup,
-              hasDropoff,
-            });
-          }
-        }
-      } finally {
-        setProcessing(false);
-        handleDragEnd();
+  // 送迎バッジサイクルクリック
+  const handleCycleTransport = async (schedule: ScheduleItem, field: 'pickup' | 'dropoff') => {
+    if (!onUpdateTransport) return;
+    setProcessing(true);
+    try {
+      if (field === 'pickup') {
+        const newMethod = cycleTransportMethod(schedule.pickupMethod, transportVehicles);
+        await onUpdateTransport(
+          schedule.id,
+          !!newMethod,
+          schedule.hasDropoff,
+          newMethod,
+          undefined,
+        );
+      } else {
+        const newMethod = cycleTransportMethod(schedule.dropoffMethod, transportVehicles);
+        await onUpdateTransport(
+          schedule.id,
+          schedule.hasPickup,
+          !!newMethod,
+          undefined,
+          newMethod,
+        );
       }
-    } else if (draggedChild) {
-      // 新規登録
-      setProcessing(true);
-      try {
-        await onAddSchedule({
-          date,
-          childId: draggedChild.id,
-          childName: draggedChild.name,
-          slot,
-          hasPickup,
-          hasDropoff,
-        });
-      } finally {
-        setProcessing(false);
-        handleDragEnd();
-      }
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // パターン一括登録
+  const handleBulkRegister = async () => {
+    if (!onBulkRegisterDay) return;
+    setProcessing(true);
+    try {
+      const result = await onBulkRegisterDay(date);
+      toast.success(`${result.added}名を一括登録しました（スキップ: ${result.skipped}名）`);
+    } catch {
+      toast.error('一括登録に失敗しました');
+    } finally {
+      setProcessing(false);
     }
   };
 
   // この日をリセット
   const handleResetDay = async () => {
-    const schedulesWithoutRecord = [...schedulesBySlot.AM, ...schedulesBySlot.PM].filter(
-      s => !getUsageRecordByScheduleId(s.id)
-    );
-
+    const schedulesWithoutRecord = allDaySchedules.filter(s => !getUsageRecordByScheduleId(s.id));
     if (schedulesWithoutRecord.length === 0) {
-      alert('削除可能な予約がありません（実績登録済みの予約は削除できません）');
+      toast.warning('削除可能な予約がありません（実績登録済みの予約は削除できません）');
       return;
     }
-
-    if (!confirm(`この日の予約${schedulesWithoutRecord.length}件を削除しますか？\n※実績登録済みの予約は除外されます`)) {
-      return;
-    }
-
+    if (!confirm(`この日の予約${schedulesWithoutRecord.length}件を削除しますか？\n※実績登録済みの予約は除外されます`)) return;
     setProcessing(true);
     try {
       for (const s of schedulesWithoutRecord) {
@@ -292,132 +267,185 @@ export default function SlotAssignmentPanel({
     }
   };
 
-  // ドロップエリアのレンダリング
-  const renderDropArea = (slot: TimeSlot, transport: 'pickup' | 'none' | 'dropoff' | 'both', label: string, icon?: React.ReactNode) => {
-    const target: DropTarget = { slot, transport };
-    const isOver = dragOverTarget?.slot === slot && dragOverTarget?.transport === transport;
-    const isDragging = !!(draggedItem || draggedChild);
+  // スロットカラー
+  const slotColors = useMemo(() => {
+    const palettes = [
+      { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', headerBg: 'bg-blue-100' },
+      { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', headerBg: 'bg-orange-100' },
+      { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', headerBg: 'bg-green-100' },
+      { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-800', headerBg: 'bg-purple-100' },
+    ];
+    const map: Record<string, typeof palettes[0]> = {};
+    slots.forEach((s, i) => { map[s.key] = palettes[i % palettes.length]; });
+    return map;
+  }, [slots]);
 
-    // このエリアに該当するスケジュール
-    const areaSchedules = schedulesBySlot[slot].filter(s => {
-      if (transport === 'both') return s.hasPickup && s.hasDropoff;
-      if (transport === 'pickup') return s.hasPickup && !s.hasDropoff;
-      if (transport === 'dropoff') return s.hasDropoff && !s.hasPickup;
-      if (transport === 'none') return !s.hasPickup && !s.hasDropoff;
-      return false;
-    });
+  // 送迎グループ別にスケジュールを分類
+  const groupSchedulesByTransport = useCallback((slotSchedules: ScheduleItem[]) => {
+    const groups: { key: string; label: string; icon: string; schedules: ScheduleItem[] }[] = [];
 
-    const allSchedules = areaSchedules;
+    // 車両ごと
+    for (const vehicle of transportVehicles) {
+      const vehicleSchedules = slotSchedules.filter(s => s.pickupMethod === vehicle.id || s.dropoffMethod === vehicle.id);
+      if (vehicleSchedules.length > 0) {
+        groups.push({
+          key: vehicle.id,
+          label: `${vehicle.name}`,
+          icon: '🚐',
+          schedules: vehicleSchedules,
+        });
+      }
+    }
+
+    // 徒歩
+    const walkSchedules = slotSchedules.filter(s =>
+      (s.pickupMethod === 'walk' || s.dropoffMethod === 'walk') &&
+      !transportVehicles.some(v => s.pickupMethod === v.id || s.dropoffMethod === v.id)
+    );
+    if (walkSchedules.length > 0) {
+      groups.push({ key: 'walk', label: '徒歩', icon: '🚶', schedules: walkSchedules });
+    }
+
+    // 保護者送迎（methodなし）
+    const alreadyGrouped = new Set(groups.flatMap(g => g.schedules.map(s => s.id)));
+    const noneSchedules = slotSchedules.filter(s => !alreadyGrouped.has(s.id));
+    if (noneSchedules.length > 0) {
+      groups.push({ key: 'none', label: '保護者送迎', icon: '👤', schedules: noneSchedules });
+    }
+
+    return groups;
+  }, [transportVehicles]);
+
+  // カード描画
+  const renderChildCard = (schedule: ScheduleItem, slotKey: TimeSlot) => {
+    const child = childList.find(c => c.id === schedule.childId);
+    if (!child) return null;
+
+    const hasRecord = !!getUsageRecordByScheduleId(schedule.id);
+    const patternMatch = isPatternMatch(child, slotKey);
+    const ageDisplay = child.birthDate
+      ? calculateAgeWithMonths(child.birthDate).display
+      : child.age ? `${child.age}歳` : null;
+
+    const pickupBadge = getTransportBadge(schedule.pickupMethod, transportVehicles);
+    const dropoffBadge = getTransportBadge(schedule.dropoffMethod, transportVehicles);
 
     return (
       <div
-        className={`
-          flex-1 min-h-[100px] rounded-lg border-2 border-dashed p-2 transition-all
-          ${isOver && isDragging
-            ? 'border-[#00c4cc] bg-[#00c4cc]/10'
-            : 'border-gray-200 bg-gray-50/50'
-          }
-          ${isDragging ? 'hover:border-[#00c4cc]/50 hover:bg-[#00c4cc]/5' : ''}
-        `}
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (isDragging) {
-            setDragOverTarget(target);
-          }
-        }}
-        onDragLeave={() => setDragOverTarget(null)}
-        onDrop={() => handleDrop(target)}
+        key={schedule.id}
+        className={`group relative bg-white border rounded-xl p-3 transition-all hover:shadow-md ${
+          hasRecord ? 'border-green-300 bg-green-50/30' : 'border-gray-200 hover:border-primary/40'
+        }`}
       >
-        {/* エリアラベル */}
-        <div className="flex items-center gap-1 mb-2 text-xs text-gray-500">
-          {icon}
-          <span className="font-medium">{label}</span>
+        {/* 削除ボタン（ホバーで表示） */}
+        {!hasRecord && (
+          <button
+            onClick={() => handleRemoveChild(schedule.id)}
+            disabled={processing}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm text-xs disabled:opacity-50"
+            title="削除"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+
+        {/* 児童名（クリックでdetailへ） */}
+        <button
+          onClick={() => onScheduleItemClick(schedule)}
+          className="w-full text-left"
+        >
+          <p className="text-sm font-bold text-gray-800 truncate">{child.name}</p>
+          {ageDisplay && (
+            <p className="text-[11px] text-gray-400 mt-0.5">{ageDisplay}</p>
+          )}
+        </button>
+
+        {/* バッジ行 */}
+        <div className="flex items-center gap-1 mt-2 flex-wrap">
+          {patternMatch && (
+            <span className="text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded font-medium">
+              パターン
+            </span>
+          )}
+          {hasRecord && (
+            <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded font-medium">
+              実績済
+            </span>
+          )}
         </div>
 
-        {/* 登録済み児童 */}
-        <div className="flex flex-wrap gap-1.5">
-          {allSchedules.map(schedule => {
-            const child = childList.find(c => c.id === schedule.childId);
-            if (!child) return null;
-
-            const hasRecord = !!getUsageRecordByScheduleId(schedule.id);
-            const hasBoth = schedule.hasPickup && schedule.hasDropoff;
-
-            return (
-              <ChildCard
-                key={schedule.id}
-                child={child}
-                slot={slot}
-                scheduleId={schedule.id}
-                isPatternMatch={isPatternMatch(child, slot)}
-                hasPickup={schedule.hasPickup}
-                hasDropoff={schedule.hasDropoff}
-                hasUsageRecord={hasRecord}
-                draggable={!hasRecord}
-                onDragStart={() => handleDragStart(schedule)}
-                onDragEnd={handleDragEnd}
-                onClick={() => onScheduleItemClick(schedule)}
-                onRemove={hasRecord ? undefined : () => handleRemoveChild(schedule.id)}
-                compact
-                showBothTransport={hasBoth}
-              />
-            );
-          })}
+        {/* 送迎バッジ */}
+        <div className="flex items-center gap-1 mt-1.5">
+          <button
+            onClick={() => !hasRecord && handleCycleTransport(schedule, 'pickup')}
+            disabled={hasRecord || processing}
+            className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+              schedule.pickupMethod
+                ? 'bg-teal-100 text-teal-700'
+                : schedule.hasPickup
+                  ? 'bg-teal-500 text-white'
+                  : 'bg-gray-100 text-gray-400'
+            } ${!hasRecord ? 'cursor-pointer hover:ring-1 hover:ring-teal-300' : 'cursor-default'}`}
+            title="迎え（タップで切替）"
+          >
+            迎{pickupBadge || (schedule.hasPickup ? '✓' : '—')}
+          </button>
+          <button
+            onClick={() => !hasRecord && handleCycleTransport(schedule, 'dropoff')}
+            disabled={hasRecord || processing}
+            className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+              schedule.dropoffMethod
+                ? 'bg-teal-100 text-teal-700'
+                : schedule.hasDropoff
+                  ? 'bg-teal-500 text-white'
+                  : 'bg-gray-100 text-gray-400'
+            } ${!hasRecord ? 'cursor-pointer hover:ring-1 hover:ring-teal-300' : 'cursor-default'}`}
+            title="送り（タップで切替）"
+          >
+            送{dropoffBadge || (schedule.hasDropoff ? '✓' : '—')}
+          </button>
         </div>
       </div>
     );
   };
 
-  // スロットセクションのレンダリング
+  // スロットセクション
   const renderSlotSection = (slot: TimeSlot) => {
-    const slotSchedules = schedulesBySlot[slot];
-    const slotCapacity = capacity[slot];
-    const remaining = slotCapacity - slotSchedules.length;
+    const slotSchedules = schedulesBySlot[slot] || [];
+    const slotInfoResolved = slots.find(s => s.key === slot);
+    const slotCap = slotInfoResolved?.capacity ?? capacity[slot] ?? 0;
+    const remaining = slotCap - slotSchedules.length;
     const isFull = remaining <= 0;
-    const stats = transportStats[slot];
-    const isOverPickup = stats.pickup > transportCapacity.pickup;
-    const isOverDropoff = stats.dropoff > transportCapacity.dropoff;
+    const colors = slotColors[slot] || { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-800', headerBg: 'bg-gray-100' };
+
+    const groups = transportVehicles.length > 0
+      ? groupSchedulesByTransport(slotSchedules)
+      : [{ key: 'all', label: '', icon: '', schedules: slotSchedules }];
 
     return (
-      <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-        {/* ヘッダー（1行にまとめる） */}
-        <div className={`px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 ${
-          slot === 'AM' ? 'bg-blue-50 border-b border-blue-100' : 'bg-orange-50 border-b border-orange-100'
-        }`}>
-          <div className="flex items-center gap-3">
-            <h3 className={`font-bold text-sm ${slot === 'AM' ? 'text-blue-800' : 'text-orange-800'}`}>
-              {slot === 'AM' ? slotInfo.AM.name : slotInfo.PM?.name || '午後'}
+      <div key={slot} className={`border rounded-lg overflow-hidden ${colors.border}`}>
+        {/* スロットヘッダー */}
+        <div className={`px-3 py-2 flex items-center justify-between ${colors.headerBg}`}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className={`font-bold text-sm ${colors.text}`}>
+              {slotDisplayName(slots, slot)}
             </h3>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-gray-500" />
               <span className={`text-xs font-medium ${isFull ? 'text-red-600' : 'text-gray-600'}`}>
-                {slotSchedules.length}/{slotCapacity}
+                {slotSchedules.length}/{slotCap}
               </span>
               {remaining > 0 && (
-                <span className="text-xs text-gray-400 ml-1">残{remaining}</span>
+                <span className="text-xs text-gray-400">残{remaining}</span>
               )}
-            </div>
-            <div className="h-4 w-px bg-gray-300" />
-            <div className="flex items-center gap-3 text-xs">
-              <span className={`flex items-center gap-1 ${isOverPickup ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                <ArrowRight className="w-3 h-3" />
-                迎{stats.pickup}/{transportCapacity.pickup}
-                {isOverPickup && <AlertTriangle className="w-3 h-3" />}
-              </span>
-              <span className={`flex items-center gap-1 ${isOverDropoff ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                <ArrowLeft className="w-3 h-3" />
-                送{stats.dropoff}/{transportCapacity.dropoff}
-                {isOverDropoff && <AlertTriangle className="w-3 h-3" />}
-              </span>
             </div>
           </div>
 
-          {/* 追加ボタン */}
           {!isFull && (
             <button
               onClick={() => setPickerSlot(slot)}
               disabled={processing}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary hover:bg-primary-dark rounded transition-colors disabled:opacity-50"
             >
               <Plus className="w-3.5 h-3.5" />
               追加
@@ -425,12 +453,36 @@ export default function SlotAssignmentPanel({
           )}
         </div>
 
-        {/* ドロップエリア（4列） */}
-        <div className="p-3 flex gap-2">
-          {renderDropArea(slot, 'both', '迎送あり', <Car className="w-3 h-3 text-purple-600" />)}
-          {renderDropArea(slot, 'pickup', 'お迎えのみ', <ArrowRight className="w-3 h-3 text-green-600" />)}
-          {renderDropArea(slot, 'dropoff', 'お送りのみ', <ArrowLeft className="w-3 h-3 text-blue-600" />)}
-          {renderDropArea(slot, 'none', '送迎なし', <Car className="w-3 h-3 text-gray-400 opacity-50" />)}
+        {/* カードグリッド */}
+        <div className="bg-white p-3">
+          {slotSchedules.length === 0 ? (
+            <div className="py-6 text-center text-xs text-gray-400">
+              児童が登録されていません
+            </div>
+          ) : transportVehicles.length > 0 ? (
+            // 送迎グループ別表示
+            <div className="space-y-3">
+              {groups.map(group => (
+                <div key={group.key}>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-sm">{group.icon}</span>
+                    <span className="text-xs font-bold text-gray-600">
+                      {group.label}
+                    </span>
+                    <span className="text-[10px] text-gray-400">({group.schedules.length}名)</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {group.schedules.map(s => renderChildCard(s, slot))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // グループなし（車両未設定時）
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {slotSchedules.map(s => renderChildCard(s, slot))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -438,22 +490,29 @@ export default function SlotAssignmentPanel({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 lg:p-4">
-      <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[95vh] lg:max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[95vh] lg:max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-gray-200">
         {/* ヘッダー */}
-        <div className="px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-[#00c4cc] to-[#00b0b8]">
+        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-primary to-primary-dark">
           <div className="flex items-center gap-3">
             <Calendar className="w-5 h-5 text-white" />
-            <div>
-              <h2 className="text-lg font-bold text-white">
-                {dateInfo.year}年{dateInfo.month}月{dateInfo.day}日
-                <span className={`ml-2 text-sm font-normal ${dateInfo.isWeekend ? 'text-yellow-200' : 'text-white/90'}`}>
-                  ({dateInfo.dayName})
-                </span>
-              </h2>
-              <p className="text-xs text-white/80">ドラッグ&ドロップで登録・送迎設定を変更</p>
-            </div>
+            <h2 className="text-lg font-bold text-white">
+              {dateInfo.year}年{dateInfo.month}月{dateInfo.day}日
+              <span className={`ml-2 text-sm font-normal ${dateInfo.isWeekend ? 'text-yellow-200' : 'text-white/90'}`}>
+                ({dateInfo.dayName})
+              </span>
+            </h2>
           </div>
           <div className="flex items-center gap-2">
+            {onBulkRegisterDay && (
+              <button
+                onClick={handleBulkRegister}
+                disabled={processing}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-white/20 hover:bg-white/30 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Zap className="w-4 h-4" />
+                パターン一括
+              </button>
+            )}
             <button
               onClick={handleResetDay}
               disabled={processing}
@@ -472,117 +531,21 @@ export default function SlotAssignmentPanel({
         </div>
 
         {/* メインコンテンツ */}
-        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-          {/* 左側: 児童一覧 */}
-          <div className="lg:w-72 border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col bg-white max-h-[250px] lg:max-h-none">
-            {/* 検索 */}
-            <div className="p-3 border-b border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="児童名で検索..."
-                  value={childSearchQuery}
-                  onChange={(e) => setChildSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {/* 曜日パターン児童セクション */}
-              <div className="p-3 border-b border-gray-100">
-                <p className="text-xs text-gray-500 mb-2">
-                  {dateInfo.dayName}曜の利用パターン ({patternChildren.length}名)
-                </p>
-                {patternChildren.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-2">該当の児童はいません</p>
-                ) : (
-                  <div className="space-y-1">
-                    {patternChildren.map(child => {
-                      const patternMatchAM = isPatternMatch(child, 'AM');
-                      const patternMatchPM = isPatternMatch(child, 'PM');
-
-                      return (
-                        <div
-                          key={child.id}
-                          draggable
-                          onDragStart={() => handleChildDragStart(child)}
-                          onDragEnd={handleDragEnd}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded bg-gray-50 border border-gray-200 hover:bg-gray-100 cursor-grab active:cursor-grabbing transition-colors"
-                        >
-                          <span className="font-medium text-sm text-gray-800 flex-1 truncate">
-                            {child.name}
-                          </span>
-                          {(child.needsPickup || child.needsDropoff) && (
-                            <Car className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                          )}
-                          <span className="text-[10px] text-gray-500">
-                            {patternMatchAM && patternMatchPM ? '終日' : patternMatchAM ? slotInfo.AM.name : (slotInfo.PM?.name || '午後')}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* その他の児童セクション */}
-              <div className="p-3">
-                <p className="text-xs text-gray-500 mb-2">
-                  その他の児童 ({otherChildren.length}名)
-                </p>
-                {otherChildren.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-2">
-                    {childSearchQuery ? `「${childSearchQuery}」該当なし` : '該当の児童はいません'}
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {otherChildren.map(child => {
-                      const ageDisplay = child.birthDate ? calculateAgeWithMonths(child.birthDate).display : child.age ? `${child.age}歳` : null;
-
-                      return (
-                        <div
-                          key={child.id}
-                          draggable
-                          onDragStart={() => handleChildDragStart(child)}
-                          onDragEnd={handleDragEnd}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded bg-gray-50 border border-gray-200 hover:bg-gray-100 cursor-grab active:cursor-grabbing transition-colors"
-                        >
-                          <span className="font-medium text-sm text-gray-800 flex-1 truncate">
-                            {child.name}
-                            {ageDisplay && (
-                              <span className="text-xs font-normal text-gray-400 ml-1">({ageDisplay})</span>
-                            )}
-                          </span>
-                          {(child.needsPickup || child.needsDropoff) && (
-                            <Car className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 右側: 時間枠 */}
-          <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-4">
-            {renderSlotSection('AM')}
-            {slotInfo.PM && renderSlotSection('PM')}
-          </div>
+        <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3">
+          {slots.map(s => renderSlotSection(s.key))}
         </div>
 
         {/* フッター */}
-        <div className="px-4 lg:px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <div className="text-sm text-gray-600">
             登録済み: <span className="font-bold text-gray-800">{registeredChildIds.length}名</span>
-            <span className="text-xs text-gray-500 ml-2">（{slotInfo.AM.name}{schedulesBySlot.AM.length}{slotInfo.PM ? ` / ${slotInfo.PM.name}${schedulesBySlot.PM.length}` : ''}）</span>
+            <span className="text-xs text-gray-500 ml-2">
+              （{slots.map(s => `${slotDisplayName(slots, s.key)}${(schedulesBySlot[s.key] || []).length}`).join(' / ')}）
+            </span>
           </div>
           <button
             onClick={onClose}
-            className="px-5 py-2 text-sm font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors shadow-sm"
+            className="px-5 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors shadow-sm"
           >
             閉じる
           </button>
@@ -594,23 +557,25 @@ export default function SlotAssignmentPanel({
         isOpen={!!pickerSlot}
         onClose={() => setPickerSlot(null)}
         childList={childList}
-        targetSlot={pickerSlot || 'AM'}
+        targetSlot={pickerSlot || slots[0]?.key || 'AM'}
         date={date}
-        slotInfo={slotInfo}
+        resolvedSlots={slots}
+        transportVehicles={transportVehicles}
         alreadyRegisteredIds={
-          pickerSlot === 'AM'
-            ? schedulesBySlot.AM.map(s => s.childId)
-            : pickerSlot === 'PM'
-              ? schedulesBySlot.PM.map(s => s.childId)
-              : []
+          pickerSlot
+            ? (schedulesBySlot[pickerSlot] || []).map(s => s.childId)
+            : []
         }
         onSelect={(childIds) => handleAddChildrenWithTransport(
           childIds.map(id => {
             const child = childList.find(c => c.id === id);
+            const tp = child?.transportPattern?.[dateInfo.dayOfWeek];
             return {
               childId: id,
-              hasPickup: child?.needsPickup || false,
-              hasDropoff: child?.needsDropoff || false,
+              hasPickup: child?.needsPickup || !!tp?.pickup,
+              hasDropoff: child?.needsDropoff || !!tp?.dropoff,
+              pickupMethod: tp?.pickup || null,
+              dropoffMethod: tp?.dropoff || null,
             };
           }),
           pickerSlot!
@@ -620,9 +585,9 @@ export default function SlotAssignmentPanel({
 
       {/* 処理中オーバーレイ */}
       {processing && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[70]">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[9999]">
           <div className="bg-white rounded-lg px-6 py-4 shadow-lg">
-            <div className="animate-spin w-6 h-6 border-2 border-[#00c4cc] border-t-transparent rounded-full mx-auto mb-2" />
+            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
             <p className="text-sm text-gray-600">処理中...</p>
           </div>
         </div>

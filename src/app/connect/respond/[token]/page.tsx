@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ConnectResponseType } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 type DateOptionForResponse = {
   id: string;
@@ -34,6 +35,7 @@ type MeetingInfo = {
 type ResponseMap = Record<string, ConnectResponseType>;
 
 export default function ConnectRespondPage() {
+  const { toast } = useToast();
   const params = useParams();
   const token = params?.token as string;
 
@@ -173,12 +175,12 @@ export default function ConnectRespondPage() {
     // 全ての日程に回答しているかチェック
     const unanswered = dateOptions.filter(o => !responses[o.id]);
     if (unanswered.length > 0) {
-      alert('すべての候補日程に回答してください。');
+      toast.warning('すべての候補日程に回答してください。');
       return;
     }
 
     if (!responderName.trim()) {
-      alert('回答者名を入力してください。');
+      toast.warning('回答者名を入力してください。');
       return;
     }
 
@@ -229,7 +231,7 @@ export default function ConnectRespondPage() {
 
       setSubmitted(true);
     } catch {
-      alert('回答の送信に失敗しました。もう一度お試しください。');
+      toast.error('回答の送信に失敗しました。もう一度お試しください。');
     } finally {
       setSubmitting(false);
     }
@@ -249,7 +251,7 @@ export default function ConnectRespondPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-t-transparent border-[#00c4cc] rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-t-transparent border-primary rounded-full animate-spin" />
       </div>
     );
   }
@@ -258,7 +260,7 @@ export default function ConnectRespondPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-[#00c4cc] py-6 px-4 text-center">
+        <div className="bg-primary py-6 px-4 text-center">
           <h1 className="text-white text-lg font-bold">Roots 連絡会議</h1>
         </div>
         <div className="max-w-lg mx-auto mt-20 text-center">
@@ -278,7 +280,7 @@ export default function ConnectRespondPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-[#00c4cc] py-6 px-4 text-center">
+        <div className="bg-primary py-6 px-4 text-center">
           <h1 className="text-white text-lg font-bold">Roots 連絡会議</h1>
         </div>
         <div className="max-w-lg mx-auto mt-20 text-center">
@@ -299,7 +301,7 @@ export default function ConnectRespondPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <div className="bg-[#00c4cc] py-6 px-4 text-center">
+      <div className="bg-primary py-6 px-4 text-center">
         <h1 className="text-white text-lg font-bold">Roots 連絡会議 日程回答</h1>
       </div>
 
@@ -394,7 +396,7 @@ export default function ConnectRespondPage() {
                 value={responderName}
                 onChange={(e) => setResponderName(e.target.value)}
                 placeholder="お名前を入力してください"
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
             <div>
@@ -430,7 +432,7 @@ export default function ConnectRespondPage() {
                   onChange={(e) => setAttendeeNames(e.target.value)}
                   placeholder="参加される方のお名前をご記入ください（1行に1名）"
                   rows={Math.min(attendeeCount, 5)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                 />
               </div>
             )}
@@ -443,7 +445,7 @@ export default function ConnectRespondPage() {
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="ご連絡事項があればご記入ください"
                 rows={2}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
               />
             </div>
           </div>
@@ -453,7 +455,7 @@ export default function ConnectRespondPage() {
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full bg-[#00c4cc] text-white font-bold py-4 rounded-xl hover:bg-[#00b0b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? '送信中...' : alreadyResponded ? '回答を更新する' : '回答を送信する'}
         </button>

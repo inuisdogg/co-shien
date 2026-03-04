@@ -300,7 +300,7 @@ export default function UsageRequestPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-client mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -309,7 +309,7 @@ export default function UsageRequestPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-client-light p-4">
         <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={40} className="text-green-500" />
@@ -362,7 +362,7 @@ export default function UsageRequestPage() {
         {siblings.length > 1 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <label className="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#F6AD55]" />
+              <Users className="w-4 h-4 text-client" />
               お子様を選択
             </label>
             <div className="flex flex-wrap gap-2">
@@ -375,7 +375,7 @@ export default function UsageRequestPage() {
                     onClick={() => handleChildSwitch(sib.id)}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all font-medium text-sm ${
                       isActive
-                        ? 'border-[#F6AD55] bg-[#FEF3E2] text-gray-800 shadow-sm'
+                        ? 'border-client bg-client-light text-gray-800 shadow-sm'
                         : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
@@ -411,7 +411,7 @@ export default function UsageRequestPage() {
                 <select
                   value={selectedFacility}
                   onChange={(e) => setSelectedFacility(e.target.value)}
-                  className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55] focus:border-[#F6AD55] text-base"
+                  className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-client focus:border-client text-base"
                 >
                   {contracts.map((contract) => (
                     <option key={contract.id} value={contract.facility_id}>
@@ -471,7 +471,7 @@ export default function UsageRequestPage() {
 
             {/* カレンダー */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 bg-[#F6AD55] flex items-center justify-between">
+              <div className="px-4 py-3 bg-client flex items-center justify-between">
                 <button
                   onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
                   className="p-1.5 hover:bg-white/20 rounded-md text-white"
@@ -524,8 +524,8 @@ export default function UsageRequestPage() {
                             : isPast
                             ? 'bg-gray-50 opacity-50 border-transparent cursor-not-allowed'
                             : isSelected
-                            ? 'bg-[#F6AD55]/10 border-[#F6AD55] cursor-pointer shadow-sm'
-                            : 'bg-white border-gray-100 cursor-pointer hover:border-[#F6AD55]/40 hover:bg-amber-50/30'
+                            ? 'bg-client/10 border-client cursor-pointer shadow-sm'
+                            : 'bg-white border-gray-100 cursor-pointer hover:border-client/40 hover:bg-amber-50/30'
                         }`}
                         onClick={() => {
                           if (dateInfo.isCurrentMonth && !isPast) {
@@ -535,9 +535,9 @@ export default function UsageRequestPage() {
                       >
                         <div className={`text-xs text-center font-medium mb-1 ${
                           isToday
-                            ? 'w-6 h-6 rounded-full bg-[#F6AD55] text-white flex items-center justify-center mx-auto'
+                            ? 'w-6 h-6 rounded-full bg-client text-white flex items-center justify-center mx-auto'
                             : isSelected
-                            ? 'text-[#ED8936] font-bold'
+                            ? 'text-client-dark font-bold'
                             : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-gray-700'
                         }`}>
                           {dateInfo.day}
@@ -554,7 +554,7 @@ export default function UsageRequestPage() {
                                   }}
                                   className={`text-[8px] px-1 py-0.5 rounded transition-colors ${
                                     selectedData.slot === slot
-                                      ? 'bg-[#F6AD55] text-white'
+                                      ? 'bg-client text-white'
                                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                   }`}
                                 >
@@ -580,7 +580,7 @@ export default function UsageRequestPage() {
             {selectedDates.size > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#F6AD55]" />
+                  <Calendar className="w-4 h-4 text-client" />
                   選択した日程 ({selectedDates.size}日)
                 </h3>
                 <div className="space-y-2">
@@ -598,7 +598,7 @@ export default function UsageRequestPage() {
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                               item.slot === 'am' ? 'bg-blue-100 text-blue-700' :
                               item.slot === 'pm' ? 'bg-orange-100 text-orange-700' :
-                              'bg-[#F6AD55]/20 text-[#ED8936]'
+                              'bg-client/20 text-client-dark'
                             }`}>
                               {item.slot === 'am' ? '午前' : item.slot === 'pm' ? '午後' : '終日'}
                             </span>
@@ -609,7 +609,7 @@ export default function UsageRequestPage() {
                                 setEditingDate(item.date);
                                 setEditingNotes(item.notes);
                               }}
-                              className="text-xs text-gray-500 hover:text-[#F6AD55] transition-colors"
+                              className="text-xs text-gray-500 hover:text-client transition-colors"
                             >
                               {item.notes ? 'メモ編集' : 'メモ追加'}
                             </button>
@@ -636,7 +636,7 @@ export default function UsageRequestPage() {
               <button
                 onClick={handleSubmit}
                 disabled={submitting || selectedDates.size === 0}
-                className="w-full h-14 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base shadow-md active:shadow-sm"
+                className="w-full h-14 bg-client hover:bg-client-dark text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base shadow-md active:shadow-sm"
               >
                 {submitting ? (
                   <>
@@ -710,7 +710,7 @@ export default function UsageRequestPage() {
               <textarea
                 value={editingNotes}
                 onChange={(e) => setEditingNotes(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base"
                 rows={3}
                 placeholder="追加の要望やメモを入力..."
               />
@@ -724,7 +724,7 @@ export default function UsageRequestPage() {
               </button>
               <button
                 onClick={saveNotes}
-                className="flex-1 py-2.5 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl text-sm"
+                className="flex-1 py-2.5 bg-client hover:bg-client-dark text-white font-bold rounded-xl text-sm"
               >
                 保存
               </button>

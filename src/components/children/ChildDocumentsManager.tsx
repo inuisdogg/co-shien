@@ -21,6 +21,7 @@ import {
   FileSignature,
   File,
   Save,
+  Eye,
 } from 'lucide-react';
 import {
   DocumentType,
@@ -30,6 +31,8 @@ import {
 } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
+import DocumentPreviewModal from '@/components/common/DocumentPreviewModal';
 
 type Props = {
   childId: string;
@@ -67,6 +70,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
   onClose,
 }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [documents, setDocuments] = useState<ChildDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategoryId>(DOCUMENT_CATEGORIES[0].id);
@@ -82,6 +86,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
     notes: '',
   });
   const [saving, setSaving] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<ChildDocument | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,7 +167,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
     if (pdfFile) {
       openUploadModal(pdfFile);
     } else {
-      alert('PDFファイルを選択してください');
+      toast.warning('PDFファイルを選択してください');
     }
   };
 
@@ -183,7 +188,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
     if (file && file.type === 'application/pdf') {
       openUploadModal(file);
     } else if (file) {
-      alert('PDFファイルを選択してください');
+      toast.warning('PDFファイルを選択してください');
     }
     e.target.value = '';
   };
@@ -231,7 +236,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
       setUploadFile(null);
     } catch (err) {
       console.error('アップロードエラー:', err);
-      alert('アップロードに失敗しました');
+      toast.error('アップロードに失敗しました');
     } finally {
       setSaving(false);
     }
@@ -240,7 +245,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
   // ダウンロード
   const handleDownload = async (doc: ChildDocument) => {
     if (!doc.filePath) {
-      alert('ファイルが見つかりません');
+      toast.error('ファイルが見つかりません');
       return;
     }
 
@@ -259,7 +264,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('ダウンロードエラー:', err);
-      alert('ダウンロードに失敗しました');
+      toast.error('ダウンロードに失敗しました');
     }
   };
 
@@ -275,7 +280,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
       await fetchData();
     } catch (err) {
       console.error('削除エラー:', err);
-      alert('削除に失敗しました');
+      toast.error('削除に失敗しました');
     }
   };
 
@@ -344,7 +349,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`w-full px-4 py-3 text-left flex items-center gap-2 transition-colors ${
                     isSelected
-                      ? 'bg-white border-l-4 border-[#00c4cc] text-[#00c4cc]'
+                      ? 'bg-white border-l-4 border-primary text-primary'
                       : 'hover:bg-gray-100 text-gray-700'
                   }`}
                 >
@@ -352,7 +357,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
                   <span className="text-sm font-medium flex-1">{cat.label}</span>
                   {count > 0 && (
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      isSelected ? 'bg-[#00c4cc]/10' : 'bg-gray-200'
+                      isSelected ? 'bg-primary/10' : 'bg-gray-200'
                     }`}>
                       {count}
                     </span>
@@ -371,12 +376,12 @@ export const ChildDocumentsManager: React.FC<Props> = ({
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors mb-4 ${
                 isDragging
-                  ? 'border-[#00c4cc] bg-[#00c4cc]/5'
+                  ? 'border-primary bg-primary/5'
                   : 'border-gray-300 hover:border-gray-400'
               }`}
             >
               <Upload className={`w-8 h-8 mx-auto mb-2 ${
-                isDragging ? 'text-[#00c4cc]' : 'text-gray-400'
+                isDragging ? 'text-primary' : 'text-gray-400'
               }`} />
               <p className="text-gray-600 text-sm mb-2">
                 PDFをドラッグ&ドロップ
@@ -390,7 +395,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-sm bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-medium py-1.5 px-4 rounded-lg transition-colors"
+                className="text-sm bg-primary hover:bg-primary-dark text-white font-medium py-1.5 px-4 rounded-lg transition-colors"
               >
                 ファイルを選択
               </button>
@@ -427,9 +432,12 @@ export const ChildDocumentsManager: React.FC<Props> = ({
                           <FileText className="w-5 h-5 text-red-500 shrink-0" />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-800 truncate">
+                              <button
+                                onClick={() => doc.filePath && setPreviewDoc(doc)}
+                                className={`font-medium truncate text-left ${doc.filePath ? 'text-gray-800 hover:text-primary transition-colors cursor-pointer' : 'text-gray-800'}`}
+                              >
                                 {doc.documentName}
-                              </span>
+                              </button>
                               {doc.status === 'expired' && (
                                 <span className="flex items-center gap-1 text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
                                   <AlertCircle className="w-3 h-3" />
@@ -452,13 +460,22 @@ export const ChildDocumentsManager: React.FC<Props> = ({
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {doc.filePath && (
-                            <button
-                              onClick={() => handleDownload(doc)}
-                              className="p-2 text-gray-500 hover:text-[#00c4cc] hover:bg-white rounded-lg transition-colors"
-                              title="ダウンロード"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setPreviewDoc(doc)}
+                                className="p-2 text-gray-500 hover:text-blue-500 hover:bg-white rounded-lg transition-colors"
+                                title="プレビュー"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDownload(doc)}
+                                className="p-2 text-gray-500 hover:text-primary hover:bg-white rounded-lg transition-colors"
+                                title="ダウンロード"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => handleDelete(doc)}
@@ -498,9 +515,21 @@ export const ChildDocumentsManager: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* プレビューモーダル */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          isOpen={!!previewDoc}
+          onClose={() => setPreviewDoc(null)}
+          filePath={previewDoc.filePath || ''}
+          fileName={previewDoc.fileName || 'document.pdf'}
+          title={previewDoc.documentName}
+          bucket="child-documents"
+        />
+      )}
+
       {/* アップロードモーダル */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-800">書類の登録</h2>
@@ -594,7 +623,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
               <button
                 onClick={handleUpload}
                 disabled={saving || !uploadForm.documentType}
-                className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {saving ? '登録中...' : '登録する'}

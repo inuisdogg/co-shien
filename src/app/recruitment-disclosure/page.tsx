@@ -75,55 +75,55 @@ export default function RecruitmentDisclosurePage() {
                 <h3 className="font-semibold text-gray-800 mb-3">対象職種一覧</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">保育士</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">児童指導員</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">理学療法士（PT）</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">作業療法士（OT）</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">言語聴覚士（ST）</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">看護師</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">管理者</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">サービス管理責任者</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">児童発達支援管理責任者</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">相談支援専門員</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">社会福祉士</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">精神保健福祉士</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0"></span>
+                    <span className="w-2 h-2 bg-personal rounded-full shrink-0"></span>
                     <span className="text-gray-700 text-sm">臨床心理士・公認心理師</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ export default function RecruitmentDisclosurePage() {
               <h2 className="text-xl font-bold text-gray-800 mb-4">4. 個人情報の取扱い</h2>
               <p className="text-gray-700 leading-relaxed">
                 当社は、職業紹介事業において取得した個人情報を、当社の
-                <Link href="/privacy" className="text-indigo-600 hover:underline font-medium">
+                <Link href="/privacy" className="text-personal hover:underline font-medium">
                   プライバシーポリシー
                 </Link>
                 に従い適切に取り扱います。

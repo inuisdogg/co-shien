@@ -14,13 +14,17 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import { ScanFace } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
+import { startAuthentication } from '@simplewebauthn/browser';
+import { useToast } from '@/components/ui/Toast';
 
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
 
 export default function CareerLoginPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect');
@@ -31,11 +35,21 @@ export default function CareerLoginPage() {
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
 
   // 既にログイン済みかチェック、保存されたログイン情報を読み込む
   useEffect(() => {
     const checkSession = async () => {
       try {
+        // セッション有効期限チェック
+        const sessionExpires = localStorage.getItem('session_expires');
+        if (sessionExpires && Date.now() > parseInt(sessionExpires, 10)) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('facility');
+          localStorage.removeItem('session_expires');
+        }
+
         const userStr = localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
@@ -76,6 +90,11 @@ export default function CareerLoginPage() {
       } catch (e) {
         console.error('Session check error:', e);
       }
+      // WebAuthn対応チェック
+      if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+        setPasskeySupported(true);
+      }
+
       setCheckingSession(false);
     };
     checkSession();
@@ -122,6 +141,7 @@ export default function CareerLoginPage() {
         account_status: userData.account_status,
       };
       localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('session_expires', (Date.now() + 8 * 60 * 60 * 1000).toString());
 
       // ログイン情報を保存するかどうか（30日間有効）
       if (rememberMe) {
@@ -148,34 +168,92 @@ export default function CareerLoginPage() {
     }
   };
 
+  // Face IDでログイン（Discoverable Credential フロー: メールアドレス不要）
+  const handleFaceIdLogin = async () => {
+    setError('');
+    setPasskeyLoading(true);
+    try {
+      // Discoverable Credential フロー: loginIdを空にしてリクエスト
+      const beginRes = await fetch('/api/passkey/authenticate/begin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!beginRes.ok) {
+        throw new Error('パスキー認証を開始できませんでした');
+      }
+      const options = await beginRes.json();
+      const credential = await startAuthentication({ optionsJSON: options });
+      const finishRes = await fetch('/api/passkey/authenticate/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          credential,
+          discoverable: true,
+          expectedChallenge: options.challenge,
+        }),
+      });
+      if (!finishRes.ok) {
+        throw new Error('パスキー認証に失敗しました');
+      }
+      const { userId } = await finishRes.json();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (!userData) throw new Error('ユーザー情報の取得に失敗しました');
+      const user = {
+        id: userData.id,
+        name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
+        lastName: userData.last_name,
+        firstName: userData.first_name,
+        email: userData.email,
+        role: userData.role,
+        userType: userData.user_type || 'staff',
+        account_status: userData.account_status,
+      };
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('session_expires', (Date.now() + 8 * 60 * 60 * 1000).toString());
+      if (redirectTo) {
+        window.location.href = redirectTo;
+      } else {
+        window.location.href = '/career';
+      }
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError') {
+        setError('パスキー認証がキャンセルされました');
+      } else {
+        setError(err.message || 'パスキー認証に失敗しました');
+      }
+    } finally {
+      setPasskeyLoading(false);
+    }
+  };
+
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8] to-[#6366F1]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-personal"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8]/90 to-[#6366F1] p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
             src="/logo.svg"
             alt="Roots"
-            width={180}
-            height={56}
-            className="h-14 w-auto mx-auto mb-4"
+            width={103}
+            height={28}
+            className="h-7 w-auto mx-auto mb-6"
             priority
           />
-          <div className="mb-3">
-            <span className="inline-block bg-[#818CF8]/10 text-[#818CF8] text-xs font-bold px-3 py-1 rounded-lg">
-              スタッフ / 施設管理
-            </span>
-          </div>
           <h1 className="text-2xl font-bold text-gray-900">ログイン</h1>
           <p className="text-gray-500 text-sm mt-1">
-            スタッフ・専門家の方はこちらからログイン
+            キャリアアカウントでログイン
           </p>
         </div>
 
@@ -201,7 +279,7 @@ export default function CareerLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all"
                 placeholder="example@email.com"
                 disabled={loading}
               />
@@ -222,7 +300,7 @@ export default function CareerLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all"
                 placeholder="パスワードを入力"
                 disabled={loading}
               />
@@ -253,7 +331,7 @@ export default function CareerLoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 text-[#818CF8] border-gray-300 rounded focus:ring-[#818CF8]"
+                className="w-4 h-4 text-personal border-gray-300 rounded focus:ring-personal"
                 disabled={loading}
               />
               <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
@@ -263,7 +341,7 @@ export default function CareerLoginPage() {
             <button
               type="button"
               onClick={() => router.push('/login/forgot-password')}
-              className="text-xs text-[#818CF8] hover:underline"
+              className="text-xs text-gray-500 hover:text-personal hover:underline"
             >
               パスワードを忘れた場合
             </button>
@@ -272,7 +350,7 @@ export default function CareerLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
+            className="w-full h-12 bg-personal hover:bg-personal-dark text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
           >
             {loading ? (
               <>
@@ -283,6 +361,39 @@ export default function CareerLoginPage() {
           </button>
         </form>
 
+        {/* Face IDでログイン（Discoverable Credential）: パスキー登録済みの方向け */}
+        {passkeySupported && (
+          <div className="mt-5">
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-white px-3 text-gray-400">または</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleFaceIdLogin}
+              disabled={passkeyLoading || loading}
+              className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-personal hover:text-personal font-bold rounded-lg transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {passkeyLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-personal border-t-transparent rounded-full animate-spin" />
+                  認証中...
+                </>
+              ) : (
+                <>
+                  <ScanFace className="w-5 h-5" />
+                  Face IDでログイン
+                </>
+              )}
+            </button>
+            <p className="text-xs text-gray-400 text-center mt-1.5">パスキー登録済みの方はワンタップでログイン</p>
+          </div>
+        )}
+
         <div className="mt-6 pt-6 border-t border-gray-100">
           <p className="text-center text-sm text-gray-500 mb-3">
             アカウントをお持ちでない方
@@ -290,7 +401,7 @@ export default function CareerLoginPage() {
           <button
             type="button"
             onClick={() => router.push('/career/signup')}
-            className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-[#818CF8] hover:text-[#818CF8] font-bold rounded-lg transition-colors text-sm min-w-[120px]"
+            className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-personal hover:text-personal font-bold rounded-lg transition-colors text-sm min-w-[120px]"
           >
             新規登録
           </button>
@@ -299,14 +410,14 @@ export default function CareerLoginPage() {
         <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-4">
           <button
             onClick={() => router.push('/login/forgot-login-id')}
-            className="text-xs text-gray-400 hover:text-[#818CF8] hover:underline"
+            className="text-xs text-gray-400 hover:text-personal hover:underline"
           >
             ログインIDを忘れた場合
           </button>
           <span className="text-xs text-gray-300">|</span>
           <button
             onClick={() => router.push('/parent/login')}
-            className="text-xs text-gray-400 hover:text-[#F472B6] hover:underline"
+            className="text-xs text-gray-400 hover:text-client-dark hover:underline"
           >
             保護者の方はこちら
           </button>
@@ -323,7 +434,7 @@ export default function CareerLoginPage() {
               onClick={() => {
                 localStorage.removeItem('user');
                 localStorage.removeItem('savedCareerLoginData');
-                alert('セッションをクリアしました。ページを再読み込みします。');
+                toast.info('セッションをクリアしました。ページを再読み込みします。');
                 window.location.reload();
               }}
               className="w-full text-xs text-red-500 hover:text-red-700 py-1"

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { DailyTransportAssignment } from '@/types';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 
@@ -99,6 +100,7 @@ function getMonthRange(baseDate: Date): { start: string; end: string } {
 
 const TransportAssignmentPanel: React.FC = () => {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   // 週ナビゲーション
@@ -193,18 +195,33 @@ const TransportAssignmentPanel: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilityId]);
 
-  // スタッフリスト取得
+  // スタッフリスト取得（staff + employment_records）
   useEffect(() => {
     if (!facilityId) return;
     (async () => {
-      const { data } = await supabase
+      // staffテーブルから取得
+      const { data: staffData } = await supabase
         .from('staff')
         .select('id, name')
         .eq('facility_id', facilityId)
         .order('name');
-      if (data) {
-        setStaffList(data.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })));
-      }
+      const staffList = (staffData || []).map((s: { id: string; name: string }) => ({ id: s.id, name: s.name }));
+
+      // employment_records + users からemp-スタッフも取得
+      const { data: empData } = await supabase
+        .from('employment_records')
+        .select('id, user_id, users!inner(name)')
+        .eq('facility_id', facilityId)
+        .eq('status', 'active');
+      const empList = (empData || []).map((e: any) => ({
+        id: `emp-${e.id}`,
+        name: e.users?.name || '不明',
+      }));
+
+      // マージ（重複排除）
+      const staffIds = new Set(staffList.map((s: { id: string }) => s.id));
+      const merged = [...staffList, ...empList.filter((e: { id: string }) => !staffIds.has(e.id))];
+      setStaffList(merged);
     })();
   }, [facilityId]);
 
@@ -293,14 +310,17 @@ const TransportAssignmentPanel: React.FC = () => {
         const countsMap = new Map<string, { driver: number; attendant: number }>();
 
         for (const row of data as Array<Record<string, unknown>>) {
+          const hasNewColumns = row.pickup_driver_staff_id || row.dropoff_driver_staff_id || row.pickup_attendant_staff_id || row.dropoff_attendant_staff_id;
           const ids = [
             { id: row.pickup_driver_staff_id as string | null, role: 'driver' as const },
             { id: row.dropoff_driver_staff_id as string | null, role: 'driver' as const },
             { id: row.pickup_attendant_staff_id as string | null, role: 'attendant' as const },
             { id: row.dropoff_attendant_staff_id as string | null, role: 'attendant' as const },
-            // legacy
-            { id: row.driver_staff_id as string | null, role: 'driver' as const },
-            { id: row.attendant_staff_id as string | null, role: 'attendant' as const },
+            // legacy — 新カラムがある場合はスキップ（二重カウント防止）
+            ...(!hasNewColumns ? [
+              { id: row.driver_staff_id as string | null, role: 'driver' as const },
+              { id: row.attendant_staff_id as string | null, role: 'attendant' as const },
+            ] : []),
           ];
           for (const { id, role } of ids) {
             if (!id) continue;
@@ -439,7 +459,7 @@ const TransportAssignmentPanel: React.FC = () => {
       closeEditModal();
     } catch (err) {
       console.error('Error saving transport assignment:', err);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -463,7 +483,7 @@ const TransportAssignmentPanel: React.FC = () => {
           </button>
           <button
             onClick={goToThisWeek}
-            className="px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors shadow-sm"
+            className="px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors shadow-sm"
           >
             今週
           </button>
@@ -485,7 +505,7 @@ const TransportAssignmentPanel: React.FC = () => {
       {/* ローディング */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-[#00c4cc] border-t-transparent rounded-full" />
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
         </div>
       )}
 
@@ -511,9 +531,9 @@ const TransportAssignmentPanel: React.FC = () => {
                     holiday
                       ? 'bg-gray-50 border-gray-200 opacity-60'
                       : assigned
-                      ? 'bg-white border-[#00c4cc]/30 hover:shadow-md'
+                      ? 'bg-white border-primary/30 hover:shadow-md'
                       : 'bg-white border-red-200 hover:shadow-md'
-                  } ${isToday ? 'ring-2 ring-[#00c4cc]' : ''}`}
+                  } ${isToday ? 'ring-2 ring-primary' : ''}`}
                 >
                   {/* 日付ヘッダー */}
                   <div
@@ -521,7 +541,7 @@ const TransportAssignmentPanel: React.FC = () => {
                       holiday
                         ? 'bg-gray-100 border-gray-200'
                         : assigned
-                        ? 'bg-[#00c4cc]/5 border-[#00c4cc]/10'
+                        ? 'bg-primary/5 border-primary/10'
                         : 'bg-red-50 border-red-100'
                     }`}
                   >
@@ -537,14 +557,14 @@ const TransportAssignmentPanel: React.FC = () => {
                       >
                         {dayLabel}
                       </span>
-                      <span className={`text-sm ${isToday ? 'font-bold text-[#00c4cc]' : 'text-gray-600'}`}>
+                      <span className={`text-sm ${isToday ? 'font-bold text-primary' : 'text-gray-600'}`}>
                         {d.getMonth() + 1}/{d.getDate()}
                       </span>
                     </div>
                     {!holiday && (
                       <button
                         onClick={() => openEditModal(dateStr)}
-                        className="p-1 text-gray-400 hover:text-[#00c4cc] hover:bg-white rounded transition-colors"
+                        className="p-1 text-gray-400 hover:text-primary hover:bg-white rounded transition-colors"
                         title="編集"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -559,18 +579,18 @@ const TransportAssignmentPanel: React.FC = () => {
                       {/* 迎え (Pickup) */}
                       <div>
                         <div className="font-bold text-[#006064] mb-1 flex items-center gap-1">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00c4cc]" />
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
                           迎え
                         </div>
                         <div className="pl-3 space-y-0.5">
                           <div className="flex items-center gap-1 text-gray-700">
-                            <Car className="w-3 h-3 text-[#00c4cc]" />
+                            <Car className="w-3 h-3 text-primary" />
                             <span className={!assignment?.pickupDriverStaffId && !assignment?.driverStaffId ? 'text-red-400' : ''}>
                               {getStaffName(assignment?.pickupDriverStaffId || assignment?.driverStaffId)}
                             </span>
                           </div>
                           <div className="flex items-center gap-1 text-gray-700">
-                            <UserCheck className="w-3 h-3 text-[#00c4cc]" />
+                            <UserCheck className="w-3 h-3 text-primary" />
                             <span className={!assignment?.pickupAttendantStaffId && !assignment?.attendantStaffId ? 'text-red-400' : ''}>
                               {getStaffName(assignment?.pickupAttendantStaffId || assignment?.attendantStaffId)}
                             </span>
@@ -678,13 +698,13 @@ const TransportAssignmentPanel: React.FC = () => {
                   key={dateStr}
                   className={`rounded-xl shadow-sm border transition-all ${
                     assigned
-                      ? 'bg-white border-[#00c4cc]/30'
+                      ? 'bg-white border-primary/30'
                       : 'bg-white border-red-200'
-                  } ${isToday ? 'ring-2 ring-[#00c4cc]' : ''}`}
+                  } ${isToday ? 'ring-2 ring-primary' : ''}`}
                 >
                   <div
                     className={`px-4 py-2 border-b flex items-center justify-between ${
-                      assigned ? 'bg-[#00c4cc]/5 border-[#00c4cc]/10' : 'bg-red-50 border-red-100'
+                      assigned ? 'bg-primary/5 border-primary/10' : 'bg-red-50 border-red-100'
                     }`}
                   >
                     <span
@@ -700,7 +720,7 @@ const TransportAssignmentPanel: React.FC = () => {
                     </span>
                     <button
                       onClick={() => openEditModal(dateStr)}
-                      className="p-1.5 text-gray-400 hover:text-[#00c4cc] hover:bg-white rounded transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-primary hover:bg-white rounded transition-colors"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
@@ -711,11 +731,11 @@ const TransportAssignmentPanel: React.FC = () => {
                       <div className="font-bold text-[#006064] mb-1">迎え</div>
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1">
-                          <Car className="w-3 h-3 text-[#00c4cc]" />
+                          <Car className="w-3 h-3 text-primary" />
                           {getStaffName(assignment?.pickupDriverStaffId || assignment?.driverStaffId)}
                         </div>
                         <div className="flex items-center gap-1">
-                          <UserCheck className="w-3 h-3 text-[#00c4cc]" />
+                          <UserCheck className="w-3 h-3 text-primary" />
                           {getStaffName(assignment?.pickupAttendantStaffId || assignment?.attendantStaffId)}
                         </div>
                         {assignment?.pickupTime && (
@@ -759,7 +779,7 @@ const TransportAssignmentPanel: React.FC = () => {
           {monthlyStaffCounts.length > 0 && (
             <div className="mt-4 rounded-xl shadow-sm border border-gray-100 bg-white p-4">
               <h4 className="text-xs font-bold text-gray-600 mb-2 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-[#00c4cc]" />
+                <Users className="w-4 h-4 text-primary" />
                 月間担当回数（{parseDateLocal(weekDates[0]).getMonth() + 1}月）
               </h4>
               <div className="flex flex-wrap gap-2">
@@ -787,7 +807,7 @@ const TransportAssignmentPanel: React.FC = () => {
             {/* モーダルヘッダー */}
             <div className="px-5 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 flex-shrink-0">
               <h3 className="font-bold text-base text-gray-800 flex items-center gap-2">
-                <Car className="w-5 h-5 text-[#00c4cc]" />
+                <Car className="w-5 h-5 text-primary" />
                 送迎体制編集
                 <span className="text-sm text-gray-500 font-normal ml-1">
                   {(() => {
@@ -809,7 +829,7 @@ const TransportAssignmentPanel: React.FC = () => {
               {/* 迎え */}
               <div className="bg-[#e0f7fa]/30 rounded-lg p-4 border border-[#b2ebf2]/50">
                 <h4 className="text-sm font-bold text-[#006064] mb-3 flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full bg-[#00c4cc]" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-primary" />
                   迎え（ピックアップ）
                 </h4>
                 <div className="space-y-3">
@@ -818,7 +838,7 @@ const TransportAssignmentPanel: React.FC = () => {
                     <select
                       value={editForm.pickupDriverStaffId}
                       onChange={(e) => setEditForm({ ...editForm, pickupDriverStaffId: e.target.value })}
-                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     >
                       <option value="">未定</option>
                       {staffList.map((s) => (
@@ -833,7 +853,7 @@ const TransportAssignmentPanel: React.FC = () => {
                     <select
                       value={editForm.pickupAttendantStaffId}
                       onChange={(e) => setEditForm({ ...editForm, pickupAttendantStaffId: e.target.value })}
-                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     >
                       <option value="">未定</option>
                       {staffList.map((s) => (
@@ -849,7 +869,7 @@ const TransportAssignmentPanel: React.FC = () => {
                       type="time"
                       value={editForm.pickupTime}
                       onChange={(e) => setEditForm({ ...editForm, pickupTime: e.target.value })}
-                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
                 </div>
@@ -867,7 +887,7 @@ const TransportAssignmentPanel: React.FC = () => {
                     <select
                       value={editForm.dropoffDriverStaffId}
                       onChange={(e) => setEditForm({ ...editForm, dropoffDriverStaffId: e.target.value })}
-                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     >
                       <option value="">未定</option>
                       {staffList.map((s) => (
@@ -882,7 +902,7 @@ const TransportAssignmentPanel: React.FC = () => {
                     <select
                       value={editForm.dropoffAttendantStaffId}
                       onChange={(e) => setEditForm({ ...editForm, dropoffAttendantStaffId: e.target.value })}
-                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     >
                       <option value="">未定</option>
                       {staffList.map((s) => (
@@ -898,7 +918,7 @@ const TransportAssignmentPanel: React.FC = () => {
                       type="time"
                       value={editForm.dropoffTime}
                       onChange={(e) => setEditForm({ ...editForm, dropoffTime: e.target.value })}
-                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                      className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
                 </div>
@@ -913,7 +933,7 @@ const TransportAssignmentPanel: React.FC = () => {
                     value={editForm.vehicleInfo}
                     onChange={(e) => setEditForm({ ...editForm, vehicleInfo: e.target.value })}
                     placeholder="例: 白バン（品川 500 あ 1234）"
-                    className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                    className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
                 <div>
@@ -923,7 +943,7 @@ const TransportAssignmentPanel: React.FC = () => {
                     onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                     placeholder="例: 田中さん遅れる場合は佐藤さんが代行"
                     rows={2}
-                    className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] resize-none"
+                    className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                   />
                 </div>
               </div>
@@ -940,7 +960,7 @@ const TransportAssignmentPanel: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg text-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="flex-1 py-2 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg text-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {saving ? '保存中...' : '保存する'}

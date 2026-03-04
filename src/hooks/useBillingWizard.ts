@@ -1,6 +1,11 @@
 /**
- * 請求ウィザード用フック
+ * 請求ウィザード用フック（完全版）
  * useBilling をラップし、ステップごとのバリデーション・検証機能を追加する
+ *
+ * - 利用実績の検証（時刻・所得区分・受給者証）
+ * - 施設設定の検証（地域区分・定員・加算届出）
+ * - 上限額管理チェック
+ * - 月次請求ステータス管理
  */
 
 import { useCallback } from 'react';
@@ -25,6 +30,8 @@ export type ValidationItem = {
   childId?: string;
   childName?: string;
   date?: string;
+  actionLabel?: string;   // 「設定画面へ」等のアクションラベル
+  actionPath?: string;    // アクションのリンク先
 };
 
 export type ChildUsageSummary = {
@@ -35,7 +42,7 @@ export type ChildUsageSummary = {
   excludedDays: number;
   hasIncomeCategory: boolean;
   incomeCategory?: string;
-  missingTimes: string[];  // dates with missing actual_start_time or actual_end_time
+  missingTimes: string[];
   hasBeneficiaryNumber: boolean;
 };
 
@@ -79,21 +86,31 @@ export type MonthlyBillingStatus = {
   usageRecordCount: number;
 };
 
+export type FacilityBillingReadiness = {
+  isReady: boolean;
+  hasRegionalGrade: boolean;
+  regionalGrade?: string;
+  unitPrice?: number;
+  hasCapacity: boolean;
+  capacity?: number;
+  hasServiceType: boolean;
+  serviceTypeCode?: string;
+  enabledAdditionCount: number;
+  validations: ValidationItem[];
+};
+
 // ─── ヘルパー関数 ───
 
-/** 対象月の初日を返す */
 function getFirstDayOfMonth(yearMonth: string): string {
   return `${yearMonth}-01`;
 }
 
-/** 対象月の末日を返す */
 function getLastDayOfMonth(yearMonth: string): string {
   const [year, month] = yearMonth.split('-').map(Number);
   const lastDay = new Date(year, month, 0).getDate();
   return `${yearMonth}-${lastDay.toString().padStart(2, '0')}`;
 }
 
-/** 対象月のカレンダー日数を返す */
 function getDaysInMonth(yearMonth: string): number {
   const [year, month] = yearMonth.split('-').map(Number);
   return new Date(year, month, 0).getDate();
@@ -103,6 +120,117 @@ function getDaysInMonth(yearMonth: string): number {
 
 export const useBillingWizard = () => {
   const billing = useBilling();
+
+  // ─── 施設の請求準備状態を検証 ───
+  const checkFacilityReadiness = useCallback(
+    async (facilityId: string): Promise<FacilityBillingReadiness> => {
+      const validations: ValidationItem[] = [];
+
+      try {
+        // 施設設定を取得
+        const { data: settings } = await supabase
+          .from('facility_settings')
+          .select('regional_grade, capacity, service_type_code')
+          .eq('facility_id', facilityId)
+          .single();
+
+        const regionalGrade = (settings?.regional_grade as string) || null;
+        const capacityVal = (settings?.capacity as number) || null;
+        const serviceTypeCode = (settings?.service_type_code as string) || null;
+
+        // 地域区分の検証
+        let unitPrice: number | undefined;
+        if (!regionalGrade) {
+          validations.push({
+            severity: 'error',
+            message: '地域区分が設定されていません。正確な単位単価を算出できません（デフォルト10円で計算されます）',
+            actionLabel: '施設設定へ',
+            actionPath: '/settings',
+          });
+        } else {
+          // 単位単価を取得
+          const { data: regionData } = await supabase
+            .from('regional_units')
+            .select('unit_price')
+            .eq('grade', regionalGrade)
+            .single();
+
+          unitPrice = regionData?.unit_price ? Number(regionData.unit_price) : undefined;
+
+          if (!unitPrice) {
+            validations.push({
+              severity: 'warning',
+              message: `地域区分「${regionalGrade}」に対応する単位単価がマスタに存在しません`,
+            });
+          }
+        }
+
+        // 定員の検証
+        if (!capacityVal || capacityVal <= 0) {
+          validations.push({
+            severity: 'warning',
+            message: '定員が設定されていません。基本報酬の区分判定に影響する可能性があります（デフォルト10名で計算）',
+            actionLabel: '施設設定へ',
+            actionPath: '/settings',
+          });
+        }
+
+        // サービス種別の検証
+        if (!serviceTypeCode) {
+          validations.push({
+            severity: 'info',
+            message: 'サービス種別コードが未設定です。利用実績の時間帯からサービス種別を自動推定します',
+          });
+        }
+
+        // 加算設定の確認
+        const { count: additionCount } = await supabase
+          .from('facility_addition_settings')
+          .select('id', { count: 'exact', head: true })
+          .eq('facility_id', facilityId)
+          .eq('is_enabled', true);
+
+        const enabledAdditions = additionCount || 0;
+
+        if (enabledAdditions === 0) {
+          validations.push({
+            severity: 'info',
+            message: '有効な加算設定がありません。加算を算定する場合は加算設定画面で有効化してください',
+            actionLabel: '加算設定へ',
+            actionPath: '/addition-settings',
+          });
+        }
+
+        const isReady = !validations.some((v) => v.severity === 'error');
+
+        return {
+          isReady,
+          hasRegionalGrade: !!regionalGrade,
+          regionalGrade: regionalGrade || undefined,
+          unitPrice,
+          hasCapacity: !!capacityVal && capacityVal > 0,
+          capacity: capacityVal || undefined,
+          hasServiceType: !!serviceTypeCode,
+          serviceTypeCode: serviceTypeCode || undefined,
+          enabledAdditionCount: enabledAdditions,
+          validations,
+        };
+      } catch {
+        return {
+          isReady: false,
+          hasRegionalGrade: false,
+          hasCapacity: false,
+          hasServiceType: false,
+          enabledAdditionCount: 0,
+          validations: [{
+            severity: 'error',
+            message: '施設設定の取得に失敗しました',
+          }],
+        };
+      }
+    },
+    []
+  );
 
   // ─── 利用実績の検証 ───
   const fetchUsageVerification = useCallback(
@@ -197,7 +325,6 @@ export const useBillingWizard = () => {
         // 5. バリデーション生成
         const validations: ValidationItem[] = [];
 
-        // ERROR: 利用実績が0件
         if (usageRecords.length === 0) {
           validations.push({
             severity: 'error',
@@ -207,11 +334,8 @@ export const useBillingWizard = () => {
 
         // 6. 児童別サマリー構築
         const childSummaries: ChildUsageSummary[] = [];
-
-        // 利用実績がある児童のIDを収集
         const childIdsWithUsage = new Set(childUsageMap.keys());
 
-        // 全児童を走査（利用実績がない児童も含む）
         for (const child of children) {
           const childId = child.id as string;
           const childName = child.name as string;
@@ -228,7 +352,6 @@ export const useBillingWizard = () => {
             if (bt === '請求する') {
               childBillingDays++;
 
-              // WARNING: 請求対象なのに実績時刻が欠けている
               const actualStart = usage.actual_start_time as string | null;
               const actualEnd = usage.actual_end_time as string | null;
               if (!actualStart || !actualEnd) {
@@ -236,34 +359,63 @@ export const useBillingWizard = () => {
                 missingTimes.push(dateStr);
                 validations.push({
                   severity: 'warning',
-                  message: `${childName}：${dateStr} の実績時刻が未入力です（請求対象）`,
+                  message: `${childName}：${dateStr} の実績時刻が未入力です（請求対象）。時間区分による基本報酬の正確な算定ができません`,
                   childId,
                   childName,
                   date: dateStr,
                 });
+              } else {
+                // 時間区分の整合性チェック
+                const [sh, sm] = actualStart.split(':').map(Number);
+                const [eh, em] = actualEnd.split(':').map(Number);
+                const minutes = (eh * 60 + em) - (sh * 60 + sm);
+
+                if (minutes < 30) {
+                  const dateStr = usage.date as string;
+                  validations.push({
+                    severity: 'warning',
+                    message: `${childName}：${dateStr} のサービス提供時間が30分未満（${minutes}分）です。基本報酬の最低区分は30分以上です`,
+                    childId,
+                    childName,
+                    date: dateStr,
+                  });
+                }
+
+                if (minutes > 600) {
+                  const dateStr = usage.date as string;
+                  validations.push({
+                    severity: 'info',
+                    message: `${childName}：${dateStr} のサービス提供時間が10時間以上（${Math.floor(minutes / 60)}時間${minutes % 60}分）です。入力に誤りがないか確認してください`,
+                    childId,
+                    childName,
+                    date: dateStr,
+                  });
+                }
               }
             } else {
               childExcludedDays++;
             }
           }
 
-          // ERROR: 所得区分未設定
-          if (!incomeCategory) {
+          // 利用実績があるのに所得区分未設定
+          if (usages.length > 0 && childBillingDays > 0 && !incomeCategory) {
             validations.push({
               severity: 'error',
-              message: `${childName}：所得区分が設定されていません`,
+              message: `${childName}：所得区分が設定されていません。請求額の計算に必須です`,
               childId,
               childName,
+              actionLabel: '児童情報へ',
             });
           }
 
-          // WARNING: 受給者証番号未設定
-          if (!beneficiaryNumber) {
+          // 利用実績があるのに受給者証番号未設定
+          if (usages.length > 0 && childBillingDays > 0 && !beneficiaryNumber) {
             validations.push({
               severity: 'warning',
-              message: `${childName}：受給者証番号が設定されていません`,
+              message: `${childName}：受給者証番号が設定されていません。国保連CSVに出力できません`,
               childId,
               childName,
+              actionLabel: '児童情報へ',
             });
           }
 
@@ -280,7 +432,7 @@ export const useBillingWizard = () => {
           });
         }
 
-        // 利用実績はあるが児童マスタにない child_id があればスキップ（不整合）
+        // 児童マスタにない利用実績
         for (const childId of childIdsWithUsage) {
           if (!childMap.has(childId)) {
             validations.push({
@@ -291,7 +443,6 @@ export const useBillingWizard = () => {
           }
         }
 
-        // INFO: 請求対象外の日数
         if (excludedDays > 0) {
           validations.push({
             severity: 'info',
@@ -332,7 +483,6 @@ export const useBillingWizard = () => {
   const fetchUpperLimitCheck = useCallback(
     async (facilityId: string, yearMonth: string): Promise<UpperLimitCheckResult> => {
       try {
-        // 1. 対象月の請求レコードを取得
         const { data: recordsData, error: recordsError } = await supabase
           .from('billing_records')
           .select('*, children(id, name, income_category)')
@@ -360,12 +510,11 @@ export const useBillingWizard = () => {
             totalInsurance: 0,
             validations: [{
               severity: 'info',
-              message: '対象月の請求レコードがありません',
+              message: '対象月の請求レコードがありません。先に請求データを生成してください',
             }],
           };
         }
 
-        // 2. 児童ごとに上限額チェック
         const childResults: UpperLimitChildResult[] = [];
         const validations: ValidationItem[] = [];
         let totalCopay = 0;
@@ -380,13 +529,9 @@ export const useBillingWizard = () => {
           const recordTotalAmount = (record.total_amount as number) || 0;
           const copayAmount = (record.copay_amount as number) || 0;
 
-          // 10%計算による利用者負担
           const calculatedCopay = Math.floor(recordTotalAmount * 0.1);
-
-          // 実際に適用された利用者負担
           const appliedCopay = copayAmount;
 
-          // 上限到達・接近判定
           const isAtLimit = upperLimitAmount > 0 && appliedCopay >= upperLimitAmount;
           const isNearLimit = upperLimitAmount > 0 && appliedCopay > upperLimitAmount * 0.8;
           const percentOfLimit = upperLimitAmount > 0
@@ -408,11 +553,10 @@ export const useBillingWizard = () => {
           totalCopay += appliedCopay;
           totalInsurance += (record.insurance_amount as number) || 0;
 
-          // バリデーション: 上限到達
           if (isAtLimit) {
             validations.push({
               severity: 'warning',
-              message: `${childName}：利用者負担額が上限月額（${upperLimitAmount.toLocaleString()}円）に到達しています`,
+              message: `${childName}：利用者負担額が上限月額（${upperLimitAmount.toLocaleString()}円）に到達しています。上限管理結果票の作成が必要です`,
               childId,
               childName,
             });
@@ -425,11 +569,21 @@ export const useBillingWizard = () => {
             });
           }
 
-          // バリデーション: 低所得・生活保護で負担額が発生
           if ((incomeCategory === 'low_income' || incomeCategory === 'welfare') && appliedCopay > 0) {
             validations.push({
               severity: 'error',
-              message: `${childName}：${incomeCategory === 'low_income' ? '低所得' : '生活保護'}区分ですが利用者負担額（${appliedCopay.toLocaleString()}円）が発生しています`,
+              message: `${childName}：${incomeCategory === 'low_income' ? '低所得' : '生活保護'}区分ですが利用者負担額（${appliedCopay.toLocaleString()}円）が発生しています。所得区分の設定を確認してください`,
+              childId,
+              childName,
+            });
+          }
+
+          // 単位単価の整合性チェック
+          const recordUnitPrice = (record.unit_price as number) || 0;
+          if (recordUnitPrice === 10) {
+            validations.push({
+              severity: 'info',
+              message: `${childName}：単位単価が10.00円（デフォルト値）です。地域区分が正しく設定されているか確認してください`,
               childId,
               childName,
             });
@@ -464,7 +618,6 @@ export const useBillingWizard = () => {
         const firstDay = getFirstDayOfMonth(yearMonth);
         const lastDay = getLastDayOfMonth(yearMonth);
 
-        // 1. 請求レコードをステータス別に集計
         const { data: billingData, error: billingError } = await supabase
           .from('billing_records')
           .select('status, total_amount')
@@ -512,7 +665,6 @@ export const useBillingWizard = () => {
           }
         }
 
-        // 2. 利用実績の件数を取得
         const { count: usageCount, error: usageError } = await supabase
           .from('usage_records')
           .select('id', { count: 'exact', head: true })
@@ -549,6 +701,7 @@ export const useBillingWizard = () => {
   // ─── 返却値 ───
   return {
     ...billing,
+    checkFacilityReadiness,
     fetchUsageVerification,
     fetchUpperLimitCheck,
     getMonthlyBillingStatus,

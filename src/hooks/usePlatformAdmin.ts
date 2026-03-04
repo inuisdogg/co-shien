@@ -8,6 +8,7 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { parseQualifications } from '@/utils/qualifications';
 import {
   CompanyExtended,
   PlatformStats,
@@ -497,14 +498,7 @@ export const usePlatformAdmin = () => {
 
       const staffList = staffData.map((s: Record<string, unknown>) => {
         const emp = employmentMap.get(s.id as string);
-        let qualifications: string[] = [];
-        if (s.qualifications) {
-          if (Array.isArray(s.qualifications)) {
-            qualifications = s.qualifications as string[];
-          } else if (typeof s.qualifications === 'string') {
-            qualifications = (s.qualifications as string).split(',').map((q: string) => q.trim());
-          }
-        }
+        const qualifications = parseQualifications(s.qualifications);
 
         return {
           id: s.id as string,
@@ -1370,14 +1364,14 @@ export const usePlatformAdmin = () => {
       ]);
 
       // 加算マスタコード一覧
-      const allAdditionCodes = new Set(
-        (additionsMasterResult.data || []).map((a: Record<string, unknown>) => a.code as string)
+      const allAdditionCodes = new Set<string>(
+        (additionsMasterResult.data || []).map((a: Record<string, unknown>) => String(a.code))
       );
       const additionNameMap = new Map<string, string>();
       const additionUnitsMap = new Map<string, number>();
-      for (const a of (additionsMasterResult.data || [])) {
-        additionNameMap.set(a.code as string, a.name as string);
-        additionUnitsMap.set(a.code as string, (a.units as number) || 0);
+      for (const a of (additionsMasterResult.data || []) as Record<string, unknown>[]) {
+        additionNameMap.set(String(a.code), String(a.name));
+        additionUnitsMap.set(String(a.code), Number(a.units) || 0);
       }
 
       // 施設ごとの有効加算コード
@@ -1448,12 +1442,12 @@ export const usePlatformAdmin = () => {
         const enabledCodes = enabledAdditionsByFacility.get(fid) || new Set();
         const missingAdditions: { code: string; name: string; units: number }[] = [];
 
-        for (const code of Array.from(allAdditionCodes)) {
+        for (const code of Array.from(allAdditionCodes) as string[]) {
           if (!enabledCodes.has(code)) {
             missingAdditions.push({
-              code,
-              name: additionNameMap.get(code) || code,
-              units: additionUnitsMap.get(code) || 0,
+              code: String(code),
+              name: additionNameMap.get(String(code)) || String(code),
+              units: additionUnitsMap.get(String(code)) || 0,
             });
           }
         }

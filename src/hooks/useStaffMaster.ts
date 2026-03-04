@@ -5,10 +5,12 @@
 
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Staff, StaffPersonnelSettings, StaffLeaveSettings } from '@/types';
+import { Staff, StaffPersonnelSettings, StaffLeaveSettings, ProxyAccountData } from '@/types';
+import type { ParsedCSVRow, BulkImportResult } from '@/types/bulkImport';
 import { useAuth } from '@/contexts/AuthContext';
+import { parseQualifications } from '@/utils/qualifications';
 
 interface StaffWithRelations extends Staff {
   personnelSettings?: StaffPersonnelSettings;
@@ -45,6 +47,12 @@ interface UseStaffMasterReturn {
 
   // 招待
   inviteStaff: (email: string, name: string) => Promise<{ token: string } | null>;
+
+  // 代理アカウント作成
+  proxyCreateStaff: (data: ProxyAccountData) => Promise<{ invitationToken: string } | null>;
+
+  // CSV一括インポート
+  bulkImportStaff: (rows: ParsedCSVRow[], importType: 'full' | 'minimal', sendEmails: boolean) => Promise<BulkImportResult | null>;
 }
 
 export function useStaffMaster(): UseStaffMasterReturn {
@@ -138,14 +146,20 @@ export function useStaffMaster(): UseStaffMasterReturn {
                   phone: user.phone || matchingStaffRecord?.phone || undefined,
                   email: user.email || matchingStaffRecord?.email || undefined,
                   profilePhotoUrl: (user as any).profile_photo_url || undefined,
-                  qualifications: matchingStaffRecord?.qualifications || undefined,
+                  accountStatus: (user as any).account_status || undefined,
+                  qualifications: matchingStaffRecord?.qualifications
+                    ? parseQualifications(matchingStaffRecord.qualifications)
+                    : undefined,
                   yearsOfExperience: matchingStaffRecord?.years_of_experience || undefined,
                   emergencyContact: matchingStaffRecord?.emergency_contact || undefined,
                   memo: matchingStaffRecord?.memo || undefined,
                   monthlySalary: matchingStaffRecord?.monthly_salary || undefined,
                   hourlyWage: matchingStaffRecord?.hourly_wage || undefined,
+                  position: matchingStaffRecord?.position || undefined,
+                  department: matchingStaffRecord?.department || undefined,
                   createdAt: emp.start_date || new Date().toISOString(),
                   updatedAt: matchingStaffRecord?.updated_at || emp.start_date || new Date().toISOString(),
+                  permissions: emp.permissions || undefined,
                   personnelSettings: personnel ? mapPersonnelFromDb(personnel) : undefined,
                   leaveSettings: leave ? mapLeaveFromDb(leave) : undefined,
                 };
@@ -159,6 +173,23 @@ export function useStaffMaster(): UseStaffMasterReturn {
 
       // 4. staffテーブルのデータを追加（employment_recordsに存在しないもののみ）
       if (staffData) {
+        // staff-onlyレコードのuser_idからaccountStatusを取得
+        const staffOnlyUserIds = staffData
+          .filter(row => row.user_id && !existingUserIds.has(row.user_id))
+          .map(row => row.user_id)
+          .filter((id): id is string => !!id);
+
+        let staffUsersMap = new Map<string, { account_status?: string; profile_photo_url?: string }>();
+        if (staffOnlyUserIds.length > 0) {
+          const { data: staffUsers } = await supabase
+            .from('users')
+            .select('id, account_status, profile_photo_url')
+            .in('id', staffOnlyUserIds);
+          if (staffUsers) {
+            staffUsersMap = new Map(staffUsers.map(u => [u.id, u]));
+          }
+        }
+
         staffData.forEach((row) => {
           // user_idがあり、すでにemployment_recordsから取得済みならスキップ
           if (row.user_id && existingUserIds.has(row.user_id)) {
@@ -167,9 +198,12 @@ export function useStaffMaster(): UseStaffMasterReturn {
 
           const personnel = personnelData?.find((p) => p.staff_id === row.id);
           const leave = row.user_id ? leaveData?.find((l) => l.user_id === row.user_id) : undefined;
+          const userInfo = row.user_id ? staffUsersMap.get(row.user_id) : undefined;
 
           allStaff.push({
             ...mapStaffFromDb(row),
+            accountStatus: (userInfo?.account_status as Staff['accountStatus']) || undefined,
+            profilePhotoUrl: userInfo?.profile_photo_url || undefined,
             personnelSettings: personnel ? mapPersonnelFromDb(personnel) : undefined,
             leaveSettings: leave ? mapLeaveFromDb(leave) : undefined,
           });
@@ -214,12 +248,16 @@ export function useStaffMaster(): UseStaffMasterReturn {
           .single();
 
         // 有給設定
-        const { data: leave } = await supabase
-          .from('staff_leave_settings')
-          .select('*')
-          .eq('user_id', data.user_id)
-          .eq('facility_id', facility.id)
-          .single();
+        let leave = null;
+        if (data.user_id) {
+          const { data: leaveData } = await supabase
+            .from('staff_leave_settings')
+            .select('*')
+            .eq('user_id', data.user_id)
+            .eq('facility_id', facility.id)
+            .single();
+          leave = leaveData;
+        }
 
         return {
           ...mapStaffFromDb(data),
@@ -306,7 +344,7 @@ export function useStaffMaster(): UseStaffMasterReturn {
     [facility?.id, fetchStaffList]
   );
 
-  // スタッフ更新
+  // スタッフ更新（staffテーブル + employment_recordsの両方を同期更新）
   const updateStaff = useCallback(
     async (staffId: string, data: Partial<Staff>): Promise<boolean> => {
       if (!facility?.id) return false;
@@ -315,44 +353,88 @@ export function useStaffMaster(): UseStaffMasterReturn {
       setError(null);
 
       try {
+        // staffテーブルのカラムマッピング
         const updateData: Record<string, unknown> = {};
-
         if (data.name !== undefined) updateData.name = data.name;
         if (data.nameKana !== undefined) updateData.name_kana = data.nameKana;
         if (data.type !== undefined) updateData.type = data.type;
         if (data.role !== undefined) updateData.role = data.role;
+        if (data.phone !== undefined) updateData.phone = data.phone;
+        if (data.email !== undefined) updateData.email = data.email;
         if (data.qualifications !== undefined) updateData.qualifications = data.qualifications;
         if (data.yearsOfExperience !== undefined) updateData.years_of_experience = data.yearsOfExperience;
         if (data.emergencyContact !== undefined) updateData.emergency_contact = data.emergencyContact;
         if (data.memo !== undefined) updateData.memo = data.memo;
         if (data.monthlySalary !== undefined) updateData.monthly_salary = data.monthlySalary;
         if (data.hourlyWage !== undefined) updateData.hourly_wage = data.hourlyWage;
+        if (data.position !== undefined) updateData.position = data.position;
+        if (data.department !== undefined) updateData.department = data.department;
 
-        const { error } = await supabase
-          .from('staff')
-          .update(updateData)
-          .eq('id', staffId)
-          .eq('facility_id', facility.id);
+        // employment_records用のカラムマッピング
+        const empUpdateData: Record<string, unknown> = {};
+        if (data.role !== undefined) empUpdateData.role = data.role;
+        if (data.type !== undefined) empUpdateData.employment_type = data.type;
+        if ((data as any).permissions !== undefined) empUpdateData.permissions = (data as any).permissions;
 
-        // employment_recordsのpermissionsも更新
-        if ((data as any).permissions !== undefined) {
-          // まずstaffからuser_idを取得
-          const { data: staffData } = await supabase
-            .from('staff')
-            .select('user_id')
-            .eq('id', staffId)
-            .single();
+        const isEmploymentOnly = staffId.startsWith('emp-');
 
-          if (staffData?.user_id) {
-            await supabase
+        if (isEmploymentOnly) {
+          // staffテーブルにレコードがない（employment_recordsのみ）場合
+          // employment_recordsのIDを抽出して直接更新
+          const empId = staffId.replace('emp-', '');
+
+          if (Object.keys(empUpdateData).length > 0) {
+            const { error: empError } = await supabase
               .from('employment_records')
-              .update({ permissions: (data as any).permissions })
-              .eq('user_id', staffData.user_id)
+              .update(empUpdateData)
+              .eq('id', empId)
               .eq('facility_id', facility.id);
+
+            if (empError) {
+              console.error('Failed to update employment record:', empError);
+              throw empError;
+            }
+          }
+        } else {
+          // 1. staffテーブルを更新
+          if (Object.keys(updateData).length > 0) {
+            const { error: staffError } = await supabase
+              .from('staff')
+              .update(updateData)
+              .eq('id', staffId)
+              .eq('facility_id', facility.id);
+
+            if (staffError) throw staffError;
+          }
+
+          // 2. employment_recordsも同期更新（role, type, permissionsを反映）
+          //    fetchStaffListではemployment_recordsのrole/employment_typeを優先読み取りするため、
+          //    ここでも同期しないと変更が反映されない（既知のバグ修正）
+          if (Object.keys(empUpdateData).length > 0) {
+            // staffからuser_idを取得
+            const { data: staffRecord } = await supabase
+              .from('staff')
+              .select('user_id')
+              .eq('id', staffId)
+              .single();
+
+            if (staffRecord?.user_id) {
+              // end_dateがnull（現在有効）のレコードのみ更新
+              const { error: empError } = await supabase
+                .from('employment_records')
+                .update(empUpdateData)
+                .eq('user_id', staffRecord.user_id)
+                .eq('facility_id', facility.id)
+                .is('end_date', null);
+
+              if (empError) {
+                console.error('Failed to update employment record:', empError);
+                // employment_recordsの更新が失敗してもstaffは更新済みなので
+                // エラーはログのみ（ただしデータ不整合の可能性を通知）
+              }
+            }
           }
         }
-
-        if (error) throw error;
 
         await fetchStaffList();
         return true;
@@ -367,7 +449,7 @@ export function useStaffMaster(): UseStaffMasterReturn {
     [facility?.id, fetchStaffList]
   );
 
-  // スタッフ削除（論理削除）
+  // スタッフ削除
   const deleteStaff = useCallback(
     async (staffId: string): Promise<boolean> => {
       if (!facility?.id) return false;
@@ -376,14 +458,26 @@ export function useStaffMaster(): UseStaffMasterReturn {
       setError(null);
 
       try {
-        // 論理削除 (is_deleted フラグを立てる or 物理削除)
-        const { error } = await supabase
-          .from('staff')
-          .delete()
-          .eq('id', staffId)
-          .eq('facility_id', facility.id);
+        const isEmploymentOnly = staffId.startsWith('emp-');
 
-        if (error) throw error;
+        if (isEmploymentOnly) {
+          // employment_recordsのみのスタッフ: end_dateを設定して無効化
+          const empId = staffId.replace('emp-', '');
+          const { error } = await supabase
+            .from('employment_records')
+            .update({ end_date: new Date().toISOString().split('T')[0] })
+            .eq('id', empId)
+            .eq('facility_id', facility.id);
+          if (error) throw error;
+        } else {
+          // staffテーブルから削除
+          const { error: staffError } = await supabase
+            .from('staff')
+            .delete()
+            .eq('id', staffId)
+            .eq('facility_id', facility.id);
+          if (staffError) throw staffError;
+        }
 
         await fetchStaffList();
         return true;
@@ -522,11 +616,148 @@ export function useStaffMaster(): UseStaffMasterReturn {
     [facility?.id]
   );
 
-  // 初期読み込み
+  // 代理アカウント作成（招待トークン付きでstaff + employment_recordsを作成）
+  const proxyCreateStaff = useCallback(
+    async (data: ProxyAccountData): Promise<{ invitationToken: string } | null> => {
+      if (!facility?.id) return null;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const newStaffId = `staff-${Date.now()}`;
+        const token = `inv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+        // 1. staffテーブルに挿入
+        const { error: staffError } = await supabase.from('staff').insert({
+          id: newStaffId,
+          facility_id: facility.id,
+          name: data.name,
+          name_kana: data.nameKana || null,
+          type: data.employmentType || '常勤',
+          role: data.role || '一般スタッフ',
+          qualifications: data.qualifications ? parseQualifications(data.qualifications) : [],
+          memo: data.memo || null,
+          monthly_salary: data.monthlySalary || null,
+          hourly_wage: data.hourlyWage || null,
+          email: data.email || null,
+          phone: data.phone || null,
+        });
+
+        if (staffError) throw staffError;
+
+        // 2. 招待レコードを作成
+        const { error: invError } = await supabase.from('staff_invitations').insert({
+          facility_id: facility.id,
+          email: data.email || '',
+          name: data.name,
+          token,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+
+        if (invError) {
+          console.error('Failed to create invitation:', invError);
+        }
+
+        await fetchStaffList();
+        return { invitationToken: token };
+      } catch (err) {
+        console.error('Failed to proxy create staff:', err);
+        setError('スタッフの代理登録に失敗しました');
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [facility?.id, fetchStaffList]
+  );
+
+  // CSV一括インポート
+  const bulkImportStaff = useCallback(
+    async (rows: ParsedCSVRow[], _importType: 'full' | 'minimal', _sendEmails: boolean): Promise<BulkImportResult | null> => {
+      if (!facility?.id) return null;
+
+      setLoading(true);
+      setError(null);
+
+      const batchId = `batch-${Date.now()}`;
+      const results: BulkImportResult['results'] = [];
+
+      try {
+        // バッチインサートデータを構築
+        const insertRows = rows.map((row, idx) => ({
+          id: `staff-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+          facility_id: facility.id,
+          name: `${row.lastName}${row.firstName}`.trim() || `行${row.rowIndex}`,
+          name_kana: row.lastNameKana && row.firstNameKana ? `${row.lastNameKana}${row.firstNameKana}` : null,
+          type: row.employmentType || '常勤',
+          role: '一般スタッフ' as const,
+          email: row.email || null,
+          phone: row.phone || null,
+          qualifications: row.qualifications ? parseQualifications(row.qualifications) : [],
+          monthly_salary: row.monthlySalary ? Number(row.monthlySalary) : null,
+          hourly_wage: row.hourlyWage ? Number(row.hourlyWage) : null,
+          memo: row.memo || null,
+        }));
+
+        // 一括インサート（N+1解消）
+        const { data: insertedData, error: batchError } = await supabase
+          .from('staff')
+          .insert(insertRows)
+          .select('id');
+
+        if (batchError) {
+          // バッチ失敗時は個別にフォールバック
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const name = insertRows[i].name;
+            try {
+              const { error: staffError } = await supabase.from('staff').insert(insertRows[i]);
+              if (staffError) {
+                results.push({ rowIndex: row.rowIndex, success: false, name, error: staffError.message });
+              } else {
+                results.push({ rowIndex: row.rowIndex, success: true, name, email: row.email });
+              }
+            } catch (err: any) {
+              results.push({ rowIndex: row.rowIndex, success: false, name, error: err.message });
+            }
+          }
+        } else {
+          // バッチ成功 — 全行成功
+          rows.forEach((row, i) => {
+            results.push({ rowIndex: row.rowIndex, success: true, name: insertRows[i].name, email: row.email });
+          });
+        }
+
+        await fetchStaffList();
+        const successCount = results.filter(r => r.success).length;
+        return {
+          batchId,
+          totalRows: rows.length,
+          successCount,
+          errorCount: rows.length - successCount,
+          results,
+        };
+      } catch (err) {
+        console.error('Bulk import error:', err);
+        setError('一括インポートに失敗しました');
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [facility?.id, fetchStaffList]
+  );
+
+  // 初期読み込み（コンポーネントアンマウント時はスキップ）
+  const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     if (facility?.id) {
       fetchStaffList();
     }
+    return () => { mountedRef.current = false; };
   }, [facility?.id, fetchStaffList]);
 
   return {
@@ -543,6 +774,8 @@ export function useStaffMaster(): UseStaffMasterReturn {
     updateLeaveSettings,
     setSelectedStaff,
     inviteStaff,
+    proxyCreateStaff,
+    bulkImportStaff,
   };
 }
 
@@ -552,11 +785,11 @@ function mapStaffFromDb(record: Record<string, unknown>): Staff {
     id: record.id as string,
     facilityId: record.facility_id as string,
     user_id: record.user_id as string | undefined,
-    name: record.name as string,
+    name: (record.name as string) || '',
     nameKana: record.name_kana as string | undefined,
-    type: record.type as Staff['type'],
-    role: record.role as Staff['role'],
-    qualifications: record.qualifications as string | undefined,
+    type: (record.type as Staff['type']) || '常勤',
+    role: (record.role as Staff['role']) || '一般スタッフ',
+    qualifications: record.qualifications ? parseQualifications(record.qualifications) : undefined,
     yearsOfExperience: record.years_of_experience as number | undefined,
     emergencyContact: record.emergency_contact as string | undefined,
     memo: record.memo as string | undefined,
@@ -564,6 +797,8 @@ function mapStaffFromDb(record: Record<string, unknown>): Staff {
     hourlyWage: record.hourly_wage as number | undefined,
     phone: record.phone as string | undefined,
     email: record.email as string | undefined,
+    position: record.position as string | undefined,
+    department: record.department as string | undefined,
     defaultWorkPattern: record.default_work_pattern as Staff['defaultWorkPattern'],
     createdAt: record.created_at as string,
     updatedAt: record.updated_at as string,

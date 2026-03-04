@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, User, Mail, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,7 @@ type Step = 'search' | 'otp' | 'result';
 type SearchType = 'email' | 'name_birthday';
 
 export default function ForgotLoginIdPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const [step, setStep] = useState<Step>('search');
   const [searchType, setSearchType] = useState<SearchType>('email');
@@ -126,7 +128,7 @@ export default function ForgotLoginIdPage() {
       }
 
       setError('');
-      alert('認証コードを再送信しました');
+      toast.success('認証コードを再送信しました');
     } catch (err: any) {
       setError(err.message || 'エラーが発生しました');
     } finally {
@@ -135,7 +137,7 @@ export default function ForgotLoginIdPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <button
           onClick={() => {
@@ -154,8 +156,8 @@ export default function ForgotLoginIdPage() {
         </button>
 
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#00c4cc]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <User className="w-8 h-8 text-[#00c4cc]" />
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <User className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">ログインIDを忘れた場合</h1>
           <p className="text-gray-600 text-sm mt-2">
@@ -186,7 +188,7 @@ export default function ForgotLoginIdPage() {
                   onClick={() => setSearchType('email')}
                   className={`flex items-center justify-center gap-2 p-3 rounded-md border-2 transition-colors ${
                     searchType === 'email'
-                      ? 'border-[#00c4cc] bg-[#00c4cc]/10 text-[#00c4cc]'
+                      ? 'border-primary bg-primary/10 text-primary'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -198,7 +200,7 @@ export default function ForgotLoginIdPage() {
                   onClick={() => setSearchType('name_birthday')}
                   className={`flex items-center justify-center gap-2 p-3 rounded-md border-2 transition-colors ${
                     searchType === 'name_birthday'
-                      ? 'border-[#00c4cc] bg-[#00c4cc]/10 text-[#00c4cc]'
+                      ? 'border-primary bg-primary/10 text-primary'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -220,7 +222,7 @@ export default function ForgotLoginIdPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="登録時のメールアドレスを入力"
                   disabled={loading}
                 />
@@ -241,7 +243,7 @@ export default function ForgotLoginIdPage() {
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       placeholder="姓を入力"
                       disabled={loading}
                     />
@@ -256,7 +258,7 @@ export default function ForgotLoginIdPage() {
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       placeholder="名を入力"
                       disabled={loading}
                     />
@@ -273,7 +275,7 @@ export default function ForgotLoginIdPage() {
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     disabled={loading}
                   />
                 </div>
@@ -289,7 +291,7 @@ export default function ForgotLoginIdPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '検索中...' : '認証コードを送信'}
             </button>
@@ -316,7 +318,7 @@ export default function ForgotLoginIdPage() {
                 onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                 required
                 maxLength={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent text-center text-2xl tracking-widest font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center text-2xl tracking-widest font-mono"
                 placeholder="000000"
                 disabled={loading}
                 autoComplete="one-time-code"
@@ -328,7 +330,7 @@ export default function ForgotLoginIdPage() {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={loading}
-                className="text-sm text-[#00c4cc] hover:underline disabled:opacity-50"
+                className="text-sm text-primary hover:underline disabled:opacity-50"
               >
                 認証コードを再送信
               </button>
@@ -337,7 +339,7 @@ export default function ForgotLoginIdPage() {
             <button
               type="submit"
               disabled={loading || otpCode.length !== 6}
-              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '認証中...' : '認証する'}
             </button>
@@ -364,7 +366,7 @@ export default function ForgotLoginIdPage() {
 
             <button
               onClick={() => router.push('/career/login')}
-              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
+              className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors"
             >
               ログイン画面へ
             </button>

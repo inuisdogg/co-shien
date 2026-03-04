@@ -6,6 +6,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { parseQualifications } from '@/utils/qualifications';
 import { Staff, AccountStatus, UserPermissions } from '@/types';
 
 export const useStaffData = () => {
@@ -33,25 +34,27 @@ export const useStaffData = () => {
 
         const ownerUserId = facilityData?.owner_user_id || null;
 
-        // 1. staffテーブルから取得（従来の方法）
-        const { data: staffData, error: staffError } = await supabase
-          .from('staff')
-          .select('*')
-          .eq('facility_id', facilityId)
-          .order('created_at', { ascending: false });
+        // 1+2. staffテーブルとemployment_recordsを並列取得（パフォーマンス改善）
+        const [staffResult, employmentResult] = await Promise.all([
+          supabase
+            .from('staff')
+            .select('*')
+            .eq('facility_id', facilityId)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('employment_records')
+            .select('id, user_id, facility_id, role, employment_type, start_date, end_date, permissions')
+            .eq('facility_id', facilityId)
+            .is('end_date', null)
+            .order('start_date', { ascending: false }),
+        ]);
+
+        const { data: staffData, error: staffError } = staffResult;
+        const { data: employmentData, error: employmentError } = employmentResult;
 
         if (staffError) {
           console.error('Error fetching staff:', staffError);
         }
-
-        // 2. employment_recordsから取得（新規招待されたスタッフ）※permissionsも含む
-        const { data: employmentData, error: employmentError } = await supabase
-          .from('employment_records')
-          .select('id, user_id, facility_id, role, employment_type, start_date, end_date, permissions')
-          .eq('facility_id', facilityId)
-          .is('end_date', null)
-          .order('start_date', { ascending: false });
-
         if (employmentError) {
           console.error('Error fetching employment records:', employmentError);
         }
@@ -146,7 +149,7 @@ export const useStaffData = () => {
                     dependentCount: user.dependent_count || 0,
                     dependents: user.dependents || null,
                     profilePhotoUrl: user.profile_photo_url || undefined,
-                    qualifications: '',
+                    qualifications: [],
                     yearsOfExperience: 0,
                     qualificationCertificate: '',
                     experienceCertificate: '',
@@ -241,7 +244,7 @@ export const useStaffData = () => {
                 address: row.address,
                 phone: row.phone,
                 email: row.email,
-                qualifications: row.qualifications,
+                qualifications: parseQualifications(row.qualifications),
                 yearsOfExperience: row.years_of_experience,
                 qualificationCertificate: row.qualification_certificate,
                 experienceCertificate: row.experience_certificate,

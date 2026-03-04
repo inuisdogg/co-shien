@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       ? (app.cover_message as string).slice(0, 100) + ((app.cover_message as string).length > 100 ? '...' : '')
       : 'なし';
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://biz.Roots.inu.co.jp';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://roots.inu.co.jp';
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'Roots <noreply@and-and.co.jp>';
 
     const { error: sendError } = await getResend().emails.send({

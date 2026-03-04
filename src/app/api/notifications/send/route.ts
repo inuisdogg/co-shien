@@ -89,22 +89,45 @@ export async function POST(request: NextRequest) {
           .eq('user_id', userId);
 
         if (subscriptions && subscriptions.length > 0) {
-          // TODO: web-push ライブラリによるプッシュ通知送信
-          // 現時点ではDB通知のみ作成し、実際のプッシュ送信は未実装
-          // 実装時は以下の流れ:
-          //   import webpush from 'web-push';
-          //   webpush.setVapidDetails(
-          //     'mailto:support@roots.example.com',
-          //     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-          //     process.env.VAPID_PRIVATE_KEY!
-          //   );
-          //   for (const sub of subscriptions) {
-          //     await webpush.sendNotification(
-          //       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          //       JSON.stringify({ title, body, data: { url: data?.url || '/', ...data }, tag: type })
-          //     );
-          //   }
-          // TODO: web-push送信の実装
+          const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+          const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+
+          if (vapidPublic && vapidPrivate) {
+            const webpush = await import('web-push');
+            webpush.setVapidDetails(
+              'mailto:support@and-and.co.jp',
+              vapidPublic,
+              vapidPrivate,
+            );
+
+            const payload = JSON.stringify({
+              title,
+              body: body || '',
+              data: { url: (data as Record<string, unknown>)?.url || '/', ...data as Record<string, unknown> },
+              tag: type,
+            });
+
+            for (const sub of subscriptions) {
+              try {
+                await webpush.sendNotification(
+                  {
+                    endpoint: sub.endpoint,
+                    keys: { p256dh: sub.p256dh, auth: sub.auth },
+                  },
+                  payload,
+                );
+              } catch (pushErr: unknown) {
+                console.error('[notifications/send] プッシュ送信エラー:', pushErr);
+                // 410 Gone = subscription expired, remove it
+                if (pushErr && typeof pushErr === 'object' && 'statusCode' in pushErr && (pushErr as { statusCode: number }).statusCode === 410) {
+                  await supabase
+                    .from('push_subscriptions')
+                    .delete()
+                    .eq('id', sub.id);
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -125,11 +148,44 @@ export async function POST(request: NextRequest) {
         !emailPrefKey || preferences?.[emailPrefKey] !== false;
 
       if (emailEnabled) {
-        // TODO: Resendを使ったメール送信
-        // 既存の notify-application/notify-status-change/notify-match ルートの
-        // パターンに従って実装する
-        // 現時点ではDB通知のみ作成し、汎用メール送信は未実装
-        // TODO: Resendを使ったメール送信の実装
+        const resendApiKey = process.env.RESEND_API_KEY;
+        if (resendApiKey) {
+          // ユーザーのメールアドレスを取得
+          const { data: userData } = await supabase
+            .from('users')
+            .select('email')
+            .eq('id', userId)
+            .single();
+
+          if (userData?.email) {
+            const { Resend } = await import('resend');
+            const resend = new Resend(resendApiKey);
+            const fromEmail = process.env.RESEND_FROM_EMAIL || 'Roots <noreply@and-and.co.jp>';
+
+            try {
+              await resend.emails.send({
+                from: fromEmail,
+                to: userData.email,
+                subject: title,
+                html: `
+                  <div style="max-width:600px;margin:0 auto;font-family:sans-serif;">
+                    <div style="background:#00c4cc;padding:24px;text-align:center;">
+                      <h1 style="color:white;font-size:20px;margin:0;">Roots</h1>
+                    </div>
+                    <div style="padding:24px;">
+                      <h2 style="font-size:16px;color:#333;">${title}</h2>
+                      ${body ? `<p style="color:#666;line-height:1.8;">${body}</p>` : ''}
+                      <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />
+                      <p style="color:#999;font-size:12px;">この通知はRootsから自動送信されています。</p>
+                    </div>
+                  </div>
+                `,
+              });
+            } catch (emailErr) {
+              console.error('[notifications/send] メール送信エラー:', emailErr);
+            }
+          }
+        }
       }
     }
 

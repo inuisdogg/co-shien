@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'jp.co.inu.coshien.client',
+  appId: 'jp.co.inu.roots.client',
   appName: 'Roots',
   webDir: '../web-placeholder',
   server: {

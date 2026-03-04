@@ -103,7 +103,7 @@ export default function ClientChatPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-client mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -117,7 +117,7 @@ export default function ClientChatPage() {
           <p className="text-red-600 mb-4">{error}</p>
           <button
             onClick={() => router.push('/parent')}
-            className="px-4 py-2 bg-[#F6AD55] text-white rounded-lg hover:bg-[#ED8936]"
+            className="px-4 py-2 bg-client text-white rounded-lg hover:bg-client-dark"
           >
             ダッシュボードに戻る
           </button>
@@ -133,7 +133,7 @@ export default function ClientChatPage() {
           <p className="text-gray-600 mb-4">この施設との契約がありません</p>
           <button
             onClick={() => router.push('/parent')}
-            className="px-4 py-2 bg-[#F6AD55] text-white rounded-lg hover:bg-[#ED8936]"
+            className="px-4 py-2 bg-client text-white rounded-lg hover:bg-client-dark"
           >
             ダッシュボードに戻る
           </button>

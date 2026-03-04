@@ -20,7 +20,7 @@ function mapRowToAppNotification(row: Record<string, unknown>): AppNotification 
     title: row.title as string,
     body: (row.body as string) || undefined,
     data: (row.data as Record<string, unknown>) || undefined,
-    read: row.read as boolean,
+    read: (row.is_read ?? row.read) as boolean,
     createdAt: row.created_at as string,
   };
 }
@@ -45,7 +45,7 @@ export async function createNotification(
         title,
         body: body || null,
         data: data || null,
-        read: false,
+        is_read: false,
       })
       .select()
       .single();
@@ -115,7 +115,7 @@ export function useNotifications(userId?: string) {
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .eq('read', false);
+        .eq('is_read', false);
 
       if (error) {
         console.error('[Notifications] 未読件数取得エラー:', error);
@@ -136,7 +136,7 @@ export function useNotifications(userId?: string) {
       try {
         const { error } = await supabase
           .from('notifications')
-          .update({ read: true })
+          .update({ is_read: true })
           .eq('id', notificationId);
 
         if (error) {
@@ -166,9 +166,9 @@ export function useNotifications(userId?: string) {
     try {
       const { error } = await supabase
         .from('notifications')
-        .update({ read: true })
+        .update({ is_read: true })
         .eq('user_id', userId)
-        .eq('read', false);
+        .eq('is_read', false);
 
       if (error) {
         console.error('[Notifications] 全既読更新エラー:', error);

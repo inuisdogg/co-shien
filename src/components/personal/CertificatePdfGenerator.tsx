@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { BUSINESS_TYPES } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 type CertificateData = {
   id: string;
@@ -66,6 +67,7 @@ const getBusinessTypeName = (typeId: number | undefined): string => {
 };
 
 export default function CertificatePdfGenerator({ data, onClose, showDownloadOnly = false }: Props) {
+  const { toast } = useToast();
   const certificateRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -104,7 +106,7 @@ export default function CertificatePdfGenerator({ data, onClose, showDownloadOnl
       pdf.save(fileName);
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('PDF生成に失敗しました');
+      toast.error('PDF生成に失敗しました');
     } finally {
       setGenerating(false);
     }
@@ -125,7 +127,7 @@ export default function CertificatePdfGenerator({ data, onClose, showDownloadOnl
             <button
               onClick={handleDownload}
               disabled={generating}
-              className={`${data.signedAt ? 'bg-[#00c4cc] hover:bg-[#00b0b8]' : 'bg-blue-500 hover:bg-blue-600'} text-white px-4 py-2 rounded-lg disabled:bg-gray-300 flex items-center gap-2`}
+              className={`${data.signedAt ? 'bg-primary hover:bg-primary-dark' : 'bg-blue-500 hover:bg-blue-600'} text-white px-4 py-2 rounded-lg disabled:bg-gray-300 flex items-center gap-2`}
             >
               {generating ? (
                 <>

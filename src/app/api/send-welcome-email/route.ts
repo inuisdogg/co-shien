@@ -24,6 +24,11 @@ function getResend(): Resend {
 
 export async function POST(req: NextRequest) {
   try {
+    // 認証チェック: ログイン済みユーザーのみ送信可
+    const { authenticateRequest, unauthorizedResponse } = await import('@/lib/apiAuth');
+    const auth = await authenticateRequest(req);
+    if (!auth) return unauthorizedResponse();
+
     const { email, name, facilityCode, type, mailType } = await req.json();
 
     if (!email || !name) {
@@ -34,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@resend.dev';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://biz.Roots.inu.co.jp';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://roots.inu.co.jp';
 
     // メールタイプに応じた内容を生成
     let subject = '';
@@ -74,7 +79,7 @@ export async function POST(req: NextRequest) {
                 <li>メールアドレス: <strong>${escapeHtml(email)}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
-                <a href="https://my.Roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                <a href="https://roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                   ログインページへ
                 </a>
               </div>
@@ -223,7 +228,7 @@ export async function POST(req: NextRequest) {
                 <li>メールアドレス: <strong>${escapeHtml(email)}</strong></li>
               </ul>
               <div style="text-align: center; margin: 30px 0;">
-                <a href="https://my.Roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                <a href="https://roots.inu.co.jp/login" style="display: inline-block; background: #00c4cc; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                   ログインページへ
                 </a>
               </div>

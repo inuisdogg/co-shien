@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/Toast';
 import {
   Briefcase,
   Plus,
@@ -111,6 +112,7 @@ function createEmptyQualification(): Qualification {
 // ─── Component ──────────────────────────────────────────────────────────────────
 
 export default function CvGeneratorPage() {
+  const { toast } = useToast();
   const [formData, setFormData] = useState<CvFormData>({
     name: '',
     creation_date: todayString(),
@@ -199,7 +201,7 @@ export default function CvGeneratorPage() {
   const handleExportPDF = useCallback(async () => {
     if (!previewRef.current) return;
     if (!formData.name.trim()) {
-      alert('氏名を入力してください。');
+      toast.warning('氏名を入力してください。');
       return;
     }
     setIsExporting(true);
@@ -280,7 +282,7 @@ export default function CvGeneratorPage() {
       pdf.save('職務経歴書.pdf');
     } catch (err) {
       console.error('PDF export error:', err);
-      alert('PDFの書き出しに失敗しました。もう一度お試しください。');
+      toast.error('PDFの書き出しに失敗しました。もう一度お試しください。');
     } finally {
       setIsExporting(false);
     }
@@ -305,13 +307,13 @@ export default function CvGeneratorPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <Link
             href="/tools"
-            className="text-lg font-bold tracking-tight text-indigo-700 hover:text-indigo-800 transition-colors"
+            className="text-lg font-bold tracking-tight text-personal-dark hover:text-personal-dark transition-colors"
           >
             Roots Tools
           </Link>
           <Link
             href="/career"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+            className="rounded-lg bg-personal px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-personal-dark transition-colors"
           >
             Rootsに無料登録
           </Link>
@@ -322,7 +324,7 @@ export default function CvGeneratorPage() {
       <section className="mx-auto max-w-7xl px-4 pb-4 pt-8 sm:px-6 sm:pt-12">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100">
-            <Briefcase className="h-7 w-7 text-indigo-600" />
+            <Briefcase className="h-7 w-7 text-personal" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
             職務経歴書 自動生成
@@ -352,7 +354,7 @@ export default function CvGeneratorPage() {
                     value={formData.name}
                     onChange={(e) => updateField('name', e.target.value)}
                     placeholder="山田 花子"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
                   />
                 </div>
                 <div>
@@ -363,7 +365,7 @@ export default function CvGeneratorPage() {
                     type="date"
                     value={formData.creation_date}
                     onChange={(e) => updateField('creation_date', e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
                   />
                 </div>
               </div>
@@ -380,7 +382,7 @@ export default function CvGeneratorPage() {
                   onChange={(e) => updateField('summary', e.target.value)}
                   placeholder="保育・福祉分野で○年の実務経験があります。○○を中心に..."
                   rows={4}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
                 />
               </div>
             </FormSection>
@@ -399,7 +401,7 @@ export default function CvGeneratorPage() {
                       onClick={() => toggleWorkCollapse(entry.id)}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 flex-shrink-0">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-personal-dark flex-shrink-0">
                           {idx + 1}
                         </span>
                         <span className="text-sm font-semibold text-gray-800 truncate">
@@ -442,7 +444,7 @@ export default function CvGeneratorPage() {
                               updateWorkEntry(entry.id, 'company_name', e.target.value)
                             }
                             placeholder="社会福祉法人○○ ○○保育園"
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
                           />
                         </div>
 
@@ -457,7 +459,7 @@ export default function CvGeneratorPage() {
                               onChange={(e) =>
                                 updateWorkEntry(entry.id, 'facility_type', e.target.value)
                               }
-                              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
+                              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
                             >
                               {FACILITY_TYPES.map((ft) => (
                                 <option key={ft} value={ft}>
@@ -475,7 +477,7 @@ export default function CvGeneratorPage() {
                               onChange={(e) =>
                                 updateWorkEntry(entry.id, 'employment_type', e.target.value)
                               }
-                              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
+                              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
                             >
                               {EMPLOYMENT_TYPES.map((et) => (
                                 <option key={et} value={et}>
@@ -535,7 +537,7 @@ export default function CvGeneratorPage() {
                               updateWorkEntry(entry.id, 'job_title', e.target.value)
                             }
                             placeholder="保育士、児童発達支援管理責任者 など"
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
                           />
                         </div>
 
@@ -551,7 +553,7 @@ export default function CvGeneratorPage() {
                             }
                             placeholder={`・0〜2歳児クラス担任（12名）\n・個別支援計画の作成・実施\n・保護者面談の実施（月4回）\n・新人職員の指導・育成`}
                             rows={5}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
                           />
                         </div>
                       </div>
@@ -561,7 +563,7 @@ export default function CvGeneratorPage() {
 
                 <button
                   onClick={addWorkEntry}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-200 px-4 py-3 text-sm font-semibold text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-200 px-4 py-3 text-sm font-semibold text-personal hover:border-personal hover:bg-indigo-50/50 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   職歴を追加
@@ -602,7 +604,7 @@ export default function CvGeneratorPage() {
                           updateQualification(qual.id, 'name', e.target.value)
                         }
                         placeholder="保育士、社会福祉士 など"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
                       />
                     </div>
                     {formData.qualifications.length > 1 && (
@@ -619,7 +621,7 @@ export default function CvGeneratorPage() {
 
                 <button
                   onClick={addQualification}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-200 px-4 py-3 text-sm font-semibold text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-200 px-4 py-3 text-sm font-semibold text-personal hover:border-personal hover:bg-indigo-50/50 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   資格を追加
@@ -638,7 +640,7 @@ export default function CvGeneratorPage() {
                   onChange={(e) => updateField('skills', e.target.value)}
                   placeholder={`・児童発達支援\n・感覚統合療法\n・保護者支援・相談対応\n・ICT活用（タブレット療育）`}
                   rows={4}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
                 />
               </div>
             </FormSection>
@@ -654,7 +656,7 @@ export default function CvGeneratorPage() {
                   onChange={(e) => updateField('self_pr', e.target.value)}
                   placeholder="これまでの経験で培ったスキルや強み、今後の目標などをご記入ください。"
                   rows={5}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
                 />
               </div>
             </FormSection>
@@ -664,7 +666,7 @@ export default function CvGeneratorPage() {
               <button
                 onClick={handleExportPDF}
                 disabled={isExporting}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-4 text-base font-bold text-white shadow-lg hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-personal px-6 py-4 text-base font-bold text-white shadow-lg hover:bg-personal-dark disabled:opacity-60 transition-colors"
               >
                 {isExporting ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -679,7 +681,7 @@ export default function CvGeneratorPage() {
             <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-6">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 flex-shrink-0">
-                  <Sparkles className="h-6 w-6 text-indigo-600" />
+                  <Sparkles className="h-6 w-6 text-personal" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-base font-bold text-gray-900">
@@ -691,7 +693,7 @@ export default function CvGeneratorPage() {
                   </p>
                   <Link
                     href="/career"
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-personal px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-personal-dark transition-colors"
                   >
                     Rootsに無料登録
                     <ArrowRight className="h-4 w-4" />
@@ -708,7 +710,7 @@ export default function CvGeneratorPage() {
               <button
                 onClick={handleExportPDF}
                 disabled={isExporting}
-                className="hidden lg:flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-bold text-white shadow-lg hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                className="hidden lg:flex w-full items-center justify-center gap-2 rounded-xl bg-personal px-6 py-3.5 text-base font-bold text-white shadow-lg hover:bg-personal-dark disabled:opacity-60 transition-colors"
               >
                 {isExporting ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -780,7 +782,7 @@ function YearMonthSelect({
       <select
         value={yearValue}
         onChange={(e) => onYearChange(e.target.value)}
-        className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
+        className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
       >
         <option value="">{yearPlaceholder}</option>
         {YEARS.map((y) => (
@@ -792,7 +794,7 @@ function YearMonthSelect({
       <select
         value={monthValue}
         onChange={(e) => onMonthChange(e.target.value)}
-        className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
+        className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors bg-white"
       >
         <option value="">{monthPlaceholder}</option>
         {MONTHS.map((m) => (
@@ -818,7 +820,7 @@ function FormSection({
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
-        <span className="text-indigo-600">{icon}</span>
+        <span className="text-personal">{icon}</span>
         <h2 className="text-lg font-bold text-gray-900">{title}</h2>
       </div>
       {children}

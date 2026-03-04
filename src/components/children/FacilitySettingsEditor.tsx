@@ -7,19 +7,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, Truck, Users, FileText } from 'lucide-react';
-import { FacilityChildrenSettings, Staff } from '@/types';
+import { FacilityChildrenSettings, Staff, ResolvedSlotInfo, TransportVehicle } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
-type SlotInfo = {
-  AM: string;
-  PM: string | null;
-};
+const DEFAULT_RESOLVED_SLOTS: ResolvedSlotInfo[] = [
+  { key: 'AM', name: '午前', startTime: '09:00', endTime: '12:00', capacity: 10, displayOrder: 1 },
+  { key: 'PM', name: '午後', startTime: '13:00', endTime: '18:00', capacity: 10, displayOrder: 2 },
+];
 
 type Props = {
   childId: string;
   childName: string;
   facilityId: string;
-  slotInfo?: SlotInfo;
+  resolvedSlots?: ResolvedSlotInfo[];
+  transportVehicles?: TransportVehicle[];
   onSave: () => void;
   onClose: () => void;
 };
@@ -34,19 +36,22 @@ const DAYS_OF_WEEK = [
   { id: 6, label: '土', shortLabel: '土' },
 ];
 
-type TimeSlot = 'AM' | 'PM' | 'AMPM';
+type TimeSlot = string;
 
 export const FacilitySettingsEditor: React.FC<Props> = ({
   childId,
   childName,
   facilityId,
-  slotInfo = { AM: '午前', PM: '午後' },
+  resolvedSlots = DEFAULT_RESOLVED_SLOTS,
+  transportVehicles = [],
   onSave,
   onClose,
 }) => {
+  const { toast } = useToast();
   const [settings, setSettings] = useState<Partial<FacilityChildrenSettings>>({
     patternDays: [],
     patternTimeSlots: {},
+    transportPattern: {},
     needsPickup: false,
     needsDropoff: false,
     pickupLocation: '',
@@ -80,6 +85,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
             childId: existingSettings.child_id,
             patternDays: existingSettings.pattern_days || [],
             patternTimeSlots: existingSettings.pattern_time_slots || {},
+            transportPattern: existingSettings.transport_pattern || {},
             needsPickup: existingSettings.needs_pickup || false,
             needsDropoff: existingSettings.needs_dropoff || false,
             pickupLocation: existingSettings.pickup_location || '',
@@ -125,12 +131,13 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
         patternTimeSlots: newTimeSlots,
       });
     } else {
+      const defaultSlot = resolvedSlots.length > 1 ? 'ALL' : (resolvedSlots[0]?.key || 'ALL');
       setSettings({
         ...settings,
         patternDays: [...currentDays, dayId].sort(),
         patternTimeSlots: {
           ...settings.patternTimeSlots,
-          [dayId]: 'AMPM',
+          [dayId]: defaultSlot,
         },
       });
     }
@@ -168,7 +175,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
     setSaving(true);
     try {
       const now = new Date().toISOString();
-      const data = {
+      const data: any = {
         facility_id: facilityId,
         child_id: childId,
         pattern_days: settings.patternDays || [],
@@ -184,6 +191,10 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
         default_addon_items: settings.defaultAddonItems || [],
         updated_at: now,
       };
+      // transport_pattern はマイグレーション適用後のみ送信
+      if (settings.transportPattern && Object.keys(settings.transportPattern).length > 0) {
+        data.transport_pattern = settings.transportPattern;
+      }
 
       if (settings.id) {
         // 更新
@@ -200,11 +211,27 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
         });
       }
 
+      // childrenテーブルのpattern_days, pattern_time_slotsも同時更新
+      const childUpdate: any = {
+        pattern_days: settings.patternDays || [],
+        pattern_time_slots: settings.patternTimeSlots || {},
+        needs_pickup: settings.needsPickup || false,
+        needs_dropoff: settings.needsDropoff || false,
+        updated_at: now,
+      };
+      if (settings.transportPattern && Object.keys(settings.transportPattern).length > 0) {
+        childUpdate.transport_pattern = settings.transportPattern;
+      }
+      await supabase
+        .from('children')
+        .update(childUpdate)
+        .eq('id', childId);
+
       onSave();
       onClose();
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -214,7 +241,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc] mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
           <p className="text-gray-600 mt-4">読み込み中...</p>
         </div>
       </div>
@@ -243,7 +270,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
           {/* 利用パターン */}
           <div>
             <div className="flex items-center space-x-2 mb-3">
-              <Calendar size={18} className="text-[#00c4cc]" />
+              <Calendar size={18} className="text-primary" />
               <h3 className="font-bold text-sm text-gray-700">利用パターン</h3>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -256,7 +283,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                       onClick={() => toggleDay(day.id)}
                       className={`w-12 h-12 rounded-lg border-2 font-bold transition-colors ${
                         isSelected
-                          ? 'border-[#00c4cc] bg-[#00c4cc] text-white'
+                          ? 'border-primary bg-primary text-white'
                           : 'border-gray-300 text-gray-500 hover:border-gray-400'
                       }`}
                     >
@@ -264,13 +291,14 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                     </button>
                     {isSelected && (
                       <select
-                        value={timeSlot || 'AMPM'}
+                        value={timeSlot || 'ALL'}
                         onChange={(e) => setTimeSlot(day.id, e.target.value as TimeSlot)}
                         className="mt-1 text-xs border border-gray-300 rounded px-1 py-0.5"
                       >
-                        <option value="AMPM">終日</option>
-                        <option value="AM">{slotInfo.AM}</option>
-                        {slotInfo.PM && <option value="PM">{slotInfo.PM}</option>}
+                        {resolvedSlots.length > 1 && <option value="ALL">終日</option>}
+                        {resolvedSlots.map((slot) => (
+                          <option key={slot.key} value={slot.key}>{slot.name}</option>
+                        ))}
                       </select>
                     )}
                   </div>
@@ -282,7 +310,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
           {/* 送迎設定 */}
           <div>
             <div className="flex items-center space-x-2 mb-3">
-              <Truck size={18} className="text-[#00c4cc]" />
+              <Truck size={18} className="text-primary" />
               <h3 className="font-bold text-sm text-gray-700">送迎設定</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -292,7 +320,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                     type="checkbox"
                     checked={settings.needsPickup || false}
                     onChange={(e) => setSettings({ ...settings, needsPickup: e.target.checked })}
-                    className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
                   />
                   <span className="text-sm text-gray-700">お迎えあり</span>
                 </label>
@@ -301,7 +329,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                     type="text"
                     value={settings.pickupLocation || ''}
                     onChange={(e) => setSettings({ ...settings, pickupLocation: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-primary"
                     placeholder="お迎え場所"
                   />
                 )}
@@ -312,7 +340,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                     type="checkbox"
                     checked={settings.needsDropoff || false}
                     onChange={(e) => setSettings({ ...settings, needsDropoff: e.target.checked })}
-                    className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
                   />
                   <span className="text-sm text-gray-700">お送りあり</span>
                 </label>
@@ -321,18 +349,81 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                     type="text"
                     value={settings.dropoffLocation || ''}
                     onChange={(e) => setSettings({ ...settings, dropoffLocation: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-primary"
                     placeholder="お送り場所"
                   />
                 )}
               </div>
             </div>
+
+            {/* 曜日別送迎方法 */}
+            {(settings.patternDays?.length ?? 0) > 0 && transportVehicles.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <h4 className="text-xs font-bold text-gray-600 mb-3">曜日別 送迎方法</h4>
+                <div className="space-y-2">
+                  {DAYS_OF_WEEK.filter(d => settings.patternDays?.includes(d.id)).map(day => {
+                    const tp = settings.transportPattern?.[day.id] || {};
+                    return (
+                      <div key={day.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-2.5">
+                        <span className="w-6 text-center text-sm font-bold text-gray-700">{day.shortLabel}</span>
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <span className="text-xs text-gray-500 w-8 flex-shrink-0">迎え:</span>
+                          <select
+                            value={tp.pickup || ''}
+                            onChange={(e) => {
+                              const val = e.target.value || null;
+                              setSettings({
+                                ...settings,
+                                transportPattern: {
+                                  ...settings.transportPattern,
+                                  [day.id]: { ...tp, pickup: val },
+                                },
+                              });
+                            }}
+                            className="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-primary"
+                          >
+                            <option value="">なし（保護者送迎）</option>
+                            <option value="walk">徒歩</option>
+                            {transportVehicles.map(v => (
+                              <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <span className="text-xs text-gray-500 w-8 flex-shrink-0">送り:</span>
+                          <select
+                            value={tp.dropoff || ''}
+                            onChange={(e) => {
+                              const val = e.target.value || null;
+                              setSettings({
+                                ...settings,
+                                transportPattern: {
+                                  ...settings.transportPattern,
+                                  [day.id]: { ...tp, dropoff: val },
+                                },
+                              });
+                            }}
+                            className="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-primary"
+                          >
+                            <option value="">なし（保護者送迎）</option>
+                            <option value="walk">徒歩</option>
+                            {transportVehicles.map(v => (
+                              <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 契約情報 */}
           <div>
             <div className="flex items-center space-x-2 mb-3">
-              <FileText size={18} className="text-[#00c4cc]" />
+              <FileText size={18} className="text-primary" />
               <h3 className="font-bold text-sm text-gray-700">契約情報</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -347,7 +438,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                       contractDays: e.target.value ? parseInt(e.target.value) : undefined,
                     })
                   }
-                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-primary"
                   placeholder="10"
                   min="0"
                   max="31"
@@ -359,7 +450,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                   type="date"
                   value={settings.contractStartDate || ''}
                   onChange={(e) => setSettings({ ...settings, contractStartDate: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-primary"
                 />
               </div>
               <div>
@@ -368,7 +459,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                   type="date"
                   value={settings.contractEndDate || ''}
                   onChange={(e) => setSettings({ ...settings, contractEndDate: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-[#00c4cc]"
+                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
@@ -378,7 +469,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
           {staffList.length > 0 && (
             <div>
               <div className="flex items-center space-x-2 mb-3">
-                <Users size={18} className="text-[#00c4cc]" />
+                <Users size={18} className="text-primary" />
                 <h3 className="font-bold text-sm text-gray-700">担当職員</h3>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -390,7 +481,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                       onClick={() => toggleStaff(staff.id)}
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         isSelected
-                          ? 'bg-[#00c4cc] text-white'
+                          ? 'bg-primary text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -414,7 +505,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center space-x-2 px-6 py-2 bg-[#00c4cc] text-white rounded-md hover:bg-[#00b0b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-2 px-6 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={16} />
             <span>{saving ? '保存中...' : '保存'}</span>

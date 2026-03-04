@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   CheckCircle,
   XCircle,
@@ -35,7 +36,7 @@ export default function SystemAdditionsTab({ staff, simulationResult }: Props) {
       {/* スタッフ配置状況 */}
       <div>
         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Users size={20} className="text-[#00c4cc]" />
+          <Users size={20} className="text-primary" />
           現在のスタッフ配置
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -84,7 +85,7 @@ export default function SystemAdditionsTab({ staff, simulationResult }: Props) {
       {/* 体制加算一覧 */}
       <div>
         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Award size={20} className="text-[#00c4cc]" />
+          <Award size={20} className="text-primary" />
           体制加算の判定結果
         </h3>
 

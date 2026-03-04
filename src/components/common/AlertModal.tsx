@@ -49,6 +49,10 @@ const AlertModal: React.FC<AlertModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity"
       onClick={onClose}
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="alert-modal-title"
+      aria-describedby="alert-modal-message"
     >
       <div
         className="relative w-full max-w-sm mx-4 bg-white rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 p-6"
@@ -63,14 +67,14 @@ const AlertModal: React.FC<AlertModalProps> = ({
 
         <div className="flex flex-col items-center text-center gap-3">
           <Icon className={`w-10 h-10 ${color}`} />
-          {title && <h3 className="text-lg font-bold text-gray-800">{title}</h3>}
-          <p className="text-sm text-gray-600 whitespace-pre-wrap">{message}</p>
+          {title && <h3 id="alert-modal-title" className="text-lg font-bold text-gray-800">{title}</h3>}
+          <p id="alert-modal-message" className="text-sm text-gray-600 whitespace-pre-wrap">{message}</p>
         </div>
 
         <div className="mt-5 flex justify-center">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-[#00c4cc] text-white text-sm font-medium rounded-lg hover:bg-[#00b0b8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:ring-offset-2"
+            className="px-6 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             {buttonLabel}
           </button>

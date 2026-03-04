@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import {
   ConnectMeeting,
   ConnectMeetingStatus,
@@ -135,6 +136,7 @@ function mapMeetingRow(row: Record<string, unknown>): ConnectMeeting {
 
 export default function ConnectMeetingView() {
   const { user, facility } = useAuth();
+  const { toast } = useToast();
 
   // State
   const [meetings, setMeetings] = useState<ConnectMeeting[]>([]);
@@ -285,15 +287,15 @@ export default function ConnectMeetingView() {
   const handleCreateMeeting = async () => {
     if (!facility?.id || !user?.id) return;
     if (!formData.childId || !formData.title) {
-      alert('対象児童とタイトルは必須です。');
+      toast.warning('対象児童とタイトルは必須です。');
       return;
     }
     if (formData.dateOptions.length === 0) {
-      alert('日程候補を1つ以上追加してください。');
+      toast.warning('日程候補を1つ以上追加してください。');
       return;
     }
     if (formData.participants.length === 0) {
-      alert('参加者を1人以上追加してください。');
+      toast.warning('参加者を1人以上追加してください。');
       return;
     }
 
@@ -317,7 +319,7 @@ export default function ConnectMeetingView() {
         .single();
 
       if (meetingError || !meetingData) {
-        alert('会議の作成に失敗しました。');
+        toast.error('会議の作成に失敗しました。');
         return;
       }
 
@@ -409,12 +411,12 @@ export default function ConnectMeetingView() {
           .eq('id', participant.id);
 
         refreshSelectedMeeting(selectedMeeting.id);
-        alert('招待メールを送信しました。');
+        toast.success('招待メールを送信しました。');
       } else {
-        alert('招待メールの送信に失敗しました。');
+        toast.error('招待メールの送信に失敗しました。');
       }
     } catch {
-      alert('招待メールの送信に失敗しました。');
+      toast.error('招待メールの送信に失敗しました。');
     }
   };
 
@@ -451,12 +453,12 @@ export default function ConnectMeetingView() {
           .eq('id', participant.id);
 
         refreshSelectedMeeting(selectedMeeting.id);
-        alert('リマインダーを送信しました。');
+        toast.success('リマインダーを送信しました。');
       } else {
-        alert('リマインダーの送信に失敗しました。');
+        toast.error('リマインダーの送信に失敗しました。');
       }
     } catch {
-      alert('リマインダーの送信に失敗しました。');
+      toast.error('リマインダーの送信に失敗しました。');
     }
   };
 
@@ -613,7 +615,7 @@ export default function ConnectMeetingView() {
         </div>
         <button
           onClick={() => { setView('create'); setCreateStep(1); }}
-          className="flex items-center gap-2 bg-[#00c4cc] text-white px-4 py-2.5 rounded-lg hover:bg-[#00b0b8] transition-colors font-medium text-sm"
+          className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium text-sm"
         >
           <Plus size={16} />
           新規作成
@@ -650,7 +652,7 @@ export default function ConnectMeetingView() {
               onClick={() => setStatusFilter(f.key)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 statusFilter === f.key
-                  ? 'bg-[#00c4cc] text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -665,7 +667,7 @@ export default function ConnectMeetingView() {
             placeholder="検索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
       </div>
@@ -673,7 +675,7 @@ export default function ConnectMeetingView() {
       {/* 会議リスト */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-[#00c4cc]" />
+          <Loader2 size={24} className="animate-spin text-primary" />
         </div>
       ) : filteredMeetings.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
@@ -694,7 +696,7 @@ export default function ConnectMeetingView() {
                   setView('detail');
                   refreshSelectedMeeting(meeting.id);
                 }}
-                className="w-full bg-white rounded-xl border border-gray-100 p-4 hover:border-[#00c4cc]/30 hover:shadow-sm transition-all text-left"
+                className="w-full bg-white rounded-xl border border-gray-100 p-4 hover:border-primary/30 hover:shadow-sm transition-all text-left"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
@@ -767,10 +769,10 @@ export default function ConnectMeetingView() {
           { step: 3 as const, label: '参加者' },
         ].map((s, i) => (
           <React.Fragment key={s.step}>
-            {i > 0 && <div className={`flex-1 h-0.5 ${createStep >= s.step ? 'bg-[#00c4cc]' : 'bg-gray-200'}`} />}
+            {i > 0 && <div className={`flex-1 h-0.5 ${createStep >= s.step ? 'bg-primary' : 'bg-gray-200'}`} />}
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                createStep >= s.step ? 'bg-[#00c4cc] text-white' : 'bg-gray-200 text-gray-500'
+                createStep >= s.step ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
               }`}
             >
               {s.step}
@@ -788,7 +790,7 @@ export default function ConnectMeetingView() {
               <select
                 value={formData.childId}
                 onChange={(e) => setFormData((p) => ({ ...p, childId: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="">選択してください</option>
                 {children.map((c) => (
@@ -803,7 +805,7 @@ export default function ConnectMeetingView() {
                 value={formData.title}
                 onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
                 placeholder="例: 学校訪問打ち合わせ"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
             <div>
@@ -813,7 +815,7 @@ export default function ConnectMeetingView() {
                 onChange={(e) => setFormData((p) => ({ ...p, purpose: e.target.value }))}
                 placeholder="会議の目的を記入してください"
                 rows={2}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
               />
             </div>
             <div>
@@ -823,7 +825,7 @@ export default function ConnectMeetingView() {
                 value={formData.location || ''}
                 onChange={(e) => setFormData((p) => ({ ...p, location: e.target.value }))}
                 placeholder="例: 施設内会議室"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
             <div>
@@ -831,7 +833,7 @@ export default function ConnectMeetingView() {
               <select
                 value={formData.estimatedDuration || 60}
                 onChange={(e) => setFormData((p) => ({ ...p, estimatedDuration: Number(e.target.value) }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 {DURATION_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -845,19 +847,19 @@ export default function ConnectMeetingView() {
                 onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
                 placeholder="補足情報があれば記入してください"
                 rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
               />
             </div>
             <div className="flex justify-end">
               <button
                 onClick={() => {
                   if (!formData.childId || !formData.title) {
-                    alert('対象児童とタイトルは必須です。');
+                    toast.warning('対象児童とタイトルは必須です。');
                     return;
                   }
                   setCreateStep(2);
                 }}
-                className="bg-[#00c4cc] text-white px-6 py-2.5 rounded-lg hover:bg-[#00b0b8] transition-colors font-medium text-sm"
+                className="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium text-sm"
               >
                 次へ
               </button>
@@ -879,7 +881,7 @@ export default function ConnectMeetingView() {
                   <input
                     type="date"
                     id="new-date-option-date"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -887,7 +889,7 @@ export default function ConnectMeetingView() {
                   <input
                     type="time"
                     id="new-date-option-start"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -895,7 +897,7 @@ export default function ConnectMeetingView() {
                   <input
                     type="time"
                     id="new-date-option-end"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
@@ -905,7 +907,7 @@ export default function ConnectMeetingView() {
                   const startEl = document.getElementById('new-date-option-start') as HTMLInputElement;
                   const endEl = document.getElementById('new-date-option-end') as HTMLInputElement;
                   if (!dateEl.value || !startEl.value) {
-                    alert('日付と開始時間は必須です。');
+                    toast.warning('日付と開始時間は必須です。');
                     return;
                   }
                   setFormData((p) => ({
@@ -919,7 +921,7 @@ export default function ConnectMeetingView() {
                   startEl.value = '';
                   endEl.value = '';
                 }}
-                className="flex items-center gap-1 text-[#00c4cc] text-sm font-medium hover:underline"
+                className="flex items-center gap-1 text-primary text-sm font-medium hover:underline"
               >
                 <Plus size={14} />
                 候補を追加
@@ -960,12 +962,12 @@ export default function ConnectMeetingView() {
               <button
                 onClick={() => {
                   if (formData.dateOptions.length === 0) {
-                    alert('日程候補を1つ以上追加してください。');
+                    toast.warning('日程候補を1つ以上追加してください。');
                     return;
                   }
                   setCreateStep(3);
                 }}
-                className="bg-[#00c4cc] text-white px-6 py-2.5 rounded-lg hover:bg-[#00b0b8] transition-colors font-medium text-sm"
+                className="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium text-sm"
               >
                 次へ
               </button>
@@ -988,7 +990,7 @@ export default function ConnectMeetingView() {
                     type="text"
                     id="new-participant-org"
                     placeholder="例: 〇〇市役所"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -997,7 +999,7 @@ export default function ConnectMeetingView() {
                     type="text"
                     id="new-participant-name"
                     placeholder="例: 田中太郎"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -1006,7 +1008,7 @@ export default function ConnectMeetingView() {
                     type="email"
                     id="new-participant-email"
                     placeholder="例: tanaka@example.com"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
@@ -1016,7 +1018,7 @@ export default function ConnectMeetingView() {
                   const nameEl = document.getElementById('new-participant-name') as HTMLInputElement;
                   const emailEl = document.getElementById('new-participant-email') as HTMLInputElement;
                   if (!orgEl.value || !emailEl.value) {
-                    alert('組織名とメールアドレスは必須です。');
+                    toast.warning('組織名とメールアドレスは必須です。');
                     return;
                   }
                   setFormData((p) => ({
@@ -1034,7 +1036,7 @@ export default function ConnectMeetingView() {
                   nameEl.value = '';
                   emailEl.value = '';
                 }}
-                className="flex items-center gap-1 text-[#00c4cc] text-sm font-medium hover:underline"
+                className="flex items-center gap-1 text-primary text-sm font-medium hover:underline"
               >
                 <Plus size={14} />
                 参加者を追加
@@ -1079,7 +1081,7 @@ export default function ConnectMeetingView() {
               <button
                 onClick={handleCreateMeeting}
                 disabled={saving}
-                className="bg-[#00c4cc] text-white px-6 py-2.5 rounded-lg hover:bg-[#00b0b8] transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 作成する
@@ -1299,7 +1301,7 @@ export default function ConnectMeetingView() {
                     <div className="flex gap-2 shrink-0 ml-4">
                       <button
                         onClick={() => handleSendInvitation(p)}
-                        className="flex items-center gap-1 bg-[#00c4cc] text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[#00b0b8] transition-colors"
+                        className="flex items-center gap-1 bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-primary-dark transition-colors"
                       >
                         <Send size={12} />
                         招待送信
@@ -1339,7 +1341,7 @@ export default function ConnectMeetingView() {
                     }}
                     onBlur={saveAgendaItems}
                     placeholder="議題タイトル"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                   <textarea
                     value={item.description || ''}
@@ -1351,7 +1353,7 @@ export default function ConnectMeetingView() {
                     onBlur={saveAgendaItems}
                     placeholder="説明（任意）"
                     rows={2}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                   />
                 </div>
                 <button
@@ -1372,7 +1374,7 @@ export default function ConnectMeetingView() {
             onClick={() => {
               setAgendaItems((prev) => [...prev, { title: '', description: '', order: prev.length + 1 }]);
             }}
-            className="flex items-center gap-1 text-[#00c4cc] text-sm font-medium hover:underline mt-3"
+            className="flex items-center gap-1 text-primary text-sm font-medium hover:underline mt-3"
           >
             <Plus size={14} />
             議題を追加
@@ -1388,12 +1390,12 @@ export default function ConnectMeetingView() {
               onChange={(e) => setMinutes(e.target.value)}
               placeholder="議事録を記入してください..."
               rows={8}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
             />
             <div className="flex justify-end mt-3">
               <button
                 onClick={saveMinutes}
-                className="bg-[#00c4cc] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#00b0b8] transition-colors"
+                className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
               >
                 保存
               </button>
@@ -1419,7 +1421,7 @@ export default function ConnectMeetingView() {
                       }}
                       onBlur={saveDecisions}
                       placeholder="決定事項"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <textarea
@@ -1432,7 +1434,7 @@ export default function ConnectMeetingView() {
                         onBlur={saveDecisions}
                         placeholder="説明"
                         rows={2}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                       />
                       <input
                         type="text"
@@ -1444,7 +1446,7 @@ export default function ConnectMeetingView() {
                         }}
                         onBlur={saveDecisions}
                         placeholder="担当者"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent h-fit"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent h-fit"
                       />
                     </div>
                   </div>
@@ -1462,7 +1464,7 @@ export default function ConnectMeetingView() {
             </div>
             <button
               onClick={() => setDecisions((prev) => [...prev, { title: '', description: '', assignee: '' }])}
-              className="flex items-center gap-1 text-[#00c4cc] text-sm font-medium hover:underline mt-3"
+              className="flex items-center gap-1 text-primary text-sm font-medium hover:underline mt-3"
             >
               <Plus size={14} />
               決定事項を追加
@@ -1501,7 +1503,7 @@ export default function ConnectMeetingView() {
                       }}
                       onBlur={saveActionItems}
                       placeholder="タスク内容"
-                      className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent ${
+                      className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
                         a.status === 'done' ? 'line-through text-gray-400' : ''
                       }`}
                     />
@@ -1516,7 +1518,7 @@ export default function ConnectMeetingView() {
                         }}
                         onBlur={saveActionItems}
                         placeholder="担当者"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       />
                       <input
                         type="date"
@@ -1527,7 +1529,7 @@ export default function ConnectMeetingView() {
                           setActionItems(updated);
                         }}
                         onBlur={saveActionItems}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -1545,7 +1547,7 @@ export default function ConnectMeetingView() {
             </div>
             <button
               onClick={() => setActionItems((prev) => [...prev, { task: '', assignee: '', dueDate: '', status: 'pending' }])}
-              className="flex items-center gap-1 text-[#00c4cc] text-sm font-medium hover:underline mt-3"
+              className="flex items-center gap-1 text-primary text-sm font-medium hover:underline mt-3"
             >
               <Plus size={14} />
               アクションアイテムを追加
@@ -1565,7 +1567,7 @@ export default function ConnectMeetingView() {
             {m.status === 'confirmed' && (
               <button
                 onClick={() => handleStatusChange('completed')}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-[#00c4cc] hover:bg-[#00b0b8] transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-dark transition-colors"
               >
                 完了にする
               </button>

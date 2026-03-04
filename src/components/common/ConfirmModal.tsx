@@ -54,6 +54,9 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity"
       onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-modal-title"
     >
       <div
         className="relative w-full max-w-sm mx-4 bg-white rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 p-6"
@@ -67,14 +70,14 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </button>
 
         <div className="text-center">
-          <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+          <h3 id="confirm-modal-title" className="text-lg font-bold text-gray-800">{title}</h3>
           <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{message}</p>
         </div>
 
         <div className="mt-5 flex gap-3 justify-center">
           <button
             onClick={onCancel}
-            className="px-5 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+            className="px-5 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           >
             {cancelLabel}
           </button>

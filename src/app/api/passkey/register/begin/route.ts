@@ -48,23 +48,9 @@ export async function POST(request: NextRequest) {
     }));
 
     // リライイングパーティ（RP）情報を設定
+    // 単一ドメイン roots.inu.co.jp でパスベースルーティングを使用
     const rpName = 'Roots';
-    const rpID = (() => {
-      if (typeof window !== 'undefined') {
-        const hostname = window.location.hostname;
-        if (hostname.startsWith('biz.') || hostname.includes('biz.Roots')) {
-          return 'biz.Roots.inu.co.jp';
-        }
-        return 'my.Roots.inu.co.jp';
-      }
-      // サーバーサイドではリクエストから判定
-      const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
-      const hostname = host.split(':')[0];
-      if (hostname.startsWith('biz.') || hostname.includes('biz.Roots')) {
-        return 'biz.Roots.inu.co.jp';
-      }
-      return 'my.Roots.inu.co.jp';
-    })();
+    const rpID = 'roots.inu.co.jp';
 
     // userIDをUint8Arrayに変換
     const userID = new Uint8Array(Buffer.from(userId));

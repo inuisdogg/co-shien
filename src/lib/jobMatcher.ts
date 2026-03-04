@@ -5,6 +5,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { QUALIFICATION_CODES, type QualificationCode } from '@/types';
+import { parseQualifications } from '@/utils/qualifications';
 
 export type MatchScore = {
   jobPostingId: string;
@@ -92,11 +93,7 @@ export async function getTopMatchingJobs(
     .order('years_of_experience', { ascending: false })
     .limit(1);
 
-  const userQualifications: string[] = Array.isArray(userData.qualifications)
-    ? userData.qualifications
-    : typeof userData.qualifications === 'string' && userData.qualifications
-      ? userData.qualifications.split(',').map((q: string) => q.trim())
-      : [];
+  const userQualifications: string[] = parseQualifications(userData.qualifications);
 
   const userExperienceYears: number =
     staffData && staffData.length > 0

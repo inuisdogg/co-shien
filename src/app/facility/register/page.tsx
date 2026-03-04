@@ -1,21 +1,20 @@
 /**
- * 施設登録ページ
- * 管理者として新しい施設を登録する
- * - トークンがある場合: 事前登録された施設の作成を完了
- * - トークンがない場合: 通常の施設登録
- * - 事業所番号（10桁）必須
- * - 指定通知書の画像アップロード必須
+ * 施設登録ページ（3ステップウィザード）
+ * 招待リンクから施設を登録する
+ * Step1: 法人情報 → Step2: 施設情報 → Step3: 確認・完了
  */
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
-import { Upload, X, Building2, FileText, AlertCircle } from 'lucide-react';
+import {
+  Upload, X, Building2, FileText, AlertCircle, CheckCircle,
+  Briefcase, MapPin, ChevronRight, ChevronLeft, Users, Clock,
+} from 'lucide-react';
 
-// 静的生成をスキップ
 export const dynamic = 'force-dynamic';
 
 interface UserInfo {
@@ -24,6 +23,24 @@ interface UserInfo {
   email: string;
 }
 
+type WizardStep = 1 | 2 | 3;
+
+const SERVICE_CATEGORIES = [
+  { key: 'childDevelopmentSupport', label: '児童発達支援', description: '未就学児向け' },
+  { key: 'afterSchoolDayService', label: '放課後等デイサービス', description: '就学児向け' },
+  { key: 'nurseryVisitSupport', label: '保育所等訪問支援', description: '訪問型' },
+  { key: 'homeBasedChildSupport', label: '居宅訪問型児童発達支援', description: '在宅型' },
+] as const;
+
+const COMPANY_TYPES = [
+  { value: 'corporation', label: '株式会社・有限会社' },
+  { value: 'npo', label: 'NPO法人' },
+  { value: 'general_association', label: '一般社団法人・一般財団法人' },
+  { value: 'social_welfare', label: '社会福祉法人' },
+  { value: 'medical', label: '医療法人' },
+  { value: 'individual', label: '個人事業主' },
+] as const;
+
 export default function FacilityRegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,17 +48,40 @@ export default function FacilityRegisterPage() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loadingToken, setLoadingToken] = useState(true);
+  const [step, setStep] = useState<WizardStep>(1);
+
+  // 完了画面用
+  const [completed, setCompleted] = useState(false);
+
+  // 旧トークン互換
   const [isPreRegistered, setIsPreRegistered] = useState(false);
   const [preRegisteredFacilityId, setPreRegisteredFacilityId] = useState<string | null>(null);
-  const [loadingToken, setLoadingToken] = useState(true);
 
-  // フォーム状態
+  // Step1: 法人情報
+  const [companyName, setCompanyName] = useState('');
+  const [companyType, setCompanyType] = useState('');
+  const [representativeName, setRepresentativeName] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyPhone, setCompanyPhone] = useState('');
+
+  // Step2: 施設情報
   const [facilityName, setFacilityName] = useState('');
   const [businessNumber, setBusinessNumber] = useState('');
+  const [serviceCategories, setServiceCategories] = useState<Record<string, boolean>>({
+    childDevelopmentSupport: false,
+    afterSchoolDayService: false,
+    nurseryVisitSupport: false,
+    homeBasedChildSupport: false,
+  });
+  const [postalCode, setPostalCode] = useState('');
+  const [facilityAddress, setFacilityAddress] = useState('');
+  const [capacityAM, setCapacityAM] = useState('');
+  const [capacityPM, setCapacityPM] = useState('');
   const [designationFile, setDesignationFile] = useState<File | null>(null);
   const [designationPreview, setDesignationPreview] = useState<string | null>(null);
 
-  // トークンを検証
+  // トークン検証
   useEffect(() => {
     const validateToken = async () => {
       const token = searchParams?.get('token');
@@ -51,70 +91,63 @@ export default function FacilityRegisterPage() {
       }
 
       try {
-        // 1. まず新しいplatform_invitation_tokensテーブルをチェック
-        const { data: platformToken, error: platformError } = await supabase
+        const { data: platformToken } = await supabase
           .from('platform_invitation_tokens')
-          .select('id, expires_at, used_at')
+          .select('id, expires_at, used_at, memo_company_name, memo_contact_name')
           .eq('token', token)
           .maybeSingle();
 
         if (platformToken) {
-          // 有効期限チェック
           if (new Date(platformToken.expires_at) < new Date()) {
-            setError('トークンの有効期限が切れています');
+            setError('トークンの有効期限が切れています。管理者に再発行を依頼してください。');
             setLoadingToken(false);
             return;
           }
-
-          // 使用済みチェック
           if (platformToken.used_at) {
             setError('このトークンは既に使用されています');
             setLoadingToken(false);
             return;
           }
-
-          // 新しいトークンの場合は事前登録なし（ユーザーが施設情報を入力）
+          // メモから法人名を事前入力
+          if (platformToken.memo_company_name) {
+            setCompanyName(platformToken.memo_company_name);
+          }
           setIsPreRegistered(false);
           setLoadingToken(false);
           return;
         }
 
-        // 2. 旧facility_registration_tokensテーブルをチェック（後方互換性）
-        const { data: tokenData, error: tokenError } = await supabase
+        // 旧トークンシステム（後方互換）
+        const { data: tokenData } = await supabase
           .from('facility_registration_tokens')
           .select('facility_id, expires_at, used_at')
           .eq('token', token)
           .maybeSingle();
 
-        if (tokenError || !tokenData) {
+        if (!tokenData) {
           setError('無効なトークンです');
           setLoadingToken(false);
           return;
         }
-
-        // 有効期限チェック
         if (new Date(tokenData.expires_at) < new Date()) {
           setError('トークンの有効期限が切れています');
           setLoadingToken(false);
           return;
         }
-
-        // 使用済みチェック
         if (tokenData.used_at) {
           setError('このトークンは既に使用されています');
           setLoadingToken(false);
           return;
         }
 
-        // 事前登録された施設情報を取得
-        const { data: facilityData, error: facilityError } = await supabase
+        const { data: facilityData } = await supabase
           .from('facilities')
           .select('id, name, pre_registered')
           .eq('id', tokenData.facility_id)
           .eq('pre_registered', true)
           .single();
 
-        if (facilityError || !facilityData) {
+        if (!facilityData) {
           setError('事前登録された施設が見つかりません');
           setLoadingToken(false);
           return;
@@ -133,521 +166,746 @@ export default function FacilityRegisterPage() {
     validateToken();
   }, [searchParams]);
 
-  // ユーザー情報を取得
+  // ユーザー情報
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (!userStr) {
-      router.push('/career/login');
+      const token = searchParams?.get('token');
+      router.push(`/career/login${token ? `?redirect=/facility/register?token=${token}` : ''}`);
       return;
     }
     setUser(JSON.parse(userStr));
-  }, [router]);
+  }, [router, searchParams]);
 
-  // ファイル選択処理
+  // 郵便番号から住所検索
+  const lookupAddress = useCallback(async (code: string) => {
+    const cleaned = code.replace(/[^\d]/g, '');
+    if (cleaned.length !== 7) return;
+
+    try {
+      const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${cleaned}`);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const r = data.results[0];
+        setFacilityAddress(`${r.address1}${r.address2}${r.address3}`);
+      }
+    } catch {
+      // 検索失敗時は何もしない
+    }
+  }, []);
+
+  const handlePostalCodeChange = (value: string) => {
+    const cleaned = value.replace(/[^\d-]/g, '').slice(0, 8);
+    setPostalCode(cleaned);
+    const digits = cleaned.replace(/-/g, '');
+    if (digits.length === 7) {
+      lookupAddress(digits);
+    }
+  };
+
+  // ファイル選択
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // ファイルサイズチェック（5MB以下）
     if (file.size > 5 * 1024 * 1024) {
       setError('ファイルサイズは5MB以下にしてください');
       return;
     }
-
-    // ファイル形式チェック
     if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
       setError('画像ファイル（JPG, PNG）またはPDFをアップロードしてください');
       return;
     }
-
     setDesignationFile(file);
     setError('');
-
-    // プレビュー生成（画像の場合のみ）
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setDesignationPreview(e.target?.result as string);
-      };
+      reader.onload = (e) => setDesignationPreview(e.target?.result as string);
       reader.readAsDataURL(file);
     } else {
       setDesignationPreview(null);
     }
   };
 
-  // ファイル削除
   const removeFile = () => {
     setDesignationFile(null);
     setDesignationPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // 施設登録処理
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
+  // サービス種別トグル
+  const toggleServiceCategory = (key: string) => {
+    setServiceCategories((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
+  // ステップ1バリデーション
+  const validateStep1 = (): boolean => {
+    if (!companyName.trim()) {
+      setError('法人名を入力してください');
+      return false;
+    }
+    setError('');
+    return true;
+  };
+
+  // ステップ2バリデーション
+  const validateStep2 = (): boolean => {
+    if (!facilityName.trim()) {
+      setError('施設名を入力してください');
+      return false;
+    }
+    if (businessNumber && !businessNumber.match(/^\d{10}$/)) {
+      setError('事業所番号は10桁の数字で入力してください');
+      return false;
+    }
+    const hasService = Object.values(serviceCategories).some((v) => v);
+    if (!hasService) {
+      setError('サービス種別を1つ以上選択してください');
+      return false;
+    }
+    setError('');
+    return true;
+  };
+
+  // 次のステップへ
+  const goNext = () => {
+    if (step === 1 && validateStep1()) setStep(2);
+    else if (step === 2 && validateStep2()) setStep(3);
+  };
+
+  // 前のステップへ
+  const goPrev = () => {
+    setError('');
+    if (step === 2) setStep(1);
+    else if (step === 3) setStep(2);
+  };
+
+  // 施設申請処理（審査フロー）
+  const handleSubmit = async () => {
+    if (!user) return;
     setError('');
     setLoading(true);
 
     try {
-      // バリデーション
-      if (!facilityName.trim()) {
-        throw new Error('施設名を入力してください');
+      // --- 1. 指定通知書をアップロード（任意） ---
+      let designationFileUrl: string | null = null;
+      if (designationFile) {
+        const fileExt = designationFile.name.split('.').pop();
+        const fileName = `applications/${user.id}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('facility-documents')
+          .upload(fileName, designationFile);
+        if (uploadError) console.error('Upload error:', uploadError);
+        else designationFileUrl = fileName;
       }
 
-      // 事業所番号が入力された場合のみバリデーション
-      if (businessNumber && !businessNumber.match(/^\d{10}$/)) {
-        throw new Error('事業所番号は10桁の数字で入力してください');
-      }
-
-      // 事業所番号の重複チェック（入力された場合のみ）
-      if (businessNumber) {
-        const { data: existingFacility } = await supabase
-          .from('facilities')
-          .select('id')
-          .eq('business_number', businessNumber)
-          .single();
-
-        if (existingFacility) {
-          throw new Error('この事業所番号は既に登録されています');
-        }
-      }
-
-      let facilityId: string;
-      let newFacilityCode: string;
-
-      if (isPreRegistered && preRegisteredFacilityId) {
-        // 事前登録された施設の場合
-        facilityId = preRegisteredFacilityId;
-
-        // 施設コードを自動発番（5桁）
-        let isUnique = false;
-        do {
-          newFacilityCode = String(10000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90000));
-          const { data: existing } = await supabase
-            .from('facilities')
-            .select('id')
-            .eq('code', newFacilityCode)
-            .single();
-          if (!existing) {
-            isUnique = true;
-          }
-        } while (!isUnique);
-
-        // 指定通知書のアップロード（アップロードされた場合のみ）
-        let fileName: string | null = null;
-        if (designationFile) {
-          const fileExt = designationFile.name.split('.').pop();
-          fileName = `${facilityId}/designation.${fileExt}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('facility-documents')
-            .upload(fileName, designationFile);
-
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-            // ストレージがない場合はスキップ（開発環境用）
-          }
-        }
-
-        // 施設を更新（事前登録から通常登録へ）
-        const updateData: any = {
-          name: facilityName.trim(),
-          code: newFacilityCode,
-          verification_status: 'unverified',
-          pre_registered: false,
-          updated_at: new Date().toISOString(),
-        };
-
-        // 事業所番号と指定通知書は入力された場合のみ更新
-        if (businessNumber && businessNumber.match(/^\d{10}$/)) {
-          updateData.business_number = businessNumber;
-        }
-        if (fileName) {
-          updateData.designation_document_path = fileName;
-        }
-
-        const { error: facilityError } = await supabase
-          .from('facilities')
-          .update(updateData)
-          .eq('id', facilityId);
-
-        if (facilityError) {
-          throw new Error(`施設の更新に失敗しました: ${facilityError.message}`);
-        }
-      } else {
-        // 通常の施設登録
-        // 施設コードを自動発番（5桁）
-        let isUnique = false;
-        do {
-          newFacilityCode = String(10000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90000));
-          const { data: existing } = await supabase
-            .from('facilities')
-            .select('id')
-            .eq('code', newFacilityCode)
-            .single();
-          if (!existing) {
-            isUnique = true;
-          }
-        } while (!isUnique);
-
-        // 施設IDを生成
-        const timestamp = Date.now();
-        facilityId = `facility-${timestamp}`;
-
-        // 指定通知書をSupabase Storageにアップロード（ファイルがある場合のみ）
-        let fileName: string | undefined;
-        if (designationFile) {
-          const fileExt = designationFile.name.split('.').pop();
-          fileName = `${facilityId}/designation.${fileExt}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('facility-documents')
-            .upload(fileName, designationFile);
-
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-            // ストレージがない場合はスキップ（開発環境用）
-          }
-        }
-
-        // 施設を作成
-        const { error: facilityError } = await supabase
-          .from('facilities')
-          .insert({
-            id: facilityId,
-            name: facilityName.trim(),
-            code: newFacilityCode,
-            business_number: businessNumber || null,
-            designation_document_path: fileName || null,
-            verification_status: 'unverified',
-            pre_registered: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-
-        if (facilityError) {
-          throw new Error(`施設の作成に失敗しました: ${facilityError.message}`);
-        }
-      }
-
-      // 施設設定を作成（存在しない場合のみ）
-      const { data: existingSettings } = await supabase
-        .from('facility_settings')
-        .select('id')
-        .eq('facility_id', facilityId)
-        .single();
-
-      if (!existingSettings) {
-        await supabase
-          .from('facility_settings')
-          .insert({
-            facility_id: facilityId,
-            facility_name: facilityName.trim(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-      } else {
-        // 既存の設定を更新
-        await supabase
-          .from('facility_settings')
-          .update({
-            facility_name: facilityName.trim(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('facility_id', facilityId);
-      }
-
-      // employment_recordsに管理者として登録
-      const { error: empError } = await supabase
-        .from('employment_records')
+      // --- 2. facility_applications に申請を作成 ---
+      const { error: appError } = await supabase
+        .from('facility_applications')
         .insert({
-          id: `emp-${user.id}-${facilityId}`,
           user_id: user.id,
-          facility_id: facilityId,
-          start_date: new Date().toISOString().split('T')[0],
-          role: '管理者',
-          employment_type: '常勤',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          company_name: companyName.trim(),
+          company_type: companyType || null,
+          representative_name: representativeName.trim() || null,
+          company_address: companyAddress.trim() || null,
+          company_phone: companyPhone.trim() || null,
+          facility_name: facilityName.trim(),
+          service_categories: serviceCategories,
+          business_number: businessNumber || null,
+          postal_code: postalCode ? postalCode.replace(/-/g, '') : null,
+          facility_address: facilityAddress.trim() || null,
+          capacity_am: capacityAM ? parseInt(capacityAM, 10) : null,
+          capacity_pm: capacityPM ? parseInt(capacityPM, 10) : null,
+          designation_file_url: designationFileUrl,
+          status: 'pending',
         });
 
-      if (empError) {
-        console.error('Employment record error:', empError);
+      if (appError) {
+        throw new Error(`申請の送信に失敗しました: ${appError.message}`);
       }
 
-      // 施設情報を取得してlocalStorageに保存
-      const { data: facilityData, error: facilityDataError } = await supabase
-        .from('facilities')
-        .select('id, name, code, created_at, updated_at')
-        .eq('id', facilityId)
-        .single();
-
-      if (facilityData && !facilityDataError) {
-        const { data: facilitySettings } = await supabase
-          .from('facility_settings')
-          .select('facility_name')
-          .eq('facility_id', facilityId)
-          .single();
-
-        const facilityInfo = {
-          id: facilityData.id,
-          name: facilitySettings?.facility_name || facilityData.name,
-          code: facilityData.code || facilityData.id,
-          createdAt: facilityData.created_at || new Date().toISOString(),
-          updatedAt: facilityData.updated_at || new Date().toISOString(),
-        };
-
-        localStorage.setItem('selectedFacility', JSON.stringify(facilityInfo));
-        
-        // ユーザー情報も更新
-        const updatedUser = {
-          ...user,
-          facilityId: facilityData.id,
-        };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-
-        // トークンを使用済みにする（トークン経由の場合）
-        const token = searchParams?.get('token');
-        if (token) {
-          // 新しいplatform_invitation_tokensテーブル
-          await supabase
-            .from('platform_invitation_tokens')
-            .update({
-              used_at: new Date().toISOString(),
-              used_by_facility_id: facilityId,
-            })
+      // --- 3. トークンを使用済みにする ---
+      const token = searchParams?.get('token');
+      if (token) {
+        await supabase.from('platform_invitation_tokens')
+          .update({ used_at: new Date().toISOString() })
+          .eq('token', token);
+        if (isPreRegistered) {
+          await supabase.from('facility_registration_tokens')
+            .update({ used_at: new Date().toISOString() })
             .eq('token', token);
-
-          // 旧facility_registration_tokensテーブル（後方互換性）
-          if (isPreRegistered && preRegisteredFacilityId) {
-            await supabase
-              .from('facility_registration_tokens')
-              .update({ used_at: new Date().toISOString() })
-              .eq('token', token);
-          }
         }
-
-        // Bizダッシュボードに直接リダイレクト（完了画面を表示しない）
-        window.location.href = `/business?facilityId=${facilityId}`;
-      } else {
-        // 施設情報が取得できない場合はエラー
-        console.error('施設情報の取得に失敗:', facilityDataError);
-        throw new Error('施設情報の取得に失敗しました');
       }
+
+      // --- 4. オーナーに通知 ---
+      const { data: owners } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'owner');
+
+      if (owners && owners.length > 0) {
+        const notifications = owners.map((owner: { id: string }) => ({
+          id: `notif-${Date.now()}-${owner.id}`,
+          user_id: owner.id,
+          title: '新規施設申請',
+          message: `${companyName.trim()} の「${facilityName.trim()}」の施設登録申請が届きました`,
+          type: 'facility_application',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        }));
+        const { error: notifError } = await supabase.from('notifications').insert(notifications);
+        if (notifError) console.error('Notification error:', notifError);
+      }
+
+      setCompleted(true);
     } catch (err: any) {
-      setError(err.message || '施設登録に失敗しました');
+      setError(err.message || '申請の送信に失敗しました');
     } finally {
       setLoading(false);
     }
   };
 
+  // --- ローディング画面 ---
   if (loadingToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">読み込み中...</h2>
-          <p className="text-gray-600 text-sm">トークンを確認しています</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">トークンを確認しています...</p>
         </div>
       </div>
     );
   }
 
-  // ローディング中（登録処理中）の表示
+  // --- エラー画面（トークン無効） ---
+  if (error && loadingToken === false && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">エラー</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button onClick={() => router.push('/')} className="px-6 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+            トップへ戻る
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- 完了画面（申請受付） ---
+  if (completed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">申請を受け付けました</h2>
+          <p className="text-gray-600 mb-6">
+            運営チームが内容を確認し、審査いたします。<br />
+            審査完了後、メールでお知らせします。
+          </p>
+
+          <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-3">
+            <div>
+              <p className="text-xs text-gray-500">法人名</p>
+              <p className="font-bold text-gray-800">{companyName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">施設名</p>
+              <p className="font-bold text-gray-800">{facilityName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">ステータス</p>
+              <span className="inline-flex items-center gap-1.5 text-sm font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                <Clock className="w-4 h-4" />
+                審査中
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-left">
+            <p className="text-sm font-bold text-blue-800 mb-2">審査完了までの流れ</p>
+            <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+              <li>運営チームが申請内容を確認</li>
+              <li>承認されると施設アカウントが作成されます</li>
+              <li>通知が届いたら施設管理画面をご利用いただけます</li>
+            </ol>
+          </div>
+
+          <button
+            onClick={() => { window.location.href = '/career'; }}
+            className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-xl transition-colors"
+          >
+            マイページに戻る
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- 申請中画面 ---
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">登録中...</h2>
-          <p className="text-gray-600 text-sm">施設を登録しています</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">申請中...</h2>
+          <p className="text-gray-600 text-sm">申請を送信しています</p>
         </div>
       </div>
     );
   }
 
+  // --- メインウィザード ---
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary to-primary-dark p-4">
       <div className="max-w-lg mx-auto">
         {/* ヘッダー */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <button
-            onClick={() => router.push('/portal')}
-            className="text-white/80 hover:text-white text-sm"
-          >
+          <button onClick={() => router.push('/portal')} className="text-white/80 hover:text-white text-sm">
             ← 戻る
           </button>
-          <Image
-            src="/logo-white.svg"
-            alt="Roots"
-            width={100}
-            height={32}
-            className="h-6 w-auto"
-          />
+          <Image src="/logo-white.svg" alt="Roots" width={100} height={32} className="h-6 w-auto" />
           <div className="w-12"></div>
         </div>
 
-        {/* メインカード */}
-        <div className="bg-white rounded-lg shadow-2xl p-8">
-          <div className="text-center mb-6">
-            <div className="w-14 h-14 bg-[#00c4cc]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-7 h-7 text-[#00c4cc]" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              {isPreRegistered ? '施設登録を完了' : '施設を新規登録'}
-            </h1>
-            <p className="text-gray-600 text-sm mt-2">
-              {isPreRegistered 
-                ? '事前登録された施設の登録を完了します'
-                : '管理者として新しい施設を登録します'}
-            </p>
-          </div>
+        {/* ステップインジケーター */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {[
+            { num: 1, label: '法人情報' },
+            { num: 2, label: '施設情報' },
+            { num: 3, label: '確認' },
+          ].map(({ num, label }) => (
+            <React.Fragment key={num}>
+              {num > 1 && <div className={`w-8 h-0.5 ${step >= num ? 'bg-white' : 'bg-white/30'}`} />}
+              <div className="flex items-center gap-1.5">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                  step >= num ? 'bg-white text-primary' : 'bg-white/30 text-white'
+                }`}>
+                  {step > num ? <CheckCircle className="w-4 h-4" /> : num}
+                </div>
+                <span className={`text-xs ${step >= num ? 'text-white font-bold' : 'text-white/60'}`}>
+                  {label}
+                </span>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
 
+        {/* メインカード */}
+        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm mb-6 flex items-start gap-2">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* 施設名 */}
+          {/* ===== Step 1: 法人情報 ===== */}
+          {step === 1 && (
             <div>
-              <label htmlFor="facilityName" className="block text-sm font-bold text-gray-700 mb-2">
-                施設名 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="facilityName"
-                type="text"
-                value={facilityName}
-                onChange={(e) => setFacilityName(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
-                placeholder="例: ○○放課後等デイサービス"
-                disabled={loading || isPreRegistered}
-              />
-              {isPreRegistered && (
-                <p className="text-xs text-gray-500 mt-1">
-                  ※ 施設名は事前登録時に設定されています
-                </p>
-              )}
-            </div>
-
-            {/* 事業所番号（任意） */}
-            <div>
-              <label htmlFor="businessNumber" className="block text-sm font-bold text-gray-700 mb-2">
-                事業所番号（10桁） <span className="text-xs text-gray-400 font-normal">任意</span>
-              </label>
-              <input
-                id="businessNumber"
-                type="text"
-                value={businessNumber}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                  setBusinessNumber(val);
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent font-mono"
-                placeholder="1234567890"
-                disabled={loading}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                指定通知書に記載されている10桁の番号（指定後に入力可能）
-              </p>
-            </div>
-
-            {/* 指定通知書アップロード（任意） */}
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                指定通知書 <span className="text-xs text-gray-400 font-normal">任意</span>
-              </label>
-
-              {!designationFile ? (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-[#00c4cc] transition-colors"
-                >
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600 text-sm">
-                    クリックしてファイルを選択
-                  </p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    JPG, PNG, PDF（5MB以下）
-                  </p>
+              <div className="text-center mb-6">
+                <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Briefcase className="w-7 h-7 text-blue-600" />
                 </div>
-              ) : (
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <FileText className="w-8 h-8 text-[#00c4cc]" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-800 truncate max-w-[200px]">
-                          {designationFile.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(designationFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
+                <h1 className="text-xl font-bold text-gray-800">法人情報</h1>
+                <p className="text-gray-500 text-sm mt-1">運営法人の情報を入力してください</p>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    法人名 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="例: 株式会社ひまわり福祉会"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">法人種別</label>
+                  <select
+                    value={companyType}
+                    onChange={(e) => setCompanyType(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+                  >
+                    <option value="">選択してください</option>
+                    {COMPANY_TYPES.map((ct) => (
+                      <option key={ct.value} value={ct.value}>{ct.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">代表者名</label>
+                  <input
+                    type="text"
+                    value={representativeName}
+                    onChange={(e) => setRepresentativeName(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="例: 山田太郎"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">法人住所</label>
+                  <input
+                    type="text"
+                    value={companyAddress}
+                    onChange={(e) => setCompanyAddress(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="例: 東京都渋谷区..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">電話番号</label>
+                  <input
+                    type="tel"
+                    value={companyPhone}
+                    onChange={(e) => setCompanyPhone(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="例: 03-1234-5678"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <button
+                  onClick={goNext}
+                  className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-xl transition-colors"
+                >
+                  次へ：施設情報
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ===== Step 2: 施設情報 ===== */}
+          {step === 2 && (
+            <div>
+              <div className="text-center mb-6">
+                <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Building2 className="w-7 h-7 text-primary" />
+                </div>
+                <h1 className="text-xl font-bold text-gray-800">施設情報</h1>
+                <p className="text-gray-500 text-sm mt-1">施設の基本情報を入力してください</p>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    施設名 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={facilityName}
+                    onChange={(e) => setFacilityName(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="例: ひまわり放課後等デイサービス"
+                    disabled={isPreRegistered}
+                  />
+                </div>
+
+                {/* サービス種別 */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    サービス種別 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    {SERVICE_CATEGORIES.map((cat) => (
+                      <label
+                        key={cat.key}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          serviceCategories[cat.key]
+                            ? 'border-primary bg-primary/5'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={serviceCategories[cat.key]}
+                          onChange={() => toggleServiceCategory(cat.key)}
+                          className="w-4 h-4 rounded text-primary focus:ring-primary"
+                        />
+                        <div>
+                          <p className="text-sm font-bold text-gray-800">{cat.label}</p>
+                          <p className="text-xs text-gray-500">{cat.description}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    事業所番号（10桁）<span className="text-xs text-gray-400 font-normal ml-1">任意</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={businessNumber}
+                    onChange={(e) => setBusinessNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono"
+                    placeholder="1234567890"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">指定後に入力可能です</p>
+                </div>
+
+                {/* 所在地 */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    <MapPin className="w-3.5 h-3.5 inline mr-1" />
+                    施設所在地
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => handlePostalCodeChange(e.target.value)}
+                      className="w-32 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="〒000-0000"
+                    />
+                    <span className="text-xs text-gray-500 self-center">→ 自動入力</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={facilityAddress}
+                    onChange={(e) => setFacilityAddress(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="住所を入力"
+                  />
+                </div>
+
+                {/* 定員 */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    <Users className="w-3.5 h-3.5 inline mr-1" />
+                    定員
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">午前（AM）</label>
+                      <input
+                        type="number"
+                        value={capacityAM}
+                        onChange={(e) => setCapacityAM(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="10"
+                        min="0"
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={removeFile}
-                      className="p-1 hover:bg-gray-100 rounded"
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">午後（PM）</label>
+                      <input
+                        type="number"
+                        value={capacityPM}
+                        onChange={(e) => setCapacityPM(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="10"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 指定通知書 */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    指定通知書 <span className="text-xs text-gray-400 font-normal ml-1">任意</span>
+                  </label>
+                  {!designationFile ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer hover:border-primary transition-colors"
                     >
-                      <X className="w-5 h-5 text-gray-400" />
+                      <Upload className="w-7 h-7 text-gray-400 mx-auto mb-1.5" />
+                      <p className="text-gray-600 text-sm">クリックして選択</p>
+                      <p className="text-gray-400 text-xs mt-0.5">JPG, PNG, PDF（5MB以下）</p>
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-6 h-6 text-primary" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-800 truncate max-w-[200px]">{designationFile.name}</p>
+                            <p className="text-xs text-gray-500">{(designationFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                          </div>
+                        </div>
+                        <button type="button" onClick={removeFile} className="p-1 hover:bg-gray-100 rounded">
+                          <X className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                      {designationPreview && (
+                        <img src={designationPreview} alt="Preview" className="mt-2 max-h-24 rounded border" />
+                      )}
+                    </div>
+                  )}
+                  <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleFileSelect} className="hidden" />
+                </div>
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                <button
+                  onClick={goPrev}
+                  className="flex items-center justify-center gap-1 px-5 py-3 border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  戻る
+                </button>
+                <button
+                  onClick={goNext}
+                  className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-xl transition-colors"
+                >
+                  次へ：確認
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ===== Step 3: 確認 ===== */}
+          {step === 3 && (
+            <div>
+              <div className="text-center mb-6">
+                <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle className="w-7 h-7 text-green-600" />
+                </div>
+                <h1 className="text-xl font-bold text-gray-800">入力内容の確認</h1>
+                <p className="text-gray-500 text-sm mt-1">内容を確認して申請してください</p>
+              </div>
+
+              <div className="space-y-4">
+                {/* 法人情報 */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-gray-600 flex items-center gap-1.5">
+                      <Briefcase className="w-4 h-4" />法人情報
+                    </h3>
+                    <button onClick={() => setStep(1)} className="text-xs text-primary hover:underline">
+                      編集
                     </button>
                   </div>
-                  {designationPreview && (
-                    <img
-                      src={designationPreview}
-                      alt="Preview"
-                      className="mt-3 max-h-32 rounded border"
-                    />
-                  )}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex">
+                      <span className="w-24 text-gray-500 flex-shrink-0">法人名</span>
+                      <span className="font-bold text-gray-800">{companyName}</span>
+                    </div>
+                    {companyType && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">種別</span>
+                        <span className="text-gray-800">{COMPANY_TYPES.find((ct) => ct.value === companyType)?.label}</span>
+                      </div>
+                    )}
+                    {representativeName && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">代表者</span>
+                        <span className="text-gray-800">{representativeName}</span>
+                      </div>
+                    )}
+                    {companyAddress && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">住所</span>
+                        <span className="text-gray-800">{companyAddress}</span>
+                      </div>
+                    )}
+                    {companyPhone && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">電話</span>
+                        <span className="text-gray-800">{companyPhone}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,.pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                行政から交付された指定通知書の画像またはPDF（指定後に入力可能）
-              </p>
+                {/* 施設情報 */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-gray-600 flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4" />施設情報
+                    </h3>
+                    <button onClick={() => setStep(2)} className="text-xs text-primary hover:underline">
+                      編集
+                    </button>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex">
+                      <span className="w-24 text-gray-500 flex-shrink-0">施設名</span>
+                      <span className="font-bold text-gray-800">{facilityName}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-24 text-gray-500 flex-shrink-0">サービス</span>
+                      <span className="text-gray-800">
+                        {SERVICE_CATEGORIES.filter((c) => serviceCategories[c.key]).map((c) => c.label).join('、')}
+                      </span>
+                    </div>
+                    {businessNumber && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">事業所番号</span>
+                        <span className="text-gray-800 font-mono">{businessNumber}</span>
+                      </div>
+                    )}
+                    {facilityAddress && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">所在地</span>
+                        <span className="text-gray-800">{postalCode ? `〒${postalCode} ` : ''}{facilityAddress}</span>
+                      </div>
+                    )}
+                    {(capacityAM || capacityPM) && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">定員</span>
+                        <span className="text-gray-800">AM {capacityAM || 0}名 / PM {capacityPM || 0}名</span>
+                      </div>
+                    )}
+                    {designationFile && (
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 flex-shrink-0">指定通知書</span>
+                        <span className="text-gray-800">{designationFile.name}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 申請者情報 */}
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-blue-700 mb-2">申請者アカウント</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex">
+                      <span className="w-24 text-blue-600 flex-shrink-0">申請者名</span>
+                      <span className="text-blue-800 font-bold">{user?.name}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-24 text-blue-600 flex-shrink-0">メール</span>
+                      <span className="text-blue-800">{user?.email}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                <button
+                  onClick={goPrev}
+                  className="flex items-center justify-center gap-1 px-5 py-3 border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  戻る
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {loading ? '申請中...' : '申請する'}
+                </button>
+              </div>
             </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <p className="text-sm text-blue-800">
-                事業所番号・指定通知書は<strong>任意</strong>です。<br />
-                指定前の事業所でも登録できます。指定後に追加してください。
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? '登録中...' : '施設を登録する'}
-            </button>
-          </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <h3 className="font-bold text-blue-800 text-sm mb-2">認証について</h3>
-              <ul className="text-xs text-blue-700 space-y-1">
-                <li>・登録直後は「認証待ち」状態となります</li>
-                <li>・運営による確認後、すべての機能が利用可能になります</li>
-                <li>・行政提出資料の出力は認証完了後に可能です</li>
-              </ul>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

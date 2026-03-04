@@ -769,7 +769,7 @@ export function generateCommitteeMeetingHTML(meeting: CommitteeMeetingData): str
 export function openPrintWindow(html: string): void {
   const printWindow = window.open('', '_blank', 'width=800,height=1000');
   if (!printWindow) {
-    alert('ポップアップがブロックされました。ポップアップを許可してください。');
+    console.warn('ポップアップがブロックされました。ポップアップを許可してください。');
     return;
   }
   printWindow.document.write(html);

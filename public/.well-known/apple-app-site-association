@@ -3,24 +3,24 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.jp.co.inu.coshien.client",
+        "appID": "TEAMID.jp.co.inu.roots.client",
         "paths": ["/parent/*", "/login/*"]
       },
       {
-        "appID": "TEAMID.jp.co.inu.coshien.staff",
+        "appID": "TEAMID.jp.co.inu.roots.staff",
         "paths": ["/career/*", "/personal/*"]
       },
       {
-        "appID": "TEAMID.jp.co.inu.coshien.facility",
+        "appID": "TEAMID.jp.co.inu.roots.facility",
         "paths": ["/business/*", "/admin-setup/*"]
       }
     ]
   },
   "webcredentials": {
     "apps": [
-      "TEAMID.jp.co.inu.coshien.client",
-      "TEAMID.jp.co.inu.coshien.staff",
-      "TEAMID.jp.co.inu.coshien.facility"
+      "TEAMID.jp.co.inu.roots.client",
+      "TEAMID.jp.co.inu.roots.staff",
+      "TEAMID.jp.co.inu.roots.facility"
     ]
   }
 }

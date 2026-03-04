@@ -28,12 +28,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useChangeNotifications } from '@/hooks/useChangeNotifications';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import type {
   ChangeNotificationType,
   OperationsReviewResponses,
   OperationsReviewChange,
 } from '@/types';
 import { CHANGE_NOTIFICATION_TYPE_LABELS } from '@/types';
+import { resolveTimeSlots } from '@/utils/slotResolver';
 
 // ==================== Constants ====================
 
@@ -99,13 +101,13 @@ function YesNoCards({
         onClick={() => onChange(true)}
         className={`p-6 rounded-xl border-2 transition-all text-center ${
           value === true
-            ? 'border-[#00c4cc] bg-[#00c4cc]/5 ring-2 ring-[#00c4cc]/20'
+            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
         }`}
       >
         <div
           className={`text-2xl font-bold mb-1 ${
-            value === true ? 'text-[#00c4cc]' : 'text-gray-700'
+            value === true ? 'text-primary' : 'text-gray-700'
           }`}
         >
           はい
@@ -116,13 +118,13 @@ function YesNoCards({
         onClick={() => onChange(false)}
         className={`p-6 rounded-xl border-2 transition-all text-center ${
           value === false
-            ? 'border-[#00c4cc] bg-[#00c4cc]/5 ring-2 ring-[#00c4cc]/20'
+            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
         }`}
       >
         <div
           className={`text-2xl font-bold mb-1 ${
-            value === false ? 'text-[#00c4cc]' : 'text-gray-700'
+            value === false ? 'text-primary' : 'text-gray-700'
           }`}
         >
           いいえ
@@ -141,9 +143,9 @@ function ProgressBar({ currentStep, totalSteps }: { currentStep: number; totalSt
           key={i}
           className={`h-1.5 flex-1 rounded-full transition-all ${
             i < currentStep
-              ? 'bg-[#00c4cc]'
+              ? 'bg-primary'
               : i === currentStep
-              ? 'bg-[#00c4cc]/50'
+              ? 'bg-primary/50'
               : 'bg-gray-200'
           }`}
         />
@@ -159,7 +161,7 @@ function OperationsChangeGuide({ onClose }: { onClose: () => void }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-          <BookOpen size={20} className="text-[#00c4cc]" />
+          <BookOpen size={20} className="text-primary" />
           変更届ガイド
         </h3>
         <button
@@ -185,7 +187,7 @@ function OperationsChangeGuide({ onClose }: { onClose: () => void }) {
             { label: '加算の追加・変更', detail: '新たに加算を取得、または廃止する場合' },
           ].map((item) => (
             <div key={item.label} className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50">
-              <ChevronRight size={14} className="text-[#00c4cc] mt-0.5 shrink-0" />
+              <ChevronRight size={14} className="text-primary mt-0.5 shrink-0" />
               <div>
                 <span className="text-sm font-medium text-gray-700">{item.label}</span>
                 <p className="text-xs text-gray-500">{item.detail}</p>
@@ -246,7 +248,7 @@ function OperationsChangeGuide({ onClose }: { onClose: () => void }) {
           ].map((item, i) => (
             <div key={i}>
               <p className="text-sm font-bold text-gray-700 flex items-start gap-2">
-                <HelpCircle size={14} className="text-[#00c4cc] mt-0.5 shrink-0" />
+                <HelpCircle size={14} className="text-primary mt-0.5 shrink-0" />
                 {item.q}
               </p>
               <p className="text-xs text-gray-500 mt-1 ml-6">{item.a}</p>
@@ -274,6 +276,8 @@ export default function OperationsReviewWizard({
   const { facility } = useAuth();
   const { facilitySettings } = useFacilityData();
   const { createNotification } = useChangeNotifications();
+  const { toast } = useToast();
+  const resolvedSlots = useMemo(() => resolveTimeSlots([], { capacity: facilitySettings.capacity as Record<string, number> | undefined }), [facilitySettings.capacity]);
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [responses, setResponses] = useState<OperationsReviewResponses>({});
@@ -450,7 +454,7 @@ export default function OperationsReviewWizard({
       onComplete?.();
     } catch (error) {
       console.error('Error saving operations review:', error);
-      alert('保存に失敗しました。もう一度お試しください。');
+      toast.error('保存に失敗しました。もう一度お試しください。');
     } finally {
       setIsSaving(false);
     }
@@ -497,8 +501,8 @@ export default function OperationsReviewWizard({
         <div className="p-5 border-b border-gray-100 shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
-                <Calendar size={20} className="text-[#00c4cc]" />
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Calendar size={20} className="text-primary" />
               </div>
               <div>
                 <h2 className="font-bold text-lg text-gray-800">
@@ -513,7 +517,7 @@ export default function OperationsReviewWizard({
               {!showGuide && !isComplete && (
                 <button
                   onClick={() => setShowGuide(true)}
-                  className="p-2 text-gray-400 hover:text-[#00c4cc] hover:bg-[#00c4cc]/5 rounded-lg transition-colors"
+                  className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
                   title="変更届ガイド"
                 >
                   <HelpCircle size={18} />
@@ -574,7 +578,7 @@ export default function OperationsReviewWizard({
               <div className="flex items-center justify-center gap-3">
                 <button
                   onClick={handleClose}
-                  className="px-6 py-2.5 text-sm bg-[#00c4cc] text-white rounded-xl font-bold hover:bg-[#00b0b8] transition-colors"
+                  className="px-6 py-2.5 text-sm bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition-colors"
                 >
                   閉じる
                 </button>
@@ -585,10 +589,10 @@ export default function OperationsReviewWizard({
             <div className="min-h-[320px]">
               {/* Step Header */}
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                   {React.createElement(currentStep.icon, {
                     size: 16,
-                    className: 'text-[#00c4cc]',
+                    className: 'text-primary',
                   })}
                 </div>
                 <div>
@@ -639,7 +643,7 @@ export default function OperationsReviewWizard({
                               }
                               className={`px-5 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
                                 responses.staff?.changeType === opt.val
-                                  ? 'border-[#00c4cc] bg-[#00c4cc]/5 text-[#00c4cc]'
+                                  ? 'border-primary bg-primary/5 text-primary'
                                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
                               }`}
                             >
@@ -664,7 +668,7 @@ export default function OperationsReviewWizard({
                             }))
                           }
                           placeholder="人数を入力"
-                          className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                          className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                         />
                         <span className="text-sm text-gray-500 ml-2">名</span>
                       </div>
@@ -695,7 +699,7 @@ export default function OperationsReviewWizard({
                                   isSelected
                                     ? isKeyRole
                                       ? 'border-amber-400 bg-amber-50 text-amber-700'
-                                      : 'border-[#00c4cc] bg-[#00c4cc]/5 text-[#00c4cc]'
+                                      : 'border-primary bg-primary/5 text-primary'
                                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                                 }`}
                               >
@@ -758,7 +762,7 @@ export default function OperationsReviewWizard({
                                 key={opt.id}
                                 className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
                                   isSelected
-                                    ? 'border-[#00c4cc] bg-[#00c4cc]/5'
+                                    ? 'border-primary bg-primary/5'
                                     : 'border-gray-200 hover:border-gray-300'
                                 }`}
                               >
@@ -775,7 +779,7 @@ export default function OperationsReviewWizard({
                                       subsidies: { ...prev.subsidies!, additions: updated },
                                     }));
                                   }}
-                                  className="w-4 h-4 text-[#00c4cc] border-gray-300 rounded focus:ring-[#00c4cc]"
+                                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
                                 />
                                 <span className="text-sm text-gray-700">{opt.label}</span>
                               </label>
@@ -899,7 +903,7 @@ export default function OperationsReviewWizard({
                           }
                           placeholder="例: 土曜日の営業時間を9:00-15:00から9:00-13:00に変更"
                           rows={3}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] resize-none"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                         />
                       </div>
 
@@ -920,7 +924,7 @@ export default function OperationsReviewWizard({
                     定員に変更はありますか？
                   </p>
                   <p className="text-xs text-gray-500 mb-2">
-                    現在の定員: 午前 {facilitySettings.capacity?.AM || 0}名 / 午後 {facilitySettings.capacity?.PM || 0}名
+                    現在の定員: {resolvedSlots.map(s => `${s.name} ${s.capacity}名`).join(' / ')}
                   </p>
                   <YesNoCards
                     value={responses.capacity?.hasChange ?? null}
@@ -936,7 +940,7 @@ export default function OperationsReviewWizard({
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-bold text-gray-700 block mb-2">
-                            新しい午前の定員
+                            新しい{resolvedSlots[0]?.name || '午前'}の定員
                           </label>
                           <div className="flex items-center gap-2">
                             <input
@@ -953,14 +957,14 @@ export default function OperationsReviewWizard({
                                   },
                                 }))
                               }
-                              className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                              className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             />
                             <span className="text-sm text-gray-500">名</span>
                           </div>
                         </div>
                         <div>
                           <label className="text-sm font-bold text-gray-700 block mb-2">
-                            新しい午後の定員
+                            新しい{resolvedSlots[1]?.name || '午後'}の定員
                           </label>
                           <div className="flex items-center gap-2">
                             <input
@@ -977,7 +981,7 @@ export default function OperationsReviewWizard({
                                   },
                                 }))
                               }
-                              className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                              className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             />
                             <span className="text-sm text-gray-500">名</span>
                           </div>
@@ -1019,7 +1023,7 @@ export default function OperationsReviewWizard({
                         }
                         placeholder="例: 事業所名を変更。設備としてスヌーズレンルームを新設。"
                         rows={4}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] resize-none"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                       />
                     </div>
                   )}
@@ -1119,7 +1123,7 @@ export default function OperationsReviewWizard({
                         {
                           label: '定員',
                           value: responses.capacity?.hasChange
-                            ? `変更あり（午前: ${responses.capacity.newCapacityAM ?? '-'}名、午後: ${responses.capacity.newCapacityPM ?? '-'}名）`
+                            ? `変更あり（${resolvedSlots[0]?.name || '午前'}: ${responses.capacity.newCapacityAM ?? '-'}名、${resolvedSlots[1]?.name || '午後'}: ${responses.capacity.newCapacityPM ?? '-'}名）`
                             : '変更なし',
                           hasChange: responses.capacity?.hasChange,
                         },
@@ -1165,7 +1169,7 @@ export default function OperationsReviewWizard({
                 <button
                   onClick={handleComplete}
                   disabled={isSaving}
-                  className="flex items-center gap-2 px-6 py-2.5 text-sm bg-[#00c4cc] text-white rounded-xl font-bold hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 text-sm bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition-colors disabled:opacity-50"
                 >
                   {isSaving ? (
                     <>
@@ -1183,7 +1187,7 @@ export default function OperationsReviewWizard({
                 <button
                   onClick={handleNext}
                   disabled={!canProceed}
-                  className="flex items-center gap-1 px-6 py-2.5 text-sm bg-[#00c4cc] text-white rounded-xl font-bold hover:bg-[#00b0b8] transition-colors disabled:opacity-30"
+                  className="flex items-center gap-1 px-6 py-2.5 text-sm bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition-colors disabled:opacity-30"
                 >
                   次へ
                   <ChevronRight size={16} />

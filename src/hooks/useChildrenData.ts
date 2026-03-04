@@ -27,6 +27,15 @@ function mapRowToChild(row: any): Child {
     } catch { /* ignore */ }
   }
 
+  let transportPattern: Record<number, { pickup?: string | null; dropoff?: string | null }> | undefined = undefined;
+  if (row.transport_pattern) {
+    try {
+      transportPattern = typeof row.transport_pattern === 'string'
+        ? JSON.parse(row.transport_pattern)
+        : typeof row.transport_pattern === 'object' ? row.transport_pattern : undefined;
+    } catch { /* ignore */ }
+  }
+
   let pickupLocation = row.pickup_location;
   const pickupLocationCustom = row.pickup_location_custom;
   if (pickupLocationCustom && !['事業所', '自宅'].includes(pickupLocation || '')) {
@@ -42,6 +51,7 @@ function mapRowToChild(row: any): Child {
   return {
     id: row.id,
     facilityId: row.facility_id,
+    ownerProfileId: row.owner_profile_id || undefined,
     name: row.name,
     nameKana: row.name_kana,
     age: row.age,
@@ -53,6 +63,7 @@ function mapRowToChild(row: any): Child {
     grantDays: row.grant_days,
     contractDays: row.contract_days,
     address: row.address,
+    postalCode: row.postal_code || undefined,
     phone: row.phone,
     email: row.email,
     doctorName: row.doctor_name,
@@ -61,6 +72,7 @@ function mapRowToChild(row: any): Child {
     pattern: row.pattern,
     patternDays,
     patternTimeSlots,
+    transportPattern,
     needsPickup: row.needs_pickup || false,
     needsDropoff: row.needs_dropoff || false,
     pickupLocation,
@@ -76,7 +88,8 @@ function mapRowToChild(row: any): Child {
     dropoffLatitude: row.dropoff_latitude || undefined,
     dropoffLongitude: row.dropoff_longitude || undefined,
     characteristics: row.characteristics,
-    contractStatus: row.contract_status,
+    income_category: row.income_category,
+    contractStatus: row.contract_status || 'pre-contract',
     contractStartDate: row.contract_start_date,
     contractEndDate: row.contract_end_date,
     registrationType: row.registration_type,
@@ -108,6 +121,7 @@ function childToDbRow(child: Partial<Child>, facilityId?: string) {
     grant_days: child.grantDays,
     contract_days: child.contractDays,
     address: child.address,
+    postal_code: child.postalCode || null,
     phone: child.phone,
     email: child.email,
     doctor_name: child.doctorName,
@@ -131,6 +145,7 @@ function childToDbRow(child: Partial<Child>, facilityId?: string) {
     dropoff_latitude: child.dropoffLatitude || null,
     dropoff_longitude: child.dropoffLongitude || null,
     characteristics: child.characteristics,
+    income_category: child.income_category,
     contract_status: child.contractStatus,
     contract_start_date: child.contractStartDate,
     contract_end_date: child.contractEndDate,
@@ -140,6 +155,15 @@ function childToDbRow(child: Partial<Child>, facilityId?: string) {
     planned_usage_days: child.plannedUsageDays,
     updated_at: new Date().toISOString(),
   };
+
+  // transport_pattern はマイグレーション適用後のみ送信
+  if (child.transportPattern && Object.keys(child.transportPattern).length > 0) {
+    row.transport_pattern = child.transportPattern;
+  }
+
+  if (child.ownerProfileId) {
+    row.owner_profile_id = child.ownerProfileId;
+  }
 
   if (facilityId) {
     row.facility_id = facilityId;

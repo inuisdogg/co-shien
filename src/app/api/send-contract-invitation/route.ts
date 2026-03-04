@@ -22,6 +22,11 @@ const getResend = () => {
 
 export async function POST(request: NextRequest) {
   try {
+    // 認証チェック
+    const { authenticateRequest, unauthorizedResponse } = await import('@/lib/apiAuth');
+    const auth = await authenticateRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const { email, facilityName, childName, invitationUrl } = await request.json();
 
     if (!email || !facilityName || !childName || !invitationUrl) {
@@ -34,7 +39,7 @@ export async function POST(request: NextRequest) {
     // メール送信
     const resend = getResend();
     const { data, error } = await resend.emails.send({
-      from: 'Roots <noreply@Roots.inu.co.jp>',
+      from: 'Roots <noreply@roots.inu.co.jp>',
       to: email,
       subject: `${escapeHtml(facilityName)}からの利用招待`,
       html: `

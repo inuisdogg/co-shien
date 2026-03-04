@@ -11,11 +11,14 @@ import Image from 'next/image';
 import {
   ArrowLeft, Building2, Calendar, FileText, CheckCircle,
   MessageSquare, PenTool, ChevronLeft, ChevronRight,
-  User, AlertCircle
+  User, AlertCircle, Bus, Receipt, ScrollText, Car
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_SLOTS = resolveTimeSlots([]);
 
 // 月ごとの実績記録
 type MonthlyRecord = {
@@ -50,13 +53,18 @@ export default function FacilityDetailPage() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'records' | 'calendar'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'calendar' | 'support-plans' | 'billing' | 'transport'>('records');
+
+  // アクティブ送迎セッション検知
+  const [activeTransportSession, setActiveTransportSession] = useState<any>(null);
 
   // サイン用のstate
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,6 +76,10 @@ export default function FacilityDetailPage() {
         }
 
         const user = JSON.parse(userStr);
+        if (!user) {
+          router.push('/parent/login');
+          return;
+        }
         if (user.userType !== 'client') {
           router.push('/career');
           return;
@@ -130,6 +142,30 @@ export default function FacilityDetailPage() {
 
     fetchData();
   }, [facilityId, childIdParam, router]);
+
+  // アクティブ送迎セッション検知
+  useEffect(() => {
+    if (!facilityId || children.length === 0) return;
+    const checkActiveTransport = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const childIds = children.map((c: any) => c.id);
+      const { data: sessions } = await supabase
+        .from('transport_sessions')
+        .select('id, mode, status, route_stops')
+        .eq('facility_id', facilityId)
+        .eq('date', today)
+        .in('status', ['active', 'preparing']);
+
+      if (sessions && sessions.length > 0) {
+        const matched = sessions.find((s: any) => {
+          const stops = (s.route_stops || []) as any[];
+          return stops.some((stop: any) => childIds.includes(stop.childId));
+        });
+        if (matched) setActiveTransportSession(matched);
+      }
+    };
+    checkActiveTransport();
+  }, [facilityId, children]);
 
   // 月の実績記録を取得
   useEffect(() => {
@@ -205,6 +241,7 @@ export default function FacilityDetailPage() {
     if (!canvas) return;
 
     setIsDrawing(true);
+    setHasDrawn(true);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -264,6 +301,7 @@ export default function FacilityDetailPage() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setSignatureData(null);
+    setHasDrawn(false);
   };
 
   const saveSignature = async () => {
@@ -321,7 +359,7 @@ export default function FacilityDetailPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-client mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -335,7 +373,7 @@ export default function FacilityDetailPage() {
           <p className="text-gray-600 mb-4">施設が見つかりません</p>
           <button
             onClick={() => router.push('/parent')}
-            className="bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md"
+            className="bg-client hover:bg-client-dark text-white font-bold py-2 px-4 rounded-md"
           >
             ダッシュボードに戻る
           </button>
@@ -358,7 +396,7 @@ export default function FacilityDetailPage() {
           </button>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-[#FDEBD0] rounded-full flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-[#ED8936]" />
+              <Building2 className="w-6 h-6 text-client-dark" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">{facility.name}</h1>
@@ -378,6 +416,28 @@ export default function FacilityDetailPage() {
           </div>
         )}
 
+        {/* アクティブ送迎バナー */}
+        {activeTransportSession && (
+          <button
+            onClick={() => router.push(`/parent/facilities/${facilityId}/transport?session=${activeTransportSession.id}`)}
+            className="w-full bg-gradient-to-r from-client to-client-dark rounded-xl p-4 mb-6 flex items-center gap-4 shadow-md hover:shadow-lg transition-shadow text-left"
+          >
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <Bus className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold text-sm">
+                {activeTransportSession.mode === 'pickup' ? 'お迎え' : 'お送り'}
+                {activeTransportSession.status === 'active' ? '中' : '準備中'}
+              </p>
+              <p className="text-white/80 text-xs mt-0.5">
+                タップしてリアルタイムで送迎車を追跡
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-white/70 flex-shrink-0" />
+          </button>
+        )}
+
         {/* 児童選択 */}
         {contracts.length > 1 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
@@ -385,7 +445,7 @@ export default function FacilityDetailPage() {
             <select
               value={selectedChildId}
               onChange={(e) => setSelectedChildId(e.target.value)}
-              className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+              className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
             >
               {contracts.map((contract) => {
                 const child = children.find(c => c.id === contract.child_id);
@@ -401,19 +461,28 @@ export default function FacilityDetailPage() {
 
         {/* タブ */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-gray-200 overflow-x-auto">
             {[
               { id: 'records', label: '実績記録表', icon: FileText },
               { id: 'calendar', label: '予約カレンダー', icon: Calendar },
+              { id: 'support-plans', label: '支援計画', icon: ScrollText },
+              { id: 'billing', label: '請求明細', icon: Receipt },
+              { id: 'transport', label: '送迎', icon: Car },
             ].map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
+                  onClick={() => {
+                    if (tab.id === 'support-plans' || tab.id === 'billing' || tab.id === 'transport') {
+                      router.push(`/parent/facilities/${facilityId}/${tab.id}`);
+                    } else {
+                      setActiveTab(tab.id as any);
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-[#F6AD55] text-[#ED8936] bg-[#FEF3E2]'
+                      ? 'border-client text-client-dark bg-client-light'
                       : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                   }`}
                 >
@@ -508,7 +577,7 @@ export default function FacilityDetailPage() {
                               {weekDays[record.dayOfWeek]}
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
-                              {record.slot === 'AM' ? '午前' : record.slot === 'PM' ? '午後' : record.serviceStatus || '-'}
+                              {record.slot ? slotDisplayName(DEFAULT_SLOTS, record.slot) : record.serviceStatus || '-'}
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
                               {record.startTime || '-'}
@@ -543,7 +612,7 @@ export default function FacilityDetailPage() {
                     ) : (
                       <button
                         onClick={() => setIsSignatureModalOpen(true)}
-                        className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
+                        className="flex items-center gap-2 bg-client hover:bg-client-dark text-white text-sm font-bold py-2 px-4 rounded-md"
                       >
                         <PenTool className="w-4 h-4" />
                         サインする
@@ -557,9 +626,11 @@ export default function FacilityDetailPage() {
                         alt="保護者サイン"
                         className="max-h-20"
                       />
-                      <p className="text-xs text-gray-500 mt-2">
-                        署名日時: {new Date(schedules[0].parent_signed_at).toLocaleString('ja-JP')}
-                      </p>
+                      {schedules[0].parent_signed_at && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          署名日時: {new Date(schedules[0].parent_signed_at).toLocaleString('ja-JP')}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -699,10 +770,10 @@ export default function FacilityDetailPage() {
                           <div
                             key={day}
                             className={`min-h-[80px] border-r border-b border-gray-200 p-1 ${
-                              isToday ? 'bg-[#FEF3E2]' : ''
+                              isToday ? 'bg-client-light' : ''
                             } ${dayOfWeek === 0 ? 'bg-red-50' : dayOfWeek === 6 ? 'bg-blue-50' : ''}`}
                           >
-                            <div className={`text-xs font-bold mb-1 ${isToday ? 'text-[#ED8936]' : ''}`}>
+                            <div className={`text-xs font-bold mb-1 ${isToday ? 'text-client-dark' : ''}`}>
                               {day}
                             </div>
                             <div className="space-y-0.5">
@@ -729,7 +800,7 @@ export default function FacilityDetailPage() {
                                     {hasMultipleChildren && (
                                       <span className="font-bold">{childForSchedule?.name?.charAt(0)}</span>
                                     )}
-                                    {schedule.slot === 'AM' ? '午前' : schedule.slot === 'PM' ? '午後' : ''}
+                                    {schedule.slot ? slotDisplayName(DEFAULT_SLOTS, schedule.slot) : ''}
                                   </div>
                                 );
                               })}
@@ -765,7 +836,7 @@ export default function FacilityDetailPage() {
                     </div>
                   )}
                   <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-[#FEF3E2] border border-[#F6AD55]/30 rounded"></div>
+                    <div className="w-4 h-4 bg-client-light border border-client/30 rounded"></div>
                     <span>今日</span>
                   </div>
                 </div>
@@ -774,7 +845,7 @@ export default function FacilityDetailPage() {
                 <div className="mt-6">
                   <button
                     onClick={() => router.push(`/parent/children/${selectedChildId}/usage-request`)}
-                    className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+                    className="w-full bg-client hover:bg-client-dark text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
                   >
                     <Calendar className="w-5 h-5" />
                     利用希望日を申請する
@@ -791,7 +862,7 @@ export default function FacilityDetailPage() {
       {/* フローティングチャットボタン */}
       <button
         onClick={() => router.push(`/parent/facilities/${facilityId}/chat`)}
-        className="fixed bottom-6 right-6 bg-[#ED8936] hover:bg-[#D97706] text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all active:scale-95 z-50 flex items-center gap-2"
+        className="fixed bottom-6 right-6 bg-client-dark hover:bg-client-dark text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all active:scale-95 z-50 flex items-center gap-2"
       >
         <MessageSquare className="w-6 h-6" />
         <span className="font-bold pr-1">施設に連絡</span>
@@ -806,12 +877,18 @@ export default function FacilityDetailPage() {
               {selectedMonth.getFullYear()}年{selectedMonth.getMonth() + 1}月分の実績記録を確認し、サインしてください。
             </p>
 
-            <div className="border border-gray-300 rounded-lg mb-4 bg-white">
+            <div ref={canvasContainerRef} className="relative border-2 border-dashed border-gray-300 rounded-lg mb-4 bg-white">
+              {!hasDrawn && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                  <span className="text-gray-400 text-sm">ここに指でサインしてください</span>
+                </div>
+              )}
               <canvas
                 ref={canvasRef}
-                width={350}
-                height={150}
+                width={canvasContainerRef.current?.clientWidth || 400}
+                height={200}
                 className="w-full touch-none"
+                style={{ minHeight: '200px' }}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
@@ -837,7 +914,7 @@ export default function FacilityDetailPage() {
               </button>
               <button
                 onClick={saveSignature}
-                className="flex-1 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md"
+                className="flex-1 bg-client hover:bg-client-dark text-white font-bold py-2 px-4 rounded-md"
               >
                 保存
               </button>

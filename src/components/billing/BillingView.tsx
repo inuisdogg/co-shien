@@ -224,9 +224,9 @@ const BillingView: React.FC = () => {
 
   const handleAddAddition = useCallback(
     async (detail: BillingDetail, addition: BillingAddition) => {
-      const newAdditions = [...detail.additions, addition];
+      const newAdditions = [...(detail.additions ?? []), addition];
       const additionUnitsTotal = newAdditions.reduce((s, a) => s + a.units, 0);
-      const baseUnits = detail.unitCount - detail.additions.reduce((s, a) => s + a.units, 0);
+      const baseUnits = detail.unitCount - (detail.additions ?? []).reduce((s, a) => s + a.units, 0);
       const newUnitCount = baseUnits + additionUnitsTotal;
       await updateBillingDetail(detail.id, { additions: newAdditions, unitCount: newUnitCount });
       if (selectedChildRecord) {
@@ -239,8 +239,10 @@ const BillingView: React.FC = () => {
 
   const handleRemoveAddition = useCallback(
     async (detail: BillingDetail, index: number) => {
-      const removed = detail.additions[index];
-      const newAdditions = detail.additions.filter((_, i) => i !== index);
+      const additions = detail.additions ?? [];
+      if (index < 0 || index >= additions.length) return;
+      const removed = additions[index];
+      const newAdditions = additions.filter((_, i) => i !== index);
       const newUnitCount = detail.unitCount - removed.units;
       await updateBillingDetail(detail.id, { additions: newAdditions, unitCount: newUnitCount });
       if (selectedChildRecord) {
@@ -261,8 +263,8 @@ const BillingView: React.FC = () => {
       const q = codeSearch.toLowerCase();
       codes = codes.filter(
         (c) =>
-          c.code.toLowerCase().includes(q) ||
-          c.name.toLowerCase().includes(q) ||
+          (c.code ?? '').toLowerCase().includes(q) ||
+          (c.name ?? '').toLowerCase().includes(q) ||
           (c.description && c.description.toLowerCase().includes(q))
       );
     }
@@ -338,7 +340,7 @@ const BillingView: React.FC = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   isActive
-                    ? 'border-teal-500 text-teal-700 bg-teal-50/50'
+                    ? 'border-primary text-teal-700 bg-teal-50/50'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -403,7 +405,7 @@ const BillingView: React.FC = () => {
               <div className="overflow-x-auto">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
-                    <div className="w-6 h-6 border-2 border-t-transparent border-teal-500 rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-t-transparent border-primary rounded-full animate-spin" />
                   </div>
                 ) : billingRecords.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">

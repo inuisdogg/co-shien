@@ -15,6 +15,7 @@ import {
   ApplicationStatus,
   PaymentStatus,
 } from '@/types';
+import { parseQualifications } from '@/utils/qualifications';
 
 // ------------------------------------------------------------------ mappers
 
@@ -93,7 +94,7 @@ function mapApplication(row: Record<string, unknown>): JobApplication {
     applicantName: applicant ? (applicant.name as string) : undefined,
     applicantEmail: applicant ? (applicant.email as string) : undefined,
     applicantQualifications: applicant
-      ? (applicant.qualifications as string[]) || []
+      ? parseQualifications(applicant.qualifications)
       : undefined,
     jobTitle: jobPosting ? (jobPosting.title as string) : undefined,
     jobType: jobPosting ? (jobPosting.job_type as JobApplication['jobType']) : undefined,

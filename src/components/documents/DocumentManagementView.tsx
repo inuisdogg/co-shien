@@ -25,11 +25,14 @@ import {
   Loader2,
   Save,
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import dynamicImport from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { useToast } from '@/components/ui/Toast';
 import { ChildDocument, DocumentStatus } from '@/types';
+import DocumentPreviewModal from '@/components/common/DocumentPreviewModal';
 
 const AuditExportView = dynamicImport(
   () => import('@/components/audit/AuditExportView'),
@@ -148,6 +151,7 @@ function DocumentManagementContent() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
   const { children } = useFacilityData();
+  const { toast } = useToast();
 
   const [documents, setDocuments] = useState<ChildDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,6 +160,9 @@ function DocumentManagementContent() {
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'updated' | 'name' | 'status'>('updated');
   const [isDragging, setIsDragging] = useState(false);
+
+  // Preview state
+  const [previewDoc, setPreviewDoc] = useState<ChildDocument | null>(null);
 
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -233,7 +240,7 @@ function DocumentManagementContent() {
       }
       if (searchTerm) {
         const child = children.find(c => c.id === doc.childId);
-        const nameMatch = child?.name.includes(searchTerm);
+        const nameMatch = child?.name?.includes(searchTerm);
         const docMatch = doc.documentName?.includes(searchTerm);
         const typeMatch = DOCUMENT_TYPE_LABELS[doc.documentType]?.includes(searchTerm);
         if (!nameMatch && !docMatch && !typeMatch) return false;
@@ -363,7 +370,7 @@ function DocumentManagementContent() {
       setUploadFile(null);
     } catch (err) {
       console.error('Upload error:', err);
-      alert('アップロードに失敗しました。再試行してください。');
+      toast.error('アップロードに失敗しました。再試行してください。');
     } finally {
       setUploading(false);
     }
@@ -385,7 +392,7 @@ function DocumentManagementContent() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      alert('ダウンロードに失敗しました。');
+      toast.error('ダウンロードに失敗しました。');
     }
   };
 
@@ -416,7 +423,7 @@ function DocumentManagementContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <FolderOpen className="w-6 h-6 text-[#00c4cc]" />
+          <FolderOpen className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">書類管理</h1>
         </div>
         <div className="flex gap-2">
@@ -429,7 +436,7 @@ function DocumentManagementContent() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
           >
             <Upload className="w-4 h-4" />
             アップロード
@@ -538,7 +545,7 @@ function DocumentManagementContent() {
                 onClick={() => setActiveCategory(cat.key)}
                 className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
                   activeCategory === cat.key
-                    ? 'bg-[#00c4cc] text-white'
+                    ? 'bg-primary text-white'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -565,13 +572,13 @@ function DocumentManagementContent() {
               placeholder="児童名・書類名で検索..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as any)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="all">全ステータス</option>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -579,7 +586,7 @@ function DocumentManagementContent() {
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value as any)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="updated">更新日順</option>
             <option value="name">名前順</option>
@@ -596,12 +603,12 @@ function DocumentManagementContent() {
         onClick={() => fileInputRef.current?.click()}
         className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${
           isDragging
-            ? 'border-[#00c4cc] bg-[#00c4cc]/5'
+            ? 'border-primary bg-primary/5'
             : 'border-gray-200 hover:border-gray-300'
         }`}
       >
-        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${isDragging ? 'text-[#00c4cc]' : 'text-gray-300'}`} />
-        <p className={`text-sm ${isDragging ? 'text-[#00c4cc] font-medium' : 'text-gray-400'}`}>
+        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${isDragging ? 'text-primary' : 'text-gray-300'}`} />
+        <p className={`text-sm ${isDragging ? 'text-primary font-medium' : 'text-gray-400'}`}>
           {isDragging ? 'ファイルをドロップしてアップロード' : 'ファイルをドラッグ&ドロップ、またはクリックしてアップロード'}
         </p>
         <p className="text-xs text-gray-300 mt-1">対応形式: PDF, Word, Excel, 画像 / 最大10MB</p>
@@ -610,17 +617,11 @@ function DocumentManagementContent() {
       {/* Document List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {filteredDocuments.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
-              <FileText className="w-8 h-8 text-gray-300" />
-            </div>
-            <p className="text-gray-500 mb-1">
-              {documents.length === 0 ? '書類がまだ登録されていません' : '条件に一致する書類がありません'}
-            </p>
-            <p className="text-sm text-gray-400">
-              {documents.length === 0 ? 'アップロードボタンから書類を追加してください' : '検索条件やフィルターを変更してください'}
-            </p>
-          </div>
+          <EmptyState
+            icon={<FileText className="w-7 h-7 text-gray-400" />}
+            title={documents.length === 0 ? '書類がまだ登録されていません' : '条件に一致する書類がありません'}
+            description={documents.length === 0 ? 'アップロードボタンから書類を追加してください' : '検索条件やフィルターを変更してください'}
+          />
         ) : (
           <div className="divide-y divide-gray-100">
             {filteredDocuments.map(doc => {
@@ -638,9 +639,12 @@ function DocumentManagementContent() {
                     {/* Document Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <p className="font-medium text-gray-800 truncate">
+                        <button
+                          onClick={() => doc.filePath && setPreviewDoc(doc)}
+                          className={`font-medium truncate text-left ${doc.filePath ? 'text-gray-800 hover:text-primary transition-colors cursor-pointer' : 'text-gray-800'}`}
+                        >
                           {doc.documentName || DOCUMENT_TYPE_LABELS[doc.documentType] || doc.documentType}
-                        </p>
+                        </button>
                         <ExpiryBadge expiryDate={doc.expiryDate} />
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-400">
@@ -660,13 +664,22 @@ function DocumentManagementContent() {
                     {/* Actions */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {doc.filePath && (
-                        <button
-                          onClick={() => handleDownload(doc)}
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="ダウンロード"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setPreviewDoc(doc)}
+                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="プレビュー"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDownload(doc)}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="ダウンロード"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="更新">
                         <RefreshCw className="w-4 h-4" />
@@ -674,7 +687,7 @@ function DocumentManagementContent() {
                       {doc.status === 'submitted' && (
                         <button
                           onClick={() => handleStatusUpdate(doc.id, 'approved')}
-                          className="px-3 py-1.5 text-xs font-medium bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
+                          className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
                         >
                           承認
                         </button>
@@ -687,6 +700,19 @@ function DocumentManagementContent() {
           </div>
         )}
       </div>
+
+      {/* Preview Modal */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          isOpen={!!previewDoc}
+          onClose={() => setPreviewDoc(null)}
+          filePath={previewDoc.filePath || ''}
+          fileName={previewDoc.fileName || 'document'}
+          mimeType={previewDoc.mimeType}
+          title={previewDoc.documentName || DOCUMENT_TYPE_LABELS[previewDoc.documentType]}
+          bucket="child-documents"
+        />
+      )}
 
       {/* Upload Modal */}
       {showUploadModal && (
@@ -722,7 +748,7 @@ function DocumentManagementContent() {
                 <select
                   value={uploadForm.childId}
                   onChange={(e) => setUploadForm({ ...uploadForm, childId: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   <option value="">選択してください</option>
                   {children.map(c => (
@@ -739,7 +765,7 @@ function DocumentManagementContent() {
                 <select
                   value={uploadForm.documentType}
                   onChange={(e) => setUploadForm({ ...uploadForm, documentType: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   {Object.entries(DOCUMENT_TYPE_LABELS).map(([key, label]) => (
                     <option key={key} value={key}>{label}</option>
@@ -754,7 +780,7 @@ function DocumentManagementContent() {
                   type="text"
                   value={uploadForm.documentName}
                   onChange={(e) => setUploadForm({ ...uploadForm, documentName: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder="例: 2025年度 受給者証"
                 />
               </div>
@@ -766,7 +792,7 @@ function DocumentManagementContent() {
                   type="date"
                   value={uploadForm.expiryDate}
                   onChange={(e) => setUploadForm({ ...uploadForm, expiryDate: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
                 <p className="text-xs text-gray-400 mt-1">受給者証など期限がある書類の場合に設定</p>
               </div>
@@ -777,7 +803,7 @@ function DocumentManagementContent() {
                 <textarea
                   value={uploadForm.description}
                   onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder="メモがあれば入力"
                 />
               </div>
@@ -793,7 +819,7 @@ function DocumentManagementContent() {
               <button
                 onClick={handleUpload}
                 disabled={uploading || !uploadForm.documentType || !uploadForm.childId}
-                className="flex items-center gap-2 px-5 py-2 text-sm font-medium bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-5 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {uploading ? (
                   <>
@@ -835,7 +861,7 @@ export default function DocumentManagementView() {
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-[#00c4cc] text-gray-800'
+                  ? 'border-primary text-gray-800'
                   : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
               }`}
             >

@@ -137,7 +137,7 @@ export default function AuthCallbackPage() {
               return;
             } else {
               // Bizアカウント認証完了
-              router.push('/setup?type=confirm');
+              router.push('/career/setup?type=confirm');
               return;
             }
           }
@@ -234,7 +234,7 @@ export default function AuthCallbackPage() {
               router.push('/career?verified=true');
               return;
             } else {
-              router.push('/setup?type=confirm');
+              router.push('/career/setup?type=confirm');
               return;
             }
           }
@@ -255,9 +255,9 @@ export default function AuthCallbackPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">認証処理中...</p>
         </div>
       </div>
@@ -266,7 +266,7 @@ export default function AuthCallbackPage() {
 
   if (status === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,7 +285,7 @@ export default function AuthCallbackPage() {
                 router.push('/career/login');
               }
             }}
-            className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
+            className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors"
           >
             ログインページへ戻る
           </button>

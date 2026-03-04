@@ -155,7 +155,7 @@ export default function ServiceWorkerRegistration() {
       )}
 
       {showInstallBanner && (
-        <div className="fixed bottom-4 left-4 z-50 bg-white border-2 border-teal-500 rounded-lg shadow-lg p-4 max-w-sm" role="alert">
+        <div className="fixed bottom-4 left-4 z-50 bg-white border-2 border-primary rounded-lg shadow-lg p-4 max-w-sm" role="alert">
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <h3 className="font-bold text-gray-900 mb-1">アプリをインストール</h3>
@@ -165,7 +165,7 @@ export default function ServiceWorkerRegistration() {
               <div className="flex gap-2">
                 <button
                   onClick={handleInstall}
-                  className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors text-sm font-medium"
+                  className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition-colors text-sm font-medium"
                 >
                   インストール
                 </button>

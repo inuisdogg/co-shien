@@ -147,7 +147,7 @@ enabled = true
 # in emails.
 site_url = "http://localhost:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://biz.co-shien.inu.co.jp/setup", "https://my.co-shien.inu.co.jp/setup", "https://biz.co-shien.inu.co.jp/setup?type=confirm", "https://my.co-shien.inu.co.jp/setup?type=confirm", "http://localhost:3000/auth/callback", "https://biz.co-shien.inu.co.jp/auth/callback", "https://my.co-shien.inu.co.jp/auth/callback"]
+additional_redirect_urls = ["https://roots.inu.co.jp/setup", "https://roots.inu.co.jp/setup?type=confirm", "http://localhost:3000/auth/callback", "https://roots.inu.co.jp/auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -222,15 +222,15 @@ otp_expiry = 3600
 
 # メールテンプレートのカスタマイズ
 [auth.email.template.confirmation]
-subject = "co-shien メールアドレスの確認"
+subject = "Roots メールアドレスの確認"
 content_path = "./supabase/templates/confirm-signup.html"
 
 [auth.email.template.recovery]
-subject = "co-shien パスワードリセット"
+subject = "Roots パスワードリセット"
 content_path = "./supabase/templates/reset-password.html"
 
 [auth.email.template.invite]
-subject = "co-shien へのご招待"
+subject = "Roots へのご招待"
 content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize notification email template

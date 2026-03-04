@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Allow: /facility
+Allow: /career/lp
+Allow: /terms
+Allow: /privacy
+
+Disallow: /admin
+Disallow: /business
+Disallow: /api
+Disallow: /career/login
+Disallow: /career/signup
+Disallow: /parent/login
+Disallow: /parent/signup
+Disallow: /owner-setup
+Disallow: /facility/register
+Disallow: /auth
+
+Sitemap: https://roots.inu.co.jp/sitemap.xml

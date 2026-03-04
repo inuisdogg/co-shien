@@ -127,7 +127,7 @@ export default function PushNotificationToggle({ userId }: Props) {
     <button
       onClick={handleEnable}
       disabled={loading}
-      className="w-full flex items-center gap-3 px-4 py-3.5 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+      className="w-full flex items-center gap-3 px-4 py-3.5 bg-personal hover:bg-personal-dark text-white rounded-xl transition-colors disabled:opacity-50 shadow-sm"
     >
       {loading ? (
         <Loader2 className="w-5 h-5 animate-spin" />

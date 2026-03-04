@@ -43,8 +43,7 @@ export default function SignupPage() {
     }
 
     // メールアドレスの形式チェック
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email.trim())) {
+    if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/.test(formData.email.trim())) {
       setError('正しいメールアドレスを入力してください');
       return;
     }
@@ -88,7 +87,7 @@ export default function SignupPage() {
       const tempPassword = Array.from(tempArray, b => b.toString(36).padStart(2, '0')).join('').slice(0, 12) + 'A1!';
       const redirectUrl = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=business`
-        : 'https://Roots.inu.co.jp/auth/callback?type=business';
+        : 'https://roots.inu.co.jp/auth/callback?type=business';
       
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -119,7 +118,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -210,7 +209,7 @@ export default function SignupPage() {
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowTermsModal(false)}
-                className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
               >
                 閉じる
               </button>
@@ -230,7 +229,7 @@ export default function SignupPage() {
             priority
           />
           <div className="mb-2">
-            <span className="inline-block bg-[#00c4cc] text-white text-xs font-bold px-3 py-1 rounded-full">
+            <span className="inline-block bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">
               Biz（事業所向け）
             </span>
           </div>
@@ -256,7 +255,7 @@ export default function SignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="メールアドレスを入力"
               disabled={loading}
             />
@@ -278,7 +277,7 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => setShowTermsModal(true)}
-                className="text-[#00c4cc] hover:underline"
+                className="text-primary hover:underline"
               >
                 利用規約
               </button>
@@ -286,7 +285,7 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => window.open('/privacy', '_blank')}
-                className="text-[#00c4cc] hover:underline"
+                className="text-primary hover:underline"
               >
                 プライバシーポリシー
               </button>
@@ -297,7 +296,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? '登録中...' : 'アカウントを作成'}
           </button>
@@ -307,8 +306,8 @@ export default function SignupPage() {
           <p className="text-center text-sm text-gray-600">
             既にアカウントをお持ちの方は{' '}
             <button
-              onClick={() => router.push('/biz')}
-              className="text-[#00c4cc] hover:underline font-bold"
+              onClick={() => router.push('/career/login')}
+              className="text-primary hover:underline font-bold"
             >
               ログイン
             </button>

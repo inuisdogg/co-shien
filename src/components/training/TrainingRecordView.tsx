@@ -231,7 +231,7 @@ function TrainingRecordContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <BookOpen className="w-6 h-6 text-[#00c4cc]" />
+          <BookOpen className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">研修記録</h1>
         </div>
         <div className="flex gap-2">
@@ -239,7 +239,7 @@ function TrainingRecordContent() {
             <Download className="w-4 h-4" />
             エクスポート
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors">
             <Plus className="w-4 h-4" />
             記録を追加
           </button>
@@ -277,7 +277,7 @@ function TrainingRecordContent() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#00c4cc]/10 rounded-lg"><Award className="w-5 h-5 text-[#00c4cc]" /></div>
+            <div className="p-2 bg-primary/10 rounded-lg"><Award className="w-5 h-5 text-primary" /></div>
             <div>
               <p className="text-sm text-gray-500">総研修時間</p>
               <p className="text-2xl font-bold text-gray-800">{stats.totalHours}<span className="text-sm font-normal text-gray-400">h</span></p>
@@ -293,10 +293,10 @@ function TrainingRecordContent() {
           {heatmapData.map(d => {
             const height = d.count > 0 ? Math.max(20, (d.count / maxCount) * 100) : 4;
             const intensity = d.count === 0 ? 'bg-gray-100' :
-              d.count <= 1 ? 'bg-[#00c4cc]/20' :
-              d.count <= 2 ? 'bg-[#00c4cc]/40' :
-              d.count <= 3 ? 'bg-[#00c4cc]/60' :
-              'bg-[#00c4cc]/80';
+              d.count <= 1 ? 'bg-primary/20' :
+              d.count <= 2 ? 'bg-primary/40' :
+              d.count <= 3 ? 'bg-primary/60' :
+              'bg-primary/80';
             return (
               <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
                 <div
@@ -313,10 +313,10 @@ function TrainingRecordContent() {
           <span>少ない</span>
           <div className="flex gap-0.5">
             <div className="w-3 h-3 rounded-sm bg-gray-100" />
-            <div className="w-3 h-3 rounded-sm bg-[#00c4cc]/20" />
-            <div className="w-3 h-3 rounded-sm bg-[#00c4cc]/40" />
-            <div className="w-3 h-3 rounded-sm bg-[#00c4cc]/60" />
-            <div className="w-3 h-3 rounded-sm bg-[#00c4cc]/80" />
+            <div className="w-3 h-3 rounded-sm bg-primary/20" />
+            <div className="w-3 h-3 rounded-sm bg-primary/40" />
+            <div className="w-3 h-3 rounded-sm bg-primary/60" />
+            <div className="w-3 h-3 rounded-sm bg-primary/80" />
           </div>
           <span>多い</span>
         </div>
@@ -332,13 +332,13 @@ function TrainingRecordContent() {
               placeholder="研修名・講師名で検索..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as any)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="all">全ステータス</option>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -346,7 +346,7 @@ function TrainingRecordContent() {
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value as any)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="all">全タイプ</option>
             {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -354,7 +354,7 @@ function TrainingRecordContent() {
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value as SortOption)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="newest">新しい順</option>
             <option value="oldest">古い順</option>
@@ -373,7 +373,7 @@ function TrainingRecordContent() {
               {records.length === 0 ? '研修記録がまだ登録されていません' : '条件に一致する研修記録がありません'}
             </p>
             {records.length === 0 && (
-              <button className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors mt-2">
+              <button className="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors mt-2">
                 <Plus className="w-4 h-4" />
                 記録を追加
               </button>
@@ -464,7 +464,7 @@ export default function TrainingRecordView() {
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-[#00c4cc] text-gray-800'
+                  ? 'border-primary text-gray-800'
                   : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
               }`}
             >

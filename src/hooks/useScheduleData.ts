@@ -11,9 +11,11 @@ import {
   ScheduleItem,
   BookingRequest,
   FacilitySettings,
+  FacilityTimeSlot,
   UsageRecord,
   TimeSlot,
 } from '@/types';
+import { resolveTimeSlots, expandSlotKeys } from '@/utils/slotResolver';
 
 export const useScheduleData = () => {
   const { facility } = useAuth();
@@ -52,6 +54,8 @@ export const useScheduleData = () => {
             slot: row.slot as TimeSlot,
             hasPickup: row.has_pickup || false,
             hasDropoff: row.has_dropoff || false,
+            pickupMethod: row.pickup_method || null,
+            dropoffMethod: row.dropoff_method || null,
             staffId: row.staff_id || undefined,
             createdAt: row.created_at || new Date().toISOString(),
             updatedAt: row.updated_at || new Date().toISOString(),
@@ -81,24 +85,29 @@ export const useScheduleData = () => {
       throw new Error('施設IDが設定されていません。ログインしてください。');
     }
 
-    const scheduleId = `schedule-${Date.now()}`;
+    const scheduleId = Date.now().toString();
     const now = new Date().toISOString();
 
     try {
+      const insertData: any = {
+        id: scheduleId,
+        facility_id: facilityId,
+        child_id: schedule.childId,
+        child_name: schedule.childName,
+        date: schedule.date,
+        slot: schedule.slot,
+        has_pickup: schedule.hasPickup || !!schedule.pickupMethod,
+        has_dropoff: schedule.hasDropoff || !!schedule.dropoffMethod,
+        created_at: now,
+        updated_at: now,
+      };
+      // pickup_method/dropoff_method はマイグレーション適用後のみ送信
+      if (schedule.pickupMethod) insertData.pickup_method = schedule.pickupMethod;
+      if (schedule.dropoffMethod) insertData.dropoff_method = schedule.dropoffMethod;
+
       const { data, error } = await supabase
         .from('schedules')
-        .insert({
-          id: scheduleId,
-          facility_id: facilityId,
-          child_id: schedule.childId,
-          child_name: schedule.childName,
-          date: schedule.date,
-          slot: schedule.slot,
-          has_pickup: schedule.hasPickup || false,
-          has_dropoff: schedule.hasDropoff || false,
-          created_at: now,
-          updated_at: now,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -113,8 +122,8 @@ export const useScheduleData = () => {
       };
       setSchedules(prev => [...prev, newSchedule]);
       return newSchedule;
-    } catch (error) {
-      console.error('Error in addSchedule:', error);
+    } catch (error: any) {
+      console.error('Error in addSchedule:', error?.message, error?.code, error?.details, error?.hint, error);
       throw error;
     }
   };
@@ -180,7 +189,13 @@ export const useScheduleData = () => {
   };
 
   // スケジュールの送迎設定を更新
-  const updateScheduleTransport = async (scheduleId: string, hasPickup: boolean, hasDropoff: boolean) => {
+  const updateScheduleTransport = async (
+    scheduleId: string,
+    hasPickup: boolean,
+    hasDropoff: boolean,
+    pickupMethod?: string | null,
+    dropoffMethod?: string | null,
+  ) => {
     const schedule = schedules.find(s => s.id === scheduleId);
     if (!schedule) {
       throw new Error('スケジュールが見つかりません');
@@ -188,13 +203,18 @@ export const useScheduleData = () => {
 
     try {
       const now = new Date().toISOString();
+      const updateData: any = {
+        has_pickup: hasPickup || !!pickupMethod,
+        has_dropoff: hasDropoff || !!dropoffMethod,
+        updated_at: now,
+      };
+      // pickup_method/dropoff_method はマイグレーション適用後のみ送信（値がある場合のみ）
+      if (pickupMethod) updateData.pickup_method = pickupMethod;
+      if (dropoffMethod) updateData.dropoff_method = dropoffMethod;
+
       const { error } = await supabase
         .from('schedules')
-        .update({
-          has_pickup: hasPickup,
-          has_dropoff: hasDropoff,
-          updated_at: now,
-        })
+        .update(updateData)
         .eq('id', scheduleId);
 
       if (error) throw error;
@@ -202,7 +222,14 @@ export const useScheduleData = () => {
       setSchedules(prev =>
         prev.map(s =>
           s.id === scheduleId
-            ? { ...s, hasPickup, hasDropoff, updatedAt: now }
+            ? {
+                ...s,
+                hasPickup: updateData.has_pickup,
+                hasDropoff: updateData.has_dropoff,
+                ...(pickupMethod !== undefined ? { pickupMethod } : {}),
+                ...(dropoffMethod !== undefined ? { dropoffMethod } : {}),
+                updatedAt: now,
+              }
             : s
         )
       );
@@ -218,7 +245,8 @@ export const useScheduleData = () => {
     month: number,
     children: Child[],
     facilitySettings: FacilitySettings,
-    getUsageRecordByScheduleId: (scheduleId: string) => UsageRecord | undefined
+    getUsageRecordByScheduleId: (scheduleId: string) => UsageRecord | undefined,
+    timeSlots?: FacilityTimeSlot[]
   ): Promise<{ added: number; skipped: number }> => {
     if (!facilityId) {
       throw new Error('施設IDが設定されていません');
@@ -243,6 +271,9 @@ export const useScheduleData = () => {
     // 施設設定から休日情報を取得
     const regularHolidays = facilitySettings.regularHolidays || [0];
     const customHolidays = facilitySettings.customHolidays || [];
+
+    // スロット解決は一度だけ（ループ外で計算）
+    const resolvedSlots = resolveTimeSlots(timeSlots || [], facilitySettings);
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -271,8 +302,8 @@ export const useScheduleData = () => {
           continue;
         }
 
-        // AMPM の場合は両方に登録
-        const slotsToRegister: TimeSlot[] = timeSlot === 'AMPM' ? ['AM', 'PM'] : [timeSlot as TimeSlot];
+        // AMPM/ALL/終日 の場合は全スロットに展開
+        const slotsToRegister: TimeSlot[] = expandSlotKeys(resolvedSlots, timeSlot);
 
         for (const slot of slotsToRegister) {
           // 重複チェック
@@ -282,15 +313,18 @@ export const useScheduleData = () => {
             continue;
           }
 
-          // 登録
+          // 登録（transportPatternから送迎方法を取得）
+          const tp = child.transportPattern?.[dayOfWeek];
           try {
             await addSchedule({
               date,
               childId: child.id,
               childName: child.name,
               slot,
-              hasPickup: child.needsPickup || false,
-              hasDropoff: child.needsDropoff || false,
+              hasPickup: child.needsPickup || !!tp?.pickup,
+              hasDropoff: child.needsDropoff || !!tp?.dropoff,
+              pickupMethod: tp?.pickup || null,
+              dropoffMethod: tp?.dropoff || null,
             });
             existingSchedules.add(key);
             added++;

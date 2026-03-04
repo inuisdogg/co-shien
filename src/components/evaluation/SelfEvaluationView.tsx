@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSelfEvaluation } from '@/hooks/useSelfEvaluation';
+import { useToast } from '@/components/ui/Toast';
 import type { SelfEvaluation, SelfEvaluationStatus } from '@/types';
 
 // --- 評価タブの定義 ---
@@ -275,6 +276,7 @@ function RadarChart({ scores, labels }: { scores: number[]; labels: string[] }) 
 // --- Main Component ---
 const SelfEvaluationView: React.FC = () => {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const {
     evaluations,
     isLoading,
@@ -405,7 +407,7 @@ const SelfEvaluationView: React.FC = () => {
       improvementPlan,
     });
     setSavingDraft(false);
-    alert('下書きを保存しました');
+    toast.success('下書きを保存しました');
   };
 
   // Complete evaluation
@@ -417,7 +419,7 @@ const SelfEvaluationView: React.FC = () => {
       status: 'completed',
       improvementPlan,
     });
-    alert('評価を完了しました');
+    toast.success('評価を完了しました');
   };
 
   // Publish evaluation
@@ -425,7 +427,7 @@ const SelfEvaluationView: React.FC = () => {
     if (!currentEvalId) return;
     if (!confirm('評価結果を公開します。公開後も編集は可能です。よろしいですか？')) return;
     await publishEvaluation(currentEvalId);
-    alert('評価結果を公開しました');
+    toast.success('評価結果を公開しました');
   };
 
   // Add action item
@@ -482,7 +484,7 @@ const SelfEvaluationView: React.FC = () => {
               <select
                 value={selectedFiscalYear}
                 onChange={(e) => setSelectedFiscalYear(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
                 {fiscalYearOptions.map((fy) => (
                   <option key={fy} value={fy}>
@@ -513,7 +515,7 @@ const SelfEvaluationView: React.FC = () => {
             <button
               onClick={handleCreate}
               disabled={isLoading}
-              className="inline-flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
             >
               <Plus size={16} />
               新規作成
@@ -525,7 +527,7 @@ const SelfEvaluationView: React.FC = () => {
             {categoryScores.some((s) => s.average > 0) && (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
                 <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-4">
-                  <BarChart3 size={20} className="text-[#00c4cc]" />
+                  <BarChart3 size={20} className="text-primary" />
                   スコア概要
                 </h3>
                 <div className="flex flex-col md:flex-row items-center gap-8">
@@ -541,7 +543,7 @@ const SelfEvaluationView: React.FC = () => {
                         </span>
                         <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
                           <div
-                            className="h-full bg-[#00c4cc] rounded-full transition-all duration-500"
+                            className="h-full bg-primary rounded-full transition-all duration-500"
                             style={{ width: `${(s.average / 4) * 100}%` }}
                           />
                         </div>
@@ -566,7 +568,7 @@ const SelfEvaluationView: React.FC = () => {
                   {cat.questions.map((q, qi) => (
                     <div key={q.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
                       <p className="text-sm text-gray-800 font-medium mb-3">
-                        <span className="text-[#00c4cc] font-bold mr-1">{qi + 1}.</span>
+                        <span className="text-primary font-bold mr-1">{qi + 1}.</span>
                         {q.text}
                       </p>
                       {/* Rating radio buttons */}
@@ -576,7 +578,7 @@ const SelfEvaluationView: React.FC = () => {
                             key={opt.value}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition-all ${
                               responses[q.id]?.rating === opt.value
-                                ? 'bg-[#00c4cc]/10 border-[#00c4cc] text-[#00c4cc] font-bold'
+                                ? 'bg-primary/10 border-primary text-primary font-bold'
                                 : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                             }`}
                           >
@@ -599,7 +601,7 @@ const SelfEvaluationView: React.FC = () => {
                         onChange={(e) => handleCommentChange(q.id, e.target.value)}
                         placeholder="コメント（任意）"
                         rows={2}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] resize-none"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                       />
                     </div>
                   ))}
@@ -623,7 +625,7 @@ const SelfEvaluationView: React.FC = () => {
                   <button
                     onClick={handleComplete}
                     disabled={isLoading}
-                    className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
                   >
                     <CheckCircle size={16} />
                     評価を完了
@@ -652,7 +654,7 @@ const SelfEvaluationView: React.FC = () => {
             <select
               value={selectedFiscalYear}
               onChange={(e) => setSelectedFiscalYear(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             >
               {fiscalYearOptions.map((fy) => (
                 <option key={fy} value={fy}>
@@ -702,7 +704,7 @@ const SelfEvaluationView: React.FC = () => {
             onChange={(e) => setImprovementPlan(e.target.value)}
             placeholder="改善計画を記入してください..."
             rows={6}
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc] resize-none"
+            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
           />
         </div>
 
@@ -715,7 +717,7 @@ const SelfEvaluationView: React.FC = () => {
                 key={i}
                 className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5"
               >
-                <CheckCircle size={16} className="text-[#00c4cc] shrink-0" />
+                <CheckCircle size={16} className="text-primary shrink-0" />
                 <span className="text-sm text-gray-800 flex-1">{item}</span>
                 <button
                   onClick={() => removeActionItem(i)}
@@ -738,11 +740,11 @@ const SelfEvaluationView: React.FC = () => {
                 }
               }}
               placeholder="新しいアクションアイテムを追加..."
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
             <button
               onClick={addActionItem}
-              className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+              className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
             >
               追加
             </button>
@@ -765,7 +767,7 @@ const SelfEvaluationView: React.FC = () => {
               <button
                 onClick={handlePublish}
                 disabled={!selfEval || isLoading}
-                className="flex items-center gap-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
               >
                 <Send size={16} />
                 公開する
@@ -806,7 +808,7 @@ const SelfEvaluationView: React.FC = () => {
                     className="flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <ClipboardCheck size={18} className="text-[#00c4cc]" />
+                      <ClipboardCheck size={18} className="text-primary" />
                       <div>
                         <p className="text-sm font-bold text-gray-800">
                           {evaluation.evaluationType === 'self'
@@ -833,7 +835,7 @@ const SelfEvaluationView: React.FC = () => {
                             evaluation.evaluationType === 'self' ? 'self' : 'parent'
                           );
                         }}
-                        className="text-sm text-[#00c4cc] hover:underline flex items-center gap-1"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
                       >
                         <Eye size={14} />
                         表示
@@ -854,8 +856,8 @@ const SelfEvaluationView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
         <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
-            <ClipboardCheck size={18} className="text-[#00c4cc]" />
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+            <ClipboardCheck size={18} className="text-primary" />
           </div>
           自己評価
         </h2>
@@ -873,7 +875,7 @@ const SelfEvaluationView: React.FC = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-bold rounded-lg transition-all ${
                 activeTab === tab.id
-                  ? 'text-white bg-[#00c4cc] shadow-sm'
+                  ? 'text-white bg-primary shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >

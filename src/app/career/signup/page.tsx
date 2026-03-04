@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, Building2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { hashPassword } from '@/utils/password';
 
@@ -44,66 +44,40 @@ export default function PersonalSignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
-    // バリデーション
-    if (formData.password !== formData.confirmPassword) {
-      setError('パスワードが一致しません');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('パスワードは6文字以上で入力してください');
-      return;
-    }
-
-    if (!formData.agreedToTerms) {
-      setError('利用規約に同意してください');
-      return;
-    }
-
-    // バリデーション
-    if (!formData.lastName || !formData.firstName) {
-      setError('姓と名を入力してください');
-      return;
-    }
-
-    if (!formData.lastNameKana || !formData.firstNameKana) {
-      setError('姓と名のフリガナを入力してください');
-      return;
-    }
-
+    // 全フィールドのバリデーションを一括チェック
+    const errors: Record<string, string> = {};
+    if (!formData.lastName.trim() || !formData.firstName.trim()) errors.name = '姓と名を入力してください';
+    if (!formData.lastNameKana.trim() || !formData.firstNameKana.trim()) errors.kana = 'フリガナを入力してください';
     if (!formData.birthDate) {
-      setError('生年月日を入力してください');
-      return;
+      errors.birthDate = '生年月日を入力してください';
+    } else {
+      const birthDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!birthDateRegex.test(formData.birthDate)) {
+        errors.birthDate = '生年月日はYYYY-MM-DD形式で入力してください';
+      } else {
+        const birthDateObj = new Date(formData.birthDate);
+        const today = new Date();
+        if (birthDateObj > today) {
+          errors.birthDate = '生年月日は未来の日付にできません';
+        }
+      }
     }
-
-    if (!formData.gender) {
-      setError('性別を選択してください');
-      return;
-    }
-
-    if (!formData.email) {
-      setError('メールアドレスを入力してください');
-      return;
-    }
-
-    // 生年月日の形式チェック
-    const birthDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!birthDateRegex.test(formData.birthDate)) {
-      setError('生年月日はYYYY-MM-DD形式で入力してください');
-      return;
-    }
-
-    // 生年月日の妥当性チェック（未来の日付でないか）
-    const birthDateObj = new Date(formData.birthDate);
-    const today = new Date();
-    if (birthDateObj > today) {
-      setError('生年月日は未来の日付にできません');
+    if (!formData.gender) errors.gender = '性別を選択してください';
+    if (!formData.email.trim()) errors.email = 'メールアドレスを入力してください';
+    if (formData.password.length < 6) errors.password = 'パスワードは6文字以上で入力してください';
+    if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'パスワードが一致しません';
+    if (!formData.agreedToTerms) errors.terms = '利用規約に同意してください';
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError('入力内容に不備があります。各項目をご確認ください。');
       return;
     }
 
@@ -148,9 +122,6 @@ export default function PersonalSignupPage() {
         throw new Error('このメールアドレスは既にログインIDとして使用されています');
       }
 
-      // 名前を結合（後方互換性のため）
-      const fullName = `${formData.lastName} ${formData.firstName}`;
-
       // Supabase Authでの重複チェックは、signUp時にエラーとして返されるため
       // ここではusersテーブルのチェックで十分
 
@@ -158,7 +129,7 @@ export default function PersonalSignupPage() {
       // redirectToがある場合はURLパラメータにも含める（localStorage非共有環境への対策）
       const baseCallback = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=career`
-        : 'https://Roots.inu.co.jp/auth/callback?type=career';
+        : 'https://roots.inu.co.jp/auth/callback?type=career';
       const redirectUrl = redirectTo
         ? `${baseCallback}&redirect=${encodeURIComponent(redirectTo)}`
         : baseCallback;
@@ -261,7 +232,7 @@ export default function PersonalSignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#818CF8] to-[#6366F1] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-personal to-personal-dark p-4">
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -281,7 +252,7 @@ export default function PersonalSignupPage() {
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <div className="prose prose-sm max-w-none space-y-4 text-sm">
-                <p className="text-gray-500 mb-4">最終更新日: 2024年1月1日</p>
+                <p className="text-gray-500 mb-4">最終更新日: 2026年3月1日</p>
                 
                 <section>
                   <h3 className="text-lg font-bold text-gray-800 mb-2">第1条（適用）</h3>
@@ -331,8 +302,13 @@ export default function PersonalSignupPage() {
                 <section>
                   <h3 className="text-lg font-bold text-gray-800 mb-2">第5条（個人情報の取扱い）</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    当社は、本サービスの利用によって取得する個人情報については、当社「プライバシーポリシー」に従い適切に取り扱うものとします。
+                    当社は、本サービスの利用によって取得する個人情報については、日本国の個人情報保護法（APPI）に準拠し、当社「プライバシーポリシー」に従い適切に取り扱うものとします。
                   </p>
+                  <ol className="list-decimal list-inside space-y-2 text-gray-700 mt-2">
+                    <li>ユーザーの個人情報（氏名、資格情報、経歴、給与情報等）は、施設との雇用関係に基づいてのみ共有されます。</li>
+                    <li>ユーザーは、自己の個人情報の開示、訂正、削除を請求できます。</li>
+                    <li>アカウント削除後、個人情報は法令で定める期間を除き速やかに削除します。</li>
+                  </ol>
                 </section>
 
                 <section>
@@ -352,7 +328,7 @@ export default function PersonalSignupPage() {
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowTermsModal(false)}
-                className="w-full bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                className="w-full bg-personal hover:bg-personal-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
               >
                 閉じる
               </button>
@@ -361,23 +337,36 @@ export default function PersonalSignupPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
+      <div className="bg-white rounded-xl shadow-lg border border-white/20 w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
             src="/logo.svg"
             alt="Roots"
-            width={200}
-            height={64}
-            className="h-16 w-auto mx-auto mb-4"
+            width={103}
+            height={28}
+            className="h-7 w-auto mx-auto mb-6"
             priority
           />
           <div className="mb-2">
-            <span className="inline-block bg-[#818CF8] text-white text-xs font-bold px-3 py-1 rounded-full">
+            <span className="inline-block bg-personal text-white text-xs font-bold px-3 py-1 rounded-full">
               キャリアアカウント
             </span>
           </div>
           <h1 className="text-2xl font-bold text-gray-800">新規登録</h1>
           <p className="text-gray-600 text-sm mt-2">アカウントを作成して始めましょう</p>
+          {redirectTo?.startsWith('/facility') && (
+            <div className="mt-4 bg-primary/10 border border-primary/30 rounded-lg px-4 py-3 text-left">
+              <div className="flex items-start gap-2">
+                <Building2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-primary">施設登録のためのアカウント作成</p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    まずあなた個人のアカウントを作成します。登録完了後、すぐに施設情報を入力できます。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -399,7 +388,7 @@ export default function PersonalSignupPage() {
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 required
-                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className={`w-full h-12 px-4 border ${fieldErrors.name ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
                 placeholder="姓を入力"
                 disabled={loading}
               />
@@ -414,12 +403,13 @@ export default function PersonalSignupPage() {
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 required
-                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className={`w-full h-12 px-4 border ${fieldErrors.name ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
                 placeholder="名を入力"
                 disabled={loading}
               />
             </div>
           </div>
+          {fieldErrors.name && <p className="text-xs text-red-500 -mt-4">{fieldErrors.name}</p>}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -432,7 +422,7 @@ export default function PersonalSignupPage() {
                 value={formData.lastNameKana}
                 onChange={(e) => setFormData({ ...formData, lastNameKana: e.target.value })}
                 required
-                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className={`w-full h-12 px-4 border ${fieldErrors.kana ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
                 placeholder="セイを入力"
                 disabled={loading}
               />
@@ -447,12 +437,13 @@ export default function PersonalSignupPage() {
                 value={formData.firstNameKana}
                 onChange={(e) => setFormData({ ...formData, firstNameKana: e.target.value })}
                 required
-                className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className={`w-full h-12 px-4 border ${fieldErrors.kana ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
                 placeholder="メイを入力"
                 disabled={loading}
               />
             </div>
           </div>
+          {fieldErrors.kana && <p className="text-xs text-red-500 -mt-4">{fieldErrors.kana}</p>}
 
           <div>
             <label htmlFor="birthDate" className="block text-sm font-bold text-gray-700 mb-2">
@@ -464,9 +455,10 @@ export default function PersonalSignupPage() {
               value={formData.birthDate}
               onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
               required
-              className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+              className={`w-full h-12 px-4 border ${fieldErrors.birthDate ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
               disabled={loading}
             />
+            {fieldErrors.birthDate && <p className="text-xs text-red-500 mt-1">{fieldErrors.birthDate}</p>}
           </div>
 
           <div>
@@ -478,7 +470,7 @@ export default function PersonalSignupPage() {
               value={formData.gender}
               onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'male' | 'female' | 'other' })}
               required
-              className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+              className={`w-full h-12 px-4 border ${fieldErrors.gender ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
               disabled={loading}
             >
               <option value="">選択してください</option>
@@ -486,6 +478,7 @@ export default function PersonalSignupPage() {
               <option value="female">女性</option>
               <option value="other">その他</option>
             </select>
+            {fieldErrors.gender && <p className="text-xs text-red-500 mt-1">{fieldErrors.gender}</p>}
           </div>
 
           <div>
@@ -498,13 +491,11 @@ export default function PersonalSignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
-              className="w-full h-12 px-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+              className={`w-full h-12 px-4 border ${fieldErrors.email ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
               placeholder="メールアドレスを入力"
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              このメールアドレスがログインIDとして使用されます
-            </p>
+            {fieldErrors.email ? <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p> : <p className="text-xs text-gray-500 mt-1">このメールアドレスがログインIDとして使用されます</p>}
           </div>
 
           <div>
@@ -519,7 +510,7 @@ export default function PersonalSignupPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 minLength={6}
-                className="w-full h-12 px-4 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className={`w-full h-12 px-4 pr-10 border ${fieldErrors.password ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
                 placeholder="6文字以上で入力"
                 disabled={loading}
               />
@@ -541,6 +532,7 @@ export default function PersonalSignupPage() {
                 )}
               </button>
             </div>
+            {fieldErrors.password && <p className="text-xs text-red-500 mt-1">{fieldErrors.password}</p>}
           </div>
 
           <div>
@@ -555,7 +547,7 @@ export default function PersonalSignupPage() {
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
                 minLength={6}
-                className="w-full h-12 px-4 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#818CF8]/30 focus:border-[#818CF8] transition-all"
+                className={`w-full h-12 px-4 pr-10 border ${fieldErrors.confirmPassword ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
                 placeholder="パスワードを再入力"
                 disabled={loading}
               />
@@ -577,22 +569,23 @@ export default function PersonalSignupPage() {
                 )}
               </button>
             </div>
+            {fieldErrors.confirmPassword && <p className="text-xs text-red-500 mt-1">{fieldErrors.confirmPassword}</p>}
           </div>
 
-          <div className="flex items-start">
+          <div className={`flex items-center min-h-[44px] bg-gray-50 rounded-lg p-3 border ${fieldErrors.terms ? 'border-red-400' : 'border-gray-100'}`}>
             <input
               type="checkbox"
               id="terms"
               checked={formData.agreedToTerms}
               onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
-              className="mt-1 mr-2"
+              className="w-5 h-5 mr-3 accent-personal cursor-pointer"
               disabled={loading}
             />
             <label htmlFor="terms" className="text-sm text-gray-700">
               <button
                 type="button"
                 onClick={() => setShowTermsModal(true)}
-                className="text-[#818CF8] hover:underline"
+                className="text-personal hover:underline"
               >
                 利用規約
               </button>
@@ -600,29 +593,35 @@ export default function PersonalSignupPage() {
               <button
                 type="button"
                 onClick={() => window.open('/privacy', '_blank')}
-                className="text-[#818CF8] hover:underline"
+                className="text-personal hover:underline"
               >
                 プライバシーポリシー
               </button>
               に同意します
             </label>
           </div>
+          {fieldErrors.terms && <p className="text-xs text-red-500 mt-1">{fieldErrors.terms}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-12 bg-personal hover:bg-personal-dark text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? '登録中...' : 'アカウントを作成'}
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                登録中...
+              </>
+            ) : 'アカウントを作成'}
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-center text-sm text-gray-600">
+        <div className="mt-6 pt-6 border-t border-gray-100">
+          <p className="text-center text-sm text-gray-500">
             既にアカウントをお持ちの方は{' '}
             <button
               onClick={() => router.push('/career/login')}
-              className="text-[#818CF8] hover:underline font-bold"
+              className="text-personal hover:underline font-bold"
             >
               ログイン
             </button>

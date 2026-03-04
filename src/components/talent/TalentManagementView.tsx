@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   Award,
   CheckCircle,
@@ -144,7 +145,7 @@ export default function TalentManagementView({ facilityId: propFacilityId }: Tal
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 isActive
-                  ? 'border-[#00c4cc] text-[#00c4cc]'
+                  ? 'border-primary text-primary'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
@@ -249,7 +250,7 @@ function TreatmentImprovementTab({ facilityId }: { facilityId: string }) {
                 <select
                   value={planForm.additionLevel}
                   onChange={(e) => setPlanForm(prev => ({ ...prev, additionLevel: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="I">加算 I（14.1%）</option>
                   <option value="II">加算 II（11.9%）</option>
@@ -264,7 +265,7 @@ function TreatmentImprovementTab({ facilityId }: { facilityId: string }) {
                   value={planForm.estimatedAnnualRevenue}
                   onChange={(e) => setPlanForm(prev => ({ ...prev, estimatedAnnualRevenue: e.target.value }))}
                   placeholder="例: 30000000"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div className="flex gap-2">
@@ -585,7 +586,7 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
                   type="text"
                   value={editingGrade.gradeName || ''}
                   onChange={(e) => setEditingGrade(prev => prev ? { ...prev, gradeName: e.target.value } : prev)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="例: 一般職員"
                 />
               </div>
@@ -595,7 +596,7 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
                   type="number"
                   value={editingGrade.gradeLevel ?? ''}
                   onChange={(e) => setEditingGrade(prev => prev ? { ...prev, gradeLevel: parseInt(e.target.value) || 0 } : prev)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div>
@@ -604,7 +605,7 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
                   type="number"
                   value={editingGrade.minSalary ?? ''}
                   onChange={(e) => setEditingGrade(prev => prev ? { ...prev, minSalary: parseFloat(e.target.value) || null } : prev)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="例: 200000"
                 />
               </div>
@@ -614,7 +615,7 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
                   type="number"
                   value={editingGrade.maxSalary ?? ''}
                   onChange={(e) => setEditingGrade(prev => prev ? { ...prev, maxSalary: parseFloat(e.target.value) || null } : prev)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="例: 300000"
                 />
               </div>
@@ -624,7 +625,7 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
                   value={editingGrade.responsibilities || ''}
                   onChange={(e) => setEditingGrade(prev => prev ? { ...prev, responsibilities: e.target.value } : prev)}
                   rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="この職位の職責・業務内容"
                 />
               </div>
@@ -634,7 +635,7 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
                   value={editingGrade.appointmentRequirements || ''}
                   onChange={(e) => setEditingGrade(prev => prev ? { ...prev, appointmentRequirements: e.target.value } : prev)}
                   rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="必要な資格・経験年数等"
                 />
               </div>
@@ -644,7 +645,7 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
                   type="number"
                   value={editingGrade.requiredExperienceYears ?? ''}
                   onChange={(e) => setEditingGrade(prev => prev ? { ...prev, requiredExperienceYears: parseInt(e.target.value) || null } : prev)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
             </div>
@@ -975,7 +976,7 @@ function StaffOverviewTab({ facilityId }: { facilityId: string }) {
                     <td className="px-5 py-3 text-gray-600">{staff.role}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        staff.employmentType === '常勤' ? 'bg-[#00c4cc]/5 text-[#00c4cc]' : 'bg-gray-100 text-gray-600'
+                        staff.employmentType === '常勤' ? 'bg-primary/5 text-primary' : 'bg-gray-100 text-gray-600'
                       }`}>
                         {staff.employmentType}
                       </span>
@@ -1089,7 +1090,7 @@ function FilingScheduleTab({ facilityId }: { facilityId: string }) {
             const isCurrent = status === 'current';
             const isPast = status === 'past';
             return (
-              <div key={filing.id} className={`flex items-center gap-4 px-5 py-3 ${isCurrent ? 'bg-[#00c4cc]/5' : ''}`}>
+              <div key={filing.id} className={`flex items-center gap-4 px-5 py-3 ${isCurrent ? 'bg-primary/5' : ''}`}>
                 <div className="shrink-0">
                   {isPast ? (
                     <CheckCircle size={18} style={{ color: ACCENT }} />

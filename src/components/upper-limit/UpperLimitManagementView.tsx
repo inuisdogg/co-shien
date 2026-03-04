@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { Child, UpperLimitManagement, UpperLimitOtherFacility } from '@/types';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -117,6 +118,7 @@ function mapRowToOtherFacility(row: any): UpperLimitOtherFacility {
 
 export default function UpperLimitManagementView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   // State
@@ -416,7 +418,7 @@ export default function UpperLimitManagementView() {
       setShowDetailModal(false);
     } catch (err) {
       console.error('Error saving upper limit data:', err);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -462,7 +464,7 @@ export default function UpperLimitManagementView() {
       pdf.save(`上限管理結果票_${childName}_${currentMonth}.pdf`);
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('PDF生成に失敗しました');
+      toast.error('PDF生成に失敗しました');
     } finally {
       setGeneratingPdf(false);
     }
@@ -659,7 +661,7 @@ export default function UpperLimitManagementView() {
                 <button
                   onClick={handlePdfDownload}
                   disabled={generatingPdf}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors text-sm font-medium disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   {generatingPdf ? (
                     <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin" />
@@ -765,7 +767,7 @@ function DetailModal({
               </div>
               <div>
                 <span className="text-gray-500">負担上限月額</span>
-                <p className="font-bold text-[#00c4cc]">{formatCurrency(upperLimit)}</p>
+                <p className="font-bold text-primary">{formatCurrency(upperLimit)}</p>
               </div>
             </div>
           </div>
@@ -808,7 +810,7 @@ function DetailModal({
                   min={0}
                   value={editData.selfUsageDays || 0}
                   onChange={(e) => setEditData(prev => ({ ...prev, selfUsageDays: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
               <div>
@@ -818,7 +820,7 @@ function DetailModal({
                   min={0}
                   value={editData.selfTotalUnits || 0}
                   onChange={(e) => setEditData(prev => ({ ...prev, selfTotalUnits: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
               <div>
@@ -828,7 +830,7 @@ function DetailModal({
                   min={0}
                   value={editData.selfCopayAmount || 0}
                   onChange={(e) => setEditData(prev => ({ ...prev, selfCopayAmount: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
             </div>
@@ -844,7 +846,7 @@ function DetailModal({
                 </h4>
                 <button
                   onClick={addOtherFacility}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#00c4cc] bg-[#00c4cc]/5 rounded-lg hover:bg-[#00c4cc]/10 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/5 rounded-lg hover:bg-primary/10 transition-colors"
                 >
                   <Plus size={14} />
                   事業所を追加
@@ -875,7 +877,7 @@ function DetailModal({
                             type="text"
                             value={facility.facilityName || ''}
                             onChange={(e) => updateOtherFacility(index, 'facilityName', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             placeholder="事業所名"
                           />
                         </div>
@@ -885,7 +887,7 @@ function DetailModal({
                             type="text"
                             value={facility.facilityNumber || ''}
                             onChange={(e) => updateOtherFacility(index, 'facilityNumber', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             placeholder="事業所番号"
                           />
                         </div>
@@ -896,7 +898,7 @@ function DetailModal({
                             min={0}
                             value={facility.usageDays || 0}
                             onChange={(e) => updateOtherFacility(index, 'usageDays', parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                           />
                         </div>
                         <div>
@@ -906,7 +908,7 @@ function DetailModal({
                             min={0}
                             value={facility.totalUnits || 0}
                             onChange={(e) => updateOtherFacility(index, 'totalUnits', parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                           />
                         </div>
                         <div>
@@ -916,7 +918,7 @@ function DetailModal({
                             min={0}
                             value={facility.copayAmount || 0}
                             onChange={(e) => updateOtherFacility(index, 'copayAmount', parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                           />
                         </div>
                         <div>
@@ -926,7 +928,7 @@ function DetailModal({
                             min={0}
                             value={facility.adjustedCopayAmount ?? ''}
                             onChange={(e) => updateOtherFacility(index, 'adjustedCopayAmount', e.target.value ? parseInt(e.target.value) : undefined)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             placeholder="任意"
                           />
                         </div>
@@ -936,7 +938,7 @@ function DetailModal({
                             type="tel"
                             value={facility.contactPhone || ''}
                             onChange={(e) => updateOtherFacility(index, 'contactPhone', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             placeholder="電話番号"
                           />
                         </div>
@@ -946,7 +948,7 @@ function DetailModal({
                             type="tel"
                             value={facility.contactFax || ''}
                             onChange={(e) => updateOtherFacility(index, 'contactFax', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             placeholder="FAX番号"
                           />
                         </div>
@@ -980,7 +982,7 @@ function DetailModal({
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">負担上限月額</span>
-              <span className="font-medium text-[#00c4cc]">{formatCurrency(upperLimit)}</span>
+              <span className="font-medium text-primary">{formatCurrency(upperLimit)}</span>
             </div>
             {isOverLimit && (
               <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
@@ -1002,7 +1004,7 @@ function DetailModal({
                 adjustedCopayAmount: e.target.value ? parseInt(e.target.value) : undefined,
               }))}
               placeholder="調整後の負担額を入力（任意）"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
           </div>
 
@@ -1037,7 +1039,7 @@ function DetailModal({
               value={editData.notes || ''}
               onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
               placeholder="備考を入力"
             />
           </div>
@@ -1054,7 +1056,7 @@ function DetailModal({
           <button
             onClick={onSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-[#00c4cc] rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
           >
             {saving ? (
               <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin" />

@@ -10,10 +10,11 @@
 import React, { useState, useCallback } from 'react';
 import { Users, AlertCircle, UserPlus } from 'lucide-react';
 import { useStaffMaster } from '@/hooks/useStaffMaster';
-import { Staff, StaffPersonnelSettings, StaffLeaveSettings } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { Staff, StaffPersonnelSettings, StaffLeaveSettings, ProxyAccountData } from '@/types';
 import StaffListPanel from './StaffListPanel';
 import StaffDetailDrawer from './StaffDetailDrawer';
-import StaffEditForm from './StaffEditForm';
+import StaffEditForm, { ProxyFormData } from './StaffEditForm';
 import StaffInviteModal from './StaffInviteModal';
 import StaffLeavePanel from './StaffLeavePanel';
 
@@ -23,6 +24,8 @@ interface StaffWithRelations extends Staff {
 }
 
 const StaffMasterView: React.FC = () => {
+  const { facility } = useAuth();
+
   // スタッフデータ管理フック
   const {
     staffList,
@@ -34,6 +37,9 @@ const StaffMasterView: React.FC = () => {
     deleteStaff,
     updateLeaveSettings,
     inviteStaff,
+    proxyCreateStaff,
+    bulkImportStaff,
+    updatePersonnelSettings,
   } = useStaffMaster();
 
   // UI状態
@@ -119,6 +125,45 @@ const StaffMasterView: React.FC = () => {
     [inviteStaff]
   );
 
+  // 代理アカウント作成
+  const handleProxyCreate = useCallback(
+    async (formData: ProxyFormData): Promise<{ token: string; url: string } | null> => {
+      const proxyData: ProxyAccountData = {
+        facilityId: '',
+        name: formData.name.trim(),
+        lastName: formData.lastName.trim() || undefined,
+        firstName: formData.firstName.trim() || undefined,
+        lastNameKana: formData.lastNameKana.trim() || undefined,
+        firstNameKana: formData.firstNameKana.trim() || undefined,
+        nameKana: formData.nameKana.trim() || undefined,
+        email: formData.email.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+        birthDate: formData.birthDate || undefined,
+        gender: formData.gender || undefined,
+        role: formData.role,
+        employmentType: formData.type,
+        startDate: formData.startDate,
+        qualifications: formData.qualifications.trim() ? formData.qualifications.split(',').map((q: string) => q.trim()).filter(Boolean) : undefined,
+        facilityRole: formData.facilityRole.trim() || undefined,
+        monthlySalary: formData.monthlySalary ? Number(formData.monthlySalary) : undefined,
+        hourlyWage: formData.hourlyWage ? Number(formData.hourlyWage) : undefined,
+        memo: formData.memo.trim() || undefined,
+        permissions: formData.role === '管理者'
+          ? { facilityManagement: true }
+          : formData.permissions,
+      };
+
+      const result = await proxyCreateStaff(proxyData);
+      if (result) {
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const url = `${baseUrl}/facility/join?token=${result.invitationToken}`;
+        return { token: result.invitationToken, url };
+      }
+      return null;
+    },
+    [proxyCreateStaff]
+  );
+
   // 有給管理パネル
   const handleOpenLeave = useCallback((staff: StaffWithRelations) => {
     setLeaveStaff(staff);
@@ -144,11 +189,11 @@ const StaffMasterView: React.FC = () => {
     // CSVエクスポート実装
     const headers = ['名前', 'ふりがな', '雇用形態', '権限', '資格', '連絡先'];
     const rows = staffList.map((staff) => [
-      staff.name,
+      staff.name || '',
       staff.nameKana || '',
-      staff.type,
-      staff.role,
-      staff.personnelSettings?.qualifications?.join('・') || '',
+      staff.type || '',
+      staff.role || '',
+      (Array.isArray(staff.qualifications) ? staff.qualifications.join('・') : '') || '',
       staff.phone || '',
     ]);
 
@@ -166,14 +211,26 @@ const StaffMasterView: React.FC = () => {
     link.click();
   }, [staffList]);
 
+  // 児発管クイックトグル
+  const handleQuickAction = useCallback(
+    async (staff: StaffWithRelations, action: string) => {
+      if (action === 'toggleServiceManager') {
+        const current = staff.personnelSettings?.isServiceManager || false;
+        if (!confirm(`${staff.name}を児発管${current ? 'から解除' : 'に設定'}しますか？`)) return;
+        await updatePersonnelSettings(staff.id, { isServiceManager: !current });
+      }
+    },
+    [updatePersonnelSettings]
+  );
+
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* ヘッダー */}
       <div className="flex-shrink-0 px-6 py-4 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
-              <Users size={20} className="text-[#00c4cc]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Users size={20} className="text-primary" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">スタッフマスタ</h1>
@@ -184,7 +241,7 @@ const StaffMasterView: React.FC = () => {
           </div>
           <button
             onClick={handleOpenInvite}
-            className="flex items-center gap-2 min-h-10 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 font-medium text-sm shadow-sm"
+            className="flex items-center gap-2 min-h-10 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all duration-200 font-medium text-sm shadow-sm"
           >
             <UserPlus size={18} />
             スタッフを招待
@@ -211,6 +268,7 @@ const StaffMasterView: React.FC = () => {
             onInviteStaff={handleOpenInvite}
             onRefresh={fetchStaffList}
             onExport={handleExport}
+            onQuickAction={handleQuickAction}
           />
         </div>
       </div>
@@ -223,6 +281,7 @@ const StaffMasterView: React.FC = () => {
         onEdit={handleEditStaff}
         onDelete={handleDeleteStaff}
         onEditLeave={handleOpenLeave}
+        onRefresh={fetchStaffList}
       />
 
       {/* 編集フォーム */}
@@ -231,6 +290,7 @@ const StaffMasterView: React.FC = () => {
         isOpen={showEditForm}
         onClose={handleCloseEdit}
         onSave={handleSaveStaff}
+        onProxyCreate={handleProxyCreate}
         loading={loading}
       />
 
@@ -239,6 +299,8 @@ const StaffMasterView: React.FC = () => {
         isOpen={showInviteModal}
         onClose={handleCloseInvite}
         onInvite={handleInviteStaff}
+        onBulkImport={bulkImportStaff}
+        facilityName={facility?.name}
         loading={loading}
       />
 

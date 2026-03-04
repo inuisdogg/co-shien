@@ -20,6 +20,7 @@ import {
   CheckCheck,
 } from 'lucide-react';
 import { Staff } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 interface StaffConfirmation {
   staff: Staff;
@@ -55,6 +56,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
   onSendReminderAll,
   loading = false,
 }) => {
+  const { toast } = useToast();
   // 統計計算
   const stats = {
     total: confirmations.length,
@@ -89,7 +91,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
       case 'draft':
         return { label: '下書き', color: 'bg-gray-100 text-gray-600' };
       case 'published':
-        return { label: '公開中', color: 'bg-[#00c4cc]/10 text-[#00c4cc]' };
+        return { label: '公開中', color: 'bg-primary/10 text-primary' };
       case 'confirmed':
         return { label: '確定済', color: 'bg-green-100 text-green-700' };
       default:
@@ -105,8 +107,8 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
       <div className="px-5 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
-              <CheckCircle size={20} className="text-[#00c4cc]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <CheckCircle size={20} className="text-primary" />
             </div>
             <div>
               <h3 className="font-bold text-gray-800">シフト確認状況</h3>
@@ -150,7 +152,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
           </div>
           <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-[#00c4cc] to-green-500 transition-all duration-500 rounded-full"
+              className="h-full bg-gradient-to-r from-primary to-green-500 transition-all duration-500 rounded-full"
               style={{ width: `${confirmationRate}%` }}
             />
           </div>
@@ -163,7 +165,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
           <button
             onClick={onPublish}
             disabled={loading}
-            className="flex items-center gap-2 min-h-10 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 disabled:opacity-50 font-medium"
+            className="flex items-center gap-2 min-h-10 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all duration-200 disabled:opacity-50 font-medium"
           >
             {loading ? (
               <RefreshCw size={16} className="animate-spin" />
@@ -192,7 +194,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
               // 未確認のスタッフに対してリマインダーを一括送信
               const pendingStaff = confirmations.filter(c => c.status !== 'confirmed');
               pendingStaff.forEach(c => onSendReminder(c.staff.id));
-              alert(`${pendingStaff.length}名のスタッフに確認リマインダーを送信しました`);
+              toast.success(`${pendingStaff.length}名のスタッフに確認リマインダーを送信しました`);
             }}
             disabled={loading}
             className="flex items-center gap-2 min-h-10 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 disabled:opacity-50 font-medium"
@@ -231,7 +233,7 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
                   <div className="flex items-center gap-3">
                     {/* 確認インジケータ */}
                     <div className="relative">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center">
                         <span className="text-white text-xs font-bold">
                           {confirmation.staff.name?.charAt(0) || '?'}
                         </span>

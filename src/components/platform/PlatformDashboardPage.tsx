@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import {
   LayoutDashboard, Building2, Briefcase, BarChart3, Lightbulb,
   ChevronLeft, ChevronRight, Search, Filter, Plus, Edit3, Trash2,
@@ -176,6 +177,7 @@ type FacilityDetailTabKey = typeof FACILITY_DETAIL_TABS[number]['key'];
 // ============================================================
 export default function PlatformDashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [hasPermission, setHasPermission] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -727,17 +729,6 @@ export default function PlatformDashboardPage() {
   };
 
   // ── Company Form Handlers ──
-  const openAddCompany = () => {
-    setEditingCompany(null);
-    setCompanyForm({
-      name: '', companyType: 'corporation', franchiseBrand: '',
-      contactPersonName: '', contactPersonEmail: '',
-      contractStartDate: '', contractEndDate: '',
-      tier: 'standard', monthlyFee: 0, status: 'active', notes: '',
-    });
-    setCompanyModalOpen(true);
-  };
-
   const openEditCompany = (c: CompanyRow) => {
     setEditingCompany(c);
     setCompanyForm({
@@ -767,24 +758,18 @@ export default function PlatformDashboardPage() {
         contract_amount: companyForm.monthlyFee || null,
       };
 
-      if (editingCompany) {
-        const { error } = await supabase
-          .from('companies')
-          .update(payload)
-          .eq('id', editingCompany.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('companies')
-          .insert(payload);
-        if (error) throw error;
-      }
+      if (!editingCompany) return;
+      const { error } = await supabase
+        .from('companies')
+        .update(payload)
+        .eq('id', editingCompany.id);
+      if (error) throw error;
 
       setCompanyModalOpen(false);
       loadCompaniesData();
     } catch (err) {
       console.error('法人保存エラー:', err);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     }
   };
 
@@ -796,7 +781,7 @@ export default function PlatformDashboardPage() {
       loadCompaniesData();
     } catch (err) {
       console.error('法人削除エラー:', err);
-      alert('削除に失敗しました');
+      toast.error('削除に失敗しました');
     }
   };
 
@@ -1511,16 +1496,31 @@ export default function PlatformDashboardPage() {
 
     return (
       <div className="space-y-4">
-        {/* Header with Add button */}
+        {/* Onboarding guidance banner */}
+        <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+              <ExternalLink className="w-4 h-4 text-cyan-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-cyan-800 mb-1">新しい法人を登録するには</h3>
+              <p className="text-xs text-cyan-700 leading-relaxed">
+                「招待リンク」を発行して法人担当者に送付してください。担当者が登録ウィザードを完了すると、法人・施設が自動で作成されます。
+              </p>
+              <button
+                onClick={() => router.push('/admin')}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-medium transition-colors"
+              >
+                招待リンクを管理
+                <ArrowUpRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Header */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">{companies.length}件の法人</p>
-          <button
-            onClick={openAddCompany}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            法人を追加
-          </button>
         </div>
 
         {/* Company Table */}
@@ -1541,8 +1541,9 @@ export default function PlatformDashboardPage() {
               <tbody>
                 {companies.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-gray-400 text-sm">
-                      法人が登録されていません
+                    <td colSpan={7} className="px-4 py-12 text-center">
+                      <p className="text-gray-400 text-sm mb-2">法人が登録されていません</p>
+                      <p className="text-gray-400 text-xs">招待リンクから施設登録が完了すると、法人が自動的に追加されます</p>
                     </td>
                   </tr>
                 ) : (
@@ -1656,7 +1657,7 @@ export default function PlatformDashboardPage() {
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl z-10">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-800">
-                {editingCompany ? '法人を編集' : '法人を追加'}
+                法人情報を編集
               </h2>
               <button
                 onClick={() => setCompanyModalOpen(false)}
@@ -1821,7 +1822,7 @@ export default function PlatformDashboardPage() {
                 disabled={!companyForm.name.trim()}
                 className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editingCompany ? '更新' : '追加'}
+                更新
               </button>
             </div>
           </div>

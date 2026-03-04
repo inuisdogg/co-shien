@@ -455,7 +455,7 @@ export default function PaidLeaveManagementPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -471,7 +471,7 @@ export default function PaidLeaveManagementPanel() {
           >
             <ChevronLeft className="w-5 h-5 text-gray-500" />
           </button>
-          <FileText className="w-6 h-6 text-[#00c4cc]" />
+          <FileText className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">
             有給管理簿 - {ledgerStaff.name}
           </h1>
@@ -549,7 +549,7 @@ export default function PaidLeaveManagementPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Calendar className="w-6 h-6 text-[#00c4cc]" />
+          <Calendar className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">有給休暇管理</h1>
           <span className="text-sm text-gray-400">{fiscalYear}年度</span>
         </div>
@@ -573,7 +573,7 @@ export default function PaidLeaveManagementPanel() {
               setSelectedStaffIds([]);
               setShowGrantModal(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
             有給付与
@@ -671,7 +671,7 @@ export default function PaidLeaveManagementPanel() {
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => setLedgerStaff(staff)}
-                          className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+                          className="text-xs text-primary hover:text-primary-dark font-medium"
                         >
                           管理簿
                         </button>
@@ -717,7 +717,7 @@ export default function PaidLeaveManagementPanel() {
                   <label
                     key={staff.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      isSelected ? 'border-[#00c4cc] bg-[#00c4cc]/5' : 'border-gray-200 hover:bg-gray-50'
+                      isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
                     <input
@@ -730,7 +730,7 @@ export default function PaidLeaveManagementPanel() {
                             : [...prev, staff.id]
                         );
                       }}
-                      className="rounded border-gray-300 text-[#00c4cc] focus:ring-[#00c4cc]"
+                      className="rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800">{staff.name}</p>
@@ -766,7 +766,7 @@ export default function PaidLeaveManagementPanel() {
               <button
                 onClick={grantLeave}
                 disabled={granting || selectedStaffIds.length === 0}
-                className="flex-1 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" />
                 {granting ? '付与中...' : `${selectedStaffIds.length}名に付与`}

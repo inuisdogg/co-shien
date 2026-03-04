@@ -7,6 +7,7 @@
  */
 
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   FileText,
@@ -21,6 +22,7 @@ import {
   Briefcase,
   Lock,
 } from 'lucide-react';
+import ToolsAuthCTA from './ToolsAuthCTA';
 
 /* ------------------------------------------------------------------ */
 /*  SEO Metadata                                                       */
@@ -147,26 +149,21 @@ export default function ToolsPage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-lg transition-transform group-hover:scale-105">
-              R
-            </div>
-            <span className="text-xl font-bold text-gray-900">
-              Roots
-            </span>
+            <Image src="/logo.svg" alt="Roots" width={80} height={22} className="h-5 w-auto transition-transform group-hover:scale-105" />
           </Link>
 
           {/* Nav actions */}
           <div className="flex items-center gap-3">
             <Link
               href="/tools"
-              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-personal transition-colors"
             >
               <Wrench className="h-4 w-4" />
               ツール一覧
             </Link>
             <Link
               href="/career"
-              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-personal px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-personal-dark hover:shadow-md active:scale-[0.98]"
             >
               Rootsに登録
               <ArrowRight className="h-4 w-4" />
@@ -188,7 +185,7 @@ export default function ToolsPage() {
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-20 sm:px-6 sm:pb-24 sm:pt-28 lg:px-8">
           <div className="text-center">
             {/* Pill badge */}
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-sm font-medium text-indigo-700">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-sm font-medium text-personal-dark">
               <Wrench className="h-4 w-4" />
               すべて無料・登録不要
             </div>
@@ -196,7 +193,7 @@ export default function ToolsPage() {
             {/* Main heading */}
             <h1 className="mx-auto max-w-3xl text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
               <span className="block">保育・福祉の専門職のための</span>
-              <span className="mt-2 block bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="mt-2 block bg-gradient-to-r from-personal to-personal-dark bg-clip-text text-transparent">
                 無料キャリアツール
               </span>
             </h1>
@@ -211,7 +208,7 @@ export default function ToolsPage() {
             {/* Stats */}
             <div className="mx-auto mt-10 flex max-w-md items-center justify-center gap-8 sm:gap-12">
               <div className="text-center">
-                <div className="text-3xl font-extrabold text-indigo-600 sm:text-4xl">
+                <div className="text-3xl font-extrabold text-personal sm:text-4xl">
                   {tools.length}
                 </div>
                 <div className="mt-1 text-sm font-medium text-gray-500">
@@ -220,7 +217,7 @@ export default function ToolsPage() {
               </div>
               <div className="h-10 w-px bg-gray-200" />
               <div className="text-center">
-                <div className="text-3xl font-extrabold text-indigo-600 sm:text-4xl">
+                <div className="text-3xl font-extrabold text-personal sm:text-4xl">
                   0円
                 </div>
                 <div className="mt-1 text-sm font-medium text-gray-500">
@@ -229,7 +226,7 @@ export default function ToolsPage() {
               </div>
               <div className="h-10 w-px bg-gray-200" />
               <div className="text-center">
-                <div className="text-3xl font-extrabold text-indigo-600 sm:text-4xl">
+                <div className="text-3xl font-extrabold text-personal sm:text-4xl">
                   30秒
                 </div>
                 <div className="mt-1 text-sm font-medium text-gray-500">
@@ -273,7 +270,7 @@ export default function ToolsPage() {
                       tool.badge === 'NEW'
                         ? 'bg-green-100 text-green-700'
                         : tool.badge === 'Premium'
-                          ? 'bg-indigo-100 text-indigo-700'
+                          ? 'bg-indigo-100 text-personal-dark'
                           : 'bg-amber-100 text-amber-700'
                     }`}
                   >
@@ -285,14 +282,14 @@ export default function ToolsPage() {
                 {/* Icon */}
                 <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-xl transition-colors ${
                   tool.premium
-                    ? 'bg-indigo-100 text-indigo-700 group-hover:bg-indigo-200'
-                    : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100'
+                    ? 'bg-indigo-100 text-personal-dark group-hover:bg-indigo-200'
+                    : 'bg-indigo-50 text-personal group-hover:bg-indigo-100'
                 }`}>
                   {tool.icon}
                 </div>
 
                 {/* Content */}
-                <h3 className="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                <h3 className="text-lg font-bold text-gray-900 group-hover:text-personal transition-colors">
                   {tool.title}
                 </h3>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-gray-600">
@@ -301,13 +298,13 @@ export default function ToolsPage() {
 
                 {/* Premium note */}
                 {tool.premium && (
-                  <p className="mt-2 text-xs text-indigo-500 font-medium">
+                  <p className="mt-2 text-xs text-personal font-medium">
                     Rootsキャリアアカウント登録で利用可能
                   </p>
                 )}
 
                 {/* Action hint */}
-                <div className="mt-5 flex items-center gap-1 text-sm font-semibold text-indigo-600 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="mt-5 flex items-center gap-1 text-sm font-semibold text-personal opacity-0 transition-opacity group-hover:opacity-100">
                   {tool.premium ? 'くわしく見る' : 'ツールを使う'}
                   <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </div>
@@ -334,7 +331,7 @@ export default function ToolsPage() {
           <div className="grid gap-8 sm:grid-cols-3">
             {features.map((feature) => (
               <div key={feature.title} className="text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-personal to-personal-dark text-white shadow-md">
                   {feature.icon}
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">
@@ -350,46 +347,9 @@ export default function ToolsPage() {
       </section>
 
       {/* ============================================================ */}
-      {/*  CTA Section                                                 */}
+      {/*  CTA Section (auth-aware)                                    */}
       {/* ============================================================ */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-20 sm:py-28">
-        {/* Decorative circles */}
-        <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full bg-white/5" />
-        <div className="absolute -bottom-16 -right-16 h-56 w-56 rounded-full bg-white/5" />
-
-        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-            ツールだけじゃない。
-            <br />
-            あなたのキャリアを丸ごとサポート。
-          </h2>
-          <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-indigo-100">
-            Rootsは保育・福祉専門職のためのキャリアプラットフォーム。
-            経歴管理・スキルの可視化・求人マッチングまで、
-            あなたのキャリアを一元管理できます。
-          </p>
-
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link
-              href="/career"
-              className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-indigo-700 shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
-            >
-              無料でRootsに登録
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-            <Link
-              href="/tools"
-              className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 px-8 py-3.5 text-base font-semibold text-white transition-all hover:border-white/60 hover:bg-white/10"
-            >
-              ツール一覧に戻る
-            </Link>
-          </div>
-
-          <p className="mt-6 text-sm text-indigo-200">
-            無料プランあり・クレジットカード不要
-          </p>
-        </div>
-      </section>
+      <ToolsAuthCTA />
 
       {/* ============================================================ */}
       {/*  Footer                                                      */}
@@ -399,29 +359,24 @@ export default function ToolsPage() {
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-sm">
-                R
-              </div>
-              <span className="text-lg font-bold text-gray-900">
-                Roots
-              </span>
+              <Image src="/logo.svg" alt="Roots" width={80} height={22} className="h-5 w-auto" />
             </Link>
 
             {/* Links */}
             <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-              <Link href="/tools" className="hover:text-indigo-600 transition-colors">
+              <Link href="/tools" className="hover:text-personal transition-colors">
                 ツール一覧
               </Link>
-              <Link href="/career" className="hover:text-indigo-600 transition-colors">
+              <Link href="/career" className="hover:text-personal transition-colors">
                 キャリアプラットフォーム
               </Link>
-              <Link href="/terms" className="hover:text-indigo-600 transition-colors">
+              <Link href="/terms" className="hover:text-personal transition-colors">
                 利用規約
               </Link>
-              <Link href="/privacy" className="hover:text-indigo-600 transition-colors">
+              <Link href="/privacy" className="hover:text-personal transition-colors">
                 プライバシーポリシー
               </Link>
-              <Link href="/recruitment-disclosure" className="hover:text-indigo-600 transition-colors">
+              <Link href="/recruitment-disclosure" className="hover:text-personal transition-colors">
                 職業紹介事業の情報開示
               </Link>
             </nav>

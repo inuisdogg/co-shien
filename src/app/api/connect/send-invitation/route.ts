@@ -8,6 +8,11 @@ import { escapeHtml } from '@/utils/escapeHtml';
 
 export async function POST(request: NextRequest) {
   try {
+    // 認証チェック
+    const { authenticateRequest, unauthorizedResponse } = await import('@/lib/apiAuth');
+    const auth = await authenticateRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body = await request.json();
     const { participantEmail, participantName, organizationName, meetingTitle, facilityName, dateOptions, respondUrl } = body;
 

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CashflowEntry, PLStatement } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 import { useCashflowManagement, CashflowStatement } from '@/hooks/useCashflowManagement';
 
 // ============================================================
@@ -169,6 +170,7 @@ type DashboardTab = 'overview' | 'pl' | 'cashflow';
 // ============================================================
 export default function CashflowWizardView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
   const {
     entries,
@@ -348,7 +350,7 @@ export default function CashflowWizardView() {
     if (copied.length > 0) {
       setLocalEntries(copied);
     } else {
-      alert('前月のデータが見つかりませんでした。');
+      toast.warning('前月のデータが見つかりませんでした。');
     }
   }, [facilityId, yearMonth, copyFromPreviousMonth]);
 
@@ -407,7 +409,7 @@ export default function CashflowWizardView() {
   if (loading && localEntries.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-t-transparent border-teal-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-t-transparent border-primary rounded-full animate-spin" />
         <span className="ml-3 text-gray-500">読み込み中...</span>
       </div>
     );
@@ -451,7 +453,7 @@ export default function CashflowWizardView() {
             {/* Progress line */}
             <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 z-0" />
             <div
-              className="absolute top-4 left-0 h-0.5 bg-teal-500 z-0 transition-all duration-500"
+              className="absolute top-4 left-0 h-0.5 bg-primary z-0 transition-all duration-500"
               style={{ width: `${(currentStep / (WIZARD_STEPS.length - 1)) * 100}%` }}
             />
 
@@ -468,9 +470,9 @@ export default function CashflowWizardView() {
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
                       isCompleted
-                        ? 'bg-teal-500 text-white'
+                        ? 'bg-primary text-white'
                         : isCurrent
-                        ? 'bg-white border-2 border-teal-500 text-teal-500 shadow-md animate-pulse'
+                        ? 'bg-white border-2 border-primary text-teal-500 shadow-md animate-pulse'
                         : 'bg-white border-2 border-gray-200 text-gray-400'
                     }`}
                   >
@@ -529,7 +531,7 @@ export default function CashflowWizardView() {
                           type="text"
                           value={entry.itemName}
                           onChange={e => updateItemName(entry.id, e.target.value)}
-                          className="font-semibold text-gray-800 text-sm bg-transparent border-b border-dashed border-gray-300 focus:border-teal-500 outline-none w-full pb-0.5"
+                          className="font-semibold text-gray-800 text-sm bg-transparent border-b border-dashed border-gray-300 focus:border-primary outline-none w-full pb-0.5"
                           placeholder="項目名を入力"
                         />
                       )}
@@ -548,7 +550,7 @@ export default function CashflowWizardView() {
                           type="number"
                           value={entry.amount || ''}
                           onChange={e => updateLocalAmount(entry.id, parseInt(e.target.value, 10) || 0)}
-                          className="w-44 pl-8 pr-3 py-2.5 text-right text-lg font-semibold text-gray-800 bg-gray-50 rounded-lg border border-gray-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none transition-colors"
+                          className="w-44 pl-8 pr-3 py-2.5 text-right text-lg font-semibold text-gray-800 bg-gray-50 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-colors"
                           placeholder="0"
                           min="0"
                         />
@@ -578,7 +580,7 @@ export default function CashflowWizardView() {
                       <textarea
                         value={entry.notes || ''}
                         onChange={e => updateLocalNotes(entry.id, e.target.value)}
-                        className="mt-1.5 w-full text-xs text-gray-600 bg-gray-50 rounded-lg border border-gray-200 p-2 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none resize-none"
+                        className="mt-1.5 w-full text-xs text-gray-600 bg-gray-50 rounded-lg border border-gray-200 p-2 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none resize-none"
                         rows={2}
                         placeholder="メモを入力..."
                       />
@@ -625,7 +627,7 @@ export default function CashflowWizardView() {
               </button>
               <button
                 onClick={() => goToStep(currentStep + 1)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-teal-500 text-white hover:bg-teal-600 transition-colors shadow-sm"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-colors shadow-sm"
               >
                 {currentStep === WIZARD_STEPS.length - 2 ? '完了' : '次へ'}
                 <ChevronRight size={16} />
@@ -634,7 +636,7 @@ export default function CashflowWizardView() {
 
             {/* Saving indicator */}
             {saving && (
-              <div className="fixed bottom-4 right-4 bg-teal-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 z-50">
+              <div className="fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 z-50">
                 <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin" />
                 保存中...
               </div>
@@ -711,7 +713,7 @@ export default function CashflowWizardView() {
                   saveCurrentStepData();
                   setMode('dashboard');
                 }}
-                className="px-6 py-2.5 rounded-lg text-sm font-medium bg-teal-500 text-white hover:bg-teal-600 transition-colors shadow-sm"
+                className="px-6 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-colors shadow-sm"
               >
                 帳票を確認
               </button>
@@ -1167,7 +1169,7 @@ export default function CashflowWizardView() {
                         value={openingBalanceInput}
                         onChange={e => setOpeningBalanceInput(e.target.value)}
                         onBlur={handleSaveBalance}
-                        className="w-36 text-right font-mono font-semibold text-gray-700 bg-gray-50 rounded-lg border border-gray-200 px-3 py-1.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none"
+                        className="w-36 text-right font-mono font-semibold text-gray-700 bg-gray-50 rounded-lg border border-gray-200 px-3 py-1.5 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
                       />
                     </div>
                     <span className="hidden print:inline font-mono font-semibold text-gray-700">
@@ -1292,7 +1294,7 @@ export default function CashflowWizardView() {
 
       {/* Saving indicator */}
       {saving && (
-        <div className="fixed bottom-4 right-4 bg-teal-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 z-50 print:hidden">
+        <div className="fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 z-50 print:hidden">
           <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin" />
           保存中...
         </div>

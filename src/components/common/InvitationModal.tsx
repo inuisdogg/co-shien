@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Mail, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { Child } from '@/types';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 
@@ -25,6 +26,7 @@ export default function InvitationModal({
   childList,
   onInvitationSent,
 }: InvitationModalProps) {
+  const { toast } = useToast();
   const [selectedChildId, setSelectedChildId] = useState('');
   const [sending, setSending] = useState(false);
   const [useCustomEmail, setUseCustomEmail] = useState(false);
@@ -119,10 +121,10 @@ export default function InvitationModal({
       }
 
       handleClose();
-      alert('招待を再送しました');
+      toast.success('招待を再送しました');
     } catch (error: any) {
       console.error('招待再送エラー:', error);
-      alert('招待の再送に失敗しました: ' + error.message);
+      toast.error('招待の再送に失敗しました: ' + error.message);
     } finally {
       setSending(false);
     }
@@ -130,11 +132,11 @@ export default function InvitationModal({
 
   const handleSendInvitation = async () => {
     if (!selectedChildId) {
-      alert('招待する児童を選択してください');
+      toast.warning('招待する児童を選択してください');
       return;
     }
     if (!effectiveEmail) {
-      alert('メールアドレスを入力してください。児童のメールアドレスがない場合は、手動で入力してください。');
+      toast.warning('メールアドレスを入力してください。児童のメールアドレスがない場合は、手動で入力してください。');
       return;
     }
 
@@ -187,10 +189,10 @@ export default function InvitationModal({
 
       onInvitationSent(data);
       handleClose();
-      alert('招待を送信しました');
+      toast.success('招待を送信しました');
     } catch (error: any) {
       console.error('招待作成エラー:', error);
-      alert('招待の作成に失敗しました: ' + error.message);
+      toast.error('招待の作成に失敗しました: ' + error.message);
     } finally {
       setSending(false);
     }
@@ -199,12 +201,12 @@ export default function InvitationModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="invitation-modal-title">
       <div className="bg-white rounded-lg w-full max-w-md shadow-2xl border border-gray-100">
         {/* ヘッダー */}
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-lg text-gray-800">利用者招待</h3>
+            <h3 id="invitation-modal-title" className="font-bold text-lg text-gray-800">利用者招待</h3>
             <button
               onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -242,7 +244,7 @@ export default function InvitationModal({
                   招待する児童 <span className="text-red-500">*</span>
                 </label>
                 <select
-                  className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   value={selectedChildId}
                   onChange={(e) => {
                     setSelectedChildId(e.target.value);
@@ -334,7 +336,7 @@ export default function InvitationModal({
                         value={customEmail}
                         onChange={(e) => setCustomEmail(e.target.value)}
                         placeholder="保護者のメールアドレスを入力"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                        className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                       {childEmail && (
                         <button
@@ -386,7 +388,7 @@ export default function InvitationModal({
             <button
               onClick={handleSendInvitation}
               disabled={sending || !selectedChildId || !effectiveEmail}
-              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-bold shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-bold shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {sending ? (
                 <>

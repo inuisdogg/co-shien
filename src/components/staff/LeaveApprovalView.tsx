@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { LeaveRequestType, LEAVE_REQUEST_TYPE_LABELS } from '@/types';
 
 // --- 型定義 ---
@@ -77,6 +78,7 @@ const formatDateRange = (start: string, end: string): string => {
 
 export default function LeaveApprovalView() {
   const { user: authUser, facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   // データ
@@ -224,14 +226,14 @@ export default function LeaveApprovalView() {
 
       if (error) {
         console.error('承認エラー:', error);
-        alert('承認に失敗しました');
+        toast.error('承認に失敗しました');
         return;
       }
 
       await fetchRequests();
     } catch (error) {
       console.error('承認エラー:', error);
-      alert('承認に失敗しました');
+      toast.error('承認に失敗しました');
     } finally {
       setProcessing(null);
     }
@@ -257,7 +259,7 @@ export default function LeaveApprovalView() {
 
       if (error) {
         console.error('却下エラー:', error);
-        alert('却下に失敗しました');
+        toast.error('却下に失敗しました');
         return;
       }
 
@@ -266,7 +268,7 @@ export default function LeaveApprovalView() {
       await fetchRequests();
     } catch (error) {
       console.error('却下エラー:', error);
-      alert('却下に失敗しました');
+      toast.error('却下に失敗しました');
     } finally {
       setProcessing(null);
     }
@@ -277,7 +279,7 @@ export default function LeaveApprovalView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -286,7 +288,7 @@ export default function LeaveApprovalView() {
     <div className="space-y-6">
       {/* ヘッダー */}
       <div className="flex items-center gap-3">
-        <Calendar className="w-6 h-6 text-[#00c4cc]" />
+        <Calendar className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-bold text-gray-800">休暇申請管理</h1>
       </div>
 
@@ -320,7 +322,7 @@ export default function LeaveApprovalView() {
               placeholder="スタッフ名・申請種別・理由で検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full min-h-10 pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] transition-all duration-200"
+              className="w-full min-h-10 pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
             />
           </div>
         </div>
@@ -339,7 +341,7 @@ export default function LeaveApprovalView() {
               onClick={() => setStatusFilter(item.key)}
               className={`min-h-10 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
                 statusFilter === item.key
-                  ? 'bg-[#00c4cc] text-white shadow-sm'
+                  ? 'bg-primary text-white shadow-sm'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -508,7 +510,7 @@ export default function LeaveApprovalView() {
                         <button
                           onClick={() => handleApprove(request.id)}
                           disabled={isProcessing}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors text-sm font-medium disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium disabled:opacity-50"
                         >
                           {isProcessing ? (
                             <Loader2 size={16} className="animate-spin" />

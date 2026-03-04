@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useParams, useRouter } from 'next/navigation';
 import { BUSINESS_TYPES } from '@/types';
 import CertificatePdfGenerator from '@/components/personal/CertificatePdfGenerator';
+import { useToast } from '@/components/ui/Toast';
 
 // Supabaseクライアント（公開APIキー使用）
 const supabase = createClient(
@@ -103,6 +104,7 @@ const generateStampImage = (text: string): string => {
 };
 
 export default function SignaturePage() {
+  const { toast } = useToast();
   const params = useParams();
   const router = useRouter();
   const token = params.token as string;
@@ -207,7 +209,7 @@ export default function SignaturePage() {
   // 署名を送信
   const handleSubmit = async () => {
     if (!record || !signerName || !stampText) {
-      alert('署名者名と印影テキストを入力してください。');
+      toast.warning('署名者名と印影テキストを入力してください。');
       return;
     }
 
@@ -235,7 +237,7 @@ export default function SignaturePage() {
 
       setCompleted(true);
     } catch (err: any) {
-      alert(err.message || '処理に失敗しました');
+      toast.error(err.message || '処理に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -244,7 +246,7 @@ export default function SignaturePage() {
   // 拒否処理
   const handleReject = async () => {
     if (!record || !rejectReason.trim()) {
-      alert('拒否理由を入力してください。');
+      toast.warning('拒否理由を入力してください。');
       return;
     }
 
@@ -267,7 +269,7 @@ export default function SignaturePage() {
       setError('証明書発行依頼を却下しました。');
       setShowRejectDialog(false);
     } catch (err: any) {
-      alert(err.message || '処理に失敗しました');
+      toast.error(err.message || '処理に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -294,7 +296,7 @@ export default function SignaturePage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -362,7 +364,7 @@ export default function SignaturePage() {
           {pdfData && (
             <button
               onClick={() => setShowPdfPreview(true)}
-              className="w-full bg-[#00c4cc] text-white py-3 px-6 rounded-lg font-medium hover:bg-[#00b0b8] transition-colors flex items-center justify-center gap-2 mb-4"
+              className="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-primary-dark transition-colors flex items-center justify-center gap-2 mb-4"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -390,7 +392,7 @@ export default function SignaturePage() {
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-3xl mx-auto">
         {/* ヘッダー */}
-        <div className="bg-gradient-to-r from-[#00c4cc] to-[#00b0b8] rounded-t-lg p-6 text-white">
+        <div className="bg-gradient-to-r from-primary to-primary-dark rounded-t-lg p-6 text-white">
           <h1 className="text-2xl font-bold text-center">実務経験証明書 電子署名</h1>
           <p className="text-center text-white/80 mt-2">
             下記内容をご確認の上、署名をお願いいたします
@@ -404,7 +406,7 @@ export default function SignaturePage() {
           {/* 申請者情報 */}
           <div className="mb-6">
             <h3 className="font-bold text-gray-700 mb-3 flex items-center">
-              <span className="w-1 h-5 bg-[#00c4cc] mr-2"></span>
+              <span className="w-1 h-5 bg-primary mr-2"></span>
               申請者情報
             </h3>
             <div className="bg-gray-50 rounded-lg p-4">
@@ -430,7 +432,7 @@ export default function SignaturePage() {
           {/* 勤務先情報 */}
           <div className="mb-6">
             <h3 className="font-bold text-gray-700 mb-3 flex items-center">
-              <span className="w-1 h-5 bg-[#00c4cc] mr-2"></span>
+              <span className="w-1 h-5 bg-primary mr-2"></span>
               勤務先情報
             </h3>
             <div className="bg-gray-50 rounded-lg p-4">
@@ -463,7 +465,7 @@ export default function SignaturePage() {
           {/* 勤務期間 */}
           <div className="mb-6">
             <h3 className="font-bold text-gray-700 mb-3 flex items-center">
-              <span className="w-1 h-5 bg-[#00c4cc] mr-2"></span>
+              <span className="w-1 h-5 bg-primary mr-2"></span>
               勤務期間・業務内容
             </h3>
             <div className="bg-gray-50 rounded-lg p-4">
@@ -511,7 +513,7 @@ export default function SignaturePage() {
           {/* 電子署名セクション */}
           <div className="mt-8 border-t pt-6">
             <h3 className="font-bold text-gray-700 mb-4 flex items-center">
-              <span className="w-1 h-5 bg-[#00c4cc] mr-2"></span>
+              <span className="w-1 h-5 bg-primary mr-2"></span>
               電子署名
             </h3>
 
@@ -525,7 +527,7 @@ export default function SignaturePage() {
                   value={signerName}
                   onChange={(e) => setSignerName(e.target.value)}
                   placeholder="山田 太郎"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div>
@@ -537,7 +539,7 @@ export default function SignaturePage() {
                   value={signerTitle}
                   onChange={(e) => setSignerTitle(e.target.value)}
                   placeholder="施設長"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
             </div>
@@ -552,7 +554,7 @@ export default function SignaturePage() {
                 value={stampText}
                 onChange={(e) => setStampText(e.target.value)}
                 placeholder="例：社会福祉法人○○福祉会"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">
                 入力した文字から自動的に角印が生成されます
@@ -589,7 +591,7 @@ export default function SignaturePage() {
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !signerName || !stampText}
-                className="flex-1 bg-[#00c4cc] text-white py-3 px-6 rounded-lg font-medium hover:bg-[#00b0b8] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-primary-dark disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 {submitting ? '処理中...' : '署名して承認する'}
               </button>

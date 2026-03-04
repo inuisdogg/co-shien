@@ -6,8 +6,10 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User, Facility, UserPermissions, UserRole, UserType, AccountStatus } from '@/types';
+import { useToast } from '@/components/ui/Toast';
+import { supabase } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -20,6 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (facilityCode: string, loginId: string, password: string) => Promise<void>;
   logout: () => void;
+  switchFacility: (facilityId: string) => Promise<void>;
   hasPermission: (permission: keyof UserPermissions) => boolean;
 }
 
@@ -67,6 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [facility, setFacility] = useState<Facility | null>(null);
   const [facilityRole, setFacilityRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   // セッション復元
   useEffect(() => {
@@ -114,6 +118,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const storedUser = localStorage.getItem('user');
         const storedFacility = localStorage.getItem('facility');
         const storedSelectedFacility = localStorage.getItem('selectedFacility');
+
+        // セッション有効期限チェック
+        const sessionExpires = localStorage.getItem('session_expires');
+        if (sessionExpires && Date.now() > parseInt(sessionExpires, 10)) {
+          // セッション期限切れ: クリアして復元しない
+          localStorage.removeItem('user');
+          localStorage.removeItem('facility');
+          localStorage.removeItem('selectedFacility');
+          localStorage.removeItem('sessionStartedAt');
+          localStorage.removeItem('session_expires');
+          setLoading(false);
+          return;
+        }
 
         if (storedUser) {
           const userData = JSON.parse(storedUser);
@@ -171,6 +188,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const mappedUser = mapDbUserToUser(data.user);
     setUser(mappedUser);
     localStorage.setItem('user', JSON.stringify(mappedUser));
+    localStorage.setItem('sessionStartedAt', Date.now().toString());
+    localStorage.setItem('session_expires', (Date.now() + 8 * 60 * 60 * 1000).toString());
 
     if (data.facility) {
       const mappedFacility = mapDbFacilityToFacility(data.facility);
@@ -188,12 +207,121 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setFacility(null);
     localStorage.removeItem('user');
     localStorage.removeItem('facility');
-  };
+    localStorage.removeItem('sessionStartedAt');
+    localStorage.removeItem('session_expires');
+  }, []);
+
+  const switchFacility = useCallback(async (facilityId: string) => {
+    // 施設情報を取得
+    const { data: facilityData, error: facilityError } = await supabase
+      .from('facilities')
+      .select('id, name, code')
+      .eq('id', facilityId)
+      .single();
+
+    if (facilityError || !facilityData) {
+      throw new Error('施設情報の取得に失敗しました');
+    }
+
+    // employment_recordsからロールを取得
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) throw new Error('ユーザー情報がありません');
+    const userData = JSON.parse(storedUser);
+
+    const { data: empData } = await supabase
+      .from('employment_records')
+      .select('role')
+      .eq('user_id', userData.id)
+      .eq('facility_id', facilityId)
+      .is('end_date', null)
+      .single();
+
+    const role = empData?.role || '管理者';
+
+    const newFacility: Facility = {
+      id: facilityData.id,
+      name: facilityData.name,
+      code: facilityData.code,
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    // state更新
+    setFacility(newFacility);
+    setFacilityRole(role);
+
+    // localStorage更新
+    localStorage.setItem('facility', JSON.stringify(newFacility));
+    localStorage.setItem('selectedFacility', JSON.stringify({
+      id: facilityData.id,
+      name: facilityData.name,
+      code: facilityData.code,
+      role,
+    }));
+
+    // ページ遷移（既存のfacilityId query paramフローを再利用）
+    window.location.href = `/business?facilityId=${facilityId}`;
+  }, []);
+
+  // セッションタイムアウト（2時間操作なしでログアウト）
+  useEffect(() => {
+    if (!user) return;
+
+    const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2時間
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        logout();
+        window.location.href = '/';
+      }, SESSION_TIMEOUT);
+    };
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, [user, logout]);
+
+  // セッション有効期限の定期チェック（5分ごと）
+  useEffect(() => {
+    if (!user) return;
+
+    const SESSION_EXPIRY_CHECK_INTERVAL = 5 * 60 * 1000; // 5分
+
+    const checkExpiry = () => {
+      const sessionStartedAt = localStorage.getItem('sessionStartedAt');
+      const sessionExpires = localStorage.getItem('session_expires');
+      const MAX_SESSION_DURATION = 8 * 60 * 60 * 1000; // 8時間
+
+      const isExpiredByStart = sessionStartedAt &&
+        (Date.now() - parseInt(sessionStartedAt, 10)) > MAX_SESSION_DURATION;
+      const isExpiredByExpiry = sessionExpires &&
+        Date.now() > parseInt(sessionExpires, 10);
+
+      if (isExpiredByStart || isExpiredByExpiry) {
+        toast.warning('セッションの有効期限（8時間）が切れました。再度ログインしてください。');
+        logout();
+        window.location.href = '/';
+      }
+    };
+
+    const intervalId = setInterval(checkExpiry, SESSION_EXPIRY_CHECK_INTERVAL);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [user, logout, toast]);
 
   const isAuthenticated = user !== null;
   const isAdmin = user?.role === 'admin' || user?.role === 'owner';
@@ -210,7 +338,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">読み込み中...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-t-transparent border-primary rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">読み込み中...</p>
+        </div>
+      </div>
+    );
   }
 
   const contextValue: AuthContextType = {
@@ -224,6 +359,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading: loading,
     login,
     logout,
+    switchFacility,
     hasPermission,
   };
 

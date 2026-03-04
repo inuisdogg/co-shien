@@ -14,6 +14,7 @@ import {
   QUALIFICATION_CODES,
 } from '@/types';
 import { calculateMatchScore, type MatchScore } from '@/lib/jobMatcher';
+import { parseQualifications } from '@/utils/qualifications';
 
 // ------------------------------------------------------------------ types
 
@@ -491,11 +492,7 @@ export function useJobBrowsing() {
         .single();
       if (userErr) throw userErr;
 
-      const userQualifications: string[] = Array.isArray(userData.qualifications)
-        ? userData.qualifications
-        : typeof userData.qualifications === 'string' && userData.qualifications
-          ? (userData.qualifications as string).split(',').map((q: string) => q.trim())
-          : [];
+      const userQualifications: string[] = parseQualifications(userData.qualifications);
 
       // 2. 経験年数を取得
       const { data: staffData } = await supabase

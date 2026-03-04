@@ -289,7 +289,7 @@ export default function StaffPlanningSimulator() {
           {/* 条件設定 */}
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Info size={18} className="text-[#00c4cc]" />
+              <Info size={18} className="text-primary" />
               シミュレーション条件
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -367,12 +367,12 @@ export default function StaffPlanningSimulator() {
           <div className="bg-white rounded-lg border border-gray-200">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                <Users size={18} className="text-[#00c4cc]" />
+                <Users size={18} className="text-primary" />
                 計画スタッフ ({plannedStaff.length}名)
               </h3>
               <button
                 onClick={addStaff}
-                className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark text-sm"
               >
                 <Plus size={16} />
                 スタッフを追加
@@ -385,7 +385,7 @@ export default function StaffPlanningSimulator() {
                 <p>スタッフを追加してシミュレーションを開始</p>
                 <button
                   onClick={addStaff}
-                  className="mt-4 px-6 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8]"
+                  className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
                 >
                   最初のスタッフを追加
                 </button>
@@ -570,7 +570,7 @@ function StaffCard({
             type="text"
             value={staff.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            className="font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#00c4cc] focus:outline-none px-1"
+            className="font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none px-1"
           />
           <span className={`text-xs px-2 py-0.5 rounded ${
             staff.personnelType === 'standard'
@@ -675,7 +675,7 @@ function StaffCard({
                       }}
                       className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
                         staff.workDays[i]
-                          ? 'bg-[#00c4cc] text-white'
+                          ? 'bg-primary text-white'
                           : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                       }`}
                     >

@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+import { parseQualifications } from '@/utils/qualifications';
 import type { WorkScheduleReport } from '@/types';
 import type { MonthlyFinancial, ExpenseSummary } from '@/types/expense';
 import {
@@ -38,6 +40,10 @@ import type {
   TrainingRecordData,
   CommitteeMeetingData,
 } from '@/lib/wordEngine';
+import {
+  generateMonthlyServiceRecords,
+  exportAllServiceRecordsToExcel,
+} from '@/lib/serviceRecordGenerator';
 
 // ---------- Types ----------
 
@@ -118,7 +124,7 @@ function buildAuditDocumentList(): Omit<AuditDocument, 'status' | 'count'>[] {
     { id: 'svc_02', name: '個別支援計画書', category: 'service', description: '児童ごとの支援計画書', exportType: 'print' },
     { id: 'svc_03', name: 'アセスメントシート', category: 'service', description: '利用開始時のアセスメント記録', exportType: 'print' },
     { id: 'svc_04', name: 'モニタリング記録', category: 'service', description: '支援計画の達成状況モニタリング', exportType: 'print' },
-    { id: 'svc_05', name: '連絡帳', category: 'service', description: '保護者との日々の連絡記録', exportType: 'none' },
+    { id: 'svc_05', name: '連絡帳', category: 'service', description: '保護者との日々の連絡記録', exportType: 'print' },
 
     // Safety (安全管理・事故対応) - 6 docs
     { id: 'saf_01', name: '事故報告書', category: 'safety', description: '事故発生時の報告書', exportType: 'print' },
@@ -158,6 +164,7 @@ function buildAuditDocumentList(): Omit<AuditDocument, 'status' | 'count'>[] {
 
 export default function AuditExportView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
   const facilityName = facility?.name || '';
 
@@ -180,6 +187,12 @@ export default function AuditExportView() {
   const [childDocCount, setChildDocCount] = useState(0);
   const [staffCount, setStaffCount] = useState(0);
   const [expenseCount, setExpenseCount] = useState(0);
+  const [usageRecordCount, setUsageRecordCount] = useState(0);
+  const [supportPlanCount, setSupportPlanCount] = useState(0);
+  const [childrenCount, setChildrenCount] = useState(0);
+  const [contactBookCount, setContactBookCount] = useState(0);
+  const [billingCount, setBillingCount] = useState(0);
+  const [regulationCount, setRegulationCount] = useState(0);
 
   // Fetch document completion data
   useEffect(() => {
@@ -198,6 +211,12 @@ export default function AuditExportView() {
           childDocResult,
           staffResult,
           expResult,
+          usageResult,
+          supportPlanResult,
+          childrenResult,
+          contactBookResult,
+          billingResult,
+          regulationResult,
         ] = await Promise.all([
           supabase
             .from('work_schedule_reports')
@@ -228,13 +247,37 @@ export default function AuditExportView() {
             .select('id', { count: 'exact' })
             .eq('facility_id', facilityId),
           supabase
-            .from('users')
-            .select('id', { count: 'exact' })
-            .eq('facility_id', facilityId)
-            .eq('user_type', 'staff'),
+            .from('staff')
+            .select('id', { count: 'exact', head: true })
+            .eq('facility_id', facilityId),
           supabase
             .from('expenses')
             .select('id', { count: 'exact' })
+            .eq('facility_id', facilityId),
+          supabase
+            .from('usage_records')
+            .select('id', { count: 'exact' })
+            .eq('facility_id', facilityId),
+          supabase
+            .from('support_plan_files')
+            .select('id', { count: 'exact' })
+            .eq('facility_id', facilityId),
+          supabase
+            .from('children')
+            .select('id', { count: 'exact', head: true })
+            .eq('facility_id', facilityId)
+            .eq('status', 'active'),
+          supabase
+            .from('daily_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('facility_id', facilityId),
+          supabase
+            .from('billing_records')
+            .select('id', { count: 'exact', head: true })
+            .eq('facility_id', facilityId),
+          supabase
+            .from('regulations')
+            .select('id', { count: 'exact', head: true })
             .eq('facility_id', facilityId),
         ]);
 
@@ -291,6 +334,12 @@ export default function AuditExportView() {
         setChildDocCount(childDocResult.count ?? 0);
         setStaffCount(staffResult.count ?? 0);
         setExpenseCount(expResult.count ?? 0);
+        setUsageRecordCount(usageResult.count ?? 0);
+        setSupportPlanCount(supportPlanResult.count ?? 0);
+        setChildrenCount(childrenResult.count ?? 0);
+        setContactBookCount(contactBookResult.count ?? 0);
+        setBillingCount(billingResult.count ?? 0);
+        setRegulationCount(regulationResult.count ?? 0);
       } catch (err) {
         console.error('Failed to fetch audit data:', err);
       } finally {
@@ -338,6 +387,10 @@ export default function AuditExportView() {
           count = expenseCount;
           status = count > 0 ? 'complete' : 'missing';
           break;
+        case 'fin_03':
+          count = billingCount;
+          status = billingCount > 0 ? 'complete' : 'missing';
+          break;
         case 'trn_01':
         case 'trn_02':
         case 'trn_03':
@@ -353,20 +406,42 @@ export default function AuditExportView() {
         case 'chi_01':
         case 'chi_02':
         case 'chi_03':
-        case 'chi_04':
         case 'chi_05':
           count = childDocCount;
-          status = count > 0 ? 'partial' : 'missing';
+          status = childDocCount > 0 ? 'partial' : 'missing';
+          break;
+        case 'chi_04':
+          count = childrenCount;
+          status = childrenCount > 0 ? 'complete' : 'missing';
           break;
         case 'svc_01':
+          count = usageRecordCount;
+          status = count > 0 ? 'complete' : 'missing';
+          break;
         case 'svc_02':
+          count = supportPlanCount;
+          status = count > 0 ? 'complete' : 'missing';
+          break;
         case 'svc_03':
         case 'svc_04':
-          count = childDocCount;
-          status = count > 0 ? 'partial' : 'missing';
+          count = supportPlanCount;
+          status = supportPlanCount > 0 ? 'partial' : 'missing';
+          break;
+        case 'svc_05':
+          count = contactBookCount;
+          status = contactBookCount > 0 ? 'complete' : 'missing';
+          break;
+        case 'gov_01':
+        case 'gov_02':
+        case 'gov_03':
+        case 'gov_04':
+        case 'gov_05':
+        case 'gov_06':
+          count = regulationCount;
+          status = regulationCount > 0 ? 'partial' : 'missing';
           break;
         default:
-          // Governance and other docs: mark as partial if facility exists
+          // Other docs: mark as partial if facility exists
           status = facilityId ? 'partial' : 'missing';
           break;
       }
@@ -375,7 +450,7 @@ export default function AuditExportView() {
     });
 
     setDocuments(docs);
-  }, [workSchedules, financials, incidentCount, trainingCount, committeeCount, childDocCount, staffCount, expenseCount, facilityId]);
+  }, [workSchedules, financials, incidentCount, trainingCount, committeeCount, childDocCount, staffCount, expenseCount, usageRecordCount, supportPlanCount, childrenCount, contactBookCount, billingCount, regulationCount, facilityId]);
 
   // Summary stats
   const stats = useMemo(() => {
@@ -589,6 +664,301 @@ export default function AuditExportView() {
             }
             break;
           }
+          case 'svc_01': {
+            // サービス提供記録 — 当月分を一括エクスポート
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const summary = await generateMonthlyServiceRecords(facilityId, year, month);
+            if (summary.records.length > 0) {
+              exportAllServiceRecordsToExcel(summary, year, month);
+            } else {
+              toast.warning('当月のサービス提供記録がありません。利用実績を登録してください。');
+            }
+            break;
+          }
+          case 'svc_02': {
+            // 個別支援計画書 — 印刷用HTML出力
+            const { data: plans } = await supabase
+              .from('support_plan_files')
+              .select('*')
+              .eq('facility_id', facilityId)
+              .eq('status', 'active')
+              .order('created_at', { ascending: false })
+              .limit(10);
+
+            if (plans && plans.length > 0) {
+              const { data: children } = await supabase
+                .from('children')
+                .select('id, name')
+                .eq('facility_id', facilityId);
+              const childMap = new Map((children || []).map((c: { id: string; name: string }) => [c.id, c.name]));
+
+              const planHtmlParts = plans.map((plan: Record<string, unknown>) => {
+                const childName = childMap.get(plan.child_id as string) || '不明';
+                const content = plan.plan_content as Record<string, unknown> | null;
+                return `
+                  <div style="page-break-after: always; padding: 20px; font-family: 'Hiragino Sans', 'Meiryo', sans-serif;">
+                    <h2 style="text-align:center; border-bottom: 2px solid #333; padding-bottom: 8px;">個別支援計画書</h2>
+                    <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+                      <tr><th style="text-align:left; padding:6px; border:1px solid #ccc; width:30%; background:#f5f5f5;">施設名</th><td style="padding:6px; border:1px solid #ccc;">${facilityName}</td></tr>
+                      <tr><th style="text-align:left; padding:6px; border:1px solid #ccc; background:#f5f5f5;">児童名</th><td style="padding:6px; border:1px solid #ccc;">${childName}</td></tr>
+                      <tr><th style="text-align:left; padding:6px; border:1px solid #ccc; background:#f5f5f5;">計画種別</th><td style="padding:6px; border:1px solid #ccc;">${plan.plan_type === 'initial' ? '初回' : plan.plan_type === 'renewal' ? '更新' : '変更'}</td></tr>
+                      <tr><th style="text-align:left; padding:6px; border:1px solid #ccc; background:#f5f5f5;">作成日</th><td style="padding:6px; border:1px solid #ccc;">${plan.created_at ? new Date(plan.created_at as string).toLocaleDateString('ja-JP') : ''}</td></tr>
+                    </table>
+                    ${content ? `<div style="margin-top:16px;"><h3>支援内容</h3><pre style="white-space:pre-wrap; font-size:12px; line-height:1.6;">${JSON.stringify(content, null, 2)}</pre></div>` : ''}
+                  </div>
+                `;
+              });
+
+              const fullHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>個別支援計画書一覧</title><style>@page{margin:15mm;}body{font-family:'Hiragino Sans','Meiryo',sans-serif;font-size:14px;}</style></head><body>${planHtmlParts.join('')}</body></html>`;
+              openPrintWindow(fullHtml);
+            } else {
+              toast.warning('有効な個別支援計画がありません。');
+            }
+            break;
+          }
+          case 'per_02': {
+            const { data: staffData } = await supabase
+              .from('users')
+              .select('id, name, login_id')
+              .eq('facility_id', facilityId)
+              .eq('user_type', 'staff');
+            if (staffData && staffData.length > 0) {
+              const now = new Date();
+              const attendanceData: StaffAttendanceData[] = staffData.map((s: any) => ({
+                staffId: s.id,
+                staffName: s.name || s.login_id || '不明',
+                days: [],
+              }));
+              exportAttendanceToExcel(attendanceData, now.getFullYear(), now.getMonth() + 1, facilityName);
+            }
+            break;
+          }
+          case 'per_03': {
+            const { data: staffData } = await supabase
+              .from('users')
+              .select('id, name, qualifications')
+              .eq('facility_id', facilityId)
+              .eq('user_type', 'staff');
+            if (staffData && staffData.length > 0) {
+              const rows = staffData.flatMap((s: any) => {
+                const quals = parseQualifications(s.qualifications);
+                return quals.length > 0
+                  ? quals.map(q => `${s.name || '不明'},${q}`)
+                  : [`${s.name || '不明'},資格なし`];
+              });
+              const csv = '\uFEFF氏名,保有資格\n' + rows.join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `資格証明書一覧_${facilityName}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }
+            break;
+          }
+          case 'fin_02': {
+            const { data: expenses } = await supabase
+              .from('expenses')
+              .select('*')
+              .eq('facility_id', facilityId)
+              .order('date', { ascending: false })
+              .limit(100);
+            if (expenses && expenses.length > 0) {
+              const rows = expenses.map((e: any) => `${e.date},${e.category},${e.description || ''},${e.amount},${e.status}`);
+              const csv = '\uFEFF日付,カテゴリ,説明,金額,ステータス\n' + rows.join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `経費明細_${facilityName}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }
+            break;
+          }
+          case 'fin_03': {
+            const { data: billings } = await supabase
+              .from('billing_records')
+              .select('*, children(name)')
+              .eq('facility_id', facilityId)
+              .order('billing_year', { ascending: false })
+              .limit(100);
+            if (billings && billings.length > 0) {
+              const rows = billings.map((b: any) => {
+                const childName = b.children?.name || '不明';
+                return `${b.billing_year}/${b.billing_month},${childName},${b.total_units || 0},${b.total_amount || 0},${b.copay_amount || 0},${b.insurance_amount || 0},${b.status}`;
+              });
+              const csv = '\uFEFF請求年月,児童名,総単位数,合計金額,自己負担額,保険請求額,ステータス\n' + rows.join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `請求書一覧_${facilityName}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }
+            break;
+          }
+          case 'chi_04': {
+            const { data: childrenData } = await supabase
+              .from('children')
+              .select('name, guardian_name, guardian_phone, guardian_email, emergency_contact_name, emergency_contact_phone')
+              .eq('facility_id', facilityId)
+              .eq('status', 'active');
+            if (childrenData && childrenData.length > 0) {
+              const rows = childrenData.map((c: any) => `${c.name || ''},${c.guardian_name || ''},${c.guardian_phone || ''},${c.guardian_email || ''},${c.emergency_contact_name || ''},${c.emergency_contact_phone || ''}`);
+              const csv = '\uFEFF児童名,保護者名,保護者電話,保護者メール,緊急連絡先名,緊急連絡先電話\n' + rows.join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `緊急連絡先一覧_${facilityName}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }
+            break;
+          }
+          case 'trn_03': {
+            const { data: trainings } = await supabase
+              .from('training_records')
+              .select('training_name, training_type, training_category, training_date, participants, status')
+              .eq('facility_id', facilityId)
+              .order('training_date', { ascending: false });
+            if (trainings && trainings.length > 0) {
+              const rows = trainings.map((t: any) => {
+                const participantNames = (t.participants || []).map((p: any) => p.name || p.staffName || '').join('; ');
+                return `${t.training_date},${t.training_name},${t.training_type},${t.training_category},${participantNames},${t.status}`;
+              });
+              const csv = '\uFEFF日付,研修名,種別,カテゴリ,参加者,ステータス\n' + rows.join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `研修受講管理台帳_${facilityName}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }
+            break;
+          }
+          case 'svc_03':
+          case 'svc_04': {
+            const isAssessment = doc.id === 'svc_03';
+            const { data: plans } = await supabase
+              .from('support_plan_files')
+              .select('*')
+              .eq('facility_id', facilityId)
+              .order('created_at', { ascending: false })
+              .limit(20);
+            if (plans && plans.length > 0) {
+              const { data: children } = await supabase
+                .from('children')
+                .select('id, name')
+                .eq('facility_id', facilityId);
+              const childMap = new Map((children || []).map((c: any) => [c.id, c.name]));
+              const title = isAssessment ? 'アセスメントシート' : 'モニタリング記録';
+              const planHtmlParts = plans.map((plan: any) => {
+                const childName = childMap.get(plan.child_id) || '不明';
+                const content = plan.plan_content || {};
+                const domains = ['health_daily_life', 'movement_sensory', 'cognition_behavior', 'language_communication', 'human_relations_social'];
+                const domainLabels: Record<string, string> = {
+                  health_daily_life: '健康・生活',
+                  movement_sensory: '運動・感覚',
+                  cognition_behavior: '認知・行動',
+                  language_communication: '言語・コミュニケーション',
+                  human_relations_social: '人間関係・社会性',
+                };
+                const domainRows = domains.map(d => {
+                  const data = (content as any)[d] || {};
+                  if (isAssessment) {
+                    return `<tr><td style="padding:6px;border:1px solid #ccc;">${domainLabels[d]}</td><td style="padding:6px;border:1px solid #ccc;">${data.current_level || '-'}</td><td style="padding:6px;border:1px solid #ccc;">${data.assessment || '-'}</td></tr>`;
+                  }
+                  return `<tr><td style="padding:6px;border:1px solid #ccc;">${domainLabels[d]}</td><td style="padding:6px;border:1px solid #ccc;">${data.short_term_goal || '-'}</td><td style="padding:6px;border:1px solid #ccc;">${data.achievement || '-'}</td></tr>`;
+                }).join('');
+                return `<div style="page-break-after:always;padding:20px;font-family:'Hiragino Sans','Meiryo',sans-serif;">
+                  <h2 style="text-align:center;border-bottom:2px solid #333;padding-bottom:8px;">${title}</h2>
+                  <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+                    <tr><th style="text-align:left;padding:6px;border:1px solid #ccc;width:30%;background:#f5f5f5;">児童名</th><td style="padding:6px;border:1px solid #ccc;">${childName}</td></tr>
+                    <tr><th style="text-align:left;padding:6px;border:1px solid #ccc;background:#f5f5f5;">作成日</th><td style="padding:6px;border:1px solid #ccc;">${plan.created_at ? new Date(plan.created_at).toLocaleDateString('ja-JP') : ''}</td></tr>
+                  </table>
+                  <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+                    <tr style="background:#f5f5f5;"><th style="padding:6px;border:1px solid #ccc;">領域</th><th style="padding:6px;border:1px solid #ccc;">${isAssessment ? '現在のレベル' : '短期目標'}</th><th style="padding:6px;border:1px solid #ccc;">${isAssessment ? 'アセスメント' : '達成状況'}</th></tr>
+                    ${domainRows}
+                  </table>
+                </div>`;
+              });
+              const fullHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>${title}</title><style>@page{margin:15mm;}body{font-family:'Hiragino Sans','Meiryo',sans-serif;font-size:14px;}</style></head><body>${planHtmlParts.join('')}</body></html>`;
+              openPrintWindow(fullHtml);
+            } else {
+              toast.warning(`${isAssessment ? 'アセスメント' : 'モニタリング'}データがありません。`);
+            }
+            break;
+          }
+          case 'svc_05': {
+            const now = new Date();
+            const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+            const { data: logs } = await supabase
+              .from('daily_logs')
+              .select('*, children(name)')
+              .eq('facility_id', facilityId)
+              .gte('date', monthStart)
+              .order('date', { ascending: false })
+              .limit(50);
+            if (logs && logs.length > 0) {
+              const logHtmlParts = logs.map((log: any) => {
+                const childName = log.children?.name || '不明';
+                return `<div style="page-break-inside:avoid;padding:12px;border-bottom:1px solid #eee;">
+                  <p><strong>${log.date}</strong> - ${childName}</p>
+                  <p>体調: ${log.health_status || '-'} / 気分: ${log.mood || '-'} / 食欲: ${log.appetite || '-'}</p>
+                  <p>活動内容: ${log.activities || '-'}</p>
+                  <p>連絡事項: ${log.staff_comment || '-'}</p>
+                </div>`;
+              });
+              const fullHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>連絡帳一覧</title><style>@page{margin:15mm;}body{font-family:'Hiragino Sans','Meiryo',sans-serif;font-size:13px;}</style></head><body><h1 style="text-align:center;">連絡帳一覧 - ${facilityName}</h1>${logHtmlParts.join('')}</body></html>`;
+              openPrintWindow(fullHtml);
+            } else {
+              toast.warning('当月の連絡帳データがありません。');
+            }
+            break;
+          }
+          case 'saf_04': {
+            const { data: trainings } = await supabase
+              .from('training_records')
+              .select('*')
+              .eq('facility_id', facilityId)
+              .eq('training_category', 'safety')
+              .order('training_date', { ascending: false })
+              .limit(5);
+            if (trainings && trainings.length > 0) {
+              const row = trainings[0];
+              const record: TrainingRecordData = {
+                id: row.id,
+                facilityName,
+                trainingName: row.training_name,
+                trainingType: row.training_type,
+                trainingCategory: row.training_category,
+                trainingDate: row.training_date,
+                startTime: row.start_time,
+                endTime: row.end_time,
+                durationHours: row.duration_hours,
+                location: row.location,
+                instructorName: row.instructor_name,
+                instructorAffiliation: row.instructor_affiliation,
+                participants: row.participants ?? [],
+                evaluationMethod: row.evaluation_method,
+                contentSummary: row.content_summary,
+                cost: row.cost,
+                status: row.status,
+              };
+              const html = generateTrainingRecordHTML(record);
+              openPrintWindow(html);
+            } else {
+              toast.warning('避難訓練の記録がありません。研修・委員会から「安全」カテゴリの研修を登録してください。');
+            }
+            break;
+          }
           default:
             break;
         }
@@ -620,13 +990,20 @@ export default function AuditExportView() {
         exportFinancialSummaryToExcel(exportData);
       }
 
-      // Brief delay between downloads so browser can handle them
+      // Export service records for current month
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const now = new Date();
+      const summary = await generateMonthlyServiceRecords(facilityId, now.getFullYear(), now.getMonth() + 1);
+      if (summary.records.length > 0) {
+        exportAllServiceRecordsToExcel(summary, now.getFullYear(), now.getMonth() + 1);
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      alert('監査パッケージの生成が完了しました。ダウンロードフォルダをご確認ください。');
+      toast.success('監査パッケージの生成が完了しました。ダウンロードフォルダをご確認ください。');
     } catch (err) {
       console.error('Package generation failed:', err);
-      alert('監査パッケージの生成中にエラーが発生しました。');
+      toast.error('監査パッケージの生成中にエラーが発生しました。');
     } finally {
       setGenerating(false);
     }

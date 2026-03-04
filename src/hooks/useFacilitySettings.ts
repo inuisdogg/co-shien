@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { FacilitySettings, FacilityTimeSlot } from '@/types';
+import { FacilitySettings, FacilityTimeSlot, TransportVehicle } from '@/types';
 
 const DEFAULT_SETTINGS: Omit<FacilitySettings, 'id' | 'facilityId'> = {
   facilityName: '',
@@ -36,7 +36,8 @@ const DEFAULT_SETTINGS: Omit<FacilitySettings, 'id' | 'facilityId'> = {
     nurseryVisitSupport: false,
     homeBasedChildSupport: false,
   },
-  capacity: { AM: 0, PM: 0 },
+  capacity: { AM: 10, PM: 10 },
+  standardWeeklyHours: 40,
   homepageEnabled: true,
   homepageTagline: '',
   homepageDescription: '',
@@ -57,6 +58,7 @@ export const useFacilitySettings = () => {
     ...DEFAULT_SETTINGS,
   });
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [timeSlots, setTimeSlots] = useState<FacilityTimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(true);
 
@@ -67,6 +69,8 @@ export const useFacilitySettings = () => {
       return;
     }
 
+    let cancelled = false;
+
     const fetchFacilitySettings = async () => {
       try {
         const { data, error } = await supabase
@@ -74,6 +78,8 @@ export const useFacilitySettings = () => {
           .select('*')
           .eq('facility_id', facilityId)
           .single();
+
+        if (cancelled) return;
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error fetching facility settings:', error);
@@ -102,7 +108,9 @@ export const useFacilitySettings = () => {
             serviceCategories: data.service_categories || DEFAULT_SETTINGS.serviceCategories,
             capacity: data.capacity || DEFAULT_SETTINGS.capacity,
             transportCapacity: data.transport_capacity || { pickup: 4, dropoff: 4 },
+            transportVehicles: data.transport_vehicles || undefined,
             prescribedWorkingHours: data.prescribed_working_hours || undefined,
+            standardWeeklyHours: data.standard_weekly_hours ?? 40,
             homepageEnabled: data.homepage_enabled ?? true,
             homepageTagline: data.homepage_tagline || '',
             homepageDescription: data.homepage_description || '',
@@ -114,13 +122,14 @@ export const useFacilitySettings = () => {
           });
         }
       } catch (error) {
-        console.error('Error in fetchFacilitySettings:', error);
+        if (!cancelled) console.error('Error in fetchFacilitySettings:', error);
       } finally {
-        setLoadingSettings(false);
+        if (!cancelled) setLoadingSettings(false);
       }
     };
 
     fetchFacilitySettings();
+    return () => { cancelled = true; };
   }, [facilityId]);
 
   // 時間枠の取得
@@ -130,6 +139,8 @@ export const useFacilitySettings = () => {
       return;
     }
 
+    let cancelled = false;
+
     const fetchTimeSlots = async () => {
       try {
         const { data, error } = await supabase
@@ -137,6 +148,8 @@ export const useFacilitySettings = () => {
           .select('*')
           .eq('facility_id', facilityId)
           .order('display_order', { ascending: true });
+
+        if (cancelled) return;
 
         if (error) {
           console.error('Error fetching time slots:', error);
@@ -158,17 +171,20 @@ export const useFacilitySettings = () => {
           })));
         }
       } catch (error) {
-        console.error('Error in fetchTimeSlots:', error);
+        if (!cancelled) console.error('Error in fetchTimeSlots:', error);
       } finally {
-        setLoadingTimeSlots(false);
+        if (!cancelled) setLoadingTimeSlots(false);
       }
     };
 
     fetchTimeSlots();
+    return () => { cancelled = true; };
   }, [facilityId]);
 
   // 施設設定の更新
   const updateFacilitySettings = async (settings: Partial<FacilitySettings>, changeDescription?: string) => {
+    setSaving(true);
+
     const updatedSettings = {
       ...facilitySettings,
       ...settings,
@@ -229,6 +245,7 @@ export const useFacilitySettings = () => {
         capacity: updatedSettings.capacity,
         transport_capacity: updatedSettings.transportCapacity,
         prescribed_working_hours: updatedSettings.prescribedWorkingHours,
+        standard_weekly_hours: updatedSettings.standardWeeklyHours ?? 40,
         homepage_enabled: updatedSettings.homepageEnabled ?? true,
         homepage_tagline: updatedSettings.homepageTagline || null,
         homepage_description: updatedSettings.homepageDescription || null,
@@ -240,6 +257,11 @@ export const useFacilitySettings = () => {
 
       if (existingData) {
         upsertData.id = existingData.id;
+      }
+
+      // transport_vehicles はマイグレーション適用後のみ送信
+      if (updatedSettings.transportVehicles && updatedSettings.transportVehicles.length > 0) {
+        upsertData.transport_vehicles = updatedSettings.transportVehicles;
       }
 
       const { data, error } = await supabase
@@ -290,7 +312,9 @@ export const useFacilitySettings = () => {
           serviceCategories: data.service_categories || DEFAULT_SETTINGS.serviceCategories,
           capacity: data.capacity || DEFAULT_SETTINGS.capacity,
           transportCapacity: data.transport_capacity || { pickup: 4, dropoff: 4 },
+          transportVehicles: data.transport_vehicles || undefined,
           prescribedWorkingHours: data.prescribed_working_hours || undefined,
+          standardWeeklyHours: data.standard_weekly_hours ?? 40,
           homepageEnabled: data.homepage_enabled ?? true,
           homepageTagline: data.homepage_tagline || '',
           homepageDescription: data.homepage_description || '',
@@ -304,6 +328,8 @@ export const useFacilitySettings = () => {
     } catch (error) {
       console.error('Error in updateFacilitySettings:', error);
       throw error;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -389,6 +415,7 @@ export const useFacilitySettings = () => {
   return {
     facilitySettings,
     loadingSettings,
+    saving,
     timeSlots,
     loadingTimeSlots,
     updateFacilitySettings,

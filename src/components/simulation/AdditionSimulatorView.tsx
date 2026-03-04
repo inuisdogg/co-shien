@@ -48,8 +48,8 @@ export default function AdditionSimulatorView() {
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#00c4cc]/10 rounded-lg">
-            <Calculator size={24} className="text-[#00c4cc]" />
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Calculator size={24} className="text-primary" />
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-800">加算シミュレーター</h1>
@@ -81,7 +81,7 @@ export default function AdditionSimulatorView() {
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-500">月間見込み売上</span>
-            <TrendingUp size={20} className="text-[#00c4cc]" />
+            <TrendingUp size={20} className="text-primary" />
           </div>
           <div className="mt-2">
             <span className="text-2xl font-bold text-gray-800">
@@ -132,7 +132,7 @@ export default function AdditionSimulatorView() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+                  ? 'text-primary border-b-2 border-primary bg-primary/5'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -145,7 +145,7 @@ export default function AdditionSimulatorView() {
         <div className="p-4 md:p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw size={24} className="animate-spin text-[#00c4cc]" />
+              <RefreshCw size={24} className="animate-spin text-primary" />
               <span className="ml-2 text-gray-500">読み込み中...</span>
             </div>
           ) : (

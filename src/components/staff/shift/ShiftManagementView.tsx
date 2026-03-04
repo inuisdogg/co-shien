@@ -28,6 +28,7 @@ import MonthlyShiftCalendar from './MonthlyShiftCalendar';
 import ShiftConfirmationPanel from './ShiftConfirmationPanel';
 import AttendanceRecordsPanel from './AttendanceRecordsPanel';
 import ShiftPatternSettings from '@/components/staff/ShiftPatternSettings';
+import { useToast } from '@/components/ui/Toast';
 
 interface StaffShiftRow {
   staff: Staff;
@@ -38,6 +39,7 @@ type ViewMode = 'calendar' | 'attendance' | 'confirmation' | 'patterns';
 
 const ShiftManagementView: React.FC = () => {
   const { facility } = useAuth();
+  const { toast } = useToast();
 
   // Current year/month
   const now = new Date();
@@ -58,6 +60,8 @@ const ShiftManagementView: React.FC = () => {
     publishSchedule,
     fetchShifts,
     fetchShiftPatterns,
+    fetchMonthlySchedule,
+    fetchConfirmations,
   } = useShiftManagement();
 
   // Availability data
@@ -65,11 +69,13 @@ const ShiftManagementView: React.FC = () => {
   // Previous month shifts for copy
   const [prevMonthShifts, setPrevMonthShifts] = useState<ShiftWithPattern[]>([]);
 
-  // Fetch shifts and patterns when year/month changes
+  // Fetch shifts, patterns, schedule, and confirmations when year/month changes
   useEffect(() => {
     fetchShifts(year, month);
     fetchShiftPatterns();
-  }, [year, month, fetchShifts, fetchShiftPatterns]);
+    fetchMonthlySchedule(year, month);
+    fetchConfirmations(year, month);
+  }, [year, month, fetchShifts, fetchShiftPatterns, fetchMonthlySchedule, fetchConfirmations]);
 
   // Fetch availability data for the current month
   useEffect(() => {
@@ -195,13 +201,26 @@ const ShiftManagementView: React.FC = () => {
     });
   }, [staffList, shifts]);
 
-  // Confirmation statuses (placeholder)
+  // Confirmation statuses from actual data
   const staffConfirmations = useMemo(() => {
-    return staffList.map((staff) => ({
-      staff,
-      status: 'pending' as const,
-    }));
-  }, [staffList]);
+    // Map DB status to panel status
+    const mapStatus = (dbStatus?: string): 'pending' | 'viewed' | 'confirmed' | 'rejected' => {
+      switch (dbStatus) {
+        case 'confirmed': return 'confirmed';
+        case 'needs_discussion': return 'rejected'; // needs_discussion maps to rejected in panel
+        default: return 'pending';
+      }
+    };
+
+    return staffList.map((staff) => {
+      const confirmation = confirmations.find(c => c.userId === staff.user_id);
+      return {
+        staff,
+        status: mapStatus(confirmation?.status),
+        confirmedAt: confirmation?.respondedAt,
+      };
+    });
+  }, [staffList, confirmations]);
 
   // Schedule status
   const scheduleStatus = useMemo(
@@ -255,11 +274,11 @@ const ShiftManagementView: React.FC = () => {
 
   // リマインダー送信
   const handleSendReminder = useCallback((staffId: string) => {
-    alert('リマインダーを送信しました');
+    toast.success('リマインダーを送信しました');
   }, []);
 
   const handleSendReminderAll = useCallback(() => {
-    alert('未確認スタッフ全員にリマインダーを送信しました');
+    toast.success('未確認スタッフ全員にリマインダーを送信しました');
   }, []);
 
   // Print
@@ -315,8 +334,8 @@ const ShiftManagementView: React.FC = () => {
       <div className="flex-shrink-0 px-6 py-4 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
-              <Calendar size={20} className="text-[#00c4cc]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Calendar size={20} className="text-primary" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">シフト管理</h1>
@@ -332,7 +351,7 @@ const ShiftManagementView: React.FC = () => {
               onClick={() => setViewMode('calendar')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'calendar'
-                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -343,7 +362,7 @@ const ShiftManagementView: React.FC = () => {
               onClick={() => setViewMode('attendance')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'attendance'
-                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -354,7 +373,7 @@ const ShiftManagementView: React.FC = () => {
               onClick={() => setViewMode('confirmation')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'confirmation'
-                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -365,7 +384,7 @@ const ShiftManagementView: React.FC = () => {
               onClick={() => setViewMode('patterns')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'patterns'
-                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >

@@ -247,7 +247,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
     if (!showWriteModal) return null;
 
     return (
-      <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center">
         <div
           className="absolute inset-0 bg-black/40"
           onClick={() => setShowWriteModal(false)}
@@ -267,7 +267,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
           {submitSuccess ? (
             <div className="p-6 text-center space-y-4">
               <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto">
-                <Star className="h-8 w-8 text-indigo-600" />
+                <Star className="h-8 w-8 text-personal" />
               </div>
               <div>
                 <h4 className="font-bold text-gray-800 mb-1">レビューを投稿しました</h4>
@@ -277,7 +277,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
               </div>
               <button
                 onClick={() => setShowWriteModal(false)}
-                className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors"
+                className="w-full rounded-xl bg-personal py-3 text-sm font-bold text-white hover:bg-personal-dark transition-colors"
               >
                 閉じる
               </button>
@@ -344,7 +344,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder="レビューの要約を入力"
                   maxLength={100}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal"
                 />
               </div>
 
@@ -357,7 +357,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
                   placeholder="この施設の良いところを教えてください"
                   rows={3}
                   maxLength={1000}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal resize-none"
                 />
               </div>
 
@@ -370,7 +370,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
                   placeholder="改善してほしい点を教えてください"
                   rows={3}
                   maxLength={1000}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal resize-none"
                 />
               </div>
 
@@ -384,7 +384,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
                   type="button"
                   onClick={() => setFormAnonymous(!formAnonymous)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formAnonymous ? 'bg-indigo-500' : 'bg-gray-300'
+                    formAnonymous ? 'bg-personal' : 'bg-gray-300'
                   }`}
                 >
                   <span
@@ -404,7 +404,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
               <button
                 onClick={handleSubmit}
                 disabled={submitting || formRating === 0}
-                className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full rounded-xl bg-personal py-3 text-sm font-bold text-white hover:bg-personal-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {submitting ? '投稿中...' : 'レビューを投稿'}
               </button>
@@ -423,13 +423,13 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-          <MessageSquare className="h-4 w-4 text-indigo-500" />
+          <MessageSquare className="h-4 w-4 text-personal" />
           口コミ・レビュー
         </h2>
         {userId && (
           <button
             onClick={handleOpenWriteModal}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+            className="text-xs font-bold text-personal hover:text-personal-dark transition-colors"
           >
             レビューを書く
           </button>
@@ -463,7 +463,7 @@ const FacilityReviewSection: React.FC<FacilityReviewSectionProps> = ({
           {userId && (
             <button
               onClick={handleOpenWriteModal}
-              className="mt-2 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+              className="mt-2 text-xs font-bold text-personal hover:text-personal-dark"
             >
               最初のレビューを書く
             </button>

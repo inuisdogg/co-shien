@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   ClipboardList,
   Download,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { parseQualifications } from '@/utils/qualifications';
 import { exportWorkScheduleToExcel } from '@/lib/excelEngine';
 import {
   WorkScheduleReport,
@@ -144,7 +146,7 @@ export default function WorkScheduleView() {
             name: s.name,
             personnelType: ps.personnel_type,
             workStyle: ps.work_style,
-            qualifications: s.qualifications || [],
+            qualifications: parseQualifications(s.qualifications),
             weeklyHours,
             fte: Math.round(fte * 100) / 100,
             assignedAdditions: ps.assigned_addition_codes || [],
@@ -248,7 +250,7 @@ export default function WorkScheduleView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -258,7 +260,7 @@ export default function WorkScheduleView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <ClipboardList className="w-6 h-6 text-[#00c4cc]" />
+          <ClipboardList className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">勤務体制一覧表</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -285,7 +287,7 @@ export default function WorkScheduleView() {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50 text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 text-sm"
           >
             {generating ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -333,7 +335,7 @@ export default function WorkScheduleView() {
                   <div
                     key={r.id}
                     onClick={() => setSelectedReport(r)}
-                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-[#00c4cc]/5' : ''}`}
+                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
                   >
                     <p className="font-medium text-gray-800 text-sm">{r.year}年{r.month}月</p>
                     <div className="flex items-center gap-2 mt-1">
@@ -413,8 +415,8 @@ export default function WorkScheduleView() {
                             </td>
                             <td className="p-3 text-gray-600">{WORK_STYLE_LABELS[a.workStyle]}</td>
                             <td className="p-3 text-gray-600 text-xs">
-                              {a.qualifications.length > 0
-                                ? a.qualifications.map(q => QUALIFICATION_CODES[q as keyof typeof QUALIFICATION_CODES] || q).join(', ')
+                              {(a.qualifications || []).length > 0
+                                ? (a.qualifications || []).map(q => QUALIFICATION_CODES[q as keyof typeof QUALIFICATION_CODES] || q).join(', ')
                                 : '-'
                               }
                             </td>

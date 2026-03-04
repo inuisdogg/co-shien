@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 // ---- Local types ----
 interface StaffAck {
@@ -35,6 +36,7 @@ const RegulationAcknowledgmentPanel: React.FC<RegulationAcknowledgmentPanelProps
   onClose,
 }) => {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const [staffList, setStaffList] = useState<StaffAck[]>([]);
   const [filter, setFilter] = useState<FilterMode>('all');
   const [search, setSearch] = useState('');
@@ -138,10 +140,10 @@ const RegulationAcknowledgmentPanel: React.FC<RegulationAcknowledgmentPanelProps
       if (notifications.length > 0) {
         await supabase.from('notifications').insert(notifications);
       }
-      alert(`${pendingUsers.length}名にリマインダーを送信しました。`);
+      toast.success(`${pendingUsers.length}名にリマインダーを送信しました。`);
     } catch (err) {
       console.error('Error sending reminders:', err);
-      alert('リマインダーの送信に失敗しました。');
+      toast.error('リマインダーの送信に失敗しました。');
     } finally {
       setSending(false);
     }
@@ -219,7 +221,7 @@ const RegulationAcknowledgmentPanel: React.FC<RegulationAcknowledgmentPanelProps
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="名前で検索"
-              className="w-full pl-7 pr-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+              className="w-full pl-7 pr-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
           </div>
         </div>

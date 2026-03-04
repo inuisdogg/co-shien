@@ -4,20 +4,70 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { ArrowLeft, Lock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+type PortalTheme = {
+  bg: string;
+  iconBg: string;
+  iconText: string;
+  button: string;
+  focusRing: string;
+};
+
+const PORTAL_THEMES: Record<string, PortalTheme> = {
+  business: {
+    bg: 'from-primary to-primary-dark',
+    iconBg: 'bg-primary/10',
+    iconText: 'text-primary',
+    button: 'bg-primary hover:bg-primary-dark',
+    focusRing: 'focus:ring-primary',
+  },
+  career: {
+    bg: 'from-personal to-personal-dark',
+    iconBg: 'bg-personal/10',
+    iconText: 'text-personal',
+    button: 'bg-personal hover:bg-personal-dark',
+    focusRing: 'focus:ring-personal',
+  },
+  parent: {
+    bg: 'from-client to-client-dark',
+    iconBg: 'bg-client/10',
+    iconText: 'text-client',
+    button: 'bg-client hover:bg-client-dark',
+    focusRing: 'focus:ring-client',
+  },
+};
+
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [emailError, setEmailError] = useState('');
+
+  // Detect portal context from query param
+  const theme = useMemo(() => {
+    const portal = searchParams?.get('portal') || 'business';
+    return PORTAL_THEMES[portal] || PORTAL_THEMES.business;
+  }, [searchParams]);
+
+  const validateEmail = (value: string) => {
+    if (!value) return 'メールアドレスを入力してください';
+    if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/.test(value)) return '有効なメールアドレスを入力してください';
+    return '';
+  };
+
+  const handleEmailBlur = () => {
+    setEmailError(validateEmail(email));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +93,7 @@ export default function ForgotPasswordPage() {
       // Supabase Authでパスワードリセットメールを送信
       const redirectUrl = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?type=recovery`
-        : 'https://Roots.inu.co.jp/auth/callback?type=recovery';
+        : 'https://roots.inu.co.jp/auth/callback?type=recovery';
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
@@ -65,7 +115,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+    <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${theme.bg} p-4`}>
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <button
           onClick={() => router.back()}
@@ -76,8 +126,8 @@ export default function ForgotPasswordPage() {
         </button>
 
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#00c4cc]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-8 h-8 text-[#00c4cc]" />
+          <div className={`w-16 h-16 ${theme.iconBg} rounded-full flex items-center justify-center mx-auto mb-4`}>
+            <Lock className={`w-8 h-8 ${theme.iconText}`} />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">パスワードを忘れた場合</h1>
           <p className="text-gray-600 text-sm mt-2">
@@ -102,7 +152,7 @@ export default function ForgotPasswordPage() {
             </div>
             <button
               onClick={() => router.push('/career/login')}
-              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
+              className={`w-full ${theme.button} text-white font-bold py-3 px-4 rounded-md transition-colors`}
             >
               ログイン画面に戻る
             </button>
@@ -117,18 +167,20 @@ export default function ForgotPasswordPage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
+                onBlur={handleEmailBlur}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                className={`w-full px-4 py-2 border ${emailError ? 'border-red-400' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 ${theme.focusRing} focus:border-transparent`}
                 placeholder="登録時のメールアドレスを入力"
                 disabled={loading}
               />
+              {emailError && <p className="text-xs text-red-500 mt-1">{emailError}</p>}
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full ${theme.button} text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {loading ? '送信中...' : 'パスワードリセットリンクを送信'}
             </button>

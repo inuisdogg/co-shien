@@ -57,6 +57,13 @@ export type FacilitySettingsHistory = {
   description?: string; // 変更説明
 };
 
+// 送迎車両
+export type TransportVehicle = {
+  id: string;
+  name: string;
+  capacity: number;
+};
+
 // 施設情報設定
 export type FacilitySettings = {
   id: string;
@@ -104,8 +111,10 @@ export type FacilitySettings = {
     pickup: number; // お迎え可能人数（デフォルト: 4）
     dropoff: number; // お送り可能人数（デフォルト: 4）
   };
+  transportVehicles?: TransportVehicle[]; // 送迎車両一覧
   // 勤怠設定
   prescribedWorkingHours?: number; // 1日の所定労働時間（分単位、例: 420 = 7時間）
+  standardWeeklyHours?: number; // 週あたり所定労働時間（常勤の基準、デフォルト40.0）
   // ホームページ設定
   homepageEnabled?: boolean; // ホームページ公開フラグ
   homepageTagline?: string; // キャッチコピー（最大100文字）
@@ -356,6 +365,22 @@ export type StaffInvitation = {
   permissions?: UserPermissions;
 };
 
+// 代理アカウント作成データ（施設が職員の詳細情報を代理入力してアカウントを作成）
+export type ProxyAccountData = StaffInvitation & {
+  lastName?: string;
+  firstName?: string;
+  lastNameKana?: string;
+  firstNameKana?: string;
+  nameKana?: string;
+  birthDate?: string; // YYYY-MM-DD
+  gender?: 'male' | 'female' | 'other';
+  qualifications?: string[];
+  facilityRole?: string; // 児発管, 保育士, 指導員 etc.
+  monthlySalary?: number;
+  hourlyWage?: number;
+  memo?: string;
+};
+
 // 契約ステータス
 export type ContractStatus = 'pre-contract' | 'active' | 'inactive' | 'terminated';
 
@@ -391,7 +416,8 @@ export type Child = {
   // 利用パターン
   pattern?: string; // 基本利用パターン (例: "月・水・金") - 後方互換性のため保持
   patternDays?: number[]; // 基本利用パターン（曜日の配列: 0=日, 1=月, ..., 6=土）
-  patternTimeSlots?: Record<number, 'AM' | 'PM' | 'AMPM'>; // 曜日ごとの時間帯設定（0=日, 1=月, ..., 6=土）
+  patternTimeSlots?: Record<number, string>; // 曜日ごとの時間帯設定（0=日, 1=月, ..., 6=土）
+  transportPattern?: Record<number, { pickup?: string | null; dropoff?: string | null }>; // 曜日別送迎方法
   needsPickup: boolean; // お迎え有無
   needsDropoff: boolean; // お送り有無
   pickupLocation?: string; // 乗車地（選択肢：事業所/自宅/その他）
@@ -470,7 +496,8 @@ export type FacilityChildrenSettings = {
   childId: string;
   // 利用パターン
   patternDays?: number[];
-  patternTimeSlots?: Record<number, 'AM' | 'PM' | 'AMPM'>;
+  patternTimeSlots?: Record<number, string>;
+  transportPattern?: Record<number, { pickup?: string | null; dropoff?: string | null }>; // 曜日別送迎方法
   // 送迎設定
   needsPickup: boolean;
   needsDropoff: boolean;
@@ -627,6 +654,8 @@ export type Staff = {
   role: '一般スタッフ' | 'マネージャー' | '管理者';
   type: '常勤' | '非常勤';
   facilityRole?: string; // 施設での役割（児童発達管理責任者、指導員など）
+  position?: string; // 役職（施設長、主任、リーダー等）
+  department?: string; // 部門・チーム（療育チーム、事務等）
   user_id?: string; // ユーザーアカウントID（usersテーブルへの参照）
   accountStatus?: AccountStatus; // アカウントステータス（招待中/連携中/停止中）
   permissions?: UserPermissions; // ダッシュボード権限（employment_recordsから取得）
@@ -654,7 +683,7 @@ export type Staff = {
   dependentCount?: number; // 扶養家族数
   dependents?: Array<{ name: string; relationship: string; birthDate: string; myNumber: string }> | null; // 扶養家族情報
   // 資格・経験
-  qualifications?: string; // 資格（複数可、カンマ区切りなど）
+  qualifications?: string[]; // 資格コード配列
   yearsOfExperience?: number; // 経験年数
   qualificationCertificate?: string; // 資格証画像（Base64またはURL）
   experienceCertificate?: string; // 実務経験証明書画像（Base64またはURL）
@@ -685,7 +714,17 @@ export type DefaultWorkPattern = {
 };
 
 // スケジュールデータ（利用実績・予定）
-export type TimeSlot = 'AM' | 'PM';
+export type TimeSlot = string;
+
+// 解決済みスロット情報
+export type ResolvedSlotInfo = {
+  key: string;        // schedules.slotに格納される値
+  name: string;       // 表示名
+  startTime: string;  // HH:mm
+  endTime: string;
+  capacity: number;
+  displayOrder: number;
+};
 
 export type ScheduleItem = {
   id: string; // データベース保存に対応するためstring型に変更
@@ -696,6 +735,8 @@ export type ScheduleItem = {
   slot: TimeSlot;
   hasPickup: boolean;
   hasDropoff: boolean;
+  pickupMethod?: string | null; // null=なし, 'walk'=徒歩, 'vehicle-1'=1号車, etc.
+  dropoffMethod?: string | null;
   staffId?: string; // Link to Staff (送迎担当など)
   createdAt: string;
   updatedAt: string;
@@ -825,7 +866,7 @@ export type ContactLog = {
   childId: string;
   scheduleId?: string;
   date: string; // YYYY-MM-DD
-  slot?: 'AM' | 'PM';
+  slot?: string;
 
   // 活動内容
   activities?: string;
@@ -1626,6 +1667,56 @@ export type TransportCompletionRecord = {
   updatedAt: string;
   // 拡張情報（JOINで取得）
   childName?: string;
+};
+
+// ============================================
+// リアルタイム送迎トラッキング
+// ============================================
+
+export type TransportRouteStop = {
+  order: number;
+  childId: string;
+  childName: string;
+  address: string;
+  lat: number;
+  lng: number;
+  etaSeconds?: number;
+  scheduleId?: string;
+};
+
+export type TransportSession = {
+  id: string;
+  facilityId: string;
+  date: string;
+  mode: 'pickup' | 'dropoff';
+  status: 'preparing' | 'active' | 'completed' | 'cancelled';
+  driverStaffId?: string;
+  attendantStaffId?: string;
+  vehicleInfo?: string;
+  routeStops: TransportRouteStop[];
+  totalDistanceMeters?: number;
+  totalDurationSeconds?: number;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  currentHeading?: number;
+  currentSpeed?: number;
+  locationUpdatedAt?: string;
+  currentStopIndex: number;
+  nextStopEtaSeconds?: number;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt?: string;
+};
+
+export type TransportStopEvent = {
+  id: string;
+  sessionId: string;
+  stopIndex: number;
+  childId: string;
+  eventType: 'approaching' | 'arrived' | 'departed' | 'skipped';
+  latitude?: number;
+  longitude?: number;
+  createdAt?: string;
 };
 
 // ============================================
@@ -2618,7 +2709,7 @@ export type InterviewSlot = {
 export type AppNotification = {
   id: string;
   userId: string;
-  type: 'new_application' | 'application_status' | 'new_message' | 'scout' | 'interview_proposed' | 'interview_confirmed' | 'new_review' | 'job_match';
+  type: 'new_application' | 'application_status' | 'new_message' | 'scout' | 'interview_proposed' | 'interview_confirmed' | 'new_review' | 'job_match' | 'transport_started' | 'transport_approaching' | 'transport_arrived' | 'transport_completed';
   title: string;
   body?: string;
   data?: Record<string, unknown>;
@@ -2977,4 +3068,36 @@ export type BenchmarkMetricKey =
   | 'profit_margin'
   | 'staff_retention'
   | 'average_rating';
+
+// 協力医療機関
+export type CooperativeMedicalInstitution = {
+  id: string;
+  facilityId: string;
+  institutionName: string;
+  department?: string;
+  doctorName?: string;
+  address?: string;
+  phone?: string;
+  travelTimeMinutes?: number;
+  agreementFileUrl?: string;
+  agreementFileName?: string;
+  agreementDate?: string;
+  agreementExpiryDate?: string;
+  notes?: string;
+  isPrimary: boolean;
+};
+
+// 指定申請チェックリスト項目
+export type DesignationChecklistItem = {
+  id: string;
+  facilityId: string;
+  documentNumber: number;
+  documentName: string;
+  status: 'not_started' | 'in_progress' | 'uploaded' | 'verified';
+  fileUrl?: string;
+  fileName?: string;
+  notes?: string;
+  linkedFeature?: string;
+  updatedAt?: string;
+};
 

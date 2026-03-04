@@ -6,17 +6,41 @@ import type { GenerateAuthenticationOptionsOpts } from '@simplewebauthn/server';
 /**
  * パスキー認証開始API
  * チャレンジを生成してクライアントに返す
+ *
+ * loginIdが空の場合: Discoverable Credential（パスキー自動検出）フローを使用
+ * loginIdが指定の場合: 特定ユーザーのパスキーを指定して認証
  */
 export async function POST(request: NextRequest) {
   try {
     const { facilityCode, loginId } = await request.json();
 
+    // RP IDを決定（単一ドメイン roots.inu.co.jp でパスベースルーティング）
+    const rpID = 'roots.inu.co.jp';
+
+    // ===== Discoverable Credential フロー（loginIdなし） =====
     if (!loginId) {
-      return NextResponse.json(
-        { error: 'loginId is required' },
-        { status: 400 }
-      );
+      // allowCredentialsを空にすることで、ブラウザがデバイスに保存された
+      // すべてのクレデンシャルからユーザーに選択させる
+      const opts: GenerateAuthenticationOptionsOpts = {
+        rpID,
+        allowCredentials: [],
+        userVerification: 'preferred',
+        timeout: 60000,
+      };
+
+      const options = await generateAuthenticationOptions(opts);
+
+      // Discoverableフローではチャレンジをセッション的に管理
+      // challenge自体をレスポンスに含め、finishで検証する
+      // 一時チャレンジをDBに保存（discoverable_challenge テーブルまたはグローバル管理）
+      // ここではシンプルにchallengeをレスポンスに含める
+      return NextResponse.json({
+        ...options,
+        discoverable: true,
+      });
     }
+
+    // ===== 通常フロー（loginId指定） =====
 
     // 個人向けの場合、loginIdはメールアドレス
     // usersテーブルからユーザーを検索
@@ -55,16 +79,6 @@ export async function POST(request: NextRequest) {
       type: 'public-key' as const,
       transports: [] as AuthenticatorTransport[],
     }));
-
-    // RP IDを決定
-    const rpID = (() => {
-      const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
-      const hostname = host.split(':')[0];
-      if (hostname.startsWith('biz.') || hostname.includes('biz.Roots')) {
-        return 'biz.Roots.inu.co.jp';
-      }
-      return 'my.Roots.inu.co.jp';
-    })();
 
     // 認証オプションを生成
     const opts: GenerateAuthenticationOptionsOpts = {

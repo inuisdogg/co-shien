@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { useToast } from '@/components/ui/Toast';
 
 // ============================================================
 // Types
@@ -147,6 +148,7 @@ const initialFormData: FormData = {
 // ============================================================
 
 export default function ResumePage() {
+  const { toast } = useToast();
   const [form, setForm] = useState<FormData>(initialFormData);
   const [education, setEducation] = useState<TimeEntry[]>([emptyEntry()]);
   const [work, setWork] = useState<TimeEntry[]>([emptyEntry()]);
@@ -223,11 +225,11 @@ export default function ResumePage() {
       const file = e.target.files?.[0];
       if (!file) return;
       if (!file.type.startsWith('image/')) {
-        alert('画像ファイルを選択してください');
+        toast.warning('画像ファイルを選択してください');
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        alert('ファイルサイズは10MB以下にしてください');
+        toast.warning('ファイルサイズは10MB以下にしてください');
         return;
       }
       const reader = new FileReader();
@@ -298,7 +300,7 @@ export default function ResumePage() {
       setGenerated(true);
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('PDF生成に失敗しました。もう一度お試しください。');
+      toast.error('PDF生成に失敗しました。もう一度お試しください。');
     } finally {
       setGenerating(false);
     }
@@ -311,7 +313,7 @@ export default function ResumePage() {
   const inputClass = (field?: string) =>
     `w-full rounded-lg border ${
       field && errors[field] ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-300'
-    } px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-colors`;
+    } px-3 py-2.5 text-sm focus:border-personal focus:ring-2 focus:ring-indigo-100 outline-none transition-colors`;
 
   const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
 
@@ -344,7 +346,7 @@ export default function ResumePage() {
                 <select
                   value={entry.year}
                   onChange={(e) => updateEntry(setter, entry.id, 'year', e.target.value)}
-                  className="w-[110px] rounded-lg border border-gray-300 px-2 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-colors bg-white"
+                  className="w-[110px] rounded-lg border border-gray-300 px-2 py-2.5 text-sm focus:border-personal focus:ring-2 focus:ring-indigo-100 outline-none transition-colors bg-white"
                 >
                   <option value="">年</option>
                   {YEARS.map((y) => (
@@ -356,7 +358,7 @@ export default function ResumePage() {
                 <select
                   value={entry.month}
                   onChange={(e) => updateEntry(setter, entry.id, 'month', e.target.value)}
-                  className="w-[80px] rounded-lg border border-gray-300 px-2 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-colors bg-white"
+                  className="w-[80px] rounded-lg border border-gray-300 px-2 py-2.5 text-sm focus:border-personal focus:ring-2 focus:ring-indigo-100 outline-none transition-colors bg-white"
                 >
                   <option value="">月</option>
                   {MONTHS.map((m) => (
@@ -391,7 +393,7 @@ export default function ResumePage() {
         <button
           type="button"
           onClick={addEntry(setter)}
-          className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 text-sm font-medium text-personal hover:text-personal-dark hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           追加
@@ -483,14 +485,14 @@ export default function ResumePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <a
             href="/tools"
-            className="flex items-center gap-2 text-gray-800 hover:text-indigo-600 transition-colors"
+            className="flex items-center gap-2 text-gray-800 hover:text-personal transition-colors"
           >
-            <FileText className="w-5 h-5 text-indigo-600" />
+            <FileText className="w-5 h-5 text-personal" />
             <span className="font-semibold text-sm">Roots Tools</span>
           </a>
           <a
             href="/career"
-            className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 bg-personal hover:bg-personal-dark text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             Rootsに無料登録
             <ChevronRight className="w-4 h-4" />
@@ -501,7 +503,7 @@ export default function ResumePage() {
       {/* ====== Hero ====== */}
       <section className="py-10 sm:py-14 text-center px-4">
         <div className="max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 text-xs font-medium px-3 py-1.5 rounded-full mb-4">
+          <div className="inline-flex items-center gap-2 bg-indigo-50 text-personal-dark text-xs font-medium px-3 py-1.5 rounded-full mb-4">
             <FileText className="w-3.5 h-3.5" />
             無料ツール
           </div>
@@ -524,7 +526,7 @@ export default function ResumePage() {
             {/* Section 1: 基本情報 */}
             <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               {sectionHeader(
-                <User className="w-4 h-4 text-indigo-600" />,
+                <User className="w-4 h-4 text-personal" />,
                 '基本情報',
               )}
               <div className="p-5 space-y-4">
@@ -582,7 +584,7 @@ export default function ResumePage() {
                           name="gender"
                           checked={form.gender === g}
                           onChange={handleRadio('gender', g)}
-                          className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                          className="w-4 h-4 text-personal focus:ring-personal border-gray-300"
                         />
                         {g}
                       </label>
@@ -658,7 +660,7 @@ export default function ResumePage() {
                         <button
                           type="button"
                           onClick={() => photoInputRef.current?.click()}
-                          className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                          className="text-xs text-personal hover:text-personal-dark font-medium"
                         >
                           写真を変更
                         </button>
@@ -675,7 +677,7 @@ export default function ResumePage() {
                     <button
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
-                      className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors text-sm text-gray-500 hover:text-indigo-600 w-full"
+                      className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-personal hover:bg-indigo-50/50 transition-colors text-sm text-gray-500 hover:text-personal w-full"
                     >
                       <Camera className="w-5 h-5" />
                       <span>カメラで撮影 または 写真を選択</span>
@@ -691,7 +693,7 @@ export default function ResumePage() {
             {/* Section 2: 学歴 */}
             {renderDynamicSection(
               '学歴',
-              <GraduationCap className="w-4 h-4 text-indigo-600" />,
+              <GraduationCap className="w-4 h-4 text-personal" />,
               education,
               setEducation,
               '○○高等学校 卒業',
@@ -700,7 +702,7 @@ export default function ResumePage() {
             {/* Section 3: 職歴 */}
             {renderDynamicSection(
               '職歴',
-              <Briefcase className="w-4 h-4 text-indigo-600" />,
+              <Briefcase className="w-4 h-4 text-personal" />,
               work,
               setWork,
               '社会福祉法人○○ ○○保育園 入職',
@@ -709,7 +711,7 @@ export default function ResumePage() {
             {/* Section 4: 免許・資格 */}
             {renderDynamicSection(
               '免許・資格',
-              <Award className="w-4 h-4 text-indigo-600" />,
+              <Award className="w-4 h-4 text-personal" />,
               licenses,
               setLicenses,
               '保育士資格 取得',
@@ -718,7 +720,7 @@ export default function ResumePage() {
             {/* Section 5: 志望動機・自己PR */}
             <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               {sectionHeader(
-                <Heart className="w-4 h-4 text-indigo-600" />,
+                <Heart className="w-4 h-4 text-personal" />,
                 '志望動機・自己PR',
               )}
               <div className="p-5 space-y-4">
@@ -748,7 +750,7 @@ export default function ResumePage() {
             {/* Section 6: 本人希望 */}
             <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               {sectionHeader(
-                <FileText className="w-4 h-4 text-indigo-600" />,
+                <FileText className="w-4 h-4 text-personal" />,
                 '本人希望',
               )}
               <div className="p-5">
@@ -769,7 +771,7 @@ export default function ResumePage() {
             <button
               onClick={handleGeneratePdf}
               disabled={generating}
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3.5 rounded-xl transition-colors shadow-lg shadow-indigo-200"
+              className="w-full flex items-center justify-center gap-2 bg-personal hover:bg-personal-dark disabled:bg-indigo-300 text-white font-semibold py-3.5 rounded-xl transition-colors shadow-lg shadow-indigo-200"
             >
               {generating ? (
                 <>
@@ -797,7 +799,7 @@ export default function ResumePage() {
               <button
                 onClick={handleGeneratePdf}
                 disabled={generating}
-                className="hidden xl:inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                className="hidden xl:inline-flex items-center gap-1.5 bg-personal hover:bg-personal-dark disabled:bg-indigo-300 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
               >
                 {generating ? (
                   <>
@@ -1232,7 +1234,7 @@ export default function ResumePage() {
         </div>
 
         {/* ====== CTA Banner ====== */}
-        <section className="mt-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 sm:p-10 text-center text-white shadow-xl">
+        <section className="mt-16 bg-gradient-to-r from-personal to-personal-dark rounded-2xl p-8 sm:p-10 text-center text-white shadow-xl">
           <h2 className="text-xl sm:text-2xl font-bold mb-3">
             Rootsに登録すると、キャリアデータから履歴書をワンクリック生成
           </h2>
@@ -1243,7 +1245,7 @@ export default function ResumePage() {
           </p>
           <a
             href="/career"
-            className="inline-flex items-center gap-2 bg-white text-indigo-700 font-semibold px-6 py-3 rounded-xl hover:bg-indigo-50 transition-colors shadow-lg"
+            className="inline-flex items-center gap-2 bg-white text-personal-dark font-semibold px-6 py-3 rounded-xl hover:bg-indigo-50 transition-colors shadow-lg"
           >
             Rootsに無料登録する
             <ChevronRight className="w-5 h-5" />

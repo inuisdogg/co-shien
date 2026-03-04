@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import RegulationAcknowledgmentPanel from './RegulationAcknowledgmentPanel';
 
 // ---- Local types ----
@@ -76,6 +77,7 @@ const ACCENT_HOVER = '#00b0b8';
 
 const RegulationsManagementView: React.FC = () => {
   const { facility, user } = useAuth();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ---- State ----
@@ -276,7 +278,7 @@ const RegulationsManagementView: React.FC = () => {
 
         if (uploadError) {
           console.error('Upload error:', uploadError);
-          alert('ファイルのアップロードに失敗しました。');
+          toast.error('ファイルのアップロードに失敗しました。');
           setSaving(false);
           return;
         }
@@ -307,7 +309,7 @@ const RegulationsManagementView: React.FC = () => {
       } else {
         // Create (file is required for new)
         if (!fileUrl) {
-          alert('ファイルを選択してください。');
+          toast.warning('ファイルを選択してください。');
           setSaving(false);
           return;
         }
@@ -332,7 +334,7 @@ const RegulationsManagementView: React.FC = () => {
       fetchRegulations();
     } catch (err) {
       console.error('Error saving regulation:', err);
-      alert('保存に失敗しました。');
+      toast.error('保存に失敗しました。');
     } finally {
       setSaving(false);
     }
@@ -364,7 +366,7 @@ const RegulationsManagementView: React.FC = () => {
       const unacked = (staffData || []).filter((s) => !ackedIds.has(s.id));
 
       if (unacked.length === 0) {
-        alert('全員が確認済みです。');
+        toast.info('全員が確認済みです。');
         return;
       }
 
@@ -378,7 +380,7 @@ const RegulationsManagementView: React.FC = () => {
       }));
 
       await supabase.from('notifications').insert(notifications);
-      alert(`${unacked.length}名にリマインダーを送信しました。`);
+      toast.success(`${unacked.length}名にリマインダーを送信しました。`);
     } catch (err) {
       console.error('Error sending reminders:', err);
     }
@@ -464,7 +466,7 @@ const RegulationsManagementView: React.FC = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="規定名で検索..."
-          className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+          className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
         />
       </div>
 
@@ -627,7 +629,7 @@ const RegulationsManagementView: React.FC = () => {
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   placeholder="就業規則（本則）"
                 />
               </div>
@@ -639,7 +641,7 @@ const RegulationsManagementView: React.FC = () => {
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   placeholder="この規定の概要"
                 />
               </div>
@@ -651,7 +653,7 @@ const RegulationsManagementView: React.FC = () => {
                   <select
                     value={form.categoryCode}
                     onChange={(e) => setForm({ ...form, categoryCode: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] appearance-none"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary appearance-none"
                   >
                     {categories.map((c) => (
                       <option key={c.code} value={c.code}>{c.name}</option>
@@ -690,7 +692,7 @@ const RegulationsManagementView: React.FC = () => {
                     type="text"
                     value={form.version}
                     onChange={(e) => setForm({ ...form, version: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     placeholder="v1.0"
                   />
                 </div>
@@ -700,7 +702,7 @@ const RegulationsManagementView: React.FC = () => {
                     type="date"
                     value={form.effectiveDate}
                     onChange={(e) => setForm({ ...form, effectiveDate: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
               </div>

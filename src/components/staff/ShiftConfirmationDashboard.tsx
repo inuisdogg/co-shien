@@ -28,6 +28,7 @@ import {
   MONTHLY_SHIFT_STATUS_LABELS,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 interface ShiftConfirmationDashboardProps {
   facilityId: string;
@@ -51,6 +52,7 @@ type StaffConfirmationSummary = {
 };
 
 export default function ShiftConfirmationDashboard({ facilityId }: ShiftConfirmationDashboardProps) {
+  const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [summaries, setSummaries] = useState<StaffConfirmationSummary[]>([]);
@@ -190,7 +192,7 @@ export default function ShiftConfirmationDashboard({ facilityId }: ShiftConfirma
   // 相談に回答
   const handleResolve = async () => {
     if (!selectedDiscussion || !resolutionNote.trim()) {
-      alert('回答内容を入力してください');
+      toast.warning('回答内容を入力してください');
       return;
     }
 
@@ -213,7 +215,7 @@ export default function ShiftConfirmationDashboard({ facilityId }: ShiftConfirma
       fetchData();
     } catch (error) {
       console.error('回答エラー:', error);
-      alert('エラーが発生しました');
+      toast.error('エラーが発生しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -233,7 +235,7 @@ export default function ShiftConfirmationDashboard({ facilityId }: ShiftConfirma
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -441,7 +443,7 @@ export default function ShiftConfirmationDashboard({ facilityId }: ShiftConfirma
                   onChange={(e) => setResolutionNote(e.target.value)}
                   placeholder="回答・対応内容を入力してください"
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                 />
               </div>
 
@@ -455,7 +457,7 @@ export default function ShiftConfirmationDashboard({ facilityId }: ShiftConfirma
                 <button
                   onClick={handleResolve}
                   disabled={isSubmitting || !resolutionNote.trim()}
-                  className="px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
                 >
                   {isSubmitting ? '送信中...' : '回答して確定'}
                 </button>

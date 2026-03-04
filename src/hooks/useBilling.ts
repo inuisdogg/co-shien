@@ -1,6 +1,11 @@
 /**
- * 国保連請求データ管理フック
- * billing_records / billing_details / service_codes テーブルの取得・CRUD操作
+ * 国保連請求データ管理フック（完全版）
+ *
+ * - 地域区分に応じた単位単価の自動取得
+ * - 時間区分に基づく基本報酬の正確な算定
+ * - 施設加算・児童加算の自動適用
+ * - 処遇改善加算等のパーセント加算対応
+ * - billing_records / billing_details テーブルの生成・CRUD
  */
 
 import { useState, useCallback } from 'react';
@@ -14,6 +19,8 @@ import {
   BillingStatus,
 } from '@/types';
 
+// ━━━ 定数 ━━━
+
 // 上限月額の区分定数
 const UPPER_LIMIT_MAP: Record<string, number> = {
   general: 37200,      // 一般（年収890万円超）
@@ -22,8 +29,68 @@ const UPPER_LIMIT_MAP: Record<string, number> = {
   welfare: 0,          // 生活保護
 };
 
-// 地域区分に応じた単位単価（1単位あたりの円単価） - デフォルトは10円
-const DEFAULT_UNIT_PRICE = 10;
+// フォールバック単位単価（regional_units が取得できない場合）
+const FALLBACK_UNIT_PRICE = 10;
+
+// サービス種別コードマッピング
+const SERVICE_TYPE_CODE_MAP: Record<string, string> = {
+  '児童発達支援': 'jido_hattatsu',
+  '放課後等デイサービス': 'hokago_day',
+};
+
+// ━━━ 内部型定義 ━━━
+
+type BaseReward = {
+  serviceTypeCode: string;
+  timeCategory: number;
+  minMinutes: number;
+  maxMinutes: number | null;
+  capacityMin: number;
+  capacityMax: number;
+  units: number;
+  applicableDays: string[];
+};
+
+type AdditionMaster = {
+  code: string;
+  name: string;
+  shortName?: string;
+  units: number | null;
+  unitType: string;
+  isPercentage: boolean;
+  percentageRate: number | null;
+  applicableServices: string[];
+  maxTimesPerMonth: number | null;
+  maxTimesPerDay: number;
+  additionType: string;
+  isActive: boolean;
+};
+
+type FacilityAdditionSetting = {
+  additionCode: string;
+  isEnabled: boolean;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+};
+
+type ChildAddition = {
+  childId: string;
+  additionCode: string;
+  isEnabled: boolean;
+  startDate?: string;
+  endDate?: string;
+  customUnits?: number;
+};
+
+type DailyAdditionRecord = {
+  childId: string;
+  date: string;
+  additionCode: string;
+  units: number;
+  times: number;
+};
+
+// ━━━ メインフック ━━━
 
 export const useBilling = () => {
   const { facility } = useAuth();
@@ -66,6 +133,212 @@ export const useBilling = () => {
       return [];
     }
   }, []);
+
+  // ─── 地域区分から単位単価を取得 ───
+  const fetchUnitPrice = useCallback(
+    async (targetFacilityId: string): Promise<number> => {
+      try {
+        // facility_settings から regional_grade を取得
+        const { data: settings } = await supabase
+          .from('facility_settings')
+          .select('regional_grade')
+          .eq('facility_id', targetFacilityId)
+          .single();
+
+        const grade = (settings?.regional_grade as string) || null;
+        if (!grade) return FALLBACK_UNIT_PRICE;
+
+        // regional_units テーブルから単位単価を取得
+        const { data: regionData } = await supabase
+          .from('regional_units')
+          .select('unit_price')
+          .eq('grade', grade)
+          .single();
+
+        if (regionData?.unit_price) {
+          return Number(regionData.unit_price);
+        }
+        return FALLBACK_UNIT_PRICE;
+      } catch {
+        return FALLBACK_UNIT_PRICE;
+      }
+    },
+    []
+  );
+
+  // ─── 基本報酬マスタ取得 ───
+  const fetchBaseRewards = useCallback(async (): Promise<BaseReward[]> => {
+    try {
+      const { data } = await supabase
+        .from('base_rewards')
+        .select('*')
+        .order('service_type_code')
+        .order('time_category');
+
+      if (!data) return [];
+
+      return data.map((row: Record<string, unknown>) => ({
+        serviceTypeCode: row.service_type_code as string,
+        timeCategory: row.time_category as number,
+        minMinutes: (row.min_minutes as number) || 0,
+        maxMinutes: (row.max_minutes as number) || null,
+        capacityMin: (row.capacity_min as number) || 1,
+        capacityMax: (row.capacity_max as number) || 99,
+        units: (row.units as number) || 0,
+        applicableDays: (row.applicable_days as string[]) || ['全日'],
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // ─── 施設の加算設定を取得 ───
+  const fetchFacilityAdditions = useCallback(
+    async (targetFacilityId: string): Promise<FacilityAdditionSetting[]> => {
+      try {
+        const { data } = await supabase
+          .from('facility_addition_settings')
+          .select('*')
+          .eq('facility_id', targetFacilityId)
+          .eq('is_enabled', true);
+
+        if (!data) return [];
+
+        return data.map((row: Record<string, unknown>) => ({
+          additionCode: row.addition_code as string,
+          isEnabled: true,
+          effectiveFrom: (row.effective_from as string) || undefined,
+          effectiveTo: (row.effective_to as string) || undefined,
+        }));
+      } catch {
+        return [];
+      }
+    },
+    []
+  );
+
+  // ─── 児童別加算設定を取得 ───
+  const fetchChildAdditions = useCallback(
+    async (targetFacilityId: string, childIds: string[]): Promise<ChildAddition[]> => {
+      try {
+        if (childIds.length === 0) return [];
+        const { data } = await supabase
+          .from('child_additions')
+          .select('*')
+          .eq('facility_id', targetFacilityId)
+          .in('child_id', childIds)
+          .eq('is_enabled', true);
+
+        if (!data) return [];
+
+        return data.map((row: Record<string, unknown>) => ({
+          childId: row.child_id as string,
+          additionCode: row.addition_code as string,
+          isEnabled: true,
+          startDate: (row.start_date as string) || undefined,
+          endDate: (row.end_date as string) || undefined,
+          customUnits: (row.custom_units as number) || undefined,
+        }));
+      } catch {
+        return [];
+      }
+    },
+    []
+  );
+
+  // ─── 日別加算実績を取得 ───
+  const fetchDailyAdditionRecords = useCallback(
+    async (targetFacilityId: string, yearMonth: string): Promise<DailyAdditionRecord[]> => {
+      try {
+        const startDate = `${yearMonth}-01`;
+        const endDate = getLastDayOfMonth(yearMonth);
+
+        const { data } = await supabase
+          .from('daily_addition_records')
+          .select('*')
+          .eq('facility_id', targetFacilityId)
+          .gte('date', startDate)
+          .lte('date', endDate);
+
+        if (!data) return [];
+
+        return data.map((row: Record<string, unknown>) => ({
+          childId: row.child_id as string,
+          date: row.date as string,
+          additionCode: row.addition_code as string,
+          units: (row.units as number) || 0,
+          times: (row.times as number) || 1,
+        }));
+      } catch {
+        return [];
+      }
+    },
+    []
+  );
+
+  // ─── 加算マスタ取得 ───
+  const fetchAdditionsMaster = useCallback(async (): Promise<AdditionMaster[]> => {
+    try {
+      const { data } = await supabase
+        .from('additions')
+        .select('*')
+        .eq('is_active', true);
+
+      if (!data) return [];
+
+      return data.map((row: Record<string, unknown>) => ({
+        code: row.code as string,
+        name: row.name as string,
+        shortName: (row.short_name as string) || undefined,
+        units: (row.units as number) || null,
+        unitType: (row.unit_type as string) || 'day',
+        isPercentage: (row.is_percentage as boolean) || false,
+        percentageRate: (row.percentage_rate as number) || null,
+        applicableServices: (row.applicable_services as string[]) || [],
+        maxTimesPerMonth: (row.max_times_per_month as number) || null,
+        maxTimesPerDay: (row.max_times_per_day as number) || 1,
+        additionType: (row.addition_type as string) || 'monthly',
+        isActive: true,
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // ─── 施設定員取得 ───
+  const fetchFacilityCapacity = useCallback(
+    async (targetFacilityId: string): Promise<number> => {
+      try {
+        const { data } = await supabase
+          .from('facility_settings')
+          .select('capacity')
+          .eq('facility_id', targetFacilityId)
+          .single();
+
+        // capacity カラム（INTEGER）は migration で追加済み
+        const cap = data?.capacity as number | null;
+        if (cap && cap > 0) return cap;
+
+        // フォールバック: JSONB の capacity.AM / capacity.PM を使用
+        const { data: jsonSettings } = await supabase
+          .from('facility_settings')
+          .select('capacity')
+          .eq('facility_id', targetFacilityId)
+          .single();
+
+        if (jsonSettings?.capacity && typeof jsonSettings.capacity === 'object') {
+          const capObj = jsonSettings.capacity as Record<string, unknown>;
+          const am = (capObj.am as number) || (capObj.AM as number) || 0;
+          const pm = (capObj.pm as number) || (capObj.PM as number) || 0;
+          return Math.max(am, pm, 10);
+        }
+        return 10; // デフォルト定員
+      } catch {
+        return 10;
+      }
+    },
+    []
+  );
 
   // ─── 月次請求レコード取得 ───
   const fetchBillingRecords = useCallback(
@@ -159,7 +432,6 @@ export const useBilling = () => {
   // ─── 利用者負担額計算 ───
   const calculateCopay = useCallback(
     (totalAmount: number, upperLimit: number): number => {
-      // 利用者負担 = 総額の10%（ただし上限月額を超えない）
       const tenPercent = Math.floor(totalAmount * 0.1);
       if (upperLimit <= 0) return 0;
       return Math.min(tenPercent, upperLimit);
@@ -167,13 +439,78 @@ export const useBilling = () => {
     []
   );
 
-  // ─── 月次請求自動生成 ───
+  // ─── サービス提供時間（分）を計算 ───
+  const calculateServiceMinutes = (
+    actualStartTime: string | null | undefined,
+    actualEndTime: string | null | undefined
+  ): number => {
+    if (!actualStartTime || !actualEndTime) return 0;
+    const [sh, sm] = actualStartTime.split(':').map(Number);
+    const [eh, em] = actualEndTime.split(':').map(Number);
+    return (eh * 60 + em) - (sh * 60 + sm);
+  };
+
+  // ─── 時間区分の判定 ───
+  const determineTimeCategory = (
+    serviceMinutes: number,
+    baseRewards: BaseReward[],
+    serviceTypeCode: string,
+    capacity: number
+  ): BaseReward | null => {
+    // サービス種別 + 定員に合致する基本報酬をフィルタ
+    const candidates = baseRewards.filter(
+      (br) =>
+        br.serviceTypeCode === serviceTypeCode &&
+        capacity >= br.capacityMin &&
+        capacity <= br.capacityMax
+    );
+
+    if (candidates.length === 0) return null;
+
+    // 時間に基づいて最適な区分を選択
+    for (const br of candidates) {
+      const min = br.minMinutes;
+      const max = br.maxMinutes;
+      if (serviceMinutes >= min && (max === null || serviceMinutes <= max)) {
+        return br;
+      }
+    }
+
+    // 最低区分を返す（30分以上のチェックは外で行う）
+    if (serviceMinutes > 0 && candidates.length > 0) {
+      return candidates[candidates.length - 1];
+    }
+
+    return null;
+  };
+
+  // ─── 月次請求自動生成（完全版） ───
   const generateMonthlyBilling = useCallback(
     async (targetFacilityId: string, yearMonth: string): Promise<BillingRecord[]> => {
       setIsLoading(true);
       setError(null);
       try {
-        // 1. 対象月の利用実績を取得
+        // ━━━ 1. マスタデータの一括取得 ━━━
+        const [
+          unitPrice,
+          baseRewards,
+          additionsMaster,
+          facilityAdditions,
+          capacity,
+        ] = await Promise.all([
+          fetchUnitPrice(targetFacilityId),
+          fetchBaseRewards(),
+          fetchAdditionsMaster(),
+          fetchFacilityAdditions(targetFacilityId),
+          fetchFacilityCapacity(targetFacilityId),
+        ]);
+
+        // 加算マスタをコードでインデックス
+        const additionMap = new Map(additionsMaster.map((a) => [a.code, a]));
+        // 施設で有効な加算コードセット
+        const enabledFacilityAdditions = new Set(facilityAdditions.map((fa) => fa.additionCode));
+
+        // ━━━ 2. 利用実績を取得 ━━━
         const startDate = `${yearMonth}-01`;
         const endDate = getLastDayOfMonth(yearMonth);
 
@@ -187,7 +524,6 @@ export const useBilling = () => {
 
         if (usageError) {
           setError('利用実績の取得に失敗しました');
-          console.error('Error fetching usage records:', usageError);
           return [];
         }
 
@@ -196,7 +532,7 @@ export const useBilling = () => {
           return [];
         }
 
-        // 2. 児童マスタ取得
+        // ━━━ 3. 児童マスタ取得 ━━━
         const childIds = [...new Set(usageData.map((r: Record<string, unknown>) => r.child_id as string))];
         const { data: childrenData } = await supabase
           .from('children')
@@ -207,24 +543,38 @@ export const useBilling = () => {
           (childrenData || []).map((c: Record<string, unknown>) => [c.id as string, c])
         );
 
-        // 3. サービスコード取得
+        // ━━━ 4. 児童別加算・日別加算実績を取得 ━━━
+        const [childAdditions, dailyAdditionRecords] = await Promise.all([
+          fetchChildAdditions(targetFacilityId, childIds),
+          fetchDailyAdditionRecords(targetFacilityId, yearMonth),
+        ]);
+
+        // 児童別加算をグルーピング
+        const childAdditionMap = new Map<string, ChildAddition[]>();
+        for (const ca of childAdditions) {
+          if (!childAdditionMap.has(ca.childId)) {
+            childAdditionMap.set(ca.childId, []);
+          }
+          childAdditionMap.get(ca.childId)!.push(ca);
+        }
+
+        // 日別加算実績をグルーピング（childId+date → records）
+        const dailyAdditionMap = new Map<string, DailyAdditionRecord[]>();
+        for (const dar of dailyAdditionRecords) {
+          const key = `${dar.childId}_${dar.date}`;
+          if (!dailyAdditionMap.has(key)) {
+            dailyAdditionMap.set(key, []);
+          }
+          dailyAdditionMap.get(key)!.push(dar);
+        }
+
+        // ━━━ 5. サービスコード取得 ━━━
         const codes = serviceCodes.length > 0 ? serviceCodes : await fetchServiceCodes();
 
-        // デフォルトの基本報酬コードを決定
-        const jihatsuBaseCode = codes.find(
-          (c) => c.category === '児童発達支援' && c.code === '611111'
-        );
-        const houkagouBaseCode = codes.find(
-          (c) => c.category === '放課後等デイサービス' && c.code === '631111'
-        );
-
-        // 送迎加算コード
-        const pickupCode = codes.find((c) => c.code === '616701');
-        const roundTripCode = codes.find((c) => c.code === '616702');
-        // 欠席時対応加算
+        // 欠席時対応加算コード
         const absenceCode = codes.find((c) => c.code === '617101');
 
-        // 4. 児童ごとにグルーピング
+        // ━━━ 6. 利用実績を児童ごとにグルーピング ━━━
         const childUsageMap = new Map<string, Array<Record<string, unknown>>>();
         for (const usage of usageData) {
           const cid = usage.child_id as string;
@@ -234,7 +584,7 @@ export const useBilling = () => {
           childUsageMap.get(cid)!.push(usage);
         }
 
-        // 5. 既存の請求レコードを削除（下書きのみ）
+        // ━━━ 7. 既存の下書き請求レコードを削除 ━━━
         await supabase
           .from('billing_records')
           .delete()
@@ -244,15 +594,15 @@ export const useBilling = () => {
 
         const newRecords: BillingRecord[] = [];
 
-        // 6. 児童ごとに請求レコード生成
+        // ━━━ 8. 児童ごとに請求レコード生成 ━━━
         for (const [childId, usages] of childUsageMap.entries()) {
           const child = childMap.get(childId) as Record<string, unknown> | undefined;
           const childName = (child?.name as string) || '不明';
           const incomeCategory = (child?.income_category as string) || 'general';
           const upperLimit = UPPER_LIMIT_MAP[incomeCategory] ?? 37200;
 
-          // サービス種別判定（利用実績のサービス時間帯から推定）
-          // 午前利用が多ければ児発、午後利用が多ければ放デイ
+          // ── サービス種別判定 ──
+          // 利用実績の時間帯から推定: 午前利用が過半数なら児発、それ以外は放デイ
           let serviceType = '放課後等デイサービス';
           const amCount = usages.filter((u: Record<string, unknown>) => {
             const st = u.actual_start_time as string | undefined;
@@ -261,11 +611,12 @@ export const useBilling = () => {
           if (amCount > usages.length / 2) {
             serviceType = '児童発達支援';
           }
-          const baseCode = serviceType === '児童発達支援' ? jihatsuBaseCode : houkagouBaseCode;
-          const baseUnits = baseCode?.baseUnits || 604;
-          const baseServiceCode = baseCode?.code || '631111';
+          const serviceTypeCode = SERVICE_TYPE_CODE_MAP[serviceType] || 'hokago_day';
 
-          // 日別明細の生成
+          // この児童に適用される加算一覧
+          const thisChildAdditions = childAdditionMap.get(childId) || [];
+
+          // ── 日別明細の生成 ──
           const detailInserts: Array<{
             billing_record_id: string;
             service_date: string;
@@ -277,82 +628,273 @@ export const useBilling = () => {
           }> = [];
 
           let totalUnits = 0;
+          // 月次加算の回数カウンタ（月上限管理用）
+          const monthlyAdditionCounts = new Map<string, number>();
 
           for (const usage of usages) {
             const serviceStatus = usage.service_status as string;
             const isAbsence = serviceStatus === '欠席(加算なし)' || serviceStatus === '加算のみ';
             const additions: BillingAddition[] = [];
-
             let dayUnits = 0;
+            const usageDate = usage.date as string;
 
             if (!isAbsence) {
-              // 基本報酬
-              dayUnits = baseUnits;
+              // ── 基本報酬の算定（時間区分対応） ──
+              const actualStart = usage.actual_start_time as string | null;
+              const actualEnd = usage.actual_end_time as string | null;
+              const serviceMinutes = calculateServiceMinutes(actualStart, actualEnd);
 
-              // 送迎加算
-              const hasPickup = usage.pickup === 'あり';
-              const hasDropoff = usage.dropoff === 'あり';
-              if (hasPickup && hasDropoff && roundTripCode) {
-                additions.push({
-                  code: roundTripCode.code,
-                  name: roundTripCode.name,
-                  units: roundTripCode.baseUnits,
-                });
-                dayUnits += roundTripCode.baseUnits;
-              } else if ((hasPickup || hasDropoff) && pickupCode) {
-                additions.push({
-                  code: pickupCode.code,
-                  name: pickupCode.name,
-                  units: pickupCode.baseUnits,
-                });
-                dayUnits += pickupCode.baseUnits;
-              }
+              // usage_records の time_category があればそれを優先、なければ時間から算出
+              const existingTimeCategory = usage.time_category as string | null;
+              let baseReward: BaseReward | null = null;
 
-              // その他の加算（addonItemsから）
-              const addonItems = (usage.addon_items as string[]) || [];
-              for (const addonName of addonItems) {
-                const matchedCode = codes.find(
-                  (c) => c.category === '加算' && c.name.includes(addonName)
-                );
-                if (matchedCode) {
-                  additions.push({
-                    code: matchedCode.code,
-                    name: matchedCode.name,
-                    units: matchedCode.baseUnits,
-                  });
-                  dayUnits += matchedCode.baseUnits;
+              if (existingTimeCategory) {
+                // time_category が既に設定されている場合、それに合致する基本報酬を検索
+                const tc = parseInt(existingTimeCategory.replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(tc)) {
+                  baseReward = baseRewards.find(
+                    (br) =>
+                      br.serviceTypeCode === serviceTypeCode &&
+                      br.timeCategory === tc &&
+                      capacity >= br.capacityMin &&
+                      capacity <= br.capacityMax
+                  ) || null;
                 }
               }
+
+              if (!baseReward && serviceMinutes > 0) {
+                baseReward = determineTimeCategory(serviceMinutes, baseRewards, serviceTypeCode, capacity);
+              }
+
+              // 基本報酬単位数の決定
+              if (baseReward) {
+                dayUnits = baseReward.units;
+              } else {
+                // フォールバック: service_codes テーブルから取得
+                const fallbackCode = serviceType === '児童発達支援'
+                  ? codes.find((c) => c.category === '児童発達支援' && c.code === '611111')
+                  : codes.find((c) => c.category === '放課後等デイサービス' && c.code === '631111');
+                dayUnits = fallbackCode?.baseUnits || 604;
+              }
+
+              // ── 送迎加算 ──
+              const hasPickup = usage.pickup === 'あり';
+              const hasDropoff = usage.dropoff === 'あり';
+              if (hasPickup) {
+                const pickupAddition = additionMap.get('616701');
+                if (pickupAddition && pickupAddition.units) {
+                  additions.push({ code: '616701', name: pickupAddition.name, units: pickupAddition.units });
+                  dayUnits += pickupAddition.units;
+                } else {
+                  // フォールバック
+                  additions.push({ code: '616701', name: '送迎加算（片道）', units: 54 });
+                  dayUnits += 54;
+                }
+              }
+              if (hasDropoff) {
+                const dropoffAddition = additionMap.get('616702');
+                if (dropoffAddition && dropoffAddition.units) {
+                  additions.push({ code: '616702', name: dropoffAddition.name, units: dropoffAddition.units });
+                  dayUnits += dropoffAddition.units;
+                } else {
+                  additions.push({ code: '616702', name: '送迎加算（片道）', units: 54 });
+                  dayUnits += 54;
+                }
+              }
+
+              // ── 日別加算実績（daily_addition_records）の適用 ──
+              const dailyKey = `${childId}_${usageDate}`;
+              const dailyRecords = dailyAdditionMap.get(dailyKey) || [];
+              for (const dar of dailyRecords) {
+                // 送迎加算は上で処理済みなのでスキップ
+                if (dar.additionCode === '616701' || dar.additionCode === '616702') continue;
+
+                const addMaster = additionMap.get(dar.additionCode);
+                if (addMaster && !addMaster.isPercentage) {
+                  const addUnits = dar.units * dar.times;
+                  additions.push({
+                    code: dar.additionCode,
+                    name: addMaster.name,
+                    units: addUnits,
+                  });
+                  dayUnits += addUnits;
+                }
+              }
+
+              // ── 施設加算の自動適用（日次型） ──
+              for (const addCode of enabledFacilityAdditions) {
+                const addMaster = additionMap.get(addCode);
+                if (!addMaster || addMaster.isPercentage) continue;
+                if (addMaster.additionType !== 'daily') continue;
+                // 既に日別実績で追加済みならスキップ
+                if (additions.some((a) => a.code === addCode)) continue;
+                // 送迎加算はスキップ（上で処理済み）
+                if (addCode === '616701' || addCode === '616702') continue;
+                // サービス種別チェック
+                if (addMaster.applicableServices.length > 0 &&
+                    !addMaster.applicableServices.includes(serviceTypeCode)) continue;
+                // 月上限チェック
+                const currentCount = monthlyAdditionCounts.get(addCode) || 0;
+                if (addMaster.maxTimesPerMonth && currentCount >= addMaster.maxTimesPerMonth) continue;
+
+                const addUnits = addMaster.units || 0;
+                if (addUnits > 0) {
+                  additions.push({ code: addCode, name: addMaster.name, units: addUnits });
+                  dayUnits += addUnits;
+                  monthlyAdditionCounts.set(addCode, currentCount + 1);
+                }
+              }
+
+              // ── 児童個別加算の自動適用（日次型） ──
+              for (const ca of thisChildAdditions) {
+                const addMaster = additionMap.get(ca.additionCode);
+                if (!addMaster || addMaster.isPercentage) continue;
+                if (addMaster.additionType !== 'daily') continue;
+                if (additions.some((a) => a.code === ca.additionCode)) continue;
+                // 有効期間チェック
+                if (ca.startDate && usageDate < ca.startDate) continue;
+                if (ca.endDate && usageDate > ca.endDate) continue;
+                // サービス種別チェック
+                if (addMaster.applicableServices.length > 0 &&
+                    !addMaster.applicableServices.includes(serviceTypeCode)) continue;
+
+                const addUnits = ca.customUnits || addMaster.units || 0;
+                if (addUnits > 0) {
+                  additions.push({ code: ca.additionCode, name: addMaster.name, units: addUnits });
+                  dayUnits += addUnits;
+                }
+              }
+
+              // ── addon_items（手動選択加算）からの適用 ──
+              const addonItems = (usage.addon_items as string[]) || [];
+              for (const addonName of addonItems) {
+                // 既に追加済みならスキップ
+                if (additions.some((a) => a.name.includes(addonName))) continue;
+
+                // 加算マスタから名前で検索
+                const matchedMaster = additionsMaster.find(
+                  (a) => a.name.includes(addonName) || (a.shortName && a.shortName.includes(addonName))
+                );
+                if (matchedMaster && matchedMaster.units && !matchedMaster.isPercentage) {
+                  additions.push({
+                    code: matchedMaster.code,
+                    name: matchedMaster.name,
+                    units: matchedMaster.units,
+                  });
+                  dayUnits += matchedMaster.units;
+                } else {
+                  // service_codes からもフォールバック検索
+                  const matchedCode = codes.find(
+                    (c) => c.category === '加算' && c.name.includes(addonName)
+                  );
+                  if (matchedCode) {
+                    additions.push({ code: matchedCode.code, name: matchedCode.name, units: matchedCode.baseUnits });
+                    dayUnits += matchedCode.baseUnits;
+                  }
+                }
+              }
+
             } else if (serviceStatus === '加算のみ' && absenceCode) {
-              // 欠席時対応加算
-              additions.push({
-                code: absenceCode.code,
-                name: absenceCode.name,
-                units: absenceCode.baseUnits,
-              });
-              dayUnits = absenceCode.baseUnits;
+              // ── 欠席時対応加算 ──
+              const absMaster = additionMap.get('617101');
+              const absUnits = absMaster?.units || absenceCode.baseUnits || 94;
+              additions.push({ code: '617101', name: '欠席時対応加算', units: absUnits });
+              dayUnits = absUnits;
             }
 
             totalUnits += dayUnits;
 
+            // 基本サービスコードの決定
+            const baseServiceCode = serviceType === '児童発達支援' ? '611111' : '631111';
+
             detailInserts.push({
-              billing_record_id: '', // 後で設定
-              service_date: usage.date as string,
-              service_code: isAbsence ? (absenceCode?.code || '') : baseServiceCode,
+              billing_record_id: '',
+              service_date: usageDate,
+              service_code: isAbsence ? '617101' : baseServiceCode,
               unit_count: dayUnits,
               is_absence: isAbsence,
-              absence_type: isAbsence ? (serviceStatus as string) : null,
+              absence_type: isAbsence ? serviceStatus : null,
               additions,
             });
           }
 
-          // 金額計算
-          const unitPrice = DEFAULT_UNIT_PRICE;
-          const totalAmount = totalUnits * unitPrice;
+          // ── 月次加算の適用（施設加算 + 児童加算） ──
+          let monthlyAdditionUnits = 0;
+          const monthlyAdditions: BillingAddition[] = [];
+
+          // 施設の月次加算
+          for (const addCode of enabledFacilityAdditions) {
+            const addMaster = additionMap.get(addCode);
+            if (!addMaster) continue;
+            if (addMaster.additionType !== 'monthly' && addMaster.additionType !== 'facility_preset') continue;
+            if (addMaster.isPercentage) continue; // パーセント加算は後で処理
+            if (addMaster.applicableServices.length > 0 &&
+                !addMaster.applicableServices.includes(serviceTypeCode)) continue;
+
+            const addUnits = addMaster.units || 0;
+            if (addUnits > 0) {
+              monthlyAdditions.push({ code: addCode, name: addMaster.name, units: addUnits });
+              monthlyAdditionUnits += addUnits;
+            }
+          }
+
+          // 児童の月次加算
+          for (const ca of thisChildAdditions) {
+            const addMaster = additionMap.get(ca.additionCode);
+            if (!addMaster) continue;
+            if (addMaster.additionType !== 'monthly') continue;
+            if (addMaster.isPercentage) continue;
+            if (monthlyAdditions.some((a) => a.code === ca.additionCode)) continue;
+
+            const addUnits = ca.customUnits || addMaster.units || 0;
+            if (addUnits > 0) {
+              monthlyAdditions.push({ code: ca.additionCode, name: addMaster.name, units: addUnits });
+              monthlyAdditionUnits += addUnits;
+            }
+          }
+
+          totalUnits += monthlyAdditionUnits;
+
+          // 月次加算を最終日の明細に追加（or 専用行として記録）
+          if (monthlyAdditions.length > 0 && detailInserts.length > 0) {
+            const lastDetail = detailInserts[detailInserts.length - 1];
+            lastDetail.additions = [...lastDetail.additions, ...monthlyAdditions];
+            lastDetail.unit_count += monthlyAdditionUnits;
+          }
+
+          // ── パーセント加算の計算（処遇改善加算等） ──
+          let percentageAdditionUnits = 0;
+          const percentageAdditions: BillingAddition[] = [];
+
+          for (const addCode of enabledFacilityAdditions) {
+            const addMaster = additionMap.get(addCode);
+            if (!addMaster || !addMaster.isPercentage || !addMaster.percentageRate) continue;
+            if (addMaster.applicableServices.length > 0 &&
+                !addMaster.applicableServices.includes(serviceTypeCode)) continue;
+
+            // パーセント加算 = 基本報酬合計単位 × percentageRate / 100
+            const pctUnits = Math.floor(totalUnits * addMaster.percentageRate / 100);
+            if (pctUnits > 0) {
+              percentageAdditions.push({ code: addCode, name: addMaster.name, units: pctUnits });
+              percentageAdditionUnits += pctUnits;
+            }
+          }
+
+          totalUnits += percentageAdditionUnits;
+
+          // パーセント加算を最終日の明細に追加
+          if (percentageAdditions.length > 0 && detailInserts.length > 0) {
+            const lastDetail = detailInserts[detailInserts.length - 1];
+            lastDetail.additions = [...lastDetail.additions, ...percentageAdditions];
+            lastDetail.unit_count += percentageAdditionUnits;
+          }
+
+          // ── 金額計算（地域区分対応） ──
+          const totalAmount = Math.floor(totalUnits * unitPrice);
           const copayAmount = calculateCopay(totalAmount, upperLimit);
           const insuranceAmount = totalAmount - copayAmount;
 
-          // 請求レコード挿入
+          // ── 請求レコード挿入 ──
           const recordId = `billing-${Date.now()}-${childId.substring(0, 8)}`;
           const now = new Date().toISOString();
 
@@ -379,7 +921,7 @@ export const useBilling = () => {
             continue;
           }
 
-          // 明細挿入
+          // ── 明細挿入 ──
           const detailRows = detailInserts.map((d) => ({
             billing_record_id: recordId,
             service_date: d.service_date,
@@ -426,7 +968,9 @@ export const useBilling = () => {
         setIsLoading(false);
       }
     },
-    [serviceCodes, fetchServiceCodes, calculateCopay]
+    [serviceCodes, fetchServiceCodes, calculateCopay, fetchUnitPrice, fetchBaseRewards,
+     fetchAdditionsMaster, fetchFacilityAdditions, fetchChildAdditions, fetchDailyAdditionRecords,
+     fetchFacilityCapacity]
   );
 
   // ─── 請求レコード更新 ───
@@ -532,7 +1076,72 @@ export const useBilling = () => {
     []
   );
 
-  // ─── CSV出力（国保連フォーマット） ───
+  // ─── 一括提出 ───
+  const submitBilling = useCallback(
+    async (targetFacilityId: string, yearMonth: string): Promise<boolean> => {
+      try {
+        const now = new Date().toISOString();
+        const { error: submitError } = await supabase
+          .from('billing_records')
+          .update({ status: 'submitted', submitted_at: now, updated_at: now })
+          .eq('facility_id', targetFacilityId)
+          .eq('year_month', yearMonth)
+          .eq('status', 'confirmed');
+
+        if (submitError) {
+          console.error('Error submitting billing:', submitError);
+          return false;
+        }
+
+        setBillingRecords((prev) =>
+          prev.map((r) =>
+            r.facilityId === targetFacilityId && r.yearMonth === yearMonth && r.status === 'confirmed'
+              ? { ...r, status: 'submitted' as BillingStatus, submittedAt: now }
+              : r
+          )
+        );
+        return true;
+      } catch (err) {
+        console.error('Error in submitBilling:', err);
+        return false;
+      }
+    },
+    []
+  );
+
+  // ─── 入金記録 ───
+  const markAsPaid = useCallback(
+    async (targetFacilityId: string, yearMonth: string): Promise<boolean> => {
+      try {
+        const { error: paidError } = await supabase
+          .from('billing_records')
+          .update({ status: 'paid', updated_at: new Date().toISOString() })
+          .eq('facility_id', targetFacilityId)
+          .eq('year_month', yearMonth)
+          .eq('status', 'submitted');
+
+        if (paidError) {
+          console.error('Error marking as paid:', paidError);
+          return false;
+        }
+
+        setBillingRecords((prev) =>
+          prev.map((r) =>
+            r.facilityId === targetFacilityId && r.yearMonth === yearMonth && r.status === 'submitted'
+              ? { ...r, status: 'paid' as BillingStatus }
+              : r
+          )
+        );
+        return true;
+      } catch (err) {
+        console.error('Error in markAsPaid:', err);
+        return false;
+      }
+    },
+    []
+  );
+
+  // ─── CSV出力（国保連フォーマット — 介護給付費明細書） ───
   const exportCSV = useCallback(
     async (targetFacilityId: string, yearMonth: string): Promise<string> => {
       try {
@@ -545,68 +1154,108 @@ export const useBilling = () => {
 
         if (!records || records.length === 0) return '';
 
+        // 明細も取得
+        const recordIds = records.map((r: Record<string, unknown>) => r.id as string);
+        const { data: allDetails } = await supabase
+          .from('billing_details')
+          .select('*')
+          .in('billing_record_id', recordIds)
+          .order('service_date', { ascending: true });
+
+        // 明細をレコードIDでグルーピング
+        const detailsByRecord = new Map<string, Array<Record<string, unknown>>>();
+        for (const d of (allDetails || [])) {
+          const rid = d.billing_record_id as string;
+          if (!detailsByRecord.has(rid)) {
+            detailsByRecord.set(rid, []);
+          }
+          detailsByRecord.get(rid)!.push(d);
+        }
+
         // 施設情報取得
         const { data: facilityData } = await supabase
           .from('facilities')
-          .select('name, code')
+          .select('name, code, business_number')
           .eq('id', targetFacilityId)
           .single();
 
         const facilityName = (facilityData?.name as string) || '';
-        const facilityCode = (facilityData?.code as string) || '';
+        const facilityCode = (facilityData?.business_number as string) || (facilityData?.code as string) || '';
 
-        // ヘッダーレコード
+        // ── JDフォーマット出力 ──
         const lines: string[] = [];
         const ym = yearMonth.replace('-', '');
-        lines.push(
-          [
-            '1',                    // レコード種別（1=ヘッダー）
-            facilityCode,           // 事業所番号
-            facilityName,           // 事業所名
-            ym,                     // 対象年月
-            records.length.toString(), // 明細件数
-          ].join(',')
-        );
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
-        // 明細レコード
+        // ファイルヘッダー
+        lines.push([
+          'JD',                      // 交換情報識別番号（障害児通所）
+          facilityCode,              // 事業所番号
+          facilityName,              // 事業所名称
+          ym,                        // サービス提供年月
+          today,                     // 作成年月日
+          records.length,            // 総件数
+        ].join(','));
+
         let totalInsuranceAll = 0;
         let totalCopayAll = 0;
+        let totalAmountAll = 0;
 
+        // ── 児童ごとの明細 ──
         for (const rec of records) {
           const childData = rec.children as Record<string, unknown> | null;
           const childName = (childData?.name as string) || '';
           const beneficiaryNumber = (childData?.beneficiary_number as string) || '';
+          const serviceType = rec.service_type as string;
+          const serviceTypeCodeCSV = serviceType === '児童発達支援' ? '63' : '64';
+          const details = detailsByRecord.get(rec.id as string) || [];
+          const usageDays = details.filter((d: Record<string, unknown>) => !(d.is_absence as boolean)).length;
 
           totalInsuranceAll += (rec.insurance_amount as number) || 0;
           totalCopayAll += (rec.copay_amount as number) || 0;
+          totalAmountAll += (rec.total_amount as number) || 0;
 
-          lines.push(
-            [
-              '2',                            // レコード種別（2=明細）
-              beneficiaryNumber,               // 受給者証番号
-              childName,                       // 利用者名
-              rec.service_type as string,      // サービス種別
-              (rec.total_units as number).toString(),      // 単位数合計
-              (rec.unit_price as number).toString(),       // 単位単価
-              (rec.total_amount as number).toString(),     // 請求額
-              (rec.copay_amount as number).toString(),     // 利用者負担額
-              (rec.insurance_amount as number).toString(), // 保険請求額
-              (rec.upper_limit_amount as number).toString(), // 上限月額
-              rec.status as string,            // ステータス
-            ].join(',')
-          );
+          // レコード種別1: 基本情報
+          lines.push([
+            '1',                              // レコード種別
+            beneficiaryNumber,                 // 受給者証番号
+            childName,                         // 利用者氏名
+            '',                                // 市区町村コード
+            serviceTypeCodeCSV,                // サービス種類コード
+            usageDays,                         // 利用日数
+            rec.total_units,                   // サービス単位数合計
+            rec.unit_price,                    // 単位数単価
+            rec.total_amount,                  // 費用合計
+            rec.upper_limit_amount,            // 利用者負担上限月額
+            rec.copay_amount,                  // 利用者負担額
+            rec.insurance_amount,              // 給付費請求額
+          ].join(','));
+
+          // レコード種別2: 日別明細
+          for (const detail of details) {
+            const additionsData = (detail.additions as BillingAddition[]) || [];
+            const additionCodes = additionsData.map((a) => `${a.code}:${a.units}`).join(';');
+
+            lines.push([
+              '2',                                           // レコード種別
+              beneficiaryNumber,                              // 受給者証番号
+              (detail.service_date as string).replace(/-/g, ''), // サービス提供日
+              detail.service_code || '',                       // サービスコード
+              detail.unit_count,                               // 単位数
+              (detail.is_absence as boolean) ? '1' : '0',     // 欠席フラグ
+              additionCodes,                                   // 加算コード
+            ].join(','));
+          }
         }
 
-        // サマリーレコード
-        lines.push(
-          [
-            '3',                          // レコード種別（3=サマリー）
-            records.length.toString(),    // 合計件数
-            totalInsuranceAll.toString(), // 保険請求額合計
-            totalCopayAll.toString(),     // 利用者負担額合計
-            (totalInsuranceAll + totalCopayAll).toString(), // 総額
-          ].join(',')
-        );
+        // レコード種別9: 集計
+        lines.push([
+          '9',                        // レコード種別
+          records.length,             // 明細件数
+          totalAmountAll,             // 費用合計
+          totalInsuranceAll,          // 給付費請求額合計
+          totalCopayAll,              // 利用者負担額合計
+        ].join(','));
 
         return lines.join('\n');
       } catch (err) {
@@ -630,6 +1279,8 @@ export const useBilling = () => {
     updateBillingRecord,
     updateBillingDetail,
     confirmBilling,
+    submitBilling,
+    markAsPaid,
     exportCSV,
     calculateCopay,
   };

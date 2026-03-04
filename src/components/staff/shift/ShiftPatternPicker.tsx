@@ -67,7 +67,7 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between gap-2 border rounded-lg bg-white transition-all duration-200 ${sizeClasses[size]} ${
           isOpen
-            ? 'border-[#00c4cc] ring-2 ring-[#00c4cc]/20'
+            ? 'border-primary ring-2 ring-primary/20'
             : 'border-gray-300 hover:border-gray-400'
         }`}
       >
@@ -122,7 +122,7 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
                       }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 min-h-10 ${
                         isSelected
-                          ? 'ring-1 ring-[#00c4cc]/30'
+                          ? 'ring-1 ring-primary/30'
                           : 'hover:bg-gray-50'
                       }`}
                       style={
@@ -141,7 +141,7 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
                       <span className="text-xs text-gray-400 font-mono">
                         {formatPatternTimeRange(pattern)}
                       </span>
-                      {isSelected && <Check size={14} className="text-[#00c4cc] flex-shrink-0" />}
+                      {isSelected && <Check size={14} className="text-primary flex-shrink-0" />}
                     </button>
                   );
                 })}

@@ -33,22 +33,16 @@ export interface TransportPoint {
   location?: LatLng;
 }
 
-const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
 /**
  * 住所から座標を取得（Geocoding API）
  */
 export async function geocodeAddress(address: string): Promise<LatLng | null> {
-  if (!API_KEY) {
-    console.error('Google Maps API key is not set');
-    return null;
-  }
-
   try {
-    const encodedAddress = encodeURIComponent(address);
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${API_KEY}&language=ja`
-    );
+    const response = await fetch('/api/geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address }),
+    });
     const data = await response.json();
 
     if (data.status === 'OK' && data.results.length > 0) {
@@ -88,11 +82,6 @@ export async function calculateOptimizedRoute(
   waypoints: { location: LatLng; childId: string; childName: string }[],
   destination: LatLng
 ): Promise<RouteResult | null> {
-  if (!API_KEY) {
-    console.error('Google Maps API key is not set');
-    return null;
-  }
-
   if (waypoints.length === 0) {
     return {
       totalDistance: 0,
@@ -108,15 +97,15 @@ export async function calculateOptimizedRoute(
       .map((wp) => `${wp.location.lat},${wp.location.lng}`)
       .join('|');
 
-    const url = new URL('https://maps.googleapis.com/maps/api/directions/json');
-    url.searchParams.set('origin', `${origin.lat},${origin.lng}`);
-    url.searchParams.set('destination', `${destination.lat},${destination.lng}`);
-    url.searchParams.set('waypoints', `optimize:true|${waypointsStr}`);
-    url.searchParams.set('key', API_KEY);
-    url.searchParams.set('language', 'ja');
-    url.searchParams.set('mode', 'driving');
-
-    const response = await fetch(url.toString());
+    const response = await fetch('/api/directions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origin: `${origin.lat},${origin.lng}`,
+        destination: `${destination.lat},${destination.lng}`,
+        waypoints: `optimize:true|${waypointsStr}`,
+      }),
+    });
     const data = await response.json();
 
     if (data.status !== 'OK') {
@@ -155,11 +144,6 @@ export async function calculateCustomRoute(
   waypoints: { location: LatLng; childId: string; childName: string }[],
   destination: LatLng
 ): Promise<RouteResult | null> {
-  if (!API_KEY) {
-    console.error('Google Maps API key is not set');
-    return null;
-  }
-
   if (waypoints.length === 0) {
     return {
       totalDistance: 0,
@@ -174,15 +158,15 @@ export async function calculateCustomRoute(
       .map((wp) => `${wp.location.lat},${wp.location.lng}`)
       .join('|');
 
-    const url = new URL('https://maps.googleapis.com/maps/api/directions/json');
-    url.searchParams.set('origin', `${origin.lat},${origin.lng}`);
-    url.searchParams.set('destination', `${destination.lat},${destination.lng}`);
-    url.searchParams.set('waypoints', waypointsStr); // optimize:trueを付けない
-    url.searchParams.set('key', API_KEY);
-    url.searchParams.set('language', 'ja');
-    url.searchParams.set('mode', 'driving');
-
-    const response = await fetch(url.toString());
+    const response = await fetch('/api/directions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origin: `${origin.lat},${origin.lng}`,
+        destination: `${destination.lat},${destination.lng}`,
+        waypoints: waypointsStr,
+      }),
+    });
     const data = await response.json();
 
     if (data.status !== 'OK') {

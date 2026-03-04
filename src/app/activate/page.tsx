@@ -906,7 +906,7 @@ function ActivatePageContent() {
   // エラー表示
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-800 mb-2">エラー</h1>
@@ -919,9 +919,9 @@ function ActivatePageContent() {
   // チェック中画面
   if (screen === 'checking') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-4">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <h1 className="text-2xl font-bold text-gray-800 mb-2">確認中...</h1>
           <p className="text-gray-600">あなたのアカウント情報を確認しています</p>
         </div>
@@ -945,7 +945,7 @@ function ActivatePageContent() {
   };
 
   return (
-    <div className={`min-h-screen p-4 ${screen === 'register' ? 'bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]' : 'bg-white'}`}>
+    <div className={`min-h-screen p-4 ${screen === 'register' ? 'bg-gradient-to-br from-primary to-primary-dark' : 'bg-white'}`}>
       {/* 利用規約モーダル */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1036,7 +1036,7 @@ function ActivatePageContent() {
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowTermsModal(false)}
-                className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors"
+                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
               >
                 閉じる
               </button>
@@ -1086,7 +1086,7 @@ function ActivatePageContent() {
                     // 既存アカウントがあるかチェック（メールアドレス入力画面に遷移）
                     setScreen('login');
                   }}
-                  className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
+                  className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors"
                 >
                   既にアカウントをお持ちの方
                 </button>
@@ -1143,7 +1143,7 @@ function ActivatePageContent() {
                     value={loginForm.email}
                     onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="example@email.com"
                     disabled={loading}
                   />
@@ -1159,7 +1159,7 @@ function ActivatePageContent() {
                       value={loginForm.password}
                       onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                       required
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="パスワードを入力"
                       disabled={loading}
                     />
@@ -1193,7 +1193,7 @@ function ActivatePageContent() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50"
+                    className="flex-1 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50"
                   >
                     {loading ? 'ログイン中...' : 'ログイン'}
                   </button>
@@ -1277,7 +1277,7 @@ function ActivatePageContent() {
                       value={accountForm.lastName}
                       onChange={(e) => setAccountForm(prev => ({ ...prev, lastName: e.target.value }))}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       placeholder="姓を入力"
                       disabled={loading}
                     />
@@ -1291,7 +1291,7 @@ function ActivatePageContent() {
                       value={accountForm.firstName}
                       onChange={(e) => setAccountForm(prev => ({ ...prev, firstName: e.target.value }))}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       placeholder="名を入力"
                       disabled={loading}
                     />
@@ -1308,7 +1308,7 @@ function ActivatePageContent() {
                       value={accountForm.lastNameKana}
                       onChange={(e) => setAccountForm(prev => ({ ...prev, lastNameKana: e.target.value }))}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       placeholder="セイを入力"
                       disabled={loading}
                     />
@@ -1322,7 +1322,7 @@ function ActivatePageContent() {
                       value={accountForm.firstNameKana}
                       onChange={(e) => setAccountForm(prev => ({ ...prev, firstNameKana: e.target.value }))}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       placeholder="メイを入力"
                       disabled={loading}
                     />
@@ -1338,7 +1338,7 @@ function ActivatePageContent() {
                     value={accountForm.birthDate}
                     onChange={(e) => setAccountForm(prev => ({ ...prev, birthDate: e.target.value }))}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     disabled={loading}
                   />
                 </div>
@@ -1351,7 +1351,7 @@ function ActivatePageContent() {
                     value={accountForm.gender}
                     onChange={(e) => setAccountForm(prev => ({ ...prev, gender: e.target.value as 'male' | 'female' | 'other' }))}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     disabled={loading}
                   >
                     <option value="">選択してください</option>
@@ -1370,7 +1370,7 @@ function ActivatePageContent() {
                     value={accountForm.email}
                     onChange={(e) => setAccountForm(prev => ({ ...prev, email: e.target.value }))}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                     disabled={loading}
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -1389,7 +1389,7 @@ function ActivatePageContent() {
                       onChange={(e) => setAccountForm(prev => ({ ...prev, password: e.target.value }))}
                       required
                       minLength={6}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="6文字以上で入力"
                       disabled={loading}
                     />
@@ -1423,7 +1423,7 @@ function ActivatePageContent() {
                       onChange={(e) => setAccountForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                       required
                       minLength={6}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="パスワードを再入力"
                       disabled={loading}
                     />
@@ -1459,7 +1459,7 @@ function ActivatePageContent() {
                     <button
                       type="button"
                       onClick={() => setShowTermsModal(true)}
-                      className="text-[#00c4cc] hover:underline"
+                      className="text-primary hover:underline"
                     >
                       利用規約
                     </button>
@@ -1467,7 +1467,7 @@ function ActivatePageContent() {
                     <button
                       type="button"
                       onClick={() => window.open('/privacy', '_blank')}
-                      className="text-[#00c4cc] hover:underline"
+                      className="text-primary hover:underline"
                     >
                       プライバシーポリシー
                     </button>
@@ -1486,7 +1486,7 @@ function ActivatePageContent() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-md text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? '作成中...' : 'アカウントを作成して次へ'}
                   </button>
@@ -1505,7 +1505,7 @@ function ActivatePageContent() {
               className="bg-white rounded-lg shadow-2xl overflow-hidden"
             >
               {/* ヘッダー */}
-              <div className="bg-gradient-to-r from-[#00c4cc] to-[#00b0b8] p-6 text-white">
+              <div className="bg-gradient-to-r from-primary to-primary-dark p-6 text-white">
                 <h2 className="text-xl font-bold mb-2">あなたのキャリアを登録しましょう</h2>
                 <p className="text-sm opacity-90">
                   ここから登録する情報は、別の職場に行ってもあなたの資産として持ち運べます
@@ -1524,7 +1524,7 @@ function ActivatePageContent() {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <motion.div
-                    className="bg-[#00c4cc] h-2 rounded-full"
+                    className="bg-primary h-2 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
                     transition={{ duration: 0.3 }}
@@ -1553,7 +1553,7 @@ function ActivatePageContent() {
                       className="space-y-4"
                     >
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-[#00c4cc] rounded-full flex items-center justify-center">
+                        <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
                           <MapPin className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -1574,7 +1574,7 @@ function ActivatePageContent() {
                           }}
                           placeholder="1234567"
                           maxLength={7}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                       <div>
@@ -1584,7 +1584,7 @@ function ActivatePageContent() {
                           value={careerForm.address}
                           onChange={(e) => setCareerForm(prev => ({ ...prev, address: e.target.value }))}
                           placeholder="都道府県市区町村番地"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                     </motion.div>
@@ -1600,7 +1600,7 @@ function ActivatePageContent() {
                       className="space-y-4"
                     >
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-[#00c4cc] rounded-full flex items-center justify-center">
+                        <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
                           <Award className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -1616,7 +1616,7 @@ function ActivatePageContent() {
                           value={careerForm.qualificationSearch}
                           onChange={(e) => setCareerForm(prev => ({ ...prev, qualificationSearch: e.target.value }))}
                           placeholder="資格を検索..."
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
 
@@ -1671,7 +1671,7 @@ function ActivatePageContent() {
                               }}
                               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                                 careerForm.qualifications.includes(qual)
-                                  ? 'bg-[#00c4cc] text-white'
+                                  ? 'bg-primary text-white'
                                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                               }`}
                             >
@@ -1691,7 +1691,7 @@ function ActivatePageContent() {
                             value={careerForm.customQualification}
                             onChange={(e) => setCareerForm(prev => ({ ...prev, customQualification: e.target.value }))}
                             placeholder="資格名を入力"
-                            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                           />
                           <button
                             type="button"
@@ -1709,7 +1709,7 @@ function ActivatePageContent() {
                                 });
                               }
                             }}
-                            className="px-4 py-2 bg-[#00c4cc] text-white rounded-md hover:bg-[#00b0b8] transition-colors"
+                            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
                           >
                             追加
                           </button>
@@ -1724,7 +1724,7 @@ function ActivatePageContent() {
                             {careerForm.qualifications.map((qual) => (
                               <span
                                 key={qual}
-                                className="px-3 py-1 bg-[#00c4cc] text-white rounded-full text-sm"
+                                className="px-3 py-1 bg-primary text-white rounded-full text-sm"
                               >
                                 {qual}
                               </span>
@@ -1745,7 +1745,7 @@ function ActivatePageContent() {
                       className="space-y-4"
                     >
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-[#00c4cc] rounded-full flex items-center justify-center">
+                        <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
                           <Camera className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -1823,7 +1823,7 @@ function ActivatePageContent() {
                       className="space-y-4"
                     >
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-[#00c4cc] rounded-full flex items-center justify-center">
+                        <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
                           <Briefcase className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -1871,7 +1871,7 @@ function ActivatePageContent() {
                                     ),
                                   }));
                                 }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                                 placeholder={history.type === 'employment' ? '事業所名を入力' : '学校名を入力'}
                               />
                             </div>
@@ -1890,7 +1890,7 @@ function ActivatePageContent() {
                                       ),
                                     }));
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                                   placeholder="役職・職種を入力"
                                 />
                               </div>
@@ -1910,7 +1910,7 @@ function ActivatePageContent() {
                                       ),
                                     }));
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                               </div>
                               <div>
@@ -1926,7 +1926,7 @@ function ActivatePageContent() {
                                       ),
                                     }));
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                               </div>
                             </div>
@@ -1944,7 +1944,7 @@ function ActivatePageContent() {
                                   }));
                                 }}
                                 rows={2}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                                 placeholder="詳細や備考を入力（任意）"
                               />
                             </div>
@@ -2029,7 +2029,7 @@ function ActivatePageContent() {
                       type="button"
                       onClick={handleNextStep}
                       disabled={loading}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] text-white rounded-md hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {currentStep === steps.length - 1 ? '完了' : '次へ'}
                       {currentStep < steps.length - 1 && <ChevronRight className="w-4 h-4" />}
@@ -2055,7 +2055,7 @@ function ActivatePageContent() {
               </p>
               <button
                 onClick={() => router.push('/career')}
-                className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-md transition-colors"
+                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors"
               >
                 ダッシュボードへ
               </button>
@@ -2070,9 +2070,9 @@ function ActivatePageContent() {
 export default function ActivatePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00c4cc] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">読み込み中...</p>
         </div>
       </div>

@@ -19,6 +19,7 @@ import {
   FileText,
   Star,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,7 @@ function emptyEntry(): Omit<CareerEntry, 'id'> {
 // ─── Component ──────────────────────────────────────────────────────────────────
 
 export default function CareerTimelinePage() {
+  const { toast } = useToast();
   const [entries, setEntries] = useState<CareerEntry[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -254,7 +256,7 @@ export default function CareerTimelinePage() {
 
       // Title
       pdf.setFontSize(18);
-      pdf.setTextColor(67, 56, 202); // indigo-700
+      pdf.setTextColor(129, 140, 248); // #818CF8
       pdf.text('キャリア年表', pdfWidth / 2, 20, { align: 'center' });
 
       if (userName.trim()) {
@@ -288,7 +290,7 @@ export default function CareerTimelinePage() {
       pdf.save('キャリア年表.pdf');
     } catch (err) {
       console.error('PDF export error:', err);
-      alert('PDFの書き出しに失敗しました。もう一度お試しください。');
+      toast.error('PDFの書き出しに失敗しました。もう一度お試しください。');
     } finally {
       setIsExporting(false);
     }
@@ -303,13 +305,13 @@ export default function CareerTimelinePage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <a
             href="/tools"
-            className="text-lg font-bold tracking-tight text-indigo-700 hover:text-indigo-800 transition-colors"
+            className="text-lg font-bold tracking-tight text-personal-dark hover:text-personal-dark transition-colors"
           >
             Roots Tools
           </a>
           <a
             href="/career"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+            className="rounded-lg bg-personal px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-personal-dark transition-colors"
           >
             Rootsに無料登録
           </a>
@@ -320,7 +322,7 @@ export default function CareerTimelinePage() {
       <section className="mx-auto max-w-7xl px-4 pb-4 pt-8 sm:px-6 sm:pt-12">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100">
-            <Calendar className="h-7 w-7 text-indigo-600" />
+            <Calendar className="h-7 w-7 text-personal" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
             キャリア年表メーカー
@@ -339,7 +341,7 @@ export default function CareerTimelinePage() {
         {entries.length > 0 && (
           <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 animate-in fade-in">
             <StatCard
-              icon={<Clock className="h-5 w-5 text-indigo-500" />}
+              icon={<Clock className="h-5 w-5 text-personal" />}
               label="総経験年数"
               value={stats.totalExperience}
             />
@@ -372,7 +374,7 @@ export default function CareerTimelinePage() {
                 <h2 className="text-lg font-bold text-gray-900">キャリアエントリー</h2>
                 <button
                   onClick={openAddModal}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-personal px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-personal-dark transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   追加
@@ -389,7 +391,7 @@ export default function CareerTimelinePage() {
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   placeholder="山田 花子"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
                 />
               </div>
 
@@ -407,7 +409,7 @@ export default function CareerTimelinePage() {
                   </p>
                   <button
                     onClick={openAddModal}
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-personal-dark hover:bg-indigo-100 transition-colors"
                   >
                     <Plus className="h-4 w-4" />
                     最初のエントリーを追加
@@ -477,7 +479,7 @@ export default function CareerTimelinePage() {
                           <div className="flex shrink-0 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => openEditModal(entry)}
-                              className="rounded-md p-1.5 text-gray-400 hover:bg-white hover:text-indigo-600 transition-colors"
+                              className="rounded-md p-1.5 text-gray-400 hover:bg-white hover:text-personal transition-colors"
                               title="編集"
                             >
                               <Edit3 className="h-3.5 w-3.5" />
@@ -503,7 +505,7 @@ export default function CareerTimelinePage() {
                   <button
                     onClick={handleExportPDF}
                     disabled={isExporting}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-personal-dark hover:bg-indigo-100 disabled:opacity-50 transition-colors"
                   >
                     <Download className="h-4 w-4" />
                     {isExporting
@@ -628,7 +630,7 @@ export default function CareerTimelinePage() {
       <section className="border-t border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-violet-50">
         <div className="mx-auto max-w-3xl px-4 py-12 text-center sm:px-6 sm:py-16">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100">
-            <Star className="h-6 w-6 text-indigo-600" />
+            <Star className="h-6 w-6 text-personal" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
             Rootsキャリアでもっと便利に
@@ -639,7 +641,7 @@ export default function CareerTimelinePage() {
           </p>
           <a
             href="/career"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-indigo-700 transition-colors"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-personal px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-personal-dark transition-colors"
           >
             Rootsに無料登録
             <ChevronRight className="h-4 w-4" />
@@ -727,7 +729,7 @@ export default function CareerTimelinePage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, start_date: e.target.value }))
                     }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors ${
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-800 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors ${
                       formErrors.start_date ? 'border-red-300' : 'border-gray-200'
                     }`}
                   />
@@ -745,7 +747,7 @@ export default function CareerTimelinePage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, end_date: e.target.value }))
                     }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors ${
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors ${
                       formErrors.end_date ? 'border-red-300' : 'border-gray-200'
                     }`}
                   />
@@ -770,7 +772,7 @@ export default function CareerTimelinePage() {
                     setForm((f) => ({ ...f, title: e.target.value }))
                   }
                   placeholder="例：○○保育園 入職、保育士資格取得"
-                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors ${
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors ${
                     formErrors.title ? 'border-red-300' : 'border-gray-200'
                   }`}
                 />
@@ -791,7 +793,7 @@ export default function CareerTimelinePage() {
                     setForm((f) => ({ ...f, facility: e.target.value }))
                   }
                   placeholder="例：社会福祉法人○○会 ○○保育園"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors"
                 />
               </div>
 
@@ -807,7 +809,7 @@ export default function CareerTimelinePage() {
                   }
                   placeholder="例：0歳児クラス担任として12名を担当"
                   rows={3}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-personal focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors resize-none"
                 />
               </div>
             </div>
@@ -822,7 +824,7 @@ export default function CareerTimelinePage() {
               </button>
               <button
                 onClick={handleSave}
-                className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                className="flex-1 rounded-xl bg-personal px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-personal-dark transition-colors"
               >
                 {editingId ? '更新する' : '追加する'}
               </button>

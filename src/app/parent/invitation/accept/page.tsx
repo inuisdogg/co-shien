@@ -9,6 +9,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
+import { useToast } from '@/components/ui/Toast';
 import {
   Building2,
   User,
@@ -44,6 +45,7 @@ type Child = {
 };
 
 function AcceptInvitationContent() {
+  const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -199,7 +201,7 @@ function AcceptInvitationContent() {
     // 新規児童を作成する場合
     if (showNewChildForm && !selectedChildId) {
       if (!newChildData.name.trim()) {
-        alert('児童名を入力してください');
+        toast.warning('児童名を入力してください');
         return;
       }
 
@@ -244,7 +246,7 @@ function AcceptInvitationContent() {
         }
       } catch (err: any) {
         console.error('Error creating/updating child:', err);
-        alert('児童の作成に失敗しました: ' + err.message);
+        toast.error('児童の作成に失敗しました: ' + err.message);
         setProcessing(false);
         return;
       }
@@ -269,7 +271,7 @@ function AcceptInvitationContent() {
     }
 
     if (!childIdToLink) {
-      alert('紐付ける児童を選択してください');
+      toast.warning('紐付ける児童を選択してください');
       return;
     }
 
@@ -316,7 +318,7 @@ function AcceptInvitationContent() {
       router.push('/parent?invitation=accepted');
     } catch (err: any) {
       console.error('Error accepting invitation:', err);
-      alert('招待の承認に失敗しました: ' + err.message);
+      toast.error('招待の承認に失敗しました: ' + err.message);
     } finally {
       setProcessing(false);
     }
@@ -324,7 +326,7 @@ function AcceptInvitationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-client-light flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg max-w-2xl w-full p-8">
           <div className="animate-pulse space-y-4">
             <div className="h-24 bg-gray-100 rounded-xl" />
@@ -345,7 +347,7 @@ function AcceptInvitationContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-client-light flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-red-500" />
@@ -354,7 +356,7 @@ function AcceptInvitationContent() {
           <p className="text-gray-600 text-sm mb-6">{error}</p>
           <button
             onClick={() => router.push('/parent')}
-            className="bg-[#ED8936] hover:bg-[#D97706] text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-md"
+            className="bg-client-dark hover:bg-client-dark text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-md"
           >
             ダッシュボードへ
           </button>
@@ -366,11 +368,11 @@ function AcceptInvitationContent() {
   if (!invitation) return null;
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0] py-8 px-4">
+    <div className="min-h-screen bg-client-light py-8 px-4">
       <div className="max-w-2xl mx-auto">
         {/* ヘッダー */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
-          <div className="bg-[#F6AD55] p-6 text-white">
+          <div className="bg-client p-6 text-white">
             <p className="text-white/80 text-sm mb-2">保護者の方へ</p>
             <h1 className="text-2xl font-bold mb-1">お子様の通所施設からの招待です</h1>
             <p className="text-white/90">
@@ -379,7 +381,7 @@ function AcceptInvitationContent() {
           </div>
 
           <div className="p-6">
-            <div className="bg-[#FEF3E2] border border-[#F6AD55]/30 rounded-lg p-4 mb-6">
+            <div className="bg-client-light border border-client/30 rounded-lg p-4 mb-6">
               <h2 className="font-bold text-[#D97706] mb-2">招待内容</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -417,12 +419,12 @@ function AcceptInvitationContent() {
                         }}
                         className={`w-full flex items-center gap-4 p-4 rounded-lg border transition-colors text-left ${
                           selectedChildId === child.id
-                            ? 'border-[#ED8936] bg-[#FEF3E2]'
-                            : 'border-gray-200 hover:border-[#F6AD55]/50 hover:bg-[#FEF3E2]'
+                            ? 'border-client-dark bg-client-light'
+                            : 'border-gray-200 hover:border-client/50 hover:bg-client-light'
                         }`}
                       >
                         <div className="w-12 h-12 bg-[#FDEBD0] rounded-full flex items-center justify-center flex-shrink-0">
-                          <User className="w-6 h-6 text-[#F6AD55]" />
+                          <User className="w-6 h-6 text-client" />
                         </div>
                         <div className="flex-1">
                           <div className="font-bold text-gray-800">{child.name}</div>
@@ -431,7 +433,7 @@ function AcceptInvitationContent() {
                           )}
                         </div>
                         {selectedChildId === child.id && (
-                          <CheckCircle className="w-6 h-6 text-[#F6AD55]" />
+                          <CheckCircle className="w-6 h-6 text-client" />
                         )}
                       </button>
                     );
@@ -447,8 +449,8 @@ function AcceptInvitationContent() {
                 }}
                 className={`w-full flex items-center gap-4 p-4 rounded-lg border transition-colors text-left ${
                   showNewChildForm && !selectedChildId
-                    ? 'border-[#ED8936] bg-[#FEF3E2]'
-                    : 'border-dashed border-gray-300 hover:border-[#F6AD55]/50 hover:bg-[#FEF3E2]'
+                    ? 'border-client-dark bg-client-light'
+                    : 'border-dashed border-gray-300 hover:border-client/50 hover:bg-client-light'
                 }`}
               >
                 <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -461,7 +463,7 @@ function AcceptInvitationContent() {
                   </div>
                 </div>
                 {showNewChildForm && !selectedChildId && (
-                  <CheckCircle className="w-6 h-6 text-[#F6AD55]" />
+                  <CheckCircle className="w-6 h-6 text-client" />
                 )}
               </button>
 
@@ -478,7 +480,7 @@ function AcceptInvitationContent() {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#ED8936]"
+                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-client-dark"
                         placeholder="例: 山田 太郎"
                         value={newChildData.name}
                         onChange={(e) =>
@@ -492,7 +494,7 @@ function AcceptInvitationContent() {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#ED8936]"
+                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-client-dark"
                         placeholder="例: ヤマダ タロウ"
                         value={newChildData.nameKana}
                         onChange={(e) =>
@@ -506,7 +508,7 @@ function AcceptInvitationContent() {
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#ED8936]"
+                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-client-dark"
                         value={newChildData.birthDate}
                         onChange={(e) =>
                           setNewChildData({ ...newChildData, birthDate: e.target.value })
@@ -529,7 +531,7 @@ function AcceptInvitationContent() {
               <button
                 onClick={handleAcceptInvitation}
                 disabled={processing || (!selectedChildId && !showNewChildForm)}
-                className="flex-1 py-3 bg-[#ED8936] hover:bg-[#D97706] text-white font-bold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-client-dark hover:bg-client-dark text-white font-bold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {processing ? (
                   <>
@@ -566,7 +568,7 @@ export default function AcceptInvitationPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#F6AD55]" />
+          <Loader2 className="w-8 h-8 animate-spin text-client" />
         </div>
       }
     >

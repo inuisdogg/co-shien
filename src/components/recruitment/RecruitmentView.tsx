@@ -29,8 +29,10 @@ import {
   BarChart3,
   MessageCircle,
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { useRecruitment } from '@/hooks/useRecruitment';
 import {
   JobPosting,
@@ -235,6 +237,7 @@ const INITIAL_FORM: JobPostingFormData = {
 
 export default function RecruitmentView() {
   const { facility, user } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const {
@@ -704,7 +707,7 @@ export default function RecruitmentView() {
   if (loading && jobPostings.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -718,7 +721,7 @@ export default function RecruitmentView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Briefcase className="w-6 h-6 text-[#00c4cc]" />
+          <Briefcase className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">採用・人材紹介</h1>
         </div>
       </div>
@@ -734,7 +737,7 @@ export default function RecruitmentView() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors flex-1 justify-center ${
                 isActive
-                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -763,7 +766,7 @@ export default function RecruitmentView() {
               { label: '公開中', value: postingStats.published, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: Send },
               { label: '下書き', value: postingStats.draft, color: 'text-gray-600', bg: 'bg-gray-50', icon: FileText },
               { label: '総応募', value: postingStats.totalApplications, color: 'text-blue-600', bg: 'bg-blue-50', icon: Users },
-              { label: '成約数', value: postingStats.totalPlacements, color: 'text-[#00c4cc]', bg: 'bg-teal-50', icon: CheckCircle },
+              { label: '成約数', value: postingStats.totalPlacements, color: 'text-primary', bg: 'bg-teal-50', icon: CheckCircle },
             ].map(stat => {
               const SIcon = stat.icon;
               return (
@@ -783,7 +786,7 @@ export default function RecruitmentView() {
             <select
               value={postingTypeFilter}
               onChange={e => setPostingTypeFilter(e.target.value as JobType | 'all')}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="all">全種別</option>
               <option value="full_time">正社員</option>
@@ -793,7 +796,7 @@ export default function RecruitmentView() {
             <select
               value={postingStatusFilter}
               onChange={e => setPostingStatusFilter(e.target.value as JobStatus | 'all')}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="all">全ステータス</option>
               <option value="draft">下書き</option>
@@ -808,12 +811,12 @@ export default function RecruitmentView() {
                 value={postingSearch}
                 onChange={e => setPostingSearch(e.target.value)}
                 placeholder="求人タイトルで検索..."
-                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <button
               onClick={() => { setShowCreateModal(true); setCreateStep(1); setFormData(INITIAL_FORM); }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-medium rounded-lg transition-colors shadow-sm ml-auto"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors shadow-sm ml-auto"
             >
               <Plus className="w-4 h-4" />
               新規求人
@@ -822,15 +825,19 @@ export default function RecruitmentView() {
 
           {/* Job Postings Table */}
           {filteredPostings.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-              <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">求人がありません</p>
-              <button
-                onClick={() => { setShowCreateModal(true); setCreateStep(1); setFormData(INITIAL_FORM); }}
-                className="mt-3 text-sm text-[#00c4cc] hover:underline"
-              >
-                求人を作成する
-              </button>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <EmptyState
+                icon={<Briefcase className="w-7 h-7 text-gray-400" />}
+                title="求人がありません"
+                action={
+                  <button
+                    onClick={() => { setShowCreateModal(true); setCreateStep(1); setFormData(INITIAL_FORM); }}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    求人を作成する
+                  </button>
+                }
+              />
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -877,7 +884,7 @@ export default function RecruitmentView() {
                               {posting.status === 'draft' && (
                                 <button
                                   onClick={() => publishJobPosting(posting.id)}
-                                  className="p-1.5 text-[#00c4cc] hover:bg-teal-50 rounded-lg transition-colors"
+                                  className="p-1.5 text-primary hover:bg-teal-50 rounded-lg transition-colors"
                                   title="公開する"
                                 >
                                   <Send className="w-4 h-4" />
@@ -951,7 +958,7 @@ export default function RecruitmentView() {
                   {[1, 2, 3].map(step => (
                     <div key={step} className="flex items-center gap-2 flex-1">
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                        step <= createStep ? 'bg-[#00c4cc] text-white' : 'bg-gray-200 text-gray-500'
+                        step <= createStep ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
                       }`}>
                         {step}
                       </div>
@@ -974,7 +981,7 @@ export default function RecruitmentView() {
                             key={jt}
                             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 rounded-xl cursor-pointer transition-colors ${
                               formData.jobType === jt
-                                ? 'border-[#00c4cc] bg-teal-50 text-[#00c4cc]'
+                                ? 'border-primary bg-teal-50 text-primary'
                                 : 'border-gray-200 text-gray-600 hover:border-gray-300'
                             }`}
                           >
@@ -999,7 +1006,7 @@ export default function RecruitmentView() {
                         value={formData.title}
                         onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
                         placeholder="例: 児童発達支援管理責任者（正社員）"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
 
@@ -1010,7 +1017,7 @@ export default function RecruitmentView() {
                         onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                         rows={4}
                         placeholder="業務内容、施設の特徴、求める人物像など..."
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                       />
                     </div>
 
@@ -1021,7 +1028,7 @@ export default function RecruitmentView() {
                         min={1}
                         value={formData.spotsNeeded}
                         onChange={e => setFormData(prev => ({ ...prev, spotsNeeded: Number(e.target.value) || 1 }))}
-                        className="w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
 
@@ -1029,7 +1036,7 @@ export default function RecruitmentView() {
                       <button
                         onClick={() => setCreateStep(2)}
                         disabled={!formData.title}
-                        className="inline-flex items-center gap-2 px-6 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-2 px-6 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         次へ
                         <ArrowRight className="w-4 h-4" />
@@ -1050,7 +1057,7 @@ export default function RecruitmentView() {
                             onClick={() => toggleQualification(q.code, 'requiredQualifications')}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                               formData.requiredQualifications.includes(q.code)
-                                ? 'border-[#00c4cc] bg-teal-50 text-[#00c4cc]'
+                                ? 'border-primary bg-teal-50 text-primary'
                                 : 'border-gray-200 text-gray-600 hover:border-gray-300'
                             }`}
                           >
@@ -1087,7 +1094,7 @@ export default function RecruitmentView() {
                           min={0}
                           value={formData.experienceYearsMin}
                           onChange={e => setFormData(prev => ({ ...prev, experienceYearsMin: Number(e.target.value) || 0 }))}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                       <div>
@@ -1097,7 +1104,7 @@ export default function RecruitmentView() {
                           value={formData.employmentType}
                           onChange={e => setFormData(prev => ({ ...prev, employmentType: e.target.value }))}
                           placeholder="例: 常勤、非常勤"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                     </div>
@@ -1108,7 +1115,7 @@ export default function RecruitmentView() {
                         <select
                           value={formData.salaryType}
                           onChange={e => setFormData(prev => ({ ...prev, salaryType: e.target.value as SalaryType }))}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                           {Object.entries(SALARY_TYPE_LABELS).map(([k, v]) => (
                             <option key={k} value={k}>{v}</option>
@@ -1122,7 +1129,7 @@ export default function RecruitmentView() {
                           value={formData.salaryMin}
                           onChange={e => setFormData(prev => ({ ...prev, salaryMin: e.target.value }))}
                           placeholder="例: 250000"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                       <div>
@@ -1132,7 +1139,7 @@ export default function RecruitmentView() {
                           value={formData.salaryMax}
                           onChange={e => setFormData(prev => ({ ...prev, salaryMax: e.target.value }))}
                           placeholder="例: 350000"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                     </div>
@@ -1147,7 +1154,7 @@ export default function RecruitmentView() {
                           value={formData.annualSalaryEstimate}
                           onChange={e => setFormData(prev => ({ ...prev, annualSalaryEstimate: e.target.value }))}
                           placeholder="例: 4000000"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                         {formData.annualSalaryEstimate && (
                           <p className="text-xs text-gray-400 mt-1">
@@ -1164,7 +1171,7 @@ export default function RecruitmentView() {
                         value={formData.workHours}
                         onChange={e => setFormData(prev => ({ ...prev, workHours: e.target.value }))}
                         placeholder="例: 9:00~18:00（休憩60分）"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
 
@@ -1175,7 +1182,7 @@ export default function RecruitmentView() {
                         onChange={e => setFormData(prev => ({ ...prev, benefits: e.target.value }))}
                         rows={2}
                         placeholder="例: 社会保険完備、交通費支給、研修制度あり..."
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                       />
                     </div>
 
@@ -1189,7 +1196,7 @@ export default function RecruitmentView() {
                       </button>
                       <button
                         onClick={() => setCreateStep(3)}
-                        className="inline-flex items-center gap-2 px-6 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-medium rounded-lg transition-colors"
+                        className="inline-flex items-center gap-2 px-6 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors"
                       >
                         次へ
                         <ArrowRight className="w-4 h-4" />
@@ -1227,7 +1234,7 @@ export default function RecruitmentView() {
                             <span className="text-gray-500">必須資格:</span>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {formData.requiredQualifications.map(q => (
-                                <span key={q} className="px-2 py-0.5 bg-teal-50 text-[#00c4cc] rounded-full text-xs">
+                                <span key={q} className="px-2 py-0.5 bg-teal-50 text-primary rounded-full text-xs">
                                   {QUALIFICATION_CODES[q as QualificationCode] || q}
                                 </span>
                               ))}
@@ -1284,7 +1291,7 @@ export default function RecruitmentView() {
                         <button
                           onClick={() => handleCreateSubmit(true)}
                           disabled={saving}
-                          className="inline-flex items-center gap-2 px-6 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-2 px-6 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                         >
                           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                           <Send className="w-4 h-4" />
@@ -1321,7 +1328,7 @@ export default function RecruitmentView() {
                 <select
                   value={spotJobPostingId}
                   onChange={e => setSpotJobPostingId(e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {spotJobPostings.map(jp => (
                     <option key={jp.id} value={jp.id}>{jp.title}</option>
@@ -1333,7 +1340,7 @@ export default function RecruitmentView() {
                   setShowAddShift(true);
                   setShiftForm(prev => ({ ...prev, date: selectedSpotDate || '' }));
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 シフト追加
@@ -1359,10 +1366,10 @@ export default function RecruitmentView() {
                     onClick={() => setSelectedSpotDate(isSelected ? null : day.date)}
                     className={`min-h-[72px] p-1.5 border-b border-r border-gray-100 text-left transition-colors ${
                       !day.isCurrentMonth ? 'bg-gray-50 text-gray-300' : ''
-                    } ${isSelected ? 'bg-teal-50 ring-2 ring-[#00c4cc] ring-inset' : 'hover:bg-gray-50'}
+                    } ${isSelected ? 'bg-teal-50 ring-2 ring-primary ring-inset' : 'hover:bg-gray-50'}
                     ${isToday && !isSelected ? 'bg-blue-50' : ''}`}
                   >
-                    <span className={`text-xs font-medium ${isToday ? 'text-[#00c4cc] font-bold' : ''}`}>
+                    <span className={`text-xs font-medium ${isToday ? 'text-primary font-bold' : ''}`}>
                       {day.day}
                     </span>
                     <div className="flex flex-wrap gap-0.5 mt-1">
@@ -1442,7 +1449,7 @@ export default function RecruitmentView() {
                       type="date"
                       value={shiftForm.date}
                       onChange={e => setShiftForm(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -1452,7 +1459,7 @@ export default function RecruitmentView() {
                         type="time"
                         value={shiftForm.startTime}
                         onChange={e => setShiftForm(prev => ({ ...prev, startTime: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
                     <div>
@@ -1461,7 +1468,7 @@ export default function RecruitmentView() {
                         type="time"
                         value={shiftForm.endTime}
                         onChange={e => setShiftForm(prev => ({ ...prev, endTime: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
                   </div>
@@ -1472,7 +1479,7 @@ export default function RecruitmentView() {
                       value={shiftForm.roleNeeded}
                       onChange={e => setShiftForm(prev => ({ ...prev, roleNeeded: e.target.value }))}
                       placeholder="例: 保育士、児童指導員"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -1483,7 +1490,7 @@ export default function RecruitmentView() {
                         value={shiftForm.hourlyRate}
                         onChange={e => setShiftForm(prev => ({ ...prev, hourlyRate: e.target.value }))}
                         placeholder="例: 1500"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
                     <div>
@@ -1493,7 +1500,7 @@ export default function RecruitmentView() {
                         min={1}
                         value={shiftForm.spotsAvailable}
                         onChange={e => setShiftForm(prev => ({ ...prev, spotsAvailable: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
                   </div>
@@ -1503,7 +1510,7 @@ export default function RecruitmentView() {
                       value={shiftForm.notes}
                       onChange={e => setShiftForm(prev => ({ ...prev, notes: e.target.value }))}
                       rows={2}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                     />
                   </div>
 
@@ -1514,7 +1521,7 @@ export default function RecruitmentView() {
                         type="checkbox"
                         checked={shiftForm.bulkCreate}
                         onChange={e => setShiftForm(prev => ({ ...prev, bulkCreate: e.target.checked, bulkDates: [] }))}
-                        className="rounded border-gray-300 text-[#00c4cc] focus:ring-[#00c4cc]"
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
                       />
                       <span className="text-sm text-gray-600">同じ枠を複数日に作成</span>
                     </label>
@@ -1529,14 +1536,14 @@ export default function RecruitmentView() {
                               setShiftForm(prev => ({ ...prev, bulkDates: [...prev.bulkDates, val].sort() }));
                             }
                           }}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                         {shiftForm.bulkDates.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {shiftForm.bulkDates.map(d => (
                               <span
                                 key={d}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-[#00c4cc] rounded-full text-xs"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-primary rounded-full text-xs"
                               >
                                 {formatDate(d)}
                                 <button
@@ -1563,7 +1570,7 @@ export default function RecruitmentView() {
                     <button
                       onClick={handleAddShift}
                       disabled={saving || (!shiftForm.date && !shiftForm.bulkCreate) || (shiftForm.bulkCreate && shiftForm.bulkDates.length === 0)}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                     >
                       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                       追加
@@ -1793,7 +1800,7 @@ export default function RecruitmentView() {
                       onChange={e => setInterviewNotesEdit(e.target.value)}
                       rows={3}
                       placeholder="面接の所感やメモを記入..."
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                     />
                   </div>
 
@@ -1831,7 +1838,7 @@ export default function RecruitmentView() {
                           const isFacility = msg.senderType === 'facility';
                           return (
                             <div key={msg.id} className={`flex ${isFacility ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${isFacility ? 'bg-[#00c4cc] text-white' : 'bg-white text-gray-800 border border-gray-200'}`}>
+                              <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${isFacility ? 'bg-primary text-white' : 'bg-white text-gray-800 border border-gray-200'}`}>
                                 {!isFacility && <p className="text-[10px] text-gray-500 mb-0.5">応募者</p>}
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
                                 <p className={`text-[10px] mt-0.5 ${isFacility ? 'text-white/70' : 'text-gray-400'}`}>
@@ -1879,7 +1886,7 @@ export default function RecruitmentView() {
                           }
                         }}
                         placeholder="返信を入力..."
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                       <button
                         onClick={async () => {
@@ -1910,7 +1917,7 @@ export default function RecruitmentView() {
                           setSendingReply(false);
                         }}
                         disabled={sendingReply || !facilityReply.trim()}
-                        className="px-3 py-1.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-40"
+                        className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-40"
                       >
                         {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       </button>
@@ -1964,7 +1971,7 @@ export default function RecruitmentView() {
                           subject,
                           message,
                         }).then(() => {
-                          alert('スカウトを送信しました');
+                          toast.success('スカウトを送信しました');
                         });
                       }}
                       className="px-3 py-1.5 bg-purple-500 text-white text-xs font-medium rounded-lg hover:bg-purple-600 transition-colors"
@@ -1991,7 +1998,7 @@ export default function RecruitmentView() {
                     {selectedApplication.status === 'applied' && (
                       <button
                         onClick={() => { handleStatusChange(selectedApplication, 'screening'); setShowApplicationDetail(false); }}
-                        className="px-3 py-1.5 bg-[#00c4cc] text-white text-xs font-medium rounded-lg hover:bg-[#00b0b8] transition-colors"
+                        className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-dark transition-colors"
                       >
                         選考開始
                       </button>
@@ -1999,7 +2006,7 @@ export default function RecruitmentView() {
                     {selectedApplication.status === 'screening' && (
                       <button
                         onClick={() => { handleStatusChange(selectedApplication, 'interview_scheduled'); setShowApplicationDetail(false); }}
-                        className="px-3 py-1.5 bg-[#00c4cc] text-white text-xs font-medium rounded-lg hover:bg-[#00b0b8] transition-colors"
+                        className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-dark transition-colors"
                       >
                         面接設定
                       </button>
@@ -2007,7 +2014,7 @@ export default function RecruitmentView() {
                     {(selectedApplication.status === 'interview_scheduled' || selectedApplication.status === 'interviewed') && (
                       <button
                         onClick={() => { handleStatusChange(selectedApplication, 'offer_sent'); setShowApplicationDetail(false); }}
-                        className="px-3 py-1.5 bg-[#00c4cc] text-white text-xs font-medium rounded-lg hover:bg-[#00b0b8] transition-colors"
+                        className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-dark transition-colors"
                       >
                         内定通知
                       </button>
@@ -2070,14 +2077,14 @@ export default function RecruitmentView() {
                       value={hireSalary}
                       onChange={e => setHireSalary(e.target.value)}
                       placeholder="例: 300000"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     {hireSalary && hireModalApp.jobType && (
                       <div className="mt-2 bg-teal-50 rounded-lg p-3">
                         <p className="text-xs text-gray-600">
                           紹介手数料（自動計算）:
                         </p>
-                        <p className="text-sm font-bold text-[#00c4cc]">
+                        <p className="text-sm font-bold text-primary">
                           {(() => {
                             const { rate, amount } = calculateFee(hireModalApp.jobType || 'full_time', Number(hireSalary));
                             return `${formatCurrency(amount)} (${(rate * 100).toFixed(0)}%)`;
@@ -2093,7 +2100,7 @@ export default function RecruitmentView() {
                       type="date"
                       value={hireStartDate}
                       onChange={e => setHireStartDate(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
 
@@ -2129,7 +2136,7 @@ export default function RecruitmentView() {
           {/* Summary Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: '総成約数', value: placementStats.total, color: 'text-[#00c4cc]', bg: 'bg-teal-50', icon: CheckCircle },
+              { label: '総成約数', value: placementStats.total, color: 'text-primary', bg: 'bg-teal-50', icon: CheckCircle },
               { label: '未請求', value: placementStats.pending, color: 'text-gray-600', bg: 'bg-gray-50', icon: Clock },
               { label: '請求済', value: placementStats.invoiced, color: 'text-yellow-600', bg: 'bg-yellow-50', icon: FileText },
               { label: '入金済', value: placementStats.paid, color: 'text-green-600', bg: 'bg-green-50', icon: DollarSign },
@@ -2149,9 +2156,11 @@ export default function RecruitmentView() {
 
           {/* Placements Table */}
           {placements.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-              <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">成約がありません</p>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <EmptyState
+                icon={<DollarSign className="w-7 h-7 text-gray-400" />}
+                title="成約がありません"
+              />
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -2189,7 +2198,7 @@ export default function RecruitmentView() {
                           <td className="px-4 py-3 text-right text-gray-600 hidden md:table-cell">
                             {(p.feeRate * 100).toFixed(0)}%
                           </td>
-                          <td className="px-4 py-3 text-right font-bold text-[#00c4cc]">
+                          <td className="px-4 py-3 text-right font-bold text-primary">
                             {formatCurrency(p.feeAmount)}
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -2202,7 +2211,7 @@ export default function RecruitmentView() {
                               {p.paymentStatus === 'pending' && (
                                 <button
                                   onClick={() => handlePayment(p)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-xs font-medium rounded-lg transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary hover:bg-primary-dark text-white text-xs font-medium rounded-lg transition-colors"
                                 >
                                   <CreditCard className="w-3.5 h-3.5" />
                                   支払い

@@ -280,7 +280,7 @@ const AttendanceRecordsPanel: React.FC<AttendanceRecordsPanelProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -291,7 +291,7 @@ const AttendanceRecordsPanel: React.FC<AttendanceRecordsPanelProps> = ({
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-[#00c4cc]" />
+            <Calendar className="w-5 h-5 text-primary" />
             日別勤怠記録
           </h3>
           <div className="flex items-center gap-2">
@@ -393,7 +393,7 @@ const AttendanceRecordsPanel: React.FC<AttendanceRecordsPanelProps> = ({
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#00c4cc]" />
+            <Clock className="w-5 h-5 text-primary" />
             {year}年{month}月 月間集計
           </h3>
           <button
@@ -439,7 +439,7 @@ const AttendanceRecordsPanel: React.FC<AttendanceRecordsPanelProps> = ({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="text-sm font-medium text-[#00c4cc]">
+                    <span className="text-sm font-medium text-primary">
                       {formatMinutes(summary.totalWorkMinutes)}
                     </span>
                   </td>

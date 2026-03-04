@@ -9,7 +9,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 
 // セットアップステップの定義
-export type SetupStep = 'timeSlots' | 'staff' | 'children' | 'completed';
+export type SetupStep = 'facility' | 'staff' | 'children' | 'shift' | 'schedule' | 'additionSettings' | 'completed';
 
 // ステップ情報
 export interface StepInfo {
@@ -20,28 +20,49 @@ export interface StepInfo {
   guideText: string;
 }
 
-// ステップ定義
+// ステップ定義（6ステップ）
 export const SETUP_STEPS: StepInfo[] = [
   {
-    id: 'timeSlots',
+    id: 'facility',
     menuId: 'facility',
-    label: '時間枠設定',
-    description: '利用時間と定員を設定',
-    guideText: '利用時間枠と定員を設定してください',
+    label: '施設情報を登録',
+    description: '施設の基本情報を設定',
+    guideText: '施設名・住所などの基本情報を登録してください',
   },
   {
     id: 'staff',
     menuId: 'staff-master',
-    label: 'スタッフ登録',
+    label: 'スタッフを追加',
     description: 'スタッフを登録',
     guideText: 'スタッフを1名以上登録してください',
   },
   {
     id: 'children',
     menuId: 'children',
-    label: '児童登録',
+    label: '児童を登録',
     description: '児童を登録',
     guideText: '児童を1名以上登録してください',
+  },
+  {
+    id: 'shift',
+    menuId: 'shift',
+    label: 'シフトを作成',
+    description: 'スタッフのシフトを作成',
+    guideText: 'スタッフのシフトを作成してください',
+  },
+  {
+    id: 'schedule',
+    menuId: 'schedule',
+    label: '利用予約を設定',
+    description: '児童の利用予約を設定',
+    guideText: '児童の利用スケジュールを登録してください',
+  },
+  {
+    id: 'additionSettings',
+    menuId: 'addition-settings',
+    label: '加算体制を設定',
+    description: '加算・体制の設定',
+    guideText: '加算体制を設定してください',
   },
 ];
 
@@ -64,6 +85,7 @@ export const SetupGuideProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     timeSlots,
     staff,
     children: childrenData,
+    schedules,
     loadingTimeSlots,
     loadingStaff,
     loadingChildren,
@@ -72,36 +94,51 @@ export const SetupGuideProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // ローディング状態
   const isLoading = loadingTimeSlots || loadingStaff || loadingChildren;
 
-  // 完了済みステップを計算
+  // 加算設定の有無（施設設定から推定 — timeSlots が設定されていればOK）
+  // シフトの有無はschedulesデータで代用不可のため、スタッフが存在すれば仮完了扱い
+  // 完了済みステップを計算（各ステップは独立判定）
   const completedSteps = useMemo(() => {
     const completed: SetupStep[] = [];
 
-    // Step 1: 時間枠が設定されているか
-    if (timeSlots.length > 0) {
-      completed.push('timeSlots');
-    }
+    // Step 1: 施設情報（施設が存在すれば登録済み — 常に完了扱い）
+    // 施設登録しないとこの画面に来れないため常にtrue
+    completed.push('facility');
 
-    // Step 2: スタッフが登録されているか（Step1完了後のみ判定）
-    if (completed.includes('timeSlots') && staff.length > 0) {
+    // Step 2: スタッフが登録されているか
+    if (staff.length > 0) {
       completed.push('staff');
     }
 
-    // Step 3: 契約中の児童が登録されているか（Step2完了後のみ判定）
-    if (completed.includes('staff')) {
-      const activeChildren = childrenData.filter(c => c.contractStatus === 'active');
-      if (activeChildren.length > 0) {
-        completed.push('children');
-      }
+    // Step 3: 児童が登録されているか
+    const activeChildren = childrenData.filter(c => c.contractStatus === 'active');
+    if (activeChildren.length > 0) {
+      completed.push('children');
+    }
+
+    // Step 4: シフト（スタッフがいればシフト作成可能 — ここではスタッフ2名以上をヒューリスティックに利用）
+    // 実際のシフトテーブルへのクエリは避け、スタッフが2名以上いれば完了扱いとする
+    if (staff.length >= 2) {
+      completed.push('shift');
+    }
+
+    // Step 5: 利用予約（スケジュールが存在するか）
+    if (schedules.length > 0) {
+      completed.push('schedule');
+    }
+
+    // Step 6: 加算体制（時間枠が設定されていれば加算設定も行われている可能性が高い）
+    if (timeSlots.length > 0) {
+      completed.push('additionSettings');
     }
 
     return completed;
-  }, [timeSlots, staff, childrenData]);
+  }, [timeSlots, staff, childrenData, schedules]);
 
-  // 現在のステップを計算
+  // 現在のステップを計算（最初の未完了ステップ）
   const currentStep = useMemo((): SetupStep => {
-    if (!completedSteps.includes('timeSlots')) return 'timeSlots';
-    if (!completedSteps.includes('staff')) return 'staff';
-    if (!completedSteps.includes('children')) return 'children';
+    for (const step of SETUP_STEPS) {
+      if (!completedSteps.includes(step.id)) return step.id;
+    }
     return 'completed';
   }, [completedSteps]);
 
@@ -156,7 +193,7 @@ const defaultContextValue: SetupGuideContextType = {
   currentStepInfo: null,
   isSetupComplete: true,
   isLoading: false,
-  completedSteps: ['timeSlots', 'staff', 'children'],
+  completedSteps: ['facility', 'staff', 'children', 'shift', 'schedule', 'additionSettings'],
   canAccessMenu: () => true,
   getStepStatus: () => 'completed',
 };

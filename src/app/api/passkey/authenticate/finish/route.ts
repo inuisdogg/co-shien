@@ -14,48 +14,13 @@ export async function POST(request: NextRequest) {
       credential: credentialData,
       facilityCode,
       loginId,
+      expectedChallenge: clientChallenge,
+      discoverable,
     } = body;
 
-    if (!credentialData || !loginId) {
+    if (!credentialData) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
-        { status: 400 }
-      );
-    }
-
-    // 個人向けの場合、loginIdはメールアドレス
-    // usersテーブルからユーザーを検索 + サーバー側のチャレンジを取得
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id, email, passkey_challenge, passkey_challenge_expires')
-      .eq('email', loginId)
-      .eq('account_status', 'active')
-      .single();
-
-    if (userError || !userData) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
-    // サーバー側のチャレンジを検証
-    const expectedChallenge = userData.passkey_challenge;
-    if (!expectedChallenge) {
-      return NextResponse.json(
-        { error: 'No challenge found. Please start authentication again.' },
-        { status: 400 }
-      );
-    }
-
-    // チャレンジの有効期限を確認
-    if (userData.passkey_challenge_expires && new Date(userData.passkey_challenge_expires) < new Date()) {
-      await supabase
-        .from('users')
-        .update({ passkey_challenge: null, passkey_challenge_expires: null })
-        .eq('id', userData.id);
-      return NextResponse.json(
-        { error: 'Challenge expired. Please start authentication again.' },
         { status: 400 }
       );
     }
@@ -69,6 +34,89 @@ export async function POST(request: NextRequest) {
 
     // クレデンシャルIDからパスキーを取得
     const credentialIdBase64 = credentialData.id || credentialData.rawId;
+
+    let userData: any;
+    let expectedChallenge: string;
+
+    if (discoverable || !loginId) {
+      // ===== Discoverable Credential フロー =====
+      // credential IDからパスキーを検索し、ユーザーを特定する
+      const { data: passkeyLookup, error: lookupError } = await supabase
+        .from('passkeys')
+        .select('user_id')
+        .eq('credential_id', credentialIdBase64)
+        .single();
+
+      if (lookupError || !passkeyLookup) {
+        return NextResponse.json(
+          { error: 'Passkey not found' },
+          { status: 404 }
+        );
+      }
+
+      const { data: userLookup, error: userLookupError } = await supabase
+        .from('users')
+        .select('id, email, passkey_challenge, passkey_challenge_expires')
+        .eq('id', passkeyLookup.user_id)
+        .eq('account_status', 'active')
+        .single();
+
+      if (userLookupError || !userLookup) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+
+      userData = userLookup;
+
+      // Discoverableフローではクライアントから渡されたチャレンジを使用
+      expectedChallenge = clientChallenge;
+      if (!expectedChallenge) {
+        return NextResponse.json(
+          { error: 'No challenge found. Please start authentication again.' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // ===== 通常フロー（loginId指定） =====
+      const { data: userFound, error: userError } = await supabase
+        .from('users')
+        .select('id, email, passkey_challenge, passkey_challenge_expires')
+        .eq('email', loginId)
+        .eq('account_status', 'active')
+        .single();
+
+      if (userError || !userFound) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+
+      userData = userFound;
+
+      // サーバー側のチャレンジを検証
+      expectedChallenge = userData.passkey_challenge;
+      if (!expectedChallenge) {
+        return NextResponse.json(
+          { error: 'No challenge found. Please start authentication again.' },
+          { status: 400 }
+        );
+      }
+
+      // チャレンジの有効期限を確認
+      if (userData.passkey_challenge_expires && new Date(userData.passkey_challenge_expires) < new Date()) {
+        await supabase
+          .from('users')
+          .update({ passkey_challenge: null, passkey_challenge_expires: null })
+          .eq('id', userData.id);
+        return NextResponse.json(
+          { error: 'Challenge expired. Please start authentication again.' },
+          { status: 400 }
+        );
+      }
+    }
 
     const { data: passkeyData, error: passkeyError } = await supabase
       .from('passkeys')
@@ -129,18 +177,10 @@ export async function POST(request: NextRequest) {
     // チャレンジをデコード
     const decodedChallenge = base64UrlDecode(expectedChallenge);
 
-    // RP IDを決定
-    const rpID = (() => {
-      const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
-      const hostname = host.split(':')[0];
-      if (hostname.startsWith('biz.') || hostname.includes('biz.Roots')) {
-        return 'biz.Roots.inu.co.jp';
-      }
-      return 'my.Roots.inu.co.jp';
-    })();
+    // RP IDを決定（単一ドメイン roots.inu.co.jp でパスベースルーティング）
+    const rpID = 'roots.inu.co.jp';
 
-    const origin = request.headers.get('origin') || 
-      `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || request.headers.get('x-forwarded-host') || rpID}`;
+    const origin = request.headers.get('origin') || `https://${rpID}`;
 
     // 認証レスポンスを検証
     // 最新の@simplewebauthn/serverでは、credentialオブジェクトとして渡す

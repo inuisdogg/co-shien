@@ -46,7 +46,7 @@ const StaffAvatar: React.FC<StaffAvatarProps> = ({
 
   return (
     <div
-      className={`${sizeConfig.container} rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0 ${className}`}
+      className={`${sizeConfig.container} rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0 ${className}`}
     >
       <span className={`text-white font-bold ${sizeConfig.text}`}>
         {initial}

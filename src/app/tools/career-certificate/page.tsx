@@ -6,6 +6,7 @@
  */
 
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   FileText,
@@ -52,7 +53,7 @@ const steps = [
     title: '証明書を自動生成',
     description:
       '登録したキャリア情報から、施設ごと・法人ごとに実務経験証明書を自動作成。プレビューで内容を確認できます。',
-    color: 'bg-indigo-500',
+    color: 'bg-personal',
   },
   {
     number: '03',
@@ -102,14 +103,12 @@ export default function CareerCertificatePage() {
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/tools" className="flex items-center gap-2 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-lg transition-transform group-hover:scale-105">
-              R
-            </div>
+            <Image src="/logo.svg" alt="Roots" width={80} height={22} className="h-5 w-auto" />
             <span className="text-xl font-bold text-gray-900">Roots Tools</span>
           </Link>
           <Link
             href="/career"
-            className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98]"
+            className="inline-flex items-center gap-1.5 rounded-full bg-personal px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-personal-dark hover:shadow-md active:scale-[0.98]"
           >
             無料で登録
             <ArrowRight className="h-4 w-4" />
@@ -126,14 +125,14 @@ export default function CareerCertificatePage() {
 
         <div className="mx-auto max-w-6xl px-4 pb-12 pt-16 sm:px-6 sm:pb-20 sm:pt-24 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-sm font-medium text-indigo-700">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-sm font-medium text-personal-dark">
               <PenTool className="h-4 w-4" />
               Rootsキャリア Premium
             </div>
 
             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
               実務経験証明書を
-              <span className="mt-1 block bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="mt-1 block bg-gradient-to-r from-personal to-personal-dark bg-clip-text text-transparent">
                 デジタルで発行・署名
               </span>
             </h1>
@@ -149,7 +148,7 @@ export default function CareerCertificatePage() {
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link
                 href="/career"
-                className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-8 py-3.5 text-base font-bold text-white shadow-lg transition-all hover:bg-indigo-700 hover:shadow-xl active:scale-[0.98]"
+                className="inline-flex items-center gap-2 rounded-full bg-personal px-8 py-3.5 text-base font-bold text-white shadow-lg transition-all hover:bg-personal-dark hover:shadow-xl active:scale-[0.98]"
               >
                 Rootsキャリアに無料登録
                 <ArrowRight className="h-5 w-5" />
@@ -200,7 +199,7 @@ export default function CareerCertificatePage() {
 
             {/* After */}
             <div className="rounded-2xl border-2 border-indigo-300 bg-white p-6 shadow-lg sm:p-8">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-600">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-personal">
                 <CloudLightning className="h-3.5 w-3.5" />
                 Rootsなら
               </div>
@@ -213,14 +212,14 @@ export default function CareerCertificatePage() {
                   '署名済み証明書をクラウドに保管',
                 ].map((text, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-indigo-500" />
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-personal" />
                     <span className="font-medium">{text}</span>
                   </li>
                 ))}
               </ul>
               <div className="mt-4 rounded-lg bg-indigo-50 p-3 text-center">
-                <span className="text-lg font-extrabold text-indigo-600">最短即日</span>
-                <span className="ml-1 text-sm text-indigo-500">で署名済み証明書を取得</span>
+                <span className="text-lg font-extrabold text-personal">最短即日</span>
+                <span className="ml-1 text-sm text-personal">で署名済み証明書を取得</span>
               </div>
             </div>
           </div>
@@ -288,7 +287,7 @@ export default function CareerCertificatePage() {
                   'PDF形式でダウンロード・印刷も可能',
                 ].map((text) => (
                   <li key={text} className="flex items-center gap-3 text-sm text-gray-700">
-                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-indigo-500" />
+                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-personal" />
                     {text}
                   </li>
                 ))}
@@ -327,11 +326,11 @@ export default function CareerCertificatePage() {
                       <div>社会福祉法人○○</div>
                       <div>施設長 鈴木 太郎</div>
                     </div>
-                    <div className="w-8 h-8 rounded-full border-2 border-indigo-400 flex items-center justify-center">
-                      <PenTool className="w-3 h-3 text-indigo-500" />
+                    <div className="w-8 h-8 rounded-full border-2 border-personal flex items-center justify-center">
+                      <PenTool className="w-3 h-3 text-personal" />
                     </div>
                   </div>
-                  <div className="text-center mt-3 text-[8px] text-indigo-500 font-medium">
+                  <div className="text-center mt-3 text-[8px] text-personal font-medium">
                     電子署名済み
                   </div>
                 </div>
@@ -353,7 +352,7 @@ export default function CareerCertificatePage() {
                 key={benefit.title}
                 className="rounded-2xl border border-gray-200 bg-white p-6 transition-shadow hover:shadow-md"
               >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-personal">
                   {benefit.icon}
                 </div>
                 <h3 className="font-bold text-gray-900">{benefit.title}</h3>
@@ -393,7 +392,7 @@ export default function CareerCertificatePage() {
                       内容をご確認の上、電子署名をお願いできますでしょうか。<br />
                       下記のリンクから証明書の確認・署名が可能です。
                     </p>
-                    <div className="mt-3 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white">
+                    <div className="mt-3 inline-flex items-center gap-1 rounded-lg bg-personal px-4 py-2 text-xs font-medium text-white">
                       <Send className="h-3 w-3" />
                       証明書を確認・署名する
                     </div>
@@ -405,7 +404,7 @@ export default function CareerCertificatePage() {
             {/* Arrow */}
             <div className="flex justify-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100">
-                <ArrowRight className="h-5 w-5 text-indigo-600 rotate-90" />
+                <ArrowRight className="h-5 w-5 text-personal rotate-90" />
               </div>
             </div>
 
@@ -429,7 +428,7 @@ export default function CareerCertificatePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-20 sm:py-28">
+      <section className="relative overflow-hidden bg-gradient-to-br from-personal via-personal-dark to-personal-dark py-20 sm:py-28">
         <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full bg-white/5" />
         <div className="absolute -bottom-16 -right-16 h-56 w-56 rounded-full bg-white/5" />
 
@@ -448,7 +447,7 @@ export default function CareerCertificatePage() {
           <div className="mt-10">
             <Link
               href="/career"
-              className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-indigo-700 shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-personal-dark shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
             >
               Rootsキャリアに無料登録
               <ArrowRight className="h-5 w-5" />
@@ -466,16 +465,14 @@ export default function CareerCertificatePage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-sm">
-                R
-              </div>
+              <Image src="/logo.svg" alt="Roots" width={80} height={22} className="h-5 w-auto" />
               <span className="text-lg font-bold text-gray-900">Roots</span>
             </Link>
             <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-              <Link href="/tools" className="hover:text-indigo-600 transition-colors">
+              <Link href="/tools" className="hover:text-personal transition-colors">
                 ツール一覧
               </Link>
-              <Link href="/career" className="hover:text-indigo-600 transition-colors">
+              <Link href="/career" className="hover:text-personal transition-colors">
                 キャリアプラットフォーム
               </Link>
             </nav>

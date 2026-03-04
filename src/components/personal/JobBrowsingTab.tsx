@@ -11,6 +11,7 @@ import {
   ApplicationStatus,
 } from '@/types';
 import { calculateMatchScore } from '@/lib/jobMatcher';
+import { useToast } from '@/components/ui/Toast';
 import { geocodeAddress, haversineDistance, PREFECTURE_LIST, FACILITY_TYPES } from '@/lib/geocoding';
 import {
   Heart,
@@ -36,6 +37,8 @@ import {
   Zap,
 } from 'lucide-react';
 import FacilityReviewSection from '@/components/personal/FacilityReviewSection';
+import ScoutInboxSection from '@/components/personal/ScoutInboxSection';
+import { parseQualifications } from '@/utils/qualifications';
 
 // ================================================================
 // Props
@@ -49,7 +52,7 @@ interface JobBrowsingTabProps {
 // Types (internal)
 // ================================================================
 
-type TabKey = 'recommended' | 'full_time' | 'part_time' | 'spot' | 'favorites' | 'applications';
+type TabKey = 'browse' | 'full_time' | 'part_time' | 'spot' | 'favorites' | 'applications' | 'scout' | 'recommended' | 'job_list';
 
 type SortKey = 'recommended' | 'salary_high' | 'salary_low' | 'newest' | 'distance';
 
@@ -100,12 +103,19 @@ type RecruitmentMessage = {
 // ================================================================
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: 'recommended', label: 'おすすめ' },
+  { key: 'browse', label: '探す' },
+  { key: 'applications', label: '応募済み' },
+  { key: 'scout', label: 'スカウト' },
+  { key: 'favorites', label: '保存済み' },
+];
+
+type JobListFilter = 'all' | 'full_time' | 'part_time' | 'spot';
+
+const JOB_LIST_FILTERS: { key: JobListFilter; label: string }[] = [
+  { key: 'all', label: '全て' },
   { key: 'full_time', label: '正社員' },
   { key: 'part_time', label: 'パート' },
   { key: 'spot', label: 'スポット' },
-  { key: 'favorites', label: 'お気に入り' },
-  { key: 'applications', label: '応募状況' },
 ];
 
 // ================================================================
@@ -113,7 +123,7 @@ const TABS: { key: TabKey; label: string }[] = [
 // ================================================================
 
 const JOB_TYPE_BADGE: Record<string, { label: string; bg: string; text: string }> = {
-  full_time: { label: '正社員', bg: 'bg-indigo-100', text: 'text-indigo-700' },
+  full_time: { label: '正社員', bg: 'bg-indigo-100', text: 'text-personal-dark' },
   part_time: { label: 'パート', bg: 'bg-emerald-100', text: 'text-emerald-700' },
   spot: { label: 'スポット', bg: 'bg-amber-100', text: 'text-amber-700' },
 };
@@ -128,7 +138,7 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   applied: { label: '応募済み', className: 'bg-blue-100 text-blue-700' },
   screening: { label: '選考中', className: 'bg-yellow-100 text-yellow-700' },
   interview_scheduled: { label: '面接予定', className: 'bg-purple-100 text-purple-700' },
-  interviewed: { label: '面接完了', className: 'bg-indigo-100 text-indigo-700' },
+  interviewed: { label: '面接完了', className: 'bg-indigo-100 text-personal-dark' },
   offer_sent: { label: '内定', className: 'bg-green-100 text-green-700' },
   offer_accepted: { label: '内定承諾', className: 'bg-green-100 text-green-700' },
   hired: { label: '採用', className: 'bg-emerald-100 text-emerald-800' },
@@ -314,8 +324,10 @@ function mapSpotShift(row: Record<string, unknown>): SpotWorkShift {
 // ================================================================
 
 export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
+  const { toast } = useToast();
   // ---- State: tabs & search ----
-  const [activeTab, setActiveTab] = useState<TabKey>('recommended');
+  const [activeTab, setActiveTab] = useState<TabKey>('browse');
+  const [jobListFilter, setJobListFilter] = useState<JobListFilter>('all');
   const [keyword, setKeyword] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('recommended');
   const tabScrollRef = useRef<HTMLDivElement>(null);
@@ -483,13 +495,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         .order('years_of_experience', { ascending: false })
         .limit(1);
 
-      const quals: string[] = userData
-        ? Array.isArray(userData.qualifications)
-          ? userData.qualifications
-          : typeof userData.qualifications === 'string' && userData.qualifications
-            ? (userData.qualifications as string).split(',').map((q: string) => q.trim())
-            : []
-        : [];
+      const quals: string[] = userData ? parseQualifications(userData.qualifications) : [];
 
       const expYears =
         staffData && staffData.length > 0
@@ -650,6 +656,12 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
 
     // Tab-specific filters
     switch (activeTab) {
+      case 'browse':
+        // "探す" tab: show all jobs, apply job list filter if set
+        if (jobListFilter !== 'all') {
+          jobs = jobs.filter((j) => j.jobType === jobListFilter);
+        }
+        break;
       case 'full_time':
         jobs = jobs.filter((j) => j.jobType === 'full_time');
         break;
@@ -658,6 +670,11 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         break;
       case 'spot':
         jobs = jobs.filter((j) => j.jobType === 'spot');
+        break;
+      case 'job_list':
+        if (jobListFilter !== 'all') {
+          jobs = jobs.filter((j) => j.jobType === jobListFilter);
+        }
         break;
       case 'favorites':
         jobs = jobs.filter((j) => favoriteIds.has(j.id));
@@ -1027,7 +1044,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         .single();
 
       if (userErr || !userData?.name) {
-        alert('プロフィール（氏名）を先に設定してください。');
+        toast.warning('プロフィール（氏名）を先に設定してください。');
         setQuickApplying(false);
         return;
       }
@@ -1257,14 +1274,14 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
           )}
 
           {/* Match score (recommended tab only) */}
-          {activeTab === 'recommended' && matchInfo && matchInfo.score > 0 && (
+          {activeTab === 'browse' && matchInfo && matchInfo.score > 0 && (
             <div className="flex items-center gap-1.5 pt-1">
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                   matchInfo.score >= 60
                     ? 'bg-emerald-100 text-emerald-700'
                     : matchInfo.score >= 30
-                      ? 'bg-indigo-100 text-indigo-700'
+                      ? 'bg-indigo-100 text-personal-dark'
                       : 'bg-gray-100 text-gray-600'
                 }`}
               >
@@ -1278,7 +1295,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
           <div className="flex justify-end pt-2">
             <button
               onClick={() => openJobDetail(job)}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-personal hover:text-personal-dark transition-colors"
             >
               詳しく見る
               <ChevronRight className="h-3.5 w-3.5" />
@@ -1335,7 +1352,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
 
         {/* Footer */}
         <div className="flex justify-end pt-2">
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-personal">
             詳細を見る
             <ChevronRight className="h-3.5 w-3.5" />
           </span>
@@ -1477,7 +1494,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 {job.requiredQualifications.map((q) => (
                   <span
                     key={q}
-                    className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700"
+                    className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-personal-dark"
                   >
                     {qualificationLabel(q)}
                   </span>
@@ -1577,7 +1594,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 setInquirySuccess(false);
               }
             }}
-            className="flex-1 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+            className="flex-1 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-personal-dark hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
           >
             <MessageCircle className="h-4 w-4" />
             問い合わせ
@@ -1608,7 +1625,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
               </button>
               <button
                 onClick={() => setShowApplyModal(true)}
-                className="flex-1 rounded-xl bg-indigo-600 px-3 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1.5"
+                className="flex-1 rounded-xl bg-personal px-3 py-3 text-sm font-bold text-white hover:bg-personal-dark transition-colors flex items-center justify-center gap-1.5"
               >
                 <Briefcase className="h-4 w-4" />
                 応募する
@@ -1619,7 +1636,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
               onClick={() => {
                 window.location.href = '/login';
               }}
-              className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors"
+              className="flex-1 rounded-xl bg-personal px-4 py-3 text-sm font-bold text-white hover:bg-personal-dark transition-colors"
             >
               ログインして応募
             </button>
@@ -1637,7 +1654,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     if (!showApplyModal || !selectedJob) return null;
 
     return (
-      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center">
         <div
           className="absolute inset-0 bg-black/40"
           onClick={() => {
@@ -1711,7 +1728,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                             }}
                             className={`w-9 h-9 rounded-full text-xs font-bold transition-colors ${
                               isSelected
-                                ? 'bg-indigo-600 text-white'
+                                ? 'bg-personal text-white'
                                 : 'bg-white border border-gray-300 text-gray-600 hover:border-indigo-300'
                             }`}
                           >
@@ -1804,7 +1821,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 <button
                   onClick={handleApply}
                   disabled={applying}
-                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 rounded-xl bg-personal px-4 py-3 text-sm font-bold text-white hover:bg-personal-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {applying ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1830,7 +1847,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
     if (!showInquiryModal || !selectedJob) return null;
 
     return (
-      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center">
         <div
           className="absolute inset-0 bg-black/40"
           onClick={() => {
@@ -1901,7 +1918,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 <button
                   onClick={handleInquiry}
                   disabled={sendingInquiry || !inquiryMessage.trim()}
-                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 rounded-xl bg-personal px-4 py-3 text-sm font-bold text-white hover:bg-personal-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {sendingInquiry ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1998,7 +2015,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                       className={`absolute left-[-20px] top-1 h-3 w-3 rounded-full border-2 ${
                         isActive && !isTerminal
                           ? isCurrent
-                            ? 'bg-indigo-600 border-indigo-600'
+                            ? 'bg-personal border-personal'
                             : 'bg-indigo-400 border-indigo-400'
                           : 'bg-white border-gray-300'
                       }`}
@@ -2070,7 +2087,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
             <h2 className="text-sm font-bold text-gray-900 mb-3">メッセージ</h2>
             {loadingMessages ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                <Loader2 className="h-5 w-5 animate-spin text-personal" />
               </div>
             ) : appMessages.length === 0 ? (
               <div className="text-center py-6 text-sm text-gray-400">
@@ -2088,7 +2105,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                       <div
                         className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
                           isMe
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-personal text-white'
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
@@ -2140,7 +2157,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
             <button
               onClick={handleSendMessage}
               disabled={sendingMessage || !newMessage.trim()}
-              className="rounded-full bg-indigo-600 p-2.5 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40"
+              className="rounded-full bg-personal p-2.5 text-white hover:bg-personal-dark transition-colors disabled:opacity-40"
             >
               {sendingMessage ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2159,10 +2176,12 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
   // ================================================================
 
   const isJobListTab =
+    activeTab === 'browse' ||
     activeTab === 'recommended' ||
     activeTab === 'full_time' ||
     activeTab === 'part_time' ||
     activeTab === 'spot' ||
+    activeTab === 'job_list' ||
     activeTab === 'favorites';
 
   return (
@@ -2204,7 +2223,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 onClick={() => setActiveTab(tab.key)}
                 className={`relative flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-personal text-white shadow-sm'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -2220,6 +2239,27 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         </div>
       </div>
 
+      {/* ========== Job list filter chips ========== */}
+      {(activeTab === 'browse' || activeTab === 'job_list') && (
+        <div className="bg-white border-b border-gray-100">
+          <div className="flex gap-2 px-4 py-2">
+            {JOB_LIST_FILTERS.map((filter) => (
+              <button
+                key={filter.key}
+                onClick={() => setJobListFilter(filter.key)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                  jobListFilter === filter.key
+                    ? 'bg-personal text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ========== Sort bar + Filter button ========== */}
       {isJobListTab && !loadingJobs && (
         <div className="bg-white border-b border-gray-100">
@@ -2233,14 +2273,14 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 onClick={() => setShowFilters((v) => !v)}
                 className={`relative inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   showFilters || activeFilterCount > 0
-                    ? 'bg-indigo-100 text-indigo-700'
+                    ? 'bg-indigo-100 text-personal-dark'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 絞り込み
                 {activeFilterCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-personal text-[10px] font-bold text-white">
                     {activeFilterCount}
                   </span>
                 )}
@@ -2357,7 +2397,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                         }}
                         className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                           isSelected
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-personal text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
@@ -2373,7 +2413,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
                 <div className="flex justify-end">
                   <button
                     onClick={clearAllFilters}
-                    className="inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    className="inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-xs font-medium text-personal hover:bg-indigo-50 transition-colors"
                   >
                     <X className="h-3 w-3" />
                     フィルターをクリア
@@ -2388,17 +2428,17 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       {/* ========== Tab Content ========== */}
       <div className="px-4 py-4">
         {/* Recommended tab: show login teaser if no user */}
-        {activeTab === 'recommended' && !userId && (
+        {activeTab === 'browse' && !userId && (
           <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-6 text-center mb-4">
             <Briefcase className="h-10 w-10 text-indigo-300 mx-auto mb-3" />
-            <p className="text-sm text-indigo-700 font-medium">
+            <p className="text-sm text-personal-dark font-medium">
               ログインするとあなたにぴったりの求人が表示されます
             </p>
             <button
               onClick={() => {
                 window.location.href = '/login';
               }}
-              className="mt-3 inline-flex items-center gap-1 rounded-full bg-indigo-600 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-700 transition-colors"
+              className="mt-3 inline-flex items-center gap-1 rounded-full bg-personal px-5 py-2 text-sm font-bold text-white hover:bg-personal-dark transition-colors"
             >
               ログイン
             </button>
@@ -2408,7 +2448,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         {/* Job list tabs */}
         {isJobListTab && (
           <>
-            {loadingJobs || (activeTab === 'recommended' && loadingRecommended) ? (
+            {loadingJobs || (activeTab === 'browse' && loadingRecommended) ? (
               renderSkeleton()
             ) : filteredJobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 py-16 text-center bg-white">
@@ -2458,14 +2498,14 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
             {!userId ? (
               <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-6 text-center">
                 <Briefcase className="h-10 w-10 text-indigo-300 mx-auto mb-3" />
-                <p className="text-sm text-indigo-700 font-medium">
+                <p className="text-sm text-personal-dark font-medium">
                   ログインして応募状況を確認しましょう
                 </p>
                 <button
                   onClick={() => {
                     window.location.href = '/login';
                   }}
-                  className="mt-3 inline-flex items-center gap-1 rounded-full bg-indigo-600 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-700 transition-colors"
+                  className="mt-3 inline-flex items-center gap-1 rounded-full bg-personal px-5 py-2 text-sm font-bold text-white hover:bg-personal-dark transition-colors"
                 >
                   ログイン
                 </button>
@@ -2502,6 +2542,11 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
               </div>
             )}
           </>
+        )}
+
+        {/* Scout tab */}
+        {activeTab === 'scout' && (
+          <ScoutInboxSection userId={userId} />
         )}
       </div>
 

@@ -21,6 +21,7 @@ import type {
   ProfitLossLineItem,
   ExpenseSummary,
 } from '@/types/expense';
+import { parseQualifications } from '@/utils/qualifications';
 
 // ---------- Helpers ----------
 
@@ -198,7 +199,7 @@ export function exportWorkScheduleToExcel(
       : sa.workStyle === 'fulltime_concurrent' ? '兼務' : '-';
 
     const role = sa.role || '-';
-    const qualStr = (sa.qualifications ?? []).join(', ') || '-';
+    const qualStr = parseQualifications(sa.qualifications).join(', ') || '-';
 
     const row: unknown[] = [
       idx + 1,

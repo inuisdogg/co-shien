@@ -9,10 +9,24 @@ export type StaffSortField =
   | 'name'
   | 'nameKana'
   | 'type'
+  | 'rolePriority'
   | 'yearsOfExperience'
   | 'createdAt'
   | 'personnelType'
-  | 'workStyle';
+  | 'workStyle'
+  | 'department'
+  | 'position';
+
+/**
+ * 役職優先度を取得（小さい=上位）
+ */
+export function getStaffRolePriority(staff: StaffWithSettings): number {
+  if (staff.role === '管理者') return 1;
+  if (staff.role === 'マネージャー' || staff.personnelSettings?.isServiceManager) return 2;
+  if (staff.type === '常勤') return 3;
+  if (staff.type === '非常勤') return 4;
+  return 5;
+}
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -40,6 +54,12 @@ export function sortStaff(
     let bValue: string | number | undefined;
 
     switch (field) {
+      case 'rolePriority': {
+        const aPri = getStaffRolePriority(a);
+        const bPri = getStaffRolePriority(b);
+        if (aPri !== bPri) return (aPri - bPri) * multiplier;
+        return (a.name || '').localeCompare(b.name || '', 'ja');
+      }
       case 'name':
         aValue = a.name || '';
         bValue = b.name || '';
@@ -67,6 +87,14 @@ export function sortStaff(
       case 'workStyle':
         aValue = a.personnelSettings?.workStyle || 'zzz';
         bValue = b.personnelSettings?.workStyle || 'zzz';
+        break;
+      case 'department':
+        aValue = a.department || 'zzz';
+        bValue = b.department || 'zzz';
+        break;
+      case 'position':
+        aValue = a.position || 'zzz';
+        bValue = b.position || 'zzz';
         break;
       default:
         return 0;
@@ -96,25 +124,52 @@ export function searchStaff(
   const normalizedQuery = query.toLowerCase().trim();
 
   return staffList.filter((staff) => {
-    // 名前で検索
-    if (staff.name?.toLowerCase().includes(normalizedQuery)) return true;
+    try {
+      // 名前で検索
+      if (staff.name && staff.name.toLowerCase().includes(normalizedQuery)) return true;
 
-    // かな名で検索
-    if (staff.nameKana?.toLowerCase().includes(normalizedQuery)) return true;
+      // かな名で検索
+      if (staff.nameKana && staff.nameKana.toLowerCase().includes(normalizedQuery)) return true;
 
-    // 職種で検索
-    if (staff.type?.toLowerCase().includes(normalizedQuery)) return true;
+      // 職種で検索
+      if (staff.type && staff.type.toLowerCase().includes(normalizedQuery)) return true;
 
-    // 資格で検索（personnelSettingsから）
-    if (
-      staff.personnelSettings?.qualifications?.some((q: string) =>
-        q.toLowerCase().includes(normalizedQuery)
-      )
-    ) {
-      return true;
+      // 役職で検索
+      if (staff.role && staff.role.toLowerCase().includes(normalizedQuery)) return true;
+
+      // メールで検索
+      if (staff.email && staff.email.toLowerCase().includes(normalizedQuery)) return true;
+
+      // 役職で検索
+      if (staff.position && staff.position.toLowerCase().includes(normalizedQuery)) return true;
+
+      // 部門で検索
+      if (staff.department && staff.department.toLowerCase().includes(normalizedQuery)) return true;
+
+      // 資格で検索（Staffオブジェクトのqualificationsから）
+      if (
+        Array.isArray(staff.qualifications) &&
+        staff.qualifications.some((q: string) =>
+          q && q.toLowerCase().includes(normalizedQuery)
+        )
+      ) {
+        return true;
+      }
+
+      // 資格で検索（personnelSettingsから ― JOINデータがある場合）
+      if (
+        Array.isArray(staff.personnelSettings?.qualifications) &&
+        staff.personnelSettings!.qualifications!.some((q: string) =>
+          q && q.toLowerCase().includes(normalizedQuery)
+        )
+      ) {
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
     }
-
-    return false;
   });
 }
 

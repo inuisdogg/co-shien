@@ -398,7 +398,7 @@ const QualificationManagementPanel: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="スタッフ名・資格名で検索..."
-            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         </div>
         <button
@@ -533,7 +533,7 @@ const QualificationManagementPanel: React.FC = () => {
                   <select
                     value={form.userId}
                     onChange={(e) => setForm({ ...form, userId: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] appearance-none"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary appearance-none"
                   >
                     <option value="">スタッフを選択</option>
                     {staffList.map((s) => (
@@ -557,7 +557,7 @@ const QualificationManagementPanel: React.FC = () => {
                     }}
                     onFocus={() => setShowQualDropdown(true)}
                     onBlur={() => setTimeout(() => setShowQualDropdown(false), 200)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     placeholder="資格名を入力または選択"
                   />
                   {showQualDropdown && (
@@ -589,7 +589,7 @@ const QualificationManagementPanel: React.FC = () => {
                   type="text"
                   value={form.certificateNumber}
                   onChange={(e) => setForm({ ...form, certificateNumber: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   placeholder="証明書番号"
                 />
               </div>
@@ -602,7 +602,7 @@ const QualificationManagementPanel: React.FC = () => {
                     type="date"
                     value={form.issuedDate}
                     onChange={(e) => setForm({ ...form, issuedDate: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
                 <div>
@@ -611,7 +611,7 @@ const QualificationManagementPanel: React.FC = () => {
                     type="date"
                     value={form.expiryDate}
                     onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
               </div>
@@ -642,7 +642,7 @@ const QualificationManagementPanel: React.FC = () => {
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   placeholder="メモ..."
                 />
               </div>

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useChangeNotifications } from '@/hooks/useChangeNotifications';
 
 interface Addition {
   code: string;
@@ -82,6 +83,7 @@ const QUALIFICATION_LABELS: Record<string, string> = {
 export default function AdditionSettingsView() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
+  const { createNotification } = useChangeNotifications();
 
   const [additions, setAdditions] = useState<Addition[]>([]);
   const [categories, setCategories] = useState<AdditionCategory[]>([]);
@@ -90,6 +92,7 @@ export default function AdditionSettingsView() {
   const [loading, setLoading] = useState(true);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string>('all');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [showAdditionAlert, setShowAdditionAlert] = useState<{ name: string; enabled: boolean } | null>(null);
 
   useEffect(() => {
     if (!facilityId) return;
@@ -187,6 +190,8 @@ export default function AdditionSettingsView() {
   const handleToggle = async (code: string) => {
     const currentSetting = settings.find(s => s.additionCode === code);
     const newEnabled = !currentSetting?.isEnabled;
+    const additionInfo = additions.find(a => a.code === code);
+    const additionName = additionInfo?.name || code;
 
     try {
       if (currentSetting) {
@@ -220,6 +225,19 @@ export default function AdditionSettingsView() {
           }]);
         }
       }
+
+      // 加算変更 → 変更届通知を自動作成（前月15日期限）
+      const action = newEnabled ? '算定開始' : '算定終了';
+      await createNotification(
+        'subsidy',
+        `加算「${additionName}」を${action}しました。翌月から適用する場合、前月15日までに届出が必要です。`,
+        { addition: additionName, enabled: !newEnabled },
+        { addition: additionName, enabled: newEnabled },
+      );
+
+      // アラート表示
+      setShowAdditionAlert({ name: additionName, enabled: newEnabled });
+      setTimeout(() => setShowAdditionAlert(null), 8000);
     } catch (error) {
       console.error('Error toggling addition:', error);
     }
@@ -228,16 +246,40 @@ export default function AdditionSettingsView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* 加算変更アラート */}
+      {showAdditionAlert && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 animate-in fade-in">
+          <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-bold text-amber-800 text-sm">
+              加算「{showAdditionAlert.name}」を{showAdditionAlert.enabled ? '有効' : '無効'}にしました
+            </p>
+            <p className="text-xs text-amber-700 mt-1">
+              {showAdditionAlert.enabled
+                ? '翌月から算定を開始する場合、前月15日までに届出書（加算届）の提出が必要です。変更届タブで書類を自動生成できます。'
+                : '加算の算定を終了する場合も届出が必要です。変更届タブをご確認ください。'
+              }
+            </p>
+            <p className="text-[10px] text-amber-600 mt-1">
+              必要書類: 届出書（加算届）、勤務体制一覧表、資格証明書
+            </p>
+          </div>
+          <button onClick={() => setShowAdditionAlert(null)} className="text-amber-400 hover:text-amber-600 shrink-0">
+            <span className="text-lg">&times;</span>
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3">
-        <ListChecks className="w-6 h-6 text-[#00c4cc]" />
+        <ListChecks className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-bold text-gray-800">加算体制設定</h1>
       </div>
 
@@ -245,7 +287,7 @@ export default function AdditionSettingsView() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#00c4cc]/10 rounded-lg"><CheckCircle className="w-5 h-5 text-[#00c4cc]" /></div>
+            <div className="p-2 bg-primary/10 rounded-lg"><CheckCircle className="w-5 h-5 text-primary" /></div>
             <div>
               <p className="text-sm text-gray-500">有効な加算</p>
               <p className="text-2xl font-bold text-gray-800">{stats.enabledCount}</p>
@@ -275,9 +317,9 @@ export default function AdditionSettingsView() {
       {/* Type Filter */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setActiveTypeFilter('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === 'all' ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全て</button>
+          <button onClick={() => setActiveTypeFilter('all')} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>全て</button>
           {Object.entries(ADDITION_TYPE_LABELS).map(([k, v]) => (
-            <button key={k} onClick={() => setActiveTypeFilter(k)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === k ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{v}</button>
+            <button key={k} onClick={() => setActiveTypeFilter(k)} className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTypeFilter === k ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{v}</button>
           ))}
         </div>
       </div>
@@ -297,7 +339,7 @@ export default function AdditionSettingsView() {
                 className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-1 h-8 bg-[#00c4cc] rounded-full" />
+                  <div className="w-1 h-8 bg-primary rounded-full" />
                   <div className="text-left">
                     <p className="font-medium text-gray-800">{cat.name}</p>
                     <p className="text-xs text-gray-500">{catAdditions.length}種類 / {enabledInCat}件有効</p>
@@ -311,7 +353,7 @@ export default function AdditionSettingsView() {
                     const enabled = isEnabled(addition.code);
                     const req = requirements.find(r => r.additionCode === addition.code);
                     return (
-                      <div key={addition.code} className={`p-4 ${enabled ? 'bg-[#00c4cc]/5' : ''}`}>
+                      <div key={addition.code} className={`p-4 ${enabled ? 'bg-primary/5' : ''}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
@@ -327,7 +369,7 @@ export default function AdditionSettingsView() {
                           </div>
                           <button onClick={() => handleToggle(addition.code)} className="flex-shrink-0">
                             {enabled
-                              ? <ToggleRight className="w-10 h-6 text-[#00c4cc]" />
+                              ? <ToggleRight className="w-10 h-6 text-primary" />
                               : <ToggleLeft className="w-10 h-6 text-gray-300" />
                             }
                           </button>

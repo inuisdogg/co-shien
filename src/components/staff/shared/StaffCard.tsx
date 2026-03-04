@@ -15,6 +15,8 @@ import {
   Shield,
   Star,
   ChevronRight,
+  AlertTriangle,
+  Briefcase,
 } from 'lucide-react';
 import { Staff, StaffPersonnelSettings, QUALIFICATION_CODES } from '@/types';
 import StaffAvatar from './StaffAvatar';
@@ -36,8 +38,11 @@ const StaffCard: React.FC<StaffCardProps> = ({
   onClick,
   actions,
 }) => {
-  // 資格ラベルを取得（personnelSettingsから取得）
-  const qualificationLabels = (personnelSettings?.qualifications || [])
+  // 資格ラベルを取得（Staffオブジェクトのqualificationsを優先、なければpersonnelSettingsから取得）
+  const rawQualifications = (Array.isArray(staff.qualifications) && staff.qualifications.length > 0)
+    ? staff.qualifications
+    : (personnelSettings?.qualifications || []);
+  const qualificationLabels = rawQualifications
     .slice(0, 3)
     .map((q: string) => QUALIFICATION_CODES[q as keyof typeof QUALIFICATION_CODES] || q);
 
@@ -45,20 +50,35 @@ const StaffCard: React.FC<StaffCardProps> = ({
   const getRoleBadges = () => {
     const badges: { label: string; color: string }[] = [];
 
-    if (personnelSettings?.isServiceManager) {
+    // 役職ベースのバッジ
+    if (staff.role === '管理者') {
+      badges.push({ label: '管理者', color: 'bg-blue-900 text-white' });
+    } else if (staff.role === 'マネージャー') {
       badges.push({ label: '児発管', color: 'bg-purple-100 text-purple-700' });
     }
-    if (personnelSettings?.isManager) {
-      badges.push({ label: '管理者', color: 'bg-blue-100 text-blue-700' });
+
+    // personnelSettingsベース（roleと重複しない場合のみ）
+    if (personnelSettings?.isServiceManager && staff.role !== 'マネージャー') {
+      badges.push({ label: '児発管', color: 'bg-purple-100 text-purple-700' });
+    }
+    if (personnelSettings?.isManager && staff.role !== '管理者') {
+      badges.push({ label: '管理者', color: 'bg-blue-900 text-white' });
     }
     if (personnelSettings?.personnelType === 'standard') {
-      badges.push({ label: '基準', color: 'bg-[#00c4cc]/10 text-[#00c4cc]' });
+      badges.push({ label: '基準', color: 'bg-primary/10 text-primary' });
     }
     if (personnelSettings?.personnelType === 'addition') {
       badges.push({ label: '加算', color: 'bg-orange-100 text-orange-700' });
     }
 
     return badges;
+  };
+
+  // 雇用形態バッジ
+  const getEmploymentTypeBadge = () => {
+    if (staff.type === '常勤') return { label: '常勤', color: 'bg-blue-100 text-blue-700' };
+    if (staff.type === '非常勤') return { label: '非常勤', color: 'bg-gray-100 text-gray-600' };
+    return null;
   };
 
   // 勤務形態ラベル
@@ -80,7 +100,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
       <div
         className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
           selected
-            ? 'bg-[#00c4cc]/5 border border-[#00c4cc]/20'
+            ? 'bg-primary/5 border border-primary/20'
             : 'hover:bg-gray-50 border border-transparent'
         }`}
         onClick={onClick}
@@ -107,7 +127,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
       <div
         className={`bg-white rounded-xl border p-4 transition-all ${
           selected
-            ? 'border-[#00c4cc]/30 shadow-md'
+            ? 'border-primary/30 shadow-md'
             : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
         } ${onClick ? 'cursor-pointer' : ''}`}
         onClick={onClick}
@@ -125,22 +145,43 @@ const StaffCard: React.FC<StaffCardProps> = ({
               )}
             </div>
 
-            {/* 役割バッジ */}
+            {/* 役割・雇用形態バッジ */}
             <div className="flex flex-wrap gap-1 mb-2">
               {getRoleBadges().map((badge, idx) => (
                 <span
                   key={idx}
-                  className={`text-xs px-2 py-0.5 rounded-full ${badge.color}`}
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.color}`}
                 >
                   {badge.label}
                 </span>
               ))}
+              {getEmploymentTypeBadge() && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getEmploymentTypeBadge()!.color}`}>
+                  {getEmploymentTypeBadge()!.label}
+                </span>
+              )}
               {getWorkStyleLabel() && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
                   {getWorkStyleLabel()}
                 </span>
               )}
+              {!personnelSettings?.personnelType && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium flex items-center gap-0.5">
+                  <AlertTriangle size={10} />
+                  要設定
+                </span>
+              )}
             </div>
+
+            {/* 役職・部門 */}
+            {(staff.position || staff.department) && (
+              <div className="flex items-center gap-1 text-xs text-gray-500 mb-0.5">
+                <Briefcase size={12} />
+                <span className="truncate">
+                  {[staff.position, staff.department].filter(Boolean).join(' / ')}
+                </span>
+              </div>
+            )}
 
             {/* 資格 */}
             {qualificationLabels.length > 0 && (
@@ -170,7 +211,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
   return (
     <div
       className={`bg-white rounded-xl border p-5 ${
-        selected ? 'border-[#00c4cc]/30 shadow-md' : 'border-gray-200'
+        selected ? 'border-primary/30 shadow-md' : 'border-gray-200'
       }`}
     >
       <div className="flex items-start gap-4">
@@ -180,7 +221,7 @@ const StaffCard: React.FC<StaffCardProps> = ({
             <img src={staff.profilePhotoUrl} alt={staff.name} className="w-full h-full object-cover" />
           </div>
         ) : (
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-2xl">
               {staff.name?.charAt(0) || '?'}
             </span>
@@ -215,6 +256,14 @@ const StaffCard: React.FC<StaffCardProps> = ({
 
           {/* 詳細情報 */}
           <div className="grid grid-cols-2 gap-3 text-sm">
+            {/* 役職・部門 */}
+            {(staff.position || staff.department) && (
+              <div className="flex items-center gap-2 text-gray-600">
+                <Briefcase size={16} className="text-gray-400" />
+                <span>{[staff.position, staff.department].filter(Boolean).join(' / ')}</span>
+              </div>
+            )}
+
             {/* 資格 */}
             {qualificationLabels.length > 0 && (
               <div className="flex items-center gap-2 text-gray-600">

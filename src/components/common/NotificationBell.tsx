@@ -32,7 +32,7 @@ interface NotificationBellProps {
 function getNotificationIcon(type: AppNotification['type']) {
   switch (type) {
     case 'new_application':
-      return <Briefcase size={16} className="text-[#00c4cc]" />;
+      return <Briefcase size={16} className="text-primary" />;
     case 'new_message':
       return <MessageCircle size={16} className="text-blue-500" />;
     case 'scout':
@@ -43,9 +43,9 @@ function getNotificationIcon(type: AppNotification['type']) {
     case 'new_review':
       return <Star size={16} className="text-yellow-500" />;
     case 'application_status':
-      return <Mail size={16} className="text-[#818CF8]" />;
+      return <Mail size={16} className="text-personal" />;
     case 'job_match':
-      return <Briefcase size={16} className="text-[#818CF8]" />;
+      return <Briefcase size={16} className="text-personal" />;
     default:
       return <Bell size={16} className="text-gray-400" />;
   }

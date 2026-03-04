@@ -159,7 +159,7 @@ export default function InterviewScheduler({
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-[#00c4cc]" />
+              <Calendar className="w-5 h-5 text-primary" />
               面接日程調整
             </h2>
             <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
@@ -317,7 +317,7 @@ export default function InterviewScheduler({
           {!showForm ? (
             <button
               onClick={() => setShowForm(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-[#00c4cc] hover:text-[#00c4cc] transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors"
             >
               <Plus className="w-4 h-4" />
               新しい日程を提案
@@ -325,7 +325,7 @@ export default function InterviewScheduler({
           ) : (
             <form onSubmit={handleSubmit} className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-200">
               <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#00c4cc]" />
+                <Plus className="w-4 h-4 text-primary" />
                 新しい日程を提案
               </h3>
 
@@ -339,7 +339,7 @@ export default function InterviewScheduler({
                   value={formDatetime}
                   onChange={(e) => setFormDatetime(e.target.value)}
                   required
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -350,7 +350,7 @@ export default function InterviewScheduler({
                   <select
                     value={formDuration}
                     onChange={(e) => setFormDuration(Number(e.target.value))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     {DURATION_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -362,7 +362,7 @@ export default function InterviewScheduler({
                   <select
                     value={formFormat}
                     onChange={(e) => setFormFormat(e.target.value as FormatKey)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="in_person">対面</option>
                     <option value="online">オンライン</option>
@@ -380,7 +380,7 @@ export default function InterviewScheduler({
                     value={formLocation}
                     onChange={(e) => setFormLocation(e.target.value)}
                     placeholder="例: 本社3F会議室"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
@@ -394,7 +394,7 @@ export default function InterviewScheduler({
                     value={formMeetingUrl}
                     onChange={(e) => setFormMeetingUrl(e.target.value)}
                     placeholder="https://meet.google.com/..."
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
@@ -407,7 +407,7 @@ export default function InterviewScheduler({
                   onChange={(e) => setFormNotes(e.target.value)}
                   placeholder="面接に関する補足事項があればご記入ください"
                   rows={2}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] resize-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
 
@@ -423,7 +423,7 @@ export default function InterviewScheduler({
                 <button
                   type="submit"
                   disabled={submitting || !formDatetime}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#00c4cc] text-white text-xs font-medium rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
                 >
                   {submitting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -439,7 +439,7 @@ export default function InterviewScheduler({
           {/* ローディング */}
           {loading && slots.length === 0 && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-[#00c4cc]" />
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           )}
 

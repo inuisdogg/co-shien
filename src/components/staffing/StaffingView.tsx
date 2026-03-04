@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { parseQualifications } from '@/utils/qualifications';
 import WorkScheduleView from './WorkScheduleView';
 import AttendanceOverviewPanel from './AttendanceOverviewPanel';
 import OvertimeDashboardPanel from './OvertimeDashboardPanel';
@@ -115,7 +116,7 @@ function StaffingContent() {
         setStaffList((staffData || []).map((s: any) => ({
           id: s.id,
           name: s.name,
-          qualifications: s.qualifications || [],
+          qualifications: parseQualifications(s.qualifications),
           role: s.role,
           type: s.type,
           personnelSettings: settingsMap.get(s.id),
@@ -187,18 +188,52 @@ function StaffingContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
+
+  // 未設定スタッフ数
+  const unconfiguredCount = stats.totalStaff - stats.configured;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Shield className="w-6 h-6 text-[#00c4cc]" />
+        <Shield className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-bold text-gray-800">人員配置管理</h1>
       </div>
+
+      {/* Quick Settings Card */}
+      {(unconfiguredCount > 0 || stats.totalStaff > 0) && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-xl p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                <Info className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">クイック設定</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  所定労働時間: <span className="font-medium text-gray-700">{standardWeeklyHours}時間/週</span>
+                  {unconfiguredCount > 0 && (
+                    <span className="ml-2 text-amber-700">
+                      ・ 人員設定が未完了のスタッフが<span className="font-bold">{unconfiguredCount}名</span>います
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <a
+              href="/business?tab=facility"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-white border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors shrink-0"
+            >
+              設定を確認
+              <ChevronRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -487,7 +522,7 @@ function OrgChartContent() {
         setStaffList((staffData || []).map((s: any) => ({
           id: s.id,
           name: s.name,
-          qualifications: s.qualifications || [],
+          qualifications: parseQualifications(s.qualifications),
           role: s.role,
           type: s.type,
           personnelSettings: settingsMap.get(s.id),
@@ -506,7 +541,7 @@ function OrgChartContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -523,7 +558,7 @@ function OrgChartContent() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Users className="w-6 h-6 text-[#00c4cc]" />
+        <Users className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-bold text-gray-800">組織図</h1>
         <span className="text-sm text-gray-400 ml-2">{staffList.length}名</span>
       </div>
@@ -635,7 +670,7 @@ export default function StaffingView() {
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'border-[#00c4cc] text-gray-800'
+                  ? 'border-primary text-gray-800'
                   : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
               }`}
             >

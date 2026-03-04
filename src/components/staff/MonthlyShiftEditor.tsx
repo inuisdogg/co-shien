@@ -26,6 +26,7 @@ import {
   Staff,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 interface MonthlyShiftEditorProps {
   facilityId: string;
@@ -50,6 +51,7 @@ const formatDate = (date: Date): string => {
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorProps) {
+  const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
@@ -307,7 +309,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
       fetchData();
     } catch (error) {
       console.error('保存エラー:', error);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -336,7 +338,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
       fetchData();
     } catch (error) {
       console.error('公開エラー:', error);
-      alert('公開に失敗しました');
+      toast.error('公開に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -361,7 +363,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
       fetchData();
     } catch (error) {
       console.error('確定エラー:', error);
-      alert('確定に失敗しました');
+      toast.error('確定に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -390,7 +392,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
       fetchData();
     } catch (error) {
       console.error('再周知エラー:', error);
-      alert('再周知に失敗しました');
+      toast.error('再周知に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -399,7 +401,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -500,7 +502,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
             onClick={() => setShowAvailabilityOverlay(!showAvailabilityOverlay)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               showAvailabilityOverlay
-                ? 'bg-[#00c4cc]/5 border-[#00c4cc]/30 text-[#00c4cc]'
+                ? 'bg-primary/5 border-primary/30 text-primary'
                 : 'bg-gray-50 border-gray-300 text-gray-600'
             }`}
           >
@@ -593,11 +595,11 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
                       {/* 希望マーカー */}
                       {hasAvailability && !pattern && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-5 h-5 rounded-full border-2 border-[#00c4cc] border-dashed opacity-60" />
+                          <div className="w-5 h-5 rounded-full border-2 border-primary border-dashed opacity-60" />
                         </div>
                       )}
                       {hasAvailability && pattern && (
-                        <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-[#00c4cc]" />
+                        <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-primary" />
                       )}
                       {pattern && (
                         <div

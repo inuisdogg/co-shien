@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Download, ChevronLeft, ChevronRight, Filter, Calendar, User } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -188,8 +189,8 @@ export default function AuditLogView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#00c4cc]/10 rounded-lg flex items-center justify-center">
-            <Shield className="w-5 h-5 text-[#00c4cc]" />
+          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+            <Shield className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-800">監査ログ</h1>
@@ -200,7 +201,7 @@ export default function AuditLogView() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg border transition-colors ${
-              showFilters ? 'bg-[#00c4cc]/10 border-[#00c4cc] text-[#00c4cc]' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+              showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
             }`}
           >
             <Filter className="w-4 h-4" />
@@ -209,7 +210,7 @@ export default function AuditLogView() {
           <button
             onClick={handleExportCSV}
             disabled={logs.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             CSV出力
@@ -230,7 +231,7 @@ export default function AuditLogView() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -242,7 +243,7 @@ export default function AuditLogView() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -253,7 +254,7 @@ export default function AuditLogView() {
               <select
                 value={resourceTypeFilter}
                 onChange={(e) => { setResourceTypeFilter(e.target.value); setPage(0); }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
                 {RESOURCE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -268,7 +269,7 @@ export default function AuditLogView() {
               <select
                 value={userFilter}
                 onChange={(e) => { setUserFilter(e.target.value); setPage(0); }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
                 <option value="">すべて</option>
                 {users.map(u => (
@@ -292,13 +293,13 @@ export default function AuditLogView() {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-6 h-6 border-2 border-t-transparent border-[#00c4cc] rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-t-transparent border-primary rounded-full animate-spin" />
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">監査ログはまだありません</p>
-          </div>
+          <EmptyState
+            icon={<Shield className="w-7 h-7 text-gray-400" />}
+            title="監査ログはまだありません"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

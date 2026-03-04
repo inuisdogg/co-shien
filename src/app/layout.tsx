@@ -8,6 +8,7 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ServiceWorkerRegistration from '@/components/pwa/ServiceWorkerRegistration';
 import GoogleAnalytics from '@/components/common/GoogleAnalytics';
+import { ToastProvider } from '@/components/ui/Toast';
 
 const notoSansJP = Noto_Sans_JP({
   subsets: ['latin'],
@@ -20,7 +21,12 @@ export const metadata: Metadata = {
   title: 'Roots - 児童福祉施設向けSaaS',
   description: '施設運営・スタッフキャリア・保護者連携を一元管理',
   icons: {
-    icon: '/favicon.png',
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: '/favicon-192.png',
   },
   manifest: '/manifest.json',
   appleWebApp: {
@@ -47,11 +53,10 @@ export default function RootLayout({
     <html lang="ja">
       <body className={notoSansJP.className}>
         <GoogleAnalytics />
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-gray-900 focus:rounded-lg focus:shadow-lg">
-          メインコンテンツへスキップ
-        </a>
         <ServiceWorkerRegistration />
-        <AuthProvider>{children}</AuthProvider>
+        <ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );

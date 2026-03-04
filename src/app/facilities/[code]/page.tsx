@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { QUALIFICATION_CODES } from '@/types';
+import { parseQualifications } from '@/utils/qualifications';
+import { resolveTimeSlots } from '@/utils/slotResolver';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -189,7 +191,7 @@ async function getFacilityData(code: string) {
   const qualMap = new Map<string, number>();
   if (staffRows) {
     for (const row of staffRows) {
-      const quals: string[] = Array.isArray(row.qualifications) ? row.qualifications : [];
+      const quals: string[] = parseQualifications(row.qualifications);
       for (const q of quals) {
         qualMap.set(q, (qualMap.get(q) || 0) + 1);
       }
@@ -295,7 +297,7 @@ export default async function FacilityHomePage({ params }: PageProps) {
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-lg">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500 text-white font-bold text-lg transition-transform group-hover:scale-105">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg transition-transform group-hover:scale-105">
               R
             </div>
             <span className="text-xl font-bold text-gray-900">Roots</span>
@@ -309,7 +311,7 @@ export default async function FacilityHomePage({ params }: PageProps) {
             </Link>
             <Link
               href="/career"
-              className="inline-flex items-center gap-1.5 rounded-full bg-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-teal-600 hover:shadow-md active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-dark hover:shadow-md active:scale-[0.98]"
             >
               Rootsに登録
             </Link>
@@ -392,6 +394,46 @@ export default async function FacilityHomePage({ params }: PageProps) {
       </section>
 
       {/* ============================================================ */}
+      {/*  Parent CTA Section                                          */}
+      {/* ============================================================ */}
+      <section className="bg-gradient-to-r from-[#FFF8F0] to-[#FEF3E2] border-b border-client/20">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-client/20">
+                <svg className="h-6 w-6 text-client-dark" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">保護者の方へ</h2>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  お子様の利用状況確認や、施設への利用申し込みはこちらから
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/parent/login"
+                className="inline-flex items-center gap-2 rounded-full bg-client px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-client-dark hover:shadow-md active:scale-[0.98]"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+                保護者としてログイン
+              </Link>
+              <Link
+                href="/parent/signup"
+                className="inline-flex items-center gap-2 rounded-full border-2 border-client bg-white px-6 py-3 text-sm font-bold text-client-dark transition-all hover:bg-client-light"
+              >
+                利用を申し込む
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================ */}
       {/*  Main Content                                                */}
       {/* ============================================================ */}
       <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
@@ -427,15 +469,19 @@ export default async function FacilityHomePage({ params }: PageProps) {
                       </div>
                     </div>
                   )}
-                  {capacity && (capacity.AM > 0 || capacity.PM > 0) && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <h3 className="text-sm font-bold text-gray-600 mb-2">定員</h3>
-                      <div className="flex gap-6 text-sm text-gray-700">
-                        {capacity.AM > 0 && <span>午前: <strong>{capacity.AM}名</strong></span>}
-                        {capacity.PM > 0 && <span>午後: <strong>{capacity.PM}名</strong></span>}
+                  {capacity && Object.values(capacity).some((v: any) => v > 0) && (() => {
+                    const slots = resolveTimeSlots([], { capacity: capacity as Record<string, number> });
+                    return (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <h3 className="text-sm font-bold text-gray-600 mb-2">定員</h3>
+                        <div className="flex gap-6 text-sm text-gray-700">
+                          {slots.filter(s => s.capacity > 0).map(s => (
+                            <span key={s.key}>{s.name}: <strong>{s.capacity}名</strong></span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </section>
             )}
@@ -575,7 +621,7 @@ export default async function FacilityHomePage({ params }: PageProps) {
                 <div className="grid gap-4 sm:grid-cols-2">
                   {jobs.map((job) => {
                     const typeLabels: Record<string, { label: string; color: string }> = {
-                      full_time: { label: '正社員', color: 'bg-indigo-100 text-indigo-700' },
+                      full_time: { label: '正社員', color: 'bg-indigo-100 text-personal-dark' },
                       part_time: { label: 'パート', color: 'bg-emerald-100 text-emerald-700' },
                       spot: { label: 'スポット', color: 'bg-amber-100 text-amber-700' },
                     };
@@ -686,7 +732,7 @@ export default async function FacilityHomePage({ params }: PageProps) {
                 </p>
                 <a
                   href={`mailto:contact@roots-app.jp?subject=${encodeURIComponent(`${facilityName}への問い合わせ`)}`}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-500 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-teal-600 active:scale-[0.98]"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition-all hover:bg-primary-dark active:scale-[0.98]"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
@@ -784,7 +830,7 @@ export default async function FacilityHomePage({ params }: PageProps) {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-white font-bold text-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-bold text-sm">
                 R
               </div>
               <span className="text-lg font-bold text-gray-900">Roots</span>
@@ -795,6 +841,9 @@ export default async function FacilityHomePage({ params }: PageProps) {
               </Link>
               <Link href="/career" className="hover:text-teal-600 transition-colors">
                 キャリアプラットフォーム
+              </Link>
+              <Link href="/parent/login" className="hover:text-client-dark transition-colors">
+                保護者ログイン
               </Link>
               <Link href="/terms" className="hover:text-teal-600 transition-colors">
                 利用規約

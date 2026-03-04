@@ -25,7 +25,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { Expense, ExpenseStatus, MonthlyFinancial } from '@/types/expense';
+import PayrollView from './PayrollView';
+import EmptyState from '@/components/ui/EmptyState';
 
 const EXPENSE_STATUS_CONFIG: Record<ExpenseStatus, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
   pending: { label: '申請中', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', icon: Clock },
@@ -46,7 +49,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 const DEFAULT_CATEGORIES = ['交通費', '消耗品費', '食費', '通信費', '水道光熱費', '修繕費', '研修費', 'その他'];
 
-type TabId = 'expenses' | 'pl' | 'cashflow';
+type TabId = 'expenses' | 'pl' | 'cashflow' | 'payroll';
 
 function mapExpenseRow(row: any): Expense {
   return {
@@ -54,16 +57,16 @@ function mapExpenseRow(row: any): Expense {
     facilityId: row.facility_id,
     staffId: row.staff_id,
     submittedByUserId: row.submitted_by_user_id,
-    title: row.title,
-    amount: row.amount,
-    expenseDate: row.expense_date,
-    category: row.category,
+    title: row.title || '',
+    amount: row.amount || 0,
+    expenseDate: row.expense_date || '',
+    category: row.category || '',
     subcategory: row.subcategory,
     description: row.description,
     receiptUrl: row.receipt_url,
     receiptFileName: row.receipt_file_name,
     receiptFileSize: row.receipt_file_size,
-    status: row.status,
+    status: row.status || 'pending',
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
     rejectionReason: row.rejection_reason,
@@ -121,6 +124,7 @@ function SkeletonCard() {
 
 export default function FinanceView() {
   const { facility, user } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [activeTab, setActiveTab] = useState<TabId>('expenses');
@@ -210,12 +214,12 @@ export default function FinanceView() {
   const filteredExpenses = useMemo(() => {
     let result = expenses.filter(e => {
       if (statusFilter !== 'all' && e.status !== statusFilter) return false;
-      if (searchTerm && !e.title.includes(searchTerm) && !e.category.includes(searchTerm)) return false;
+      if (searchTerm && !(e.title || '').includes(searchTerm) && !(e.category || '').includes(searchTerm)) return false;
       return true;
     });
 
     if (sortBy === 'oldest') {
-      result.sort((a, b) => a.expenseDate.localeCompare(b.expenseDate));
+      result.sort((a, b) => (a.expenseDate || '').localeCompare(b.expenseDate || ''));
     } else if (sortBy === 'amount') {
       result.sort((a, b) => b.amount - a.amount);
     }
@@ -293,7 +297,7 @@ export default function FinanceView() {
       setShowAddModal(false);
     } catch (error) {
       console.error('Error adding expense:', error);
-      alert('経費の追加に失敗しました');
+      toast.error('経費の追加に失敗しました');
     } finally {
       setSavingExpense(false);
     }
@@ -361,7 +365,7 @@ export default function FinanceView() {
       setShowAddFinancialModal(false);
     } catch (error) {
       console.error('Error adding monthly financial:', error);
-      alert('月次財務データの追加に失敗しました');
+      toast.error('月次財務データの追加に失敗しました');
     } finally {
       setSavingFinancial(false);
     }
@@ -386,7 +390,7 @@ export default function FinanceView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <BarChart3 className="w-6 h-6 text-[#00c4cc]" />
+          <BarChart3 className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">財務管理</h1>
         </div>
         <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
@@ -400,7 +404,7 @@ export default function FinanceView() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#00c4cc]/10 rounded-lg"><Wallet className="w-5 h-5 text-[#00c4cc]" /></div>
+              <div className="p-2 bg-primary/10 rounded-lg"><Wallet className="w-5 h-5 text-primary" /></div>
               <div>
                 <p className="text-xs text-gray-500">月間売上 ({kpi.month}月)</p>
                 <p className="text-xl font-bold text-gray-800">{formatCompactCurrency(kpi.revenue)}</p>
@@ -459,7 +463,7 @@ export default function FinanceView() {
                 <div className="w-full flex gap-0.5 items-end justify-center h-24">
                   {/* Revenue bar */}
                   <div
-                    className="flex-1 max-w-4 bg-[#00c4cc]/30 rounded-t-sm transition-all"
+                    className="flex-1 max-w-4 bg-primary/30 rounded-t-sm transition-all"
                     style={{ height: `${(d.revenue / trendMaxValue) * 100}%`, minHeight: d.revenue > 0 ? '2px' : '0' }}
                     title={`売上: ${formatCurrency(d.revenue)}`}
                   />
@@ -476,7 +480,7 @@ export default function FinanceView() {
           </div>
           <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-[#00c4cc]/30" /> 売上
+              <span className="w-2.5 h-2.5 rounded-sm bg-primary/30" /> 売上
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-red-300/50" /> 経費
@@ -491,12 +495,13 @@ export default function FinanceView() {
           { id: 'expenses' as TabId, label: '経費管理' },
           { id: 'pl' as TabId, label: '損益計算書' },
           { id: 'cashflow' as TabId, label: 'キャッシュフロー' },
+          { id: 'payroll' as TabId, label: '給与計算' },
         ]).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === tab.id ? 'bg-[#00c4cc] text-white' : 'text-gray-600 hover:bg-gray-100'
+              activeTab === tab.id ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             {tab.label}
@@ -538,7 +543,7 @@ export default function FinanceView() {
                     <span className="text-sm text-gray-700 w-24 flex-shrink-0">{item.category}</span>
                     <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#00c4cc] rounded-full transition-all"
+                        className="h-full bg-primary rounded-full transition-all"
                         style={{ width: `${item.percentage}%` }}
                       />
                     </div>
@@ -558,13 +563,13 @@ export default function FinanceView() {
                 placeholder="タイトル・カテゴリで検索..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as any)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               <option value="all">全ステータス</option>
               {Object.entries(EXPENSE_STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -572,7 +577,7 @@ export default function FinanceView() {
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               <option value="newest">新しい順</option>
               <option value="oldest">古い順</option>
@@ -580,7 +585,7 @@ export default function FinanceView() {
             </select>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
             >
               <Plus className="w-4 h-4" />
               経費追加
@@ -590,23 +595,19 @@ export default function FinanceView() {
           {/* Expense List */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {filteredExpenses.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
-                  <Receipt className="w-8 h-8 text-gray-300" />
-                </div>
-                <p className="text-gray-500 mb-2">
-                  {expenses.length === 0 ? '経費がまだ登録されていません' : '条件に一致する経費がありません'}
-                </p>
-                {expenses.length === 0 && (
+              <EmptyState
+                icon={<Receipt className="w-7 h-7 text-gray-400" />}
+                title={expenses.length === 0 ? '経費がまだ登録されていません' : '条件に一致する経費がありません'}
+                action={expenses.length === 0 ? (
                   <button
                     onClick={() => setShowAddModal(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors mt-2"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     経費を追加
                   </button>
-                )}
-              </div>
+                ) : undefined}
+              />
             ) : (
               <div className="divide-y divide-gray-100">
                 {filteredExpenses.map(exp => {
@@ -647,7 +648,7 @@ export default function FinanceView() {
                         {exp.status === 'pending' && (
                           <button
                             onClick={() => handleApprove(exp.id)}
-                            className="px-3 py-1.5 text-xs font-medium bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                            className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
                           >
                             承認
                           </button>
@@ -670,7 +671,7 @@ export default function FinanceView() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowAddFinancialModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#00c4cc] rounded-lg hover:bg-[#00b0b8] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 月次データ追加
@@ -682,19 +683,19 @@ export default function FinanceView() {
             </div>
           </div>
           {financials.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
-                <BarChart3 className="w-8 h-8 text-gray-300" />
-              </div>
-              <p className="text-gray-500 mb-2">月次財務データがありません</p>
-              <button
-                onClick={() => setShowAddFinancialModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors mt-2"
-              >
-                <Plus className="w-4 h-4" />
-                記録を作成
-              </button>
-            </div>
+            <EmptyState
+              icon={<BarChart3 className="w-7 h-7 text-gray-400" />}
+              title="月次財務データがありません"
+              action={
+                <button
+                  onClick={() => setShowAddFinancialModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  記録を作成
+                </button>
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -755,7 +756,7 @@ export default function FinanceView() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowAddFinancialModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#00c4cc] rounded-lg hover:bg-[#00b0b8] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 月次データ追加
@@ -767,19 +768,19 @@ export default function FinanceView() {
             </div>
           </div>
           {financials.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
-                <TrendingUp className="w-8 h-8 text-gray-300" />
-              </div>
-              <p className="text-gray-500 mb-2">月次財務データがありません</p>
-              <button
-                onClick={() => setShowAddFinancialModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors mt-2"
-              >
-                <Plus className="w-4 h-4" />
-                記録を作成
-              </button>
-            </div>
+            <EmptyState
+              icon={<TrendingUp className="w-7 h-7 text-gray-400" />}
+              title="月次財務データがありません"
+              action={
+                <button
+                  onClick={() => setShowAddFinancialModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  記録を作成
+                </button>
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -827,6 +828,11 @@ export default function FinanceView() {
         </div>
       )}
 
+      {/* Payroll Tab */}
+      {activeTab === 'payroll' && (
+        <PayrollView />
+      )}
+
       {/* Add Monthly Financial Modal */}
       {showAddFinancialModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -847,7 +853,7 @@ export default function FinanceView() {
                     type="number"
                     value={newFinancial.year}
                     onChange={e => setNewFinancial(prev => ({ ...prev, year: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     placeholder="2026"
                   />
                 </div>
@@ -858,7 +864,7 @@ export default function FinanceView() {
                   <select
                     value={newFinancial.month}
                     onChange={e => setNewFinancial(prev => ({ ...prev, month: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   >
                     {[...Array(12)].map((_, i) => (
                       <option key={i + 1} value={String(i + 1)}>{i + 1}月</option>
@@ -875,7 +881,7 @@ export default function FinanceView() {
                       type="number"
                       value={newFinancial.revenueService}
                       onChange={e => setNewFinancial(prev => ({ ...prev, revenueService: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       placeholder="0"
                     />
                   </div>
@@ -885,7 +891,7 @@ export default function FinanceView() {
                       type="number"
                       value={newFinancial.revenueOther}
                       onChange={e => setNewFinancial(prev => ({ ...prev, revenueOther: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       placeholder="0"
                     />
                   </div>
@@ -900,7 +906,7 @@ export default function FinanceView() {
                       type="number"
                       value={newFinancial.expensePersonnel}
                       onChange={e => setNewFinancial(prev => ({ ...prev, expensePersonnel: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       placeholder="0"
                     />
                   </div>
@@ -910,7 +916,7 @@ export default function FinanceView() {
                       type="number"
                       value={newFinancial.expenseFixed}
                       onChange={e => setNewFinancial(prev => ({ ...prev, expenseFixed: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       placeholder="0"
                     />
                   </div>
@@ -920,7 +926,7 @@ export default function FinanceView() {
                       type="number"
                       value={newFinancial.expenseVariable}
                       onChange={e => setNewFinancial(prev => ({ ...prev, expenseVariable: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       placeholder="0"
                     />
                   </div>
@@ -930,7 +936,7 @@ export default function FinanceView() {
                       type="number"
                       value={newFinancial.expenseOther}
                       onChange={e => setNewFinancial(prev => ({ ...prev, expenseOther: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       placeholder="0"
                     />
                   </div>
@@ -942,7 +948,7 @@ export default function FinanceView() {
                   value={newFinancial.notes}
                   onChange={e => setNewFinancial(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder="補足メモ..."
                 />
               </div>
@@ -957,7 +963,7 @@ export default function FinanceView() {
               <button
                 onClick={handleAddMonthlyFinancial}
                 disabled={!newFinancial.year || !newFinancial.month || savingFinancial}
-                className="px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {savingFinancial ? '保存中...' : '追加'}
               </button>
@@ -985,7 +991,7 @@ export default function FinanceView() {
                   type="text"
                   value={newExpense.title}
                   onChange={e => setNewExpense(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder="経費の名称"
                 />
               </div>
@@ -998,7 +1004,7 @@ export default function FinanceView() {
                     type="number"
                     value={newExpense.amount}
                     onChange={e => setNewExpense(prev => ({ ...prev, amount: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     placeholder="0"
                   />
                 </div>
@@ -1010,7 +1016,7 @@ export default function FinanceView() {
                     type="date"
                     value={newExpense.expenseDate}
                     onChange={e => setNewExpense(prev => ({ ...prev, expenseDate: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   />
                 </div>
               </div>
@@ -1019,7 +1025,7 @@ export default function FinanceView() {
                 <select
                   value={newExpense.category}
                   onChange={e => setNewExpense(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   {DEFAULT_CATEGORIES.map(c => (
                     <option key={c} value={c}>{CATEGORY_ICONS[c] || ''} {c}</option>
@@ -1032,7 +1038,7 @@ export default function FinanceView() {
                   value={newExpense.description}
                   onChange={e => setNewExpense(prev => ({ ...prev, description: e.target.value }))}
                   rows={2}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder="補足説明..."
                 />
               </div>
@@ -1047,7 +1053,7 @@ export default function FinanceView() {
               <button
                 onClick={handleAddExpense}
                 disabled={!newExpense.title || !newExpense.amount || savingExpense}
-                className="px-4 py-2 text-sm bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {savingExpense ? '保存中...' : '追加'}
               </button>

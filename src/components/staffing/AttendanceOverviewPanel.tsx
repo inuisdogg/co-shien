@@ -8,9 +8,26 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Lock,
+  Unlock,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+
+// ---- Monthly Closing Types ----
+
+interface MonthlyClosing {
+  id: string;
+  status: 'open' | 'closed';
+  closed_at: string | null;
+  closed_by: string | null;
+  notes: string | null;
+  closer_name?: string;
+}
 
 // ---- Local types ----
 
@@ -79,7 +96,8 @@ const CELL_COLORS: Record<CellType, string> = {
 // ---- Component ----
 
 export default function AttendanceOverviewPanel() {
-  const { facility } = useAuth();
+  const { facility, isAdmin, user } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -91,6 +109,11 @@ export default function AttendanceOverviewPanel() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [selectedCell, setSelectedCell] = useState<{ userId: string; date: string } | null>(null);
+
+  // Monthly closing state
+  const [monthlyClosing, setMonthlyClosing] = useState<MonthlyClosing | null>(null);
+  const [closingLoading, setClosingLoading] = useState(false);
+  const [closingActionLoading, setClosingActionLoading] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [year, month] = useMemo(() => selectedMonth.split('-').map(Number), [selectedMonth]);
@@ -165,6 +188,111 @@ export default function AttendanceOverviewPanel() {
 
     fetchData();
   }, [facilityId, year, month, daysInMonth]);
+
+  // Fetch monthly closing status
+  const fetchMonthlyClosing = useCallback(async () => {
+    if (!facilityId) return;
+    setClosingLoading(true);
+    try {
+      const { data } = await supabase
+        .from('attendance_monthly_closings')
+        .select('id, status, closed_at, closed_by, notes')
+        .eq('facility_id', facilityId)
+        .eq('year', year)
+        .eq('month', month)
+        .maybeSingle();
+
+      if (data) {
+        let closerName: string | undefined;
+        if (data.closed_by) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('last_name, first_name')
+            .eq('id', data.closed_by)
+            .maybeSingle();
+          if (userData) {
+            closerName = `${userData.last_name || ''}${userData.first_name || ''}`.trim() || undefined;
+          }
+        }
+        setMonthlyClosing({
+          id: data.id,
+          status: data.status,
+          closed_at: data.closed_at,
+          closed_by: data.closed_by,
+          notes: data.notes,
+          closer_name: closerName,
+        });
+      } else {
+        setMonthlyClosing(null);
+      }
+    } catch (err) {
+      console.error('Error fetching monthly closing:', err);
+    } finally {
+      setClosingLoading(false);
+    }
+  }, [facilityId, year, month]);
+
+  useEffect(() => {
+    fetchMonthlyClosing();
+  }, [fetchMonthlyClosing]);
+
+  // Close the month
+  const handleCloseMonth = async () => {
+    if (!facilityId || !user?.id) return;
+    if (!confirm(`${year}年${month}月の勤怠を締めますか？締め後は勤怠データの編集が制限されます。`)) return;
+
+    setClosingActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('attendance_monthly_closings')
+        .upsert({
+          facility_id: facilityId,
+          year,
+          month,
+          status: 'closed',
+          closed_at: new Date().toISOString(),
+          closed_by: user.id,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'facility_id,year,month' });
+
+      if (error) throw error;
+      await fetchMonthlyClosing();
+    } catch (err) {
+      console.error('Error closing month:', err);
+      toast.error('月次締めに失敗しました。');
+    } finally {
+      setClosingActionLoading(false);
+    }
+  };
+
+  // Reopen the month (admin only)
+  const handleReopenMonth = async () => {
+    if (!facilityId || !isAdmin) return;
+    if (!confirm(`${year}年${month}月の締めを解除しますか？`)) return;
+
+    setClosingActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('attendance_monthly_closings')
+        .update({
+          status: 'open',
+          closed_at: null,
+          closed_by: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('facility_id', facilityId)
+        .eq('year', year)
+        .eq('month', month);
+
+      if (error) throw error;
+      await fetchMonthlyClosing();
+    } catch (err) {
+      console.error('Error reopening month:', err);
+      toast.error('締め解除に失敗しました。');
+    } finally {
+      setClosingActionLoading(false);
+    }
+  };
 
   // Build daily summaries for all staff
   const dailySummaries = useMemo(() => {
@@ -296,7 +424,7 @@ export default function AttendanceOverviewPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -305,8 +433,81 @@ export default function AttendanceOverviewPanel() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Clock className="w-6 h-6 text-[#00c4cc]" />
+        <Clock className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-bold text-gray-800">出退勤管理</h1>
+      </div>
+
+      {/* Monthly Closing Panel */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {monthlyClosing?.status === 'closed' ? (
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <Lock className="w-5 h-5 text-emerald-600" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+                <Unlock className="w-5 h-5 text-amber-600" />
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-gray-800">月次締め</h2>
+                <span className="text-sm text-gray-400">{year}年{month}月</span>
+                {closingLoading ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">
+                    読込中...
+                  </span>
+                ) : monthlyClosing?.status === 'closed' ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    締め済み
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    未締め
+                  </span>
+                )}
+              </div>
+              {monthlyClosing?.status === 'closed' && monthlyClosing.closed_at && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {monthlyClosing.closer_name && `${monthlyClosing.closer_name}が`}
+                  {new Date(monthlyClosing.closed_at).toLocaleString('ja-JP', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                  に締め実行
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {monthlyClosing?.status === 'closed' ? (
+              isAdmin && (
+                <button
+                  onClick={handleReopenMonth}
+                  disabled={closingActionLoading}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {closingActionLoading ? '処理中...' : '締め解除'}
+                </button>
+              )
+            ) : (
+              <button
+                onClick={handleCloseMonth}
+                disabled={closingActionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors disabled:opacity-50"
+              >
+                {closingActionLoading ? '処理中...' : '月次締めを実行'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -340,7 +541,10 @@ export default function AttendanceOverviewPanel() {
         </div>
 
         {todayBoard.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">スタッフが登録されていません</div>
+          <EmptyState
+            icon={<Users className="w-7 h-7 text-gray-400" />}
+            title="スタッフが登録されていません"
+          />
         ) : (
           <div className="divide-y divide-gray-50">
             {todayBoard.map(staff => {

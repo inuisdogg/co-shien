@@ -39,7 +39,7 @@ const ComplianceView: React.FC = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   isActive
-                    ? 'border-current text-[#00c4cc]'
+                    ? 'border-current text-primary'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
                 style={isActive ? { color: ACCENT } : undefined}

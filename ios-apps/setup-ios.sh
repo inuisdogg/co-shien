@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# co-shien iOS Apps Setup Script
+# Roots iOS Apps Setup Script
 # このスクリプトは3つのiOSアプリプロジェクトを初期化します
 
 set -e
 
 echo "========================================"
-echo "co-shien iOS Apps Setup"
+echo "Roots iOS Apps Setup"
 echo "========================================"
 
 # カレントディレクトリを取得
@@ -32,8 +32,8 @@ fi
 
 # 各アプリを初期化
 apps=("client" "staff" "facility")
-app_names=("co-shien" "co-shien Staff" "co-shien Biz")
-app_ids=("jp.co.inu.coshien.client" "jp.co.inu.coshien.staff" "jp.co.inu.coshien.facility")
+app_names=("Roots" "Roots Staff" "Roots Biz")
+app_ids=("jp.co.inu.roots.client" "jp.co.inu.roots.staff" "jp.co.inu.roots.facility")
 
 for i in "${!apps[@]}"; do
     app="${apps[$i]}"

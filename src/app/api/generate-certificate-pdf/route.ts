@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 // Supabaseクライアント（Anon Key使用）
 function getSupabase() {
@@ -29,6 +30,14 @@ export async function GET(req: NextRequest) {
         { error: 'recordIdまたはtokenが必要です' },
         { status: 400 }
       );
+    }
+
+    // recordIdでのアクセスは認証必須、tokenは署名確認用の公開アクセス
+    if (recordId && !token) {
+      const auth = await authenticateRequest(req);
+      if (!auth) {
+        return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+      }
     }
 
     const supabase = getSupabase();

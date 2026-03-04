@@ -1,17 +1,13 @@
-import * as Sentry from '@sentry/nextjs';
+// Sentry integration (disabled - re-add @sentry/nextjs to enable)
 
-const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
+const noopSentry = {
+  captureException: (error: unknown) => { console.error('[Sentry disabled]', error); },
+  captureMessage: (message: string) => { console.warn('[Sentry disabled]', message); },
+  init: () => {},
+};
 
 export function initSentry() {
-  if (SENTRY_DSN) {
-    Sentry.init({
-      dsn: SENTRY_DSN,
-      tracesSampleRate: 0.1,
-      replaysSessionSampleRate: 0.1,
-      replaysOnErrorSampleRate: 1.0,
-      environment: process.env.NODE_ENV,
-    });
-  }
+  // No-op: @sentry/nextjs is not installed
 }
 
-export { Sentry };
+export { noopSentry as Sentry };

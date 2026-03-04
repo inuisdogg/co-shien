@@ -435,8 +435,8 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
         textColor = '';
         label = getPatternShortLabel(shift);
       } else {
-        bgColor = 'bg-[#00c4cc]/10';
-        textColor = 'text-[#00c4cc]';
+        bgColor = 'bg-primary/10';
+        textColor = 'text-primary';
         label = getPatternShortLabel(shift);
       }
     } else {
@@ -462,8 +462,8 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
       <div
         key={`${staffRow.staff.id}-${dateStr}`}
         onClick={(e) => handleCellClick(staffRow.staff.id, dateStr, e)}
-        className={`relative flex items-center justify-center border-r border-b border-gray-200 cursor-pointer transition-all duration-150 hover:ring-2 hover:ring-[#00c4cc] hover:ring-inset ${
-          isEditing ? 'ring-2 ring-[#00c4cc] ring-inset z-10' : ''
+        className={`relative flex items-center justify-center border-r border-b border-gray-200 cursor-pointer transition-all duration-150 hover:ring-2 hover:ring-primary hover:ring-inset ${
+          isEditing ? 'ring-2 ring-primary ring-inset z-10' : ''
         } ${isSelected ? 'ring-2 ring-blue-500 ring-inset bg-blue-50' : ''} ${bgColor}`}
         style={{ minHeight: '48px', height: '48px', minWidth: '60px', width: '60px', ...bgStyle }}
       >
@@ -533,7 +533,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
               <ChevronLeft size={20} />
             </button>
             <div className="flex items-center gap-2 min-w-[160px] justify-center">
-              <Calendar size={18} className="text-[#00c4cc]" />
+              <Calendar size={18} className="text-primary" />
               <span className="text-lg font-bold text-gray-800">
                 {year}年{month}月
               </span>
@@ -547,7 +547,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
             </button>
             <button
               onClick={handleToday}
-              className="min-h-10 ml-2 px-3 py-1.5 text-sm text-[#00c4cc] hover:bg-[#00c4cc]/5 rounded-lg transition-all duration-200"
+              className="min-h-10 ml-2 px-3 py-1.5 text-sm text-primary hover:bg-primary/5 rounded-lg transition-all duration-200"
             >
               今月
             </button>
@@ -685,11 +685,11 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
                   key={day.dateStr}
                   className={`flex flex-col items-center py-1.5 border-r ${
                     showWeekSep ? 'border-r-2 border-r-gray-400' : 'border-r-gray-200'
-                  } ${getDayColor(day.dayOfWeek)} ${isToday_ ? 'bg-[#00c4cc]/10' : isWeekend ? 'bg-gray-100' : ''}`}
+                  } ${getDayColor(day.dayOfWeek)} ${isToday_ ? 'bg-primary/10' : isWeekend ? 'bg-gray-100' : ''}`}
                   style={{ width: COL_W, minWidth: COL_W }}
                 >
                   <span className="text-[10px] leading-none">{DAY_LABELS[day.dayOfWeek]}</span>
-                  <span className={`text-sm font-bold leading-tight ${isToday_ ? 'text-[#00c4cc]' : ''}`}>
+                  <span className={`text-sm font-bold leading-tight ${isToday_ ? 'text-primary' : ''}`}>
                     {day.day}
                   </span>
                 </div>
@@ -731,7 +731,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
                           <img src={staffRow.staff.profilePhotoUrl} alt={staffRow.staff.name} className="w-full h-full object-cover" />
                         </div>
                       ) : (
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#00c4cc] to-[#00b0b8] flex items-center justify-center flex-shrink-0 mr-2">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0 mr-2">
                           <span className="text-white text-[10px] font-bold">
                             {staffRow.staff.name?.charAt(0) || '?'}
                           </span>
@@ -769,7 +769,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
                       return (
                         <div
                           key={`${staffRow.staff.id}-${day.dateStr}`}
-                          className={`${showWeekSep ? 'border-r-2 border-r-gray-400' : ''} ${isToday_ ? 'bg-[#00c4cc]/5' : isWeekend && !staffRow.shifts.get(day.dateStr)?.hasShift ? 'bg-gray-50/50' : ''}`}
+                          className={`${showWeekSep ? 'border-r-2 border-r-gray-400' : ''} ${isToday_ ? 'bg-primary/5' : isWeekend && !staffRow.shifts.get(day.dateStr)?.hasShift ? 'bg-gray-50/50' : ''}`}
                           style={{ width: COL_W, minWidth: COL_W }}
                         >
                           {renderShiftCell(staffRow, day.dateStr, day.dayOfWeek)}
@@ -794,7 +794,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
               })}
 
               {/* ---- Summary row: working staff count per day ---- */}
-              <div className="flex border-t-2 border-[#00c4cc]/30">
+              <div className="flex border-t-2 border-primary/30">
                 <div
                   className="sticky left-0 z-10 flex items-center px-3 py-2 bg-gray-50 border-r-2 border-b border-gray-300"
                   style={{ width: STAFF_COL_W, minWidth: STAFF_COL_W }}
@@ -814,14 +814,14 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
                       key={`summary-${day.dateStr}`}
                       className={`flex items-center justify-center border-r border-b border-gray-200 py-2 ${
                         showWeekSep ? 'border-r-2 border-r-gray-400' : ''
-                      } ${isShort ? 'bg-red-50' : workingCount > 0 ? 'bg-[#00c4cc]/5' : ''} ${isToday_ ? 'bg-[#00c4cc]/10' : ''}`}
+                      } ${isShort ? 'bg-red-50' : workingCount > 0 ? 'bg-primary/5' : ''} ${isToday_ ? 'bg-primary/10' : ''}`}
                       style={{ width: COL_W, minWidth: COL_W }}
                     >
                       <div className="flex items-center gap-0.5">
                         {isShort && <AlertTriangle size={10} className="text-red-500" />}
                         <span
                           className={`text-xs font-bold ${
-                            isShort ? 'text-red-600' : workingCount > 0 ? 'text-[#00c4cc]' : 'text-gray-300'
+                            isShort ? 'text-red-600' : workingCount > 0 ? 'text-primary' : 'text-gray-300'
                           }`}
                         >
                           {workingCount || '-'}
@@ -934,7 +934,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
           </div>
           <div className="text-xs text-gray-500">
             合計:{' '}
-            <span className="font-bold text-[#00c4cc]">
+            <span className="font-bold text-primary">
               {patternSummary.totalHours.toFixed(1)}
             </span>
             時間
@@ -1022,7 +1022,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
               <button
                 onClick={handleConfirmCopy}
                 disabled={copyPreviewData.length === 0}
-                className="px-4 py-2 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 <Check size={16} />
                 コピーを適用

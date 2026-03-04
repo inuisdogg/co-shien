@@ -14,8 +14,11 @@ import {
   BookOpen, PenLine, ChevronRight, Smile, Frown, Meh
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_SLOTS = resolveTimeSlots([]);
 
 type ContactLog = {
   id: string;
@@ -274,8 +277,8 @@ export default function ContactBookPage() {
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="w-10 h-10 bg-[#F6AD55]/10 rounded-full flex items-center justify-center shrink-0">
-              <BookOpen size={20} className="text-[#F6AD55]" />
+            <div className="w-10 h-10 bg-client/10 rounded-full flex items-center justify-center shrink-0">
+              <BookOpen size={20} className="text-client" />
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-gray-800 text-sm truncate">
@@ -307,7 +310,7 @@ export default function ContactBookPage() {
                   onClick={() => setSelectedChildId(child.id)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
                     selectedChildId === child.id
-                      ? 'border-[#F6AD55] bg-[#F6AD55]/10 text-[#ED8936]'
+                      ? 'border-client bg-client/10 text-client-dark'
                       : 'border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}
                 >
@@ -326,7 +329,7 @@ export default function ContactBookPage() {
               onClick={() => setActiveTab('unsigned')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'unsigned'
-                  ? 'border-[#F6AD55] text-[#ED8936] bg-amber-50'
+                  ? 'border-client text-client-dark bg-amber-50'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -342,7 +345,7 @@ export default function ContactBookPage() {
               onClick={() => setActiveTab('history')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'history'
-                  ? 'border-[#F6AD55] text-[#ED8936] bg-amber-50'
+                  ? 'border-client text-client-dark bg-amber-50'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -364,17 +367,17 @@ export default function ContactBookPage() {
                 ) : (
                   <div className="space-y-3">
                     {unsignedLogs.map((log) => (
-                      <div key={log.id} className="border border-[#F6AD55]/30 bg-amber-50/50 rounded-xl p-4">
+                      <div key={log.id} className="border border-client/30 bg-amber-50/50 rounded-xl p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-gray-800">{log.date}</span>
                             {log.slot && (
                               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                {log.slot === 'AM' ? '午前' : '午後'}
+                                {slotDisplayName(DEFAULT_SLOTS, log.slot)}
                               </span>
                             )}
                           </div>
-                          <span className="text-xs bg-[#F6AD55] text-white px-2 py-0.5 rounded-full font-bold">
+                          <span className="text-xs bg-client text-white px-2 py-0.5 rounded-full font-bold">
                             署名待ち
                           </span>
                         </div>
@@ -409,7 +412,7 @@ export default function ContactBookPage() {
                         {log.staff_comment && (
                           <div className="mb-3">
                             <p className="text-xs font-bold text-gray-500 mb-1">スタッフからのコメント</p>
-                            <p className="text-sm text-gray-700 bg-white rounded-lg p-2 border-l-4 border-[#F6AD55]">
+                            <p className="text-sm text-gray-700 bg-white rounded-lg p-2 border-l-4 border-client">
                               {log.staff_comment}
                             </p>
                           </div>
@@ -418,7 +421,7 @@ export default function ContactBookPage() {
                         {/* 署名ボタン */}
                         <button
                           onClick={() => setSigningLog(log)}
-                          className="w-full mt-2 py-2.5 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                          className="w-full mt-2 py-2.5 bg-client hover:bg-client-dark text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
                         >
                           <PenLine className="w-4 h-4" />
                           署名する
@@ -449,7 +452,7 @@ export default function ContactBookPage() {
                             <span className="text-sm font-bold text-gray-800">{log.date}</span>
                             {log.slot && (
                               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                {log.slot === 'AM' ? '午前' : '午後'}
+                                {slotDisplayName(DEFAULT_SLOTS, log.slot)}
                               </span>
                             )}
                           </div>
@@ -461,7 +464,7 @@ export default function ContactBookPage() {
                           ) : log.status === 'submitted' ? (
                             <button
                               onClick={() => setSigningLog(log)}
-                              className="text-xs bg-[#F6AD55] text-white px-2 py-1 rounded-full font-bold hover:bg-[#ED8936]"
+                              className="text-xs bg-client text-white px-2 py-1 rounded-full font-bold hover:bg-client-dark"
                             >
                               署名する
                             </button>
@@ -532,7 +535,7 @@ export default function ContactBookPage() {
                   type="text"
                   value={signerName}
                   onChange={(e) => setSignerName(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] text-base"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base"
                   placeholder="保護者名を入力"
                 />
               </div>
@@ -547,7 +550,7 @@ export default function ContactBookPage() {
               <button
                 onClick={handleSign}
                 disabled={signing || !signerName.trim()}
-                className="flex-1 py-3 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-client hover:bg-client-dark text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {signing ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

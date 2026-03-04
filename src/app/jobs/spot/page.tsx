@@ -441,7 +441,7 @@ export default function SpotWorkPage() {
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-lg transition-transform group-hover:scale-105">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-personal text-white font-bold text-lg transition-transform group-hover:scale-105">
               R
             </div>
             <span className="text-xl font-bold text-gray-900">Roots</span>
@@ -449,14 +449,14 @@ export default function SpotWorkPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/jobs"
-              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-personal transition-colors"
             >
               <Briefcase className="h-4 w-4" />
               求人一覧
             </Link>
             <Link
               href="/career"
-              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-personal px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-personal-dark hover:shadow-md active:scale-[0.98]"
             >
               Rootsに登録
               <ArrowRight className="h-4 w-4" />
@@ -752,31 +752,31 @@ export default function SpotWorkPage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-personal text-white font-bold text-sm">
                 R
               </div>
               <span className="text-lg font-bold text-gray-900">Roots</span>
             </Link>
             <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-              <Link href="/jobs" className="hover:text-indigo-600 transition-colors">
+              <Link href="/jobs" className="hover:text-personal transition-colors">
                 求人一覧
               </Link>
               <Link href="/jobs/spot" className="hover:text-amber-600 transition-colors">
                 スポットワーク
               </Link>
-              <Link href="/career" className="hover:text-indigo-600 transition-colors">
+              <Link href="/career" className="hover:text-personal transition-colors">
                 キャリアプラットフォーム
               </Link>
-              <Link href="/tools" className="hover:text-indigo-600 transition-colors">
+              <Link href="/tools" className="hover:text-personal transition-colors">
                 無料ツール
               </Link>
-              <Link href="/terms" className="hover:text-indigo-600 transition-colors">
+              <Link href="/terms" className="hover:text-personal transition-colors">
                 利用規約
               </Link>
-              <Link href="/privacy" className="hover:text-indigo-600 transition-colors">
+              <Link href="/privacy" className="hover:text-personal transition-colors">
                 プライバシーポリシー
               </Link>
-              <Link href="/recruitment-disclosure" className="hover:text-indigo-600 transition-colors">
+              <Link href="/recruitment-disclosure" className="hover:text-personal transition-colors">
                 職業紹介事業の情報開示
               </Link>
             </nav>

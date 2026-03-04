@@ -26,6 +26,7 @@ export const useFacilityData = () => {
   const {
     facilitySettings,
     loadingSettings,
+    saving,
     timeSlots,
     loadingTimeSlots,
     updateFacilitySettings,
@@ -103,7 +104,7 @@ export const useFacilityData = () => {
   // to children/facilitySettings/getUsageRecordByScheduleId in the monolith.
   // Consumers call them with fewer args, so we inject the dependencies here.
   const wrappedBulkRegister = async (year: number, month: number) => {
-    return bulkRegisterFromPatterns(year, month, children, facilitySettings, getUsageRecordByScheduleId);
+    return bulkRegisterFromPatterns(year, month, children, facilitySettings, getUsageRecordByScheduleId, timeSlots);
   };
 
   const wrappedResetDay = async (date: string) => {
@@ -122,6 +123,7 @@ export const useFacilityData = () => {
     requests,
     facilitySettings,
     loadingSettings,
+    saving,
     loadingChildren,
     loadingStaff,
     usageRecords,

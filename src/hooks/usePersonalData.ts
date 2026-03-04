@@ -8,7 +8,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { validateGeofence, getCurrentPosition } from '@/lib/geoFence';
+import { useToast } from '@/components/ui/Toast';
+// GPS/ジオフェンスは使用しない（シンプル打刻に変更済み）
 import {
   EmploymentRecord,
   FacilityWorkToolSettings,
@@ -88,6 +89,7 @@ const createDailySummary = (
 
 export function usePersonalData(): UsePersonalDataReturn {
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [facilities, setFacilities] = useState<FacilityWorkData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +146,11 @@ export function usePersonalData(): UsePersonalDataReturn {
 
         // 施設IDを集めて施設データを取得
         const facilityIds = staffData.map((s: any) => s.facility_id).filter(Boolean);
+        if (facilityIds.length === 0) {
+          setFacilities([]);
+          setIsLoading(false);
+          return;
+        }
         const { data: facilitiesData } = await supabase
           .from('facilities')
           .select('id, name, code')
@@ -228,8 +235,10 @@ export function usePersonalData(): UsePersonalDataReturn {
       }
 
       // employment_recordsからFacilityWorkDataを作成
+      // facilities JOINがnullの場合はスキップ
+      const validEmploymentData = employmentData.filter((record: any) => record.facilities);
       const facilityWorkData: FacilityWorkData[] = await Promise.all(
-        employmentData.map(async (record: any) => {
+        validEmploymentData.map(async (record: any) => {
           const facility = record.facilities;
 
           // 業務ツール設定を取得
@@ -430,59 +439,23 @@ export function usePersonalData(): UsePersonalDataReturn {
     }
   };
 
-  // 始業打刻（ジオフェンス検証付き）
+  // 始業打刻（シンプル — ボタンを押すだけで出勤）
   const clockIn = async (facilityId: string) => {
     try {
-      // ジオフェンス検証を実行
-      const geoResult = await validateGeofence(facilityId);
-
-      if (!geoResult.isValid) {
-        // 位置情報エラーの場合はユーザーに通知して中止
-        const errorMessage = geoResult.error || '施設の範囲外です。';
-        alert(`出勤打刻できません:\n${errorMessage}`);
-        console.warn('ジオフェンス検証失敗:', geoResult);
-        return;
-      }
-
-      // GPS座標データを作成（位置情報が取得できた場合）
-      const gpsData: GpsData | undefined =
-        geoResult.userLocation.lat !== 0 || geoResult.userLocation.lng !== 0
-          ? {
-              latitude: geoResult.userLocation.lat,
-              longitude: geoResult.userLocation.lng,
-              geoValidated: geoResult.isValid,
-              geoDistanceMeters: geoResult.distance >= 0 ? geoResult.distance : 0,
-            }
-          : undefined;
-
-      await recordAttendance(facilityId, 'start', gpsData);
+      await recordAttendance(facilityId, 'start');
     } catch (error) {
       console.error('出勤打刻エラー:', error);
-      alert('出勤の記録に失敗しました。ページを再読み込みしてください。');
+      toast.error('出勤の記録に失敗しました。ページを再読み込みしてください。');
     }
   };
 
-  // 退勤打刻（ジオフェンスはブロックしない、GPS座標のみ記録）
+  // 退勤打刻（シンプル — ボタンを押すだけで退勤）
   const clockOut = async (facilityId: string) => {
     try {
-      // GPS座標の記録を試みるが、失敗しても打刻は続行
-      let gpsData: GpsData | undefined;
-      try {
-        const position = await getCurrentPosition();
-        gpsData = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          geoValidated: false, // 退勤時はジオフェンス検証しない
-          geoDistanceMeters: 0,
-        };
-      } catch (gpsError) {
-        console.warn('退勤時のGPS取得失敗（打刻は続行）:', gpsError);
-      }
-
-      await recordAttendance(facilityId, 'end', gpsData);
+      await recordAttendance(facilityId, 'end');
     } catch (error) {
       console.error('退勤打刻エラー:', error);
-      alert('退勤の記録に失敗しました。ページを再読み込みしてください。');
+      toast.error('退勤の記録に失敗しました。ページを再読み込みしてください。');
     }
   };
 
@@ -492,7 +465,7 @@ export function usePersonalData(): UsePersonalDataReturn {
       await recordAttendance(facilityId, 'break_start');
     } catch (error) {
       console.error('休憩開始打刻エラー:', error);
-      alert('休憩開始の記録に失敗しました。ページを再読み込みしてください。');
+      toast.error('休憩開始の記録に失敗しました。ページを再読み込みしてください。');
     }
   };
 
@@ -502,7 +475,7 @@ export function usePersonalData(): UsePersonalDataReturn {
       await recordAttendance(facilityId, 'break_end');
     } catch (error) {
       console.error('休憩終了打刻エラー:', error);
-      alert('休憩終了の記録に失敗しました。ページを再読み込みしてください。');
+      toast.error('休憩終了の記録に失敗しました。ページを再読み込みしてください。');
     }
   };
 

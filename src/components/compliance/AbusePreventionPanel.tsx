@@ -281,7 +281,7 @@ const AbusePreventionPanel: React.FC = () => {
               value={form.agenda}
               onChange={(e) => setForm({ ...form, agenda: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               placeholder="検討議題..."
             />
           </div>
@@ -291,7 +291,7 @@ const AbusePreventionPanel: React.FC = () => {
               value={form.minutes}
               onChange={(e) => setForm({ ...form, minutes: e.target.value })}
               rows={4}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               placeholder="議事内容..."
             />
           </div>
@@ -301,7 +301,7 @@ const AbusePreventionPanel: React.FC = () => {
               value={form.actionItems}
               onChange={(e) => setForm({ ...form, actionItems: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               placeholder="次回までの対応事項..."
             />
           </div>
@@ -317,7 +317,7 @@ const AbusePreventionPanel: React.FC = () => {
             value={form.checkItems}
             onChange={(e) => setForm({ ...form, checkItems: e.target.value })}
             rows={6}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             placeholder="自己点検の項目と結果を記録..."
           />
         </div>
@@ -333,7 +333,7 @@ const AbusePreventionPanel: React.FC = () => {
               value={form.goals}
               onChange={(e) => setForm({ ...form, goals: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               placeholder="年間の目標..."
             />
           </div>
@@ -343,7 +343,7 @@ const AbusePreventionPanel: React.FC = () => {
               value={form.schedule}
               onChange={(e) => setForm({ ...form, schedule: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               placeholder="年間スケジュール..."
             />
           </div>
@@ -353,7 +353,7 @@ const AbusePreventionPanel: React.FC = () => {
               type="text"
               value={form.responsiblePersons}
               onChange={(e) => setForm({ ...form, responsiblePersons: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               placeholder="担当者名（カンマ区切り）"
             />
           </div>
@@ -380,13 +380,13 @@ const AbusePreventionPanel: React.FC = () => {
               onClick={() => setActiveSection(section.id)}
               className={`p-3 rounded-xl border-2 text-left transition-colors ${
                 isActive
-                  ? 'border-[#00c4cc] bg-[#00c4cc]/5'
+                  ? 'border-primary bg-primary/5'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
             >
               <div className="flex items-center gap-2 mb-1">
-                <Icon size={16} className={isActive ? 'text-[#00c4cc]' : 'text-gray-400'} />
-                <span className={`text-sm font-bold ${isActive ? 'text-[#00c4cc]' : 'text-gray-700'}`}>
+                <Icon size={16} className={isActive ? 'text-primary' : 'text-gray-400'} />
+                <span className={`text-sm font-bold ${isActive ? 'text-primary' : 'text-gray-700'}`}>
                   {section.label}
                 </span>
               </div>
@@ -512,7 +512,7 @@ const AbusePreventionPanel: React.FC = () => {
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   placeholder={
                     form.recordType === 'committee_meeting' ? '第X回 虐待防止委員会' :
                     form.recordType === 'restraint_committee' ? '第X回 身体拘束適正化委員会' :
@@ -530,7 +530,7 @@ const AbusePreventionPanel: React.FC = () => {
                     type="date"
                     value={form.date}
                     onChange={(e) => setForm({ ...form, date: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
                 <div>
@@ -539,7 +539,7 @@ const AbusePreventionPanel: React.FC = () => {
                     <select
                       value={form.status}
                       onChange={(e) => setForm({ ...form, status: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] appearance-none"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary appearance-none"
                     >
                       <option value="draft">下書き</option>
                       <option value="completed">完了</option>
@@ -557,7 +557,7 @@ const AbusePreventionPanel: React.FC = () => {
                     type="text"
                     value={form.participants}
                     onChange={(e) => setForm({ ...form, participants: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     placeholder="氏名（カンマ区切り）"
                   />
                 </div>

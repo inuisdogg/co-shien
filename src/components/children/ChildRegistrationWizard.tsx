@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Loader2, User, FileText, Shield, ClipboardCheck, Save, Info } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 import { ChildFormData } from '@/types';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import { saveDraft, deleteDraft } from '@/utils/draftStorage';
@@ -78,7 +79,8 @@ const initialFormData: ChildFormData & { postalCode?: string } = {
   pickupLocation: '',
   dropoffLocation: '',
   characteristics: '',
-  contractStatus: 'active',
+  income_category: undefined,
+  contractStatus: 'pre-contract',
 };
 
 export const ChildRegistrationWizard: React.FC<Props> = ({
@@ -87,6 +89,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
   initialData,
   mode,
 }) => {
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<WizardStep>('basic');
   const [formData, setFormData] = useState<ChildFormData & { postalCode?: string }>({
     ...initialFormData,
@@ -123,10 +126,12 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
       setFormData((prev) => ({
         ...prev,
         age: ageInfo.years,
-        contractEndDate: `${endYear}-03-31`,
+        // 編集モードで既にcontractEndDateがある場合は上書きしない
+        contractEndDate: (mode === 'edit' && prev.contractEndDate) ? prev.contractEndDate : `${endYear}-03-31`,
       }));
     }
-  }, [formData.birthDate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.birthDate, mode]);
 
   // 郵便番号から住所を取得
   const handlePostalCodeChange = useCallback(async (value: string) => {
@@ -164,7 +169,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
       // メールアドレスの必須チェック
       if (!formData.email?.trim()) {
         newErrors.email = '保護者メールアドレスを入力してください';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      } else if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/.test(formData.email)) {
         newErrors.email = 'メールアドレスの形式が正しくありません';
       }
     }
@@ -203,9 +208,9 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
   const handleSaveDraft = () => {
     if (formData.name) {
       saveDraft(formData);
-      alert('下書きを保存しました');
+      toast.success('下書きを保存しました');
     } else {
-      alert('児童名を入力してから下書き保存してください');
+      toast.warning('児童名を入力してから下書き保存してください');
     }
   };
 
@@ -226,7 +231,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
         deleteDraft(formData.name);
       }
     } catch {
-      alert('登録に失敗しました');
+      toast.error('登録に失敗しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -234,7 +239,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
 
   // 共通の入力フィールドスタイル
   const inputClass = (hasError?: boolean) =>
-    `w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] transition-colors ${
+    `w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors ${
       hasError ? 'border-red-400 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
     }`;
 
@@ -246,8 +251,8 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
   const renderBasicStep = () => (
     <div className="space-y-6">
       {/* ヒントカード */}
-      <div className="flex items-start gap-3 bg-[#00c4cc]/5 border border-[#00c4cc]/20 rounded-xl p-4">
-        <Info size={18} className="text-[#00c4cc] mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-xl p-4">
+        <Info size={18} className="text-primary mt-0.5 shrink-0" />
         <div>
           <p className="text-sm font-medium text-gray-700">児童の基本情報を入力してください</p>
           <p className="text-xs text-gray-500 mt-0.5">児童名、生年月日、保護者メールアドレスは必須項目です。</p>
@@ -257,7 +262,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
       {/* 児童情報 */}
       <div className={sectionClass}>
         <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
-          <User size={16} className="text-[#00c4cc]" />
+          <User size={16} className="text-primary" />
           児童情報
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -299,7 +304,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
             />
             {errors.birthDate && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><X size={12} />{errors.birthDate}</p>}
             {formData.birthDate && (
-              <p className="text-xs text-[#00c4cc] font-medium mt-1.5">
+              <p className="text-xs text-primary font-medium mt-1.5">
                 現在 {calculateAgeWithMonths(formData.birthDate).display}
               </p>
             )}
@@ -320,7 +325,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
       {/* 保護者連絡先（必須） */}
       <div className={sectionClass}>
         <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
-          <FileText size={16} className="text-[#00c4cc]" />
+          <FileText size={16} className="text-primary" />
           保護者連絡先
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -392,12 +397,26 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
 
       <div className={sectionClass}>
         <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
-          <Shield size={16} className="text-[#00c4cc]" />
+          <Shield size={16} className="text-primary" />
           受給者証
+          <span className="relative group">
+            <Info size={14} className="text-gray-400 cursor-help" />
+            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+              お住まいの市区町村が発行する「通所受給者証」です。放課後等デイサービスの利用に必要な証書で、利用日数や負担上限額が記載されています。
+            </span>
+          </span>
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>受給者証番号</label>
+            <label className={labelClass}>
+              受給者証番号
+              <span className="relative group inline-block ml-1">
+                <Info size={12} className="text-gray-400 cursor-help inline" />
+                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-normal">
+                  受給者証の上部に記載されている10桁の番号です
+                </span>
+              </span>
+            </label>
             <input
               type="text"
               value={formData.beneficiaryNumber || ''}
@@ -408,7 +427,15 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
             <p className={helpClass}>受給者証に記載の10桁の番号</p>
           </div>
           <div>
-            <label className={labelClass}>支給日数</label>
+            <label className={labelClass}>
+              支給日数（月あたり）
+              <span className="relative group inline-block ml-1">
+                <Info size={12} className="text-gray-400 cursor-help inline" />
+                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-normal">
+                  1ヶ月に利用できる最大日数です。受給者証の「支給量」欄に記載されています。
+                </span>
+              </span>
+            </label>
             <input
               type="number"
               value={formData.grantDays || ''}
@@ -420,12 +447,20 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
               min="0"
               max="31"
             />
-            <p className={helpClass}>受給者証に記載の月あたり支給日数</p>
+            <p className={helpClass}>受給者証の「支給量」欄に記載の日数</p>
           </div>
         </div>
 
         <div className="mt-4">
-          <label className={labelClass}>契約日数（月あたり）</label>
+          <label className={labelClass}>
+            契約日数（月あたり）
+            <span className="relative group inline-block ml-1">
+              <Info size={12} className="text-gray-400 cursor-help inline" />
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-normal">
+                施設と取り決めた月の利用予定日数です。支給日数以下で設定します。
+              </span>
+            </span>
+          </label>
           <input
             type="number"
             value={formData.contractDays || ''}
@@ -437,7 +472,48 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
             min="0"
             max="31"
           />
-          <p className={helpClass}>施設との契約で定めた月あたりの利用日数</p>
+          <p className={helpClass}>施設と取り決めた月あたりの利用予定日数</p>
+        </div>
+
+        <div className="mt-4">
+          <label className={labelClass}>
+            所得区分（利用者負担上限月額）
+            <span className="relative group inline-block ml-1">
+              <Info size={12} className="text-gray-400 cursor-help inline" />
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-normal">
+                ご家庭の所得に応じて月の自己負担額の上限が決まります。受給者証の「負担上限月額」欄に記載されています。
+              </span>
+            </span>
+          </label>
+          <div className="space-y-2 mt-2">
+            {([
+              { value: 'general', label: '一般2', amount: '37,200円' },
+              { value: 'general_low', label: '一般1', amount: '4,600円' },
+              { value: 'low_income', label: '低所得', amount: '0円' },
+              { value: 'welfare', label: '生活保護', amount: '0円' },
+            ] as const).map((option) => (
+              <label
+                key={option.value}
+                className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                  formData.income_category === option.value
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="income_category"
+                  value={option.value}
+                  checked={formData.income_category === option.value}
+                  onChange={(e) => setFormData({ ...formData, income_category: e.target.value })}
+                  className="accent-primary"
+                />
+                <span className="text-sm text-gray-800 font-medium">{option.label}</span>
+                <span className="text-xs text-gray-500">— {option.amount}</span>
+              </label>
+            ))}
+          </div>
+          <p className={helpClass}>受給者証の「利用者負担上限月額」欄を確認してください</p>
         </div>
       </div>
     </div>
@@ -458,7 +534,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
       {/* 住所・電話 */}
       <div className={sectionClass}>
         <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
-          <FileText size={16} className="text-[#00c4cc]" />
+          <FileText size={16} className="text-primary" />
           住所・電話番号
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -474,7 +550,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
                 maxLength={8}
               />
               {isLoadingAddress && (
-                <Loader2 className="w-5 h-5 text-[#00c4cc] animate-spin shrink-0" />
+                <Loader2 className="w-5 h-5 text-primary animate-spin shrink-0" />
               )}
             </div>
             {postalCodeError && (
@@ -509,7 +585,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
       {/* その他の情報 */}
       <div className={sectionClass}>
         <h4 className="font-bold text-sm text-gray-800 mb-4 flex items-center gap-2">
-          <Info size={16} className="text-[#00c4cc]" />
+          <Info size={16} className="text-primary" />
           その他の情報
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -582,12 +658,12 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
         <div className={sectionClass}>
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
-              <User size={16} className="text-[#00c4cc]" />
+              <User size={16} className="text-primary" />
               基本情報
             </h4>
             <button
               onClick={() => setCurrentStep('basic')}
-              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+              className="text-xs text-primary hover:text-primary-dark font-medium"
             >
               編集する
             </button>
@@ -603,12 +679,12 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
         <div className={sectionClass}>
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
-              <FileText size={16} className="text-[#00c4cc]" />
+              <FileText size={16} className="text-primary" />
               保護者情報
             </h4>
             <button
               onClick={() => setCurrentStep('basic')}
-              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+              className="text-xs text-primary hover:text-primary-dark font-medium"
             >
               編集する
             </button>
@@ -623,12 +699,12 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
         <div className={sectionClass}>
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
-              <Shield size={16} className="text-[#00c4cc]" />
+              <Shield size={16} className="text-primary" />
               受給者証情報
             </h4>
             <button
               onClick={() => setCurrentStep('certificate')}
-              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+              className="text-xs text-primary hover:text-primary-dark font-medium"
             >
               編集する
             </button>
@@ -636,18 +712,25 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
           <ConfirmItem label="受給者証番号" value={formData.beneficiaryNumber} />
           <ConfirmItem label="支給日数" value={formData.grantDays ? `${formData.grantDays}日` : undefined} />
           <ConfirmItem label="契約日数" value={formData.contractDays ? `${formData.contractDays}日` : undefined} />
+          <ConfirmItem label="所得区分" value={
+            formData.income_category === 'general' ? '一般2（37,200円）' :
+            formData.income_category === 'general_low' ? '一般1（4,600円）' :
+            formData.income_category === 'low_income' ? '低所得（0円）' :
+            formData.income_category === 'welfare' ? '生活保護（0円）' :
+            undefined
+          } />
         </div>
 
         {/* 連絡先・その他 */}
         <div className={sectionClass}>
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
-              <Info size={16} className="text-[#00c4cc]" />
+              <Info size={16} className="text-primary" />
               連絡先・その他
             </h4>
             <button
               onClick={() => setCurrentStep('contact')}
-              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-medium"
+              className="text-xs text-primary hover:text-primary-dark font-medium"
             >
               編集する
             </button>
@@ -723,16 +806,16 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
                       }}
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                         isCompleted
-                          ? 'bg-[#00c4cc] text-white shadow-sm cursor-pointer hover:bg-[#00b0b8]'
+                          ? 'bg-primary text-white shadow-sm cursor-pointer hover:bg-primary-dark'
                           : isCurrent
-                          ? 'bg-[#00c4cc] text-white shadow-md ring-4 ring-[#00c4cc]/20'
+                          ? 'bg-primary text-white shadow-md ring-4 ring-primary/20'
                           : 'bg-gray-200 text-gray-400'
                       } ${index <= currentStepIndex ? 'cursor-pointer' : 'cursor-default'}`}
                     >
                       {isCompleted ? <Check size={18} /> : <StepIcon size={18} />}
                     </button>
                     <span className={`text-xs mt-2 font-medium text-center ${
-                      isCurrent ? 'text-[#00c4cc]' : isCompleted ? 'text-gray-600' : 'text-gray-400'
+                      isCurrent ? 'text-primary' : isCompleted ? 'text-gray-600' : 'text-gray-400'
                     }`}>
                       {step.label}
                     </span>
@@ -741,7 +824,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
                     <div className="flex-shrink-0 w-8 md:w-12 h-0.5 mt-[-16px] mx-1">
                       <div
                         className={`h-full rounded-full transition-colors ${
-                          index < currentStepIndex ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                          index < currentStepIndex ? 'bg-primary' : 'bg-gray-200'
                         }`}
                       />
                     </div>
@@ -788,7 +871,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-6 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm shadow-sm"
+                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm shadow-sm"
               >
                 {isSubmitting ? (
                   <>
@@ -805,7 +888,7 @@ export const ChildRegistrationWizard: React.FC<Props> = ({
             ) : (
               <button
                 onClick={handleNext}
-                className="flex items-center gap-1.5 px-6 py-2.5 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors font-bold text-sm shadow-sm"
+                className="flex items-center gap-1.5 px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-bold text-sm shadow-sm"
               >
                 次へ
                 <ChevronRight size={16} />

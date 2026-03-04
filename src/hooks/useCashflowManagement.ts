@@ -4,7 +4,7 @@
  * P&L（損益計算書）・キャッシュフロー計算書の生成
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { CashflowEntry, CashflowBalance, PLStatement } from '@/types';
@@ -21,7 +21,7 @@ function mapRow(row: Record<string, unknown>): CashflowEntry {
     amount: (row.amount as number) || 0,
     sortOrder: (row.sort_order as number) || 0,
     notes: (row.notes as string) || undefined,
-    isTemplateItem: row.is_template_item as boolean,
+    isTemplateItem: (row.is_template_item as boolean) || false,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -255,8 +255,19 @@ export function useCashflowManagement() {
   }, []);
 
   // Initialize a month with default template items (only if no entries exist)
+  // 重複防止: 初期化中フラグで StrictMode の二重実行を防ぐ
+  const initializingRef = useRef<string | null>(null);
+
   const initializeMonth = useCallback(async (fId: string, yearMonth: string): Promise<CashflowEntry[]> => {
     if (!fId || !yearMonth) return [];
+
+    // 同一月の初期化が既に進行中なら、完了を待ってフェッチだけ行う
+    const key = `${fId}_${yearMonth}`;
+    if (initializingRef.current === key) {
+      // 少し待ってからフェッチ（先行の insert 完了を待つ）
+      await new Promise(r => setTimeout(r, 500));
+      return fetchEntries(fId, yearMonth);
+    }
 
     // Check if entries already exist
     const { data: existing, error: checkError } = await supabase
@@ -272,50 +283,99 @@ export function useCashflowManagement() {
     }
 
     if (existing && existing.length > 0) {
-      // Already has entries, fetch them
+      // Already has entries — fetch and deduplicate
+      const entries = await fetchEntries(fId, yearMonth);
+      return deduplicateEntries(entries, fId, yearMonth);
+    }
+
+    // 初期化中フラグをセット
+    initializingRef.current = key;
+
+    try {
+      // Create default items
+      const rows: Record<string, unknown>[] = [];
+
+      for (const item of DEFAULT_INCOME_ITEMS) {
+        rows.push({
+          facility_id: fId,
+          year_month: yearMonth,
+          category: 'income',
+          subcategory: item.subcategory,
+          item_name: item.itemName,
+          amount: 0,
+          sort_order: item.sortOrder,
+          is_template_item: true,
+        });
+      }
+
+      for (const item of DEFAULT_EXPENSE_ITEMS) {
+        rows.push({
+          facility_id: fId,
+          year_month: yearMonth,
+          category: 'expense',
+          subcategory: item.subcategory,
+          item_name: item.itemName,
+          amount: 0,
+          sort_order: item.sortOrder,
+          is_template_item: true,
+        });
+      }
+
+      const { error } = await supabase
+        .from('cashflow_entries')
+        .insert(rows);
+
+      if (error) {
+        console.error('Error initializing month:', error);
+        return [];
+      }
+
       return fetchEntries(fId, yearMonth);
+    } finally {
+      initializingRef.current = null;
     }
-
-    // Create default items
-    const rows: Record<string, unknown>[] = [];
-
-    for (const item of DEFAULT_INCOME_ITEMS) {
-      rows.push({
-        facility_id: fId,
-        year_month: yearMonth,
-        category: 'income',
-        subcategory: item.subcategory,
-        item_name: item.itemName,
-        amount: 0,
-        sort_order: item.sortOrder,
-        is_template_item: true,
-      });
-    }
-
-    for (const item of DEFAULT_EXPENSE_ITEMS) {
-      rows.push({
-        facility_id: fId,
-        year_month: yearMonth,
-        category: 'expense',
-        subcategory: item.subcategory,
-        item_name: item.itemName,
-        amount: 0,
-        sort_order: item.sortOrder,
-        is_template_item: true,
-      });
-    }
-
-    const { error } = await supabase
-      .from('cashflow_entries')
-      .insert(rows);
-
-    if (error) {
-      console.error('Error initializing month:', error);
-      return [];
-    }
-
-    return fetchEntries(fId, yearMonth);
   }, [fetchEntries]);
+
+  // テンプレート項目の重複を検出・削除する
+  const deduplicateEntries = useCallback(async (
+    entries: CashflowEntry[],
+    fId: string,
+    yearMonth: string
+  ): Promise<CashflowEntry[]> => {
+    // テンプレート項目だけ重複チェック
+    const seen = new Map<string, CashflowEntry>();
+    const duplicateIds: string[] = [];
+
+    for (const entry of entries) {
+      if (!entry.isTemplateItem) continue;
+      const key = `${entry.category}_${entry.subcategory}_${entry.itemName}`;
+      const existing = seen.get(key);
+      if (existing) {
+        // 金額が入ってる方を残す、両方0なら先のを残す
+        if (entry.amount > 0 && existing.amount === 0) {
+          duplicateIds.push(existing.id);
+          seen.set(key, entry);
+        } else {
+          duplicateIds.push(entry.id);
+        }
+      } else {
+        seen.set(key, entry);
+      }
+    }
+
+    if (duplicateIds.length > 0) {
+      // DBから重複を削除
+      for (const id of duplicateIds) {
+        await supabase.from('cashflow_entries').delete().eq('id', id);
+      }
+      // 重複を除いたリストを返す
+      const cleaned = entries.filter(e => !duplicateIds.includes(e.id));
+      setEntries(cleaned);
+      return cleaned;
+    }
+
+    return entries;
+  }, []);
 
   // Copy entries from previous month
   const copyFromPreviousMonth = useCallback(async (fId: string, yearMonth: string): Promise<CashflowEntry[]> => {

@@ -26,6 +26,7 @@ import {
   SHIFT_CONFIRMATION_STATUS_LABELS,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 interface ShiftConfirmationViewProps {
   userId: string;
@@ -66,6 +67,7 @@ export default function ShiftConfirmationView({
   facilityName,
   onClose,
 }: ShiftConfirmationViewProps) {
+  const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
@@ -263,7 +265,7 @@ export default function ShiftConfirmationView({
       fetchData();
     } catch (error) {
       console.error('確認エラー:', error);
-      alert('エラーが発生しました');
+      toast.error('エラーが発生しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -272,7 +274,7 @@ export default function ShiftConfirmationView({
   // 相談したい回答
   const handleNeedsDiscussion = async () => {
     if (!selectedShift || !comment.trim()) {
-      alert('相談内容を入力してください');
+      toast.warning('相談内容を入力してください');
       return;
     }
 
@@ -304,7 +306,7 @@ export default function ShiftConfirmationView({
       fetchData();
     } catch (error) {
       console.error('相談エラー:', error);
-      alert('エラーが発生しました');
+      toast.error('エラーが発生しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -346,7 +348,7 @@ export default function ShiftConfirmationView({
         <div className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#818CF8]" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-personal" />
             </div>
           ) : scheduleStatus !== 'published' && scheduleStatus !== 'confirmed' ? (
             <div className="text-center py-12">
@@ -546,7 +548,7 @@ export default function ShiftConfirmationView({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
             onClick={() => setShowCommentModal(false)}
           >
             <motion.div
@@ -565,7 +567,7 @@ export default function ShiftConfirmationView({
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="相談したい内容を入力してください"
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
               />
               <div className="flex justify-end gap-2 mt-4">
                 <button

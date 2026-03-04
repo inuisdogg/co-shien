@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { parseQualifications } from '@/utils/qualifications';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   StaffForJudgment,
@@ -188,14 +189,7 @@ export function useAdditionSimulator(): UseAdditionSimulatorReturn {
         const standardWeeklyHours = 40;
 
         // 資格データのパース（カンマ区切りの文字列または配列）
-        let qualifications: string[] = [];
-        if (s.qualifications) {
-          if (Array.isArray(s.qualifications)) {
-            qualifications = s.qualifications;
-          } else if (typeof s.qualifications === 'string') {
-            qualifications = s.qualifications.split(',').map((q: string) => q.trim());
-          }
-        }
+        const qualifications = parseQualifications(s.qualifications);
 
         return {
           id: s.id,

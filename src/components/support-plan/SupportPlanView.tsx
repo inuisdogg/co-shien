@@ -34,6 +34,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useFacilityData } from '@/hooks/useFacilityData';
+import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   SupportPlanFile,
   SupportPlanFileStatus,
@@ -244,7 +246,7 @@ function hasRootsContent(plan: SupportPlanFile): boolean {
 // Sub-components
 // ============================================
 
-function StatusBadge({ status, label }: { status: ChildPlanStatus; label: string }) {
+function StatusBadge({ status, label, daysLeft }: { status: ChildPlanStatus; label: string; daysLeft?: number | null }) {
   const styles: Record<ChildPlanStatus, string> = {
     all: '',
     active: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
@@ -259,6 +261,9 @@ function StatusBadge({ status, label }: { status: ChildPlanStatus; label: string
       {status === 'expired' && <AlertTriangle className="w-3 h-3" />}
       {status === 'none' && <X className="w-3 h-3" />}
       {label}
+      {status === 'expiring' && daysLeft != null && (
+        <span className="ml-0.5">({'\u6B8B\u308A'}{daysLeft}{'\u65E5'})</span>
+      )}
     </span>
   );
 }
@@ -292,7 +297,7 @@ function SkeletonCard() {
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-      <div className="w-1 h-4 bg-[#00c4cc] rounded-full" />
+      <div className="w-1 h-4 bg-primary rounded-full" />
       {children}
     </h3>
   );
@@ -320,7 +325,7 @@ function FormInput({ value, onChange, placeholder, type = 'text', ...props }: {
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] disabled:bg-gray-50 disabled:text-gray-400"
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-50 disabled:text-gray-400"
       {...props}
     />
   );
@@ -340,7 +345,7 @@ function FormTextarea({ value, onChange, placeholder, rows = 3, disabled }: {
       placeholder={placeholder}
       rows={rows}
       disabled={disabled}
-      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] disabled:bg-gray-50 disabled:text-gray-400"
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-50 disabled:text-gray-400"
     />
   );
 }
@@ -366,6 +371,7 @@ function PlanEditor({
   onDelete: (planId: string) => Promise<void>;
   onStatusChange: (planId: string, status: SupportPlanFileStatus) => Promise<void>;
 }) {
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<EditorSection>('header');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -474,7 +480,7 @@ function PlanEditor({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('PDFファイルのみアップロードできます');
+      toast.warning('PDFファイルのみアップロードできます');
       return;
     }
     setUploading(true);
@@ -486,7 +492,7 @@ function PlanEditor({
       markDirty();
     } catch (err) {
       console.error('Upload error:', err);
-      alert('ファイルのアップロードに失敗しました');
+      toast.error('ファイルのアップロードに失敗しました');
     } finally {
       setUploading(false);
     }
@@ -510,7 +516,7 @@ function PlanEditor({
               <ArrowLeft className="w-4 h-4" />
               一覧に戻る
             </button>
-            <div className="w-10 h-10 rounded-full bg-[#00c4cc] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               {getInitials(child.name)}
             </div>
             <div>
@@ -539,7 +545,7 @@ function PlanEditor({
               <span className="text-xs text-gray-400">完成度</span>
               <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${completeness.percentage === 100 ? 'bg-emerald-500' : completeness.percentage >= 50 ? 'bg-[#00c4cc]' : 'bg-amber-400'}`}
+                  className={`h-full rounded-full transition-all ${completeness.percentage === 100 ? 'bg-emerald-500' : completeness.percentage >= 50 ? 'bg-primary' : 'bg-amber-400'}`}
                   style={{ width: `${completeness.percentage}%` }}
                 />
               </div>
@@ -576,7 +582,7 @@ function PlanEditor({
             <button
               onClick={handleSave}
               disabled={saving || !dirty}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-[#00c4cc] rounded-lg hover:bg-[#00b0b8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Save className="w-4 h-4" />
               {saving ? '保存中...' : '保存'}
@@ -598,7 +604,7 @@ function PlanEditor({
                   onClick={() => setActiveSection(section.key)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors text-left ${
                     activeSection === section.key
-                      ? 'bg-[#00c4cc]/10 text-[#00c4cc] font-medium'
+                      ? 'bg-primary/10 text-primary font-medium'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                   }`}
                 >
@@ -633,7 +639,7 @@ function PlanEditor({
                 onClick={() => setActiveSection(section.key)}
                 className={`flex-shrink-0 flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] rounded-lg transition-colors ${
                   activeSection === section.key
-                    ? 'bg-[#00c4cc]/10 text-[#00c4cc] font-medium'
+                    ? 'bg-primary/10 text-primary font-medium'
                     : 'text-gray-400'
                 }`}
               >
@@ -677,7 +683,7 @@ function PlanEditor({
                     <select
                       value={planType}
                       onChange={e => { setPlanType(e.target.value as SupportPlanType); markDirty(); }}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     >
                       {Object.entries(PLAN_TYPE_LABELS).map(([k, v]) => (
                         <option key={k} value={k}>{v}</option>
@@ -743,7 +749,7 @@ function PlanEditor({
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 border border-dashed border-gray-300 rounded-lg hover:border-[#00c4cc] hover:text-[#00c4cc] hover:bg-[#00c4cc]/5 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 border border-dashed border-gray-300 rounded-lg hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
                     >
                       <Upload className="w-4 h-4" />
                       {uploading ? 'アップロード中...' : 'PDFを選択'}
@@ -762,7 +768,7 @@ function PlanEditor({
                         type="checkbox"
                         checked={parentAgreed}
                         onChange={e => { setParentAgreed(e.target.checked); markDirty(); }}
-                        className="rounded border-gray-300 text-[#00c4cc] focus:ring-[#00c4cc]"
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
                       />
                       <span className="text-sm text-gray-700">保護者同意済み</span>
                     </label>
@@ -874,7 +880,7 @@ function PlanEditor({
                   <SectionHeading>短期目標（3〜6ヶ月）</SectionHeading>
                   <button
                     onClick={addGoal}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#00c4cc] border border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     目標を追加
@@ -884,7 +890,7 @@ function PlanEditor({
                   {(content.shortTermGoals || []).map((goal, index) => (
                     <div key={goal.id} className="border border-gray-200 rounded-xl p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#00c4cc] bg-[#00c4cc]/10 px-2.5 py-1 rounded-full">
+                        <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
                           目標 {index + 1}
                         </span>
                         {(content.shortTermGoals || []).length > 1 && (
@@ -948,7 +954,7 @@ function PlanEditor({
                 return (
                   <div key={goal.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <div className="flex items-start gap-3 mb-4">
-                      <span className="text-xs font-bold text-[#00c4cc] bg-[#00c4cc]/10 px-2.5 py-1 rounded-full flex-shrink-0">
+                      <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full flex-shrink-0">
                         目標 {index + 1}
                       </span>
                       <div>
@@ -1045,7 +1051,7 @@ function PlanEditor({
                   {(content.shortTermGoals || []).filter(g => g.goalText).map((goal, index) => (
                     <div key={goal.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#00c4cc] bg-[#00c4cc]/10 px-2 py-0.5 rounded-full">目標 {index + 1}</span>
+                        <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">目標 {index + 1}</span>
                         <span className="text-sm text-gray-600">{goal.goalText}</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1054,7 +1060,7 @@ function PlanEditor({
                           <select
                             value={goal.midEvaluationLevel || ''}
                             onChange={e => updateGoal(goal.id, { midEvaluationLevel: (e.target.value || undefined) as ShortTermGoal['midEvaluationLevel'] })}
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                           >
                             <option value="">選択してください</option>
                             <option value="achieved">達成</option>
@@ -1101,7 +1107,7 @@ function PlanEditor({
                   {(content.shortTermGoals || []).filter(g => g.goalText).map((goal, index) => (
                     <div key={goal.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#00c4cc] bg-[#00c4cc]/10 px-2 py-0.5 rounded-full">目標 {index + 1}</span>
+                        <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">目標 {index + 1}</span>
                         <span className="text-sm text-gray-600">{goal.goalText}</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1110,7 +1116,7 @@ function PlanEditor({
                           <select
                             value={goal.finalEvaluationLevel || ''}
                             onChange={e => updateGoal(goal.id, { finalEvaluationLevel: (e.target.value || undefined) as ShortTermGoal['finalEvaluationLevel'] })}
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                           >
                             <option value="">選択してください</option>
                             <option value="achieved">達成</option>
@@ -1185,7 +1191,7 @@ function TimelineView({ plans, childList }: { plans: SupportPlanFile[]; childLis
         <div key={plan.id} className="flex gap-3">
           <div className="flex flex-col items-center">
             <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-              plan.status === 'active' ? 'bg-[#00c4cc]' : plan.status === 'completed' ? 'bg-emerald-500' : 'bg-gray-300'
+              plan.status === 'active' ? 'bg-primary' : plan.status === 'completed' ? 'bg-emerald-500' : 'bg-gray-300'
             }`} />
             {index < childPlans.length - 1 && (
               <div className="w-px flex-1 bg-gray-200 mt-1" />
@@ -1217,6 +1223,7 @@ function TimelineView({ plans, childList }: { plans: SupportPlanFile[]; childLis
 
 export default function SupportPlanView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
   const { children, staff } = useFacilityData();
 
@@ -1335,7 +1342,7 @@ export default function SupportPlanView() {
       }
     } catch (error) {
       console.error('Error creating plan:', error);
-      alert('計画の作成に失敗しました');
+      toast.error('計画の作成に失敗しました');
     }
   };
 
@@ -1363,7 +1370,7 @@ export default function SupportPlanView() {
       setEditingPlan(updated);
     } catch (error) {
       console.error('Error saving plan:', error);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     }
   };
 
@@ -1379,7 +1386,7 @@ export default function SupportPlanView() {
       setEditingChild(null);
     } catch (error) {
       console.error('Error deleting plan:', error);
-      alert('削除に失敗しました');
+      toast.error('削除に失敗しました');
     }
   };
 
@@ -1445,7 +1452,7 @@ export default function SupportPlanView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <FileText className="w-6 h-6 text-[#00c4cc]" />
+          <FileText className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-800">個別支援計画</h1>
           <span className="text-sm text-gray-400 ml-1">5領域対応</span>
         </div>
@@ -1542,7 +1549,7 @@ export default function SupportPlanView() {
               placeholder="児童名で検索..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc]"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
@@ -1553,7 +1560,7 @@ export default function SupportPlanView() {
               onClick={() => setChildFilter(tab.key)}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                 childFilter === tab.key
-                  ? 'bg-[#00c4cc] text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -1577,16 +1584,12 @@ export default function SupportPlanView() {
         {/* Children Grid */}
         <div className="flex-1 min-w-0">
           {filteredChildren.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
-                <FileText className="w-8 h-8 text-gray-300" />
-              </div>
-              <p className="text-gray-500 mb-1">
-                {searchTerm || childFilter !== 'all' ? '条件に一致する児童がいません' : '児童が登録されていません'}
-              </p>
-              <p className="text-sm text-gray-400">
-                {searchTerm ? '検索条件を変更してください' : '児童管理画面から児童を追加してください'}
-              </p>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+              <EmptyState
+                icon={<FileText className="w-7 h-7 text-gray-400" />}
+                title={searchTerm || childFilter !== 'all' ? '条件に一致する児童がいません' : '児童が登録されていません'}
+                description={searchTerm ? '検索条件を変更してください' : '児童管理画面から児童を追加してください'}
+              />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1613,7 +1616,7 @@ export default function SupportPlanView() {
                   >
                     {/* Child Header */}
                     <div className="flex items-start gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-full bg-[#00c4cc] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                         {getInitials(child.name)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1622,7 +1625,7 @@ export default function SupportPlanView() {
                           <p className="text-xs text-gray-400 truncate">{child.nameKana}</p>
                         )}
                       </div>
-                      <StatusBadge status={status} label={label} />
+                      <StatusBadge status={status} label={label} daysLeft={daysRemaining} />
                     </div>
 
                     {/* Plan Info */}
@@ -1687,7 +1690,7 @@ export default function SupportPlanView() {
                             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${
-                                  progress.percentage === 100 ? 'bg-emerald-500' : progress.percentage >= 50 ? 'bg-[#00c4cc]' : 'bg-amber-400'
+                                  progress.percentage === 100 ? 'bg-emerald-500' : progress.percentage >= 50 ? 'bg-primary' : 'bg-amber-400'
                                 }`}
                                 style={{ width: `${progress.percentage}%` }}
                               />
@@ -1702,7 +1705,7 @@ export default function SupportPlanView() {
                               setEditingPlan(latestPlan);
                               setEditingChild(child);
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-[#00c4cc] bg-[#00c4cc]/5 rounded-lg hover:bg-[#00c4cc]/10 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-primary bg-primary/5 rounded-lg hover:bg-primary/10 transition-colors"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             編集
@@ -1711,7 +1714,7 @@ export default function SupportPlanView() {
                             onClick={() => setTimelineChildId(timelineChildId === child.id ? null : child.id)}
                             className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                               timelineChildId === child.id
-                                ? 'text-[#00c4cc] bg-[#00c4cc]/10'
+                                ? 'text-primary bg-primary/10'
                                 : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
                             }`}
                             title="計画履歴"
@@ -1732,7 +1735,7 @@ export default function SupportPlanView() {
                         <p className="text-sm text-gray-400">支援計画が作成されていません</p>
                         <button
                           onClick={() => handleCreatePlan(child.id, 'initial')}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[#00c4cc] border border-dashed border-[#00c4cc]/30 rounded-lg hover:bg-[#00c4cc]/5 transition-colors"
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-primary border border-dashed border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
                         >
                           <Plus className="w-4 h-4" />
                           新規作成
@@ -1752,7 +1755,7 @@ export default function SupportPlanView() {
             <div className="sticky top-4 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-[#00c4cc]" />
+                  <History className="w-4 h-4 text-primary" />
                   <h3 className="text-sm font-bold text-gray-700">
                     {children.find(c => c.id === timelineChildId)?.name}の計画履歴
                   </h3>

@@ -6,9 +6,9 @@ Roots は3つの iOS アプリとして App Store に提出します:
 
 | アプリ名 | Bundle ID | 対象ユーザー | サーバーURL |
 |---------|-----------|------------|------------|
-| Roots | `jp.co.inu.coshien.client` | 保護者（利用者） | `https://roots.inu.co.jp/parent` |
-| Roots Staff | `jp.co.inu.coshien.staff` | スタッフ（従業員） | `https://roots.inu.co.jp/career` |
-| Roots Biz | `jp.co.inu.coshien.facility` | 施設管理者 | `https://roots.inu.co.jp/business` |
+| Roots | `jp.co.inu.roots.client` | 保護者（利用者） | `https://roots.inu.co.jp/parent` |
+| Roots Staff | `jp.co.inu.roots.staff` | スタッフ（従業員） | `https://roots.inu.co.jp/career` |
+| Roots Biz | `jp.co.inu.roots.facility` | 施設管理者 | `https://roots.inu.co.jp/business` |
 
 各アプリは Capacitor の「Live Web Mode」を使用し、Web サーバーからコンテンツを読み込みます。
 Web を更新すればアプリも自動的に更新されます。
@@ -54,9 +54,9 @@ Web を更新すればアプリも自動的に更新されます。
 1. Developer Portal > Identifiers > 「+」ボタン
 2. 「App IDs」を選択
 3. 以下の情報を入力:
-   - **Roots**: Bundle ID = `jp.co.inu.coshien.client`
-   - **Roots Staff**: Bundle ID = `jp.co.inu.coshien.staff`
-   - **Roots Biz**: Bundle ID = `jp.co.inu.coshien.facility`
+   - **Roots**: Bundle ID = `jp.co.inu.roots.client`
+   - **Roots Staff**: Bundle ID = `jp.co.inu.roots.staff`
+   - **Roots Biz**: Bundle ID = `jp.co.inu.roots.facility`
 4. Capabilities で以下を有効化:
    - Push Notifications
    - Associated Domains
@@ -83,17 +83,17 @@ Web を更新すればアプリも自動的に更新されます。
 - プラットフォーム: iOS
 - 名前: Roots
 - プライマリ言語: 日本語
-- バンドルID: `jp.co.inu.coshien.client`
+- バンドルID: `jp.co.inu.roots.client`
 - SKU: `roots-client-001`
 
 **Roots Staff（スタッフアプリ）**
 - 名前: Roots Staff
-- バンドルID: `jp.co.inu.coshien.staff`
+- バンドルID: `jp.co.inu.roots.staff`
 - SKU: `roots-staff-001`
 
 **Roots Biz（施設管理アプリ）**
 - 名前: Roots Biz
-- バンドルID: `jp.co.inu.coshien.facility`
+- バンドルID: `jp.co.inu.roots.facility`
 - SKU: `roots-facility-001`
 
 ### 3-2. アプリ情報の設定

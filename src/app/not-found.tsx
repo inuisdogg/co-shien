@@ -2,10 +2,12 @@ export default function NotFound() {
   return (
     <div className="flex h-screen items-center justify-center bg-gray-50">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">ページが見つかりません</h2>
+        <p className="text-7xl font-bold text-primary/20 mb-2">404</p>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">ページが見つかりません</h2>
+        <p className="text-sm text-gray-500 mb-6">お探しのページは移動または削除された可能性があります。</p>
         <a
           href="/"
-          className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors inline-block"
+          className="px-5 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors inline-block font-medium text-sm"
         >
           ホームに戻る
         </a>
@@ -13,12 +15,3 @@ export default function NotFound() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

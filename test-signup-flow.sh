@@ -71,8 +71,9 @@ fi
 echo ""
 echo "4. テスト用URL"
 echo "-------------------"
-echo "Biz新規登録: https://biz.co-shien.inu.co.jp/signup"
-echo "パーソナル新規登録: https://my.co-shien.inu.co.jp/personal/signup"
+echo "事業所新規登録: https://roots.inu.co.jp/signup"
+echo "保護者新規登録: https://roots.inu.co.jp/parent/signup"
+echo "キャリア新規登録: https://roots.inu.co.jp/career/signup"
 echo ""
 
 echo "=========================================="

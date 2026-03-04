@@ -39,6 +39,9 @@ import {
   UpperLimitChildResult,
 } from '@/hooks/useBillingWizard';
 import { BillingRecord, BillingDetail, BillingStatus } from '@/types';
+import { printProxyReceiptBatch, exportKokuhorenCSV } from '@/lib/regulatoryDocuments';
+import type { ProxyReceiptData, KokuhorenRecord, KokuhorenExportData } from '@/lib/regulatoryDocuments';
+import { supabase } from '@/lib/supabase';
 
 // ============================================================
 // Helper: format yen
@@ -156,7 +159,7 @@ function StepIndicator({
         <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 z-0" />
         {/* Active progress line */}
         <div
-          className="absolute top-4 left-0 h-0.5 bg-[#00c4cc] z-0 transition-all duration-500"
+          className="absolute top-4 left-0 h-0.5 bg-primary z-0 transition-all duration-500"
           style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
         />
 
@@ -178,9 +181,9 @@ function StepIndicator({
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
                   isCompleted
-                    ? 'bg-[#00c4cc] text-white'
+                    ? 'bg-primary text-white'
                     : isCurrent
-                    ? 'bg-white border-2 border-[#00c4cc] text-[#00c4cc] shadow-md'
+                    ? 'bg-white border-2 border-primary text-primary shadow-md'
                     : 'bg-white border-2 border-gray-200 text-gray-400'
                 }`}
               >
@@ -192,7 +195,7 @@ function StepIndicator({
               </div>
               <span
                 className={`text-[10px] font-medium whitespace-nowrap ${
-                  isCurrent ? 'text-[#00c4cc]' : isCompleted ? 'text-[#00c4cc]' : 'text-gray-400'
+                  isCurrent ? 'text-primary' : isCompleted ? 'text-primary' : 'text-gray-400'
                 }`}
               >
                 {s.label}
@@ -259,10 +262,10 @@ function ValidationPanel({ validations }: { validations: ValidationItem[] }) {
       )}
 
       {infos.length > 0 && (
-        <div className="bg-[#00c4cc]/5 border border-[#00c4cc]/20 rounded-xl p-4">
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Info size={16} className="text-[#00c4cc]" />
-            <span className="text-sm font-semibold text-[#00c4cc]">情報 ({infos.length}件)</span>
+            <Info size={16} className="text-primary" />
+            <span className="text-sm font-semibold text-primary">情報 ({infos.length}件)</span>
           </div>
           <ul className="space-y-1.5">
             {infos.map((v, i) => (
@@ -597,13 +600,134 @@ export default function BillingWizardView() {
     }
   }, [facilityId, yearMonth, exportCSV]);
 
+  // 代理受領通知書の一括印刷
+  const handleProxyReceipt = useCallback(async () => {
+    if (!facilityId || billingRecords.length === 0) return;
+    // 児童情報を取得
+    const childIds = billingRecords.map(r => r.childId);
+    const { data: children } = await supabase
+      .from('children')
+      .select('id, name, guardian_name, beneficiary_number')
+      .in('id', childIds);
+    const childMap = new Map((children || []).map((c: Record<string, unknown>) => [c.id as string, c]));
+
+    const { data: facilityData } = await supabase
+      .from('facilities')
+      .select('name, code, address')
+      .eq('id', facilityId)
+      .single();
+
+    const receipts: ProxyReceiptData[] = billingRecords.map(rec => {
+      const child = childMap.get(rec.childId) as Record<string, unknown> | undefined;
+      return {
+        facilityName: (facilityData?.name as string) || '',
+        facilityCode: (facilityData?.code as string) || '',
+        facilityAddress: facilityData?.address as string | undefined,
+        yearMonth,
+        childName: (child?.name as string) || rec.childName || '',
+        guardianName: (child?.guardian_name as string) || '',
+        beneficiaryNumber: (child?.beneficiary_number as string) || '',
+        serviceType: rec.serviceType,
+        totalUnits: rec.totalUnits,
+        unitPrice: rec.unitPrice,
+        totalAmount: rec.totalAmount,
+        copayAmount: rec.copayAmount,
+        insuranceAmount: rec.insuranceAmount,
+        upperLimitAmount: rec.upperLimitAmount,
+        usageDays: 0, // will be calculated below
+      };
+    });
+
+    // 利用日数を取得
+    for (const receipt of receipts) {
+      const rec = billingRecords.find(r => r.childName === receipt.childName || childMap.get(r.childId)?.name === receipt.childName);
+      if (rec) {
+        const { count } = await supabase
+          .from('billing_details')
+          .select('id', { count: 'exact', head: true })
+          .eq('billing_record_id', rec.id)
+          .eq('is_absence', false);
+        receipt.usageDays = count || 0;
+      }
+    }
+
+    printProxyReceiptBatch(receipts);
+  }, [facilityId, billingRecords, yearMonth]);
+
+  // 国保連CSV（詳細版）エクスポート
+  const handleKokuhorenExport = useCallback(async () => {
+    if (!facilityId || billingRecords.length === 0) return;
+
+    const { data: facilityData } = await supabase
+      .from('facilities')
+      .select('name, code')
+      .eq('id', facilityId)
+      .single();
+
+    const childIds = billingRecords.map(r => r.childId);
+    const { data: children } = await supabase
+      .from('children')
+      .select('id, name, beneficiary_number, city_code')
+      .in('id', childIds);
+    const childMap = new Map((children || []).map((c: Record<string, unknown>) => [c.id as string, c]));
+
+    const kokuhorenRecords: KokuhorenRecord[] = [];
+
+    for (const rec of billingRecords) {
+      const child = childMap.get(rec.childId) as Record<string, unknown> | undefined;
+
+      // 日別明細を取得
+      const { data: details } = await supabase
+        .from('billing_details')
+        .select('*')
+        .eq('billing_record_id', rec.id)
+        .order('service_date', { ascending: true });
+
+      const { count: usageDays } = await supabase
+        .from('billing_details')
+        .select('id', { count: 'exact', head: true })
+        .eq('billing_record_id', rec.id)
+        .eq('is_absence', false);
+
+      kokuhorenRecords.push({
+        childName: (child?.name as string) || rec.childName || '',
+        beneficiaryNumber: (child?.beneficiary_number as string) || '',
+        serviceType: rec.serviceType,
+        cityCode: child?.city_code as string | undefined,
+        totalUnits: rec.totalUnits,
+        unitPrice: rec.unitPrice,
+        totalAmount: rec.totalAmount,
+        copayAmount: rec.copayAmount,
+        insuranceAmount: rec.insuranceAmount,
+        upperLimitAmount: rec.upperLimitAmount,
+        usageDays: usageDays || 0,
+        details: (details || []).map((d: Record<string, unknown>) => ({
+          serviceDate: d.service_date as string,
+          serviceCode: d.service_code as string,
+          units: d.unit_count as number,
+          isAbsence: d.is_absence as boolean,
+          additions: d.additions as { code: string; name: string; units: number }[] | undefined,
+        })),
+      });
+    }
+
+    const exportData: KokuhorenExportData = {
+      facilityName: (facilityData?.name as string) || '',
+      facilityCode: (facilityData?.code as string) || '',
+      yearMonth,
+      records: kokuhorenRecords,
+    };
+
+    exportKokuhorenCSV(exportData);
+  }, [facilityId, billingRecords, yearMonth]);
+
   // ============================================================
   // Loading state
   // ============================================================
   if (isLoading && billingRecords.length === 0 && mode === 'dashboard') {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-t-transparent border-[#00c4cc] rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-t-transparent border-primary rounded-full animate-spin" />
         <span className="ml-3 text-gray-500">読み込み中...</span>
       </div>
     );
@@ -660,7 +784,7 @@ export default function BillingWizardView() {
         {currentStep === 0 && (
           <div className="space-y-6">
             {/* Description */}
-            <div className="bg-[#00c4cc]/5 border border-[#00c4cc]/20 rounded-xl p-4">
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
               <p className="text-sm text-gray-700">
                 ステップに沿って進めるだけで請求業務が完了します。まず請求対象の月を選択してください。
               </p>
@@ -737,7 +861,7 @@ export default function BillingWizardView() {
             <div className="flex items-center justify-end mt-6">
               <button
                 onClick={() => goToStep(1)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[#00c4cc] text-white hover:bg-[#00b0b8] transition-colors shadow-sm"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-colors shadow-sm"
               >
                 次へ
                 <ChevronRight size={16} />
@@ -753,7 +877,7 @@ export default function BillingWizardView() {
           <div className="space-y-6">
             {isVerifying ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 size={24} className="text-[#00c4cc] animate-spin" />
+                <Loader2 size={24} className="text-primary animate-spin" />
                 <span className="ml-3 text-gray-500">利用実績を確認中...</span>
               </div>
             ) : verificationResult ? (
@@ -768,7 +892,7 @@ export default function BillingWizardView() {
                   </div>
                   <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#00c4cc] rounded-full transition-all duration-700"
+                      className="h-full bg-primary rounded-full transition-all duration-700"
                       style={{ width: `${verificationResult.completionRate}%` }}
                     />
                   </div>
@@ -886,7 +1010,7 @@ export default function BillingWizardView() {
                 disabled={!canAdvance}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
                   canAdvance
-                    ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
+                    ? 'bg-primary text-white hover:bg-primary-dark'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
@@ -903,9 +1027,9 @@ export default function BillingWizardView() {
         {currentStep === 2 && (
           <div className="space-y-6">
             {/* Info box */}
-            <div className="bg-[#00c4cc]/5 border border-[#00c4cc]/20 rounded-xl p-4">
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
               <div className="flex items-start gap-3">
-                <Info size={18} className="text-[#00c4cc] shrink-0 mt-0.5" />
+                <Info size={18} className="text-primary shrink-0 mt-0.5" />
                 <div className="text-sm text-gray-700">
                   <p>利用実績から請求データを自動計算します。</p>
                   <p className="mt-1">既存の下書きデータは上書きされます。確定済みデータには影響しません。</p>
@@ -918,7 +1042,7 @@ export default function BillingWizardView() {
               <div className="flex justify-center py-8">
                 <button
                   onClick={handleGenerate}
-                  className="flex items-center gap-3 px-8 py-4 rounded-xl text-base font-semibold bg-[#00c4cc] text-white hover:bg-[#00b0b8] transition-colors shadow-md hover:shadow-lg"
+                  className="flex items-center gap-3 px-8 py-4 rounded-xl text-base font-semibold bg-primary text-white hover:bg-primary-dark transition-colors shadow-md hover:shadow-lg"
                 >
                   <Zap size={20} />
                   請求データを生成する
@@ -928,7 +1052,7 @@ export default function BillingWizardView() {
 
             {isGenerating && (
               <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 size={32} className="text-[#00c4cc] animate-spin mb-4" />
+                <Loader2 size={32} className="text-primary animate-spin mb-4" />
                 <span className="text-gray-600 font-medium">生成中...</span>
                 <span className="text-sm text-gray-400 mt-1">利用実績から請求データを計算しています</span>
               </div>
@@ -1002,7 +1126,7 @@ export default function BillingWizardView() {
                 disabled={!canAdvance}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
                   canAdvance
-                    ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
+                    ? 'bg-primary text-white hover:bg-primary-dark'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
@@ -1020,7 +1144,7 @@ export default function BillingWizardView() {
           <div className="space-y-4">
             {isLoading && billingRecords.length === 0 ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 size={24} className="text-[#00c4cc] animate-spin" />
+                <Loader2 size={24} className="text-primary animate-spin" />
                 <span className="ml-3 text-gray-500">読み込み中...</span>
               </div>
             ) : billingRecords.length === 0 ? (
@@ -1076,7 +1200,7 @@ export default function BillingWizardView() {
                         <div className="border-t border-gray-100 p-4 bg-gray-50/30">
                           {details.length === 0 ? (
                             <div className="flex items-center justify-center py-6">
-                              <Loader2 size={18} className="text-[#00c4cc] animate-spin" />
+                              <Loader2 size={18} className="text-primary animate-spin" />
                               <span className="ml-2 text-sm text-gray-500">明細を読み込み中...</span>
                             </div>
                           ) : (
@@ -1104,7 +1228,7 @@ export default function BillingWizardView() {
                                               {detail.absenceType || '欠席'}
                                             </span>
                                           ) : (
-                                            <span className="font-mono text-[#00c4cc]">
+                                            <span className="font-mono text-primary">
                                               {detail.serviceCode || '-'}
                                             </span>
                                           )}
@@ -1154,7 +1278,7 @@ export default function BillingWizardView() {
               </button>
               <button
                 onClick={() => goToStep(4)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[#00c4cc] text-white hover:bg-[#00b0b8] transition-colors shadow-sm"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-colors shadow-sm"
               >
                 次へ
                 <ChevronRight size={16} />
@@ -1170,7 +1294,7 @@ export default function BillingWizardView() {
           <div className="space-y-6">
             {isCheckingUpperLimit ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 size={24} className="text-[#00c4cc] animate-spin" />
+                <Loader2 size={24} className="text-primary animate-spin" />
                 <span className="ml-3 text-gray-500">上限額を確認中...</span>
               </div>
             ) : upperLimitResult ? (
@@ -1266,7 +1390,7 @@ export default function BillingWizardView() {
               </button>
               <button
                 onClick={() => goToStep(5)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[#00c4cc] text-white hover:bg-[#00b0b8] transition-colors shadow-sm"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-colors shadow-sm"
               >
                 次へ
                 <ChevronRight size={16} />
@@ -1366,8 +1490,8 @@ export default function BillingWizardView() {
                       !billingRecords.some((r) => r.status === 'draft')
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : isConfirming
-                        ? 'bg-[#00c4cc]/50 text-white cursor-wait'
-                        : 'bg-[#00c4cc] text-white hover:bg-[#00b0b8] shadow-sm'
+                        ? 'bg-primary/50 text-white cursor-wait'
+                        : 'bg-primary text-white hover:bg-primary-dark shadow-sm'
                     }`}
                   >
                     {isConfirming ? (
@@ -1408,7 +1532,7 @@ export default function BillingWizardView() {
                     disabled={!csvPreview}
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-colors ${
                       csvPreview
-                        ? 'bg-[#00c4cc] text-white hover:bg-[#00b0b8] shadow-sm'
+                        ? 'bg-primary text-white hover:bg-primary-dark shadow-sm'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
@@ -1457,7 +1581,7 @@ export default function BillingWizardView() {
                   setMode('dashboard');
                   fetchBillingRecords(facilityId, yearMonth);
                 }}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[#00c4cc] text-white hover:bg-[#00b0b8] transition-colors shadow-sm"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-colors shadow-sm"
               >
                 ダッシュボードへ
               </button>
@@ -1509,7 +1633,7 @@ export default function BillingWizardView() {
               setIsConfirmed(false);
               setCsvPreview('');
             }}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-[#00c4cc] bg-[#00c4cc]/10 hover:bg-[#00c4cc]/20 transition-colors border border-[#00c4cc]/20"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
           >
             <Sparkles size={14} />
             ウィザードで請求する
@@ -1557,7 +1681,7 @@ export default function BillingWizardView() {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
         {isLoading && billingRecords.length === 0 ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-t-transparent border-[#00c4cc] rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-t-transparent border-primary rounded-full animate-spin" />
           </div>
         ) : billingRecords.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
@@ -1584,7 +1708,7 @@ export default function BillingWizardView() {
                   return (
                     <tr
                       key={record.id}
-                      className="border-b border-gray-100 hover:bg-[#00c4cc]/5 transition-colors"
+                      className="border-b border-gray-100 hover:bg-primary/5 transition-colors"
                     >
                       <td className="px-4 py-3 font-medium text-gray-800">
                         {record.childName || record.childId}
@@ -1646,10 +1770,26 @@ export default function BillingWizardView() {
           </button>
           <button
             onClick={handleDashboardExportCSV}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#00c4cc] text-white hover:bg-[#00b0b8] transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-colors shadow-sm"
           >
             <Download size={14} />
             CSV出力
+          </button>
+          <button
+            onClick={handleKokuhorenExport}
+            disabled={billingRecords.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-primary text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+          >
+            <FileText size={14} />
+            国保連CSV（詳細）
+          </button>
+          <button
+            onClick={handleProxyReceipt}
+            disabled={billingRecords.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <Receipt size={14} />
+            代理受領通知書
           </button>
         </div>
       )}

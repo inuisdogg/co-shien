@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { StaffInvitation, User, EmploymentRecord, AccountStatus } from '@/types';
+import { StaffInvitation, ProxyAccountData, User, EmploymentRecord, AccountStatus } from '@/types';
 import { hashPassword } from './password';
 
 /**
@@ -480,6 +480,134 @@ export async function addExistingUserToFacility(
     } as EmploymentRecord;
   } catch (error) {
     console.error('Error adding existing user to facility:', error);
+    throw error;
+  }
+}
+
+/**
+ * 代理アカウント作成
+ * 施設管理者が職員の詳細情報を入力し、pendingアカウント + staff + employment_records を一括作成
+ * 職員は後からアクティベーションリンクでパスワードを設定してアクティブ化
+ */
+export async function createProxyAccount(
+  facilityId: string,
+  data: ProxyAccountData
+): Promise<{ userId: string; invitationToken: string; staffId: string }> {
+  try {
+    // 既存ユーザーをチェック（メールまたは電話で重複防止）
+    if (data.email) {
+      const { data: existing } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', data.email)
+        .single();
+      if (existing) {
+        throw new Error('このメールアドレスは既に登録されています。「招待」機能で既存アカウントを追加してください。');
+      }
+    }
+
+    if (data.phone) {
+      const { data: existing } = await supabase
+        .from('users')
+        .select('id')
+        .eq('phone', data.phone)
+        .single();
+      if (existing) {
+        throw new Error('この電話番号は既に登録されています。「招待」機能で既存アカウントを追加してください。');
+      }
+    }
+
+    const userId = crypto.randomUUID();
+    const staffId = `proxy-staff-${userId.slice(0, 8)}`;
+
+    // 1. usersテーブルにpendingアカウントを作成（個人情報のSource of Truth）
+    const newUser: Record<string, any> = {
+      id: userId,
+      name: data.name,
+      last_name: data.lastName || null,
+      first_name: data.firstName || null,
+      last_name_kana: data.lastNameKana || null,
+      first_name_kana: data.firstNameKana || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      birth_date: data.birthDate || null,
+      gender: data.gender || null,
+      role: 'staff',
+      user_type: 'staff',
+      facility_id: facilityId,
+      account_status: 'pending' as AccountStatus,
+      has_account: false,
+      invited_by_facility_id: facilityId,
+      invited_at: new Date().toISOString(),
+      invitation_start_date: data.startDate,
+      invitation_role: data.role,
+      invitation_employment_type: data.employmentType,
+      invitation_permissions: data.permissions || {},
+    };
+
+    const { error: userError } = await supabase
+      .from('users')
+      .insert(newUser);
+
+    if (userError) {
+      throw new Error(`ユーザー作成エラー: ${userError.message}`);
+    }
+
+    // 2. employment_recordsを作成（施設との紐付け）
+    const { error: empError } = await supabase
+      .from('employment_records')
+      .insert({
+        user_id: userId,
+        facility_id: facilityId,
+        start_date: data.startDate,
+        role: data.role,
+        employment_type: data.employmentType,
+        permissions: data.permissions || {},
+        experience_verification_status: 'not_requested',
+      });
+
+    if (empError) {
+      // ロールバック: ユーザーを削除
+      await supabase.from('users').delete().eq('id', userId);
+      throw new Error(`雇用記録作成エラー: ${empError.message}`);
+    }
+
+    // 3. staffテーブルを作成（レガシー互換 + 資格・給与情報の保存先）
+    const genderJa = data.gender === 'male' ? '男性' : data.gender === 'female' ? '女性' : data.gender === 'other' ? 'その他' : undefined;
+
+    const staffRecord: Record<string, any> = {
+      id: staffId,
+      facility_id: facilityId,
+      user_id: userId,
+      name: data.name,
+      name_kana: data.nameKana || (data.lastNameKana && data.firstNameKana ? `${data.lastNameKana} ${data.firstNameKana}` : null),
+      role: data.role,
+      type: data.employmentType,
+      birth_date: data.birthDate || null,
+      gender: genderJa,
+      email: data.email || null,
+      phone: data.phone || null,
+      qualifications: data.qualifications || null,
+      monthly_salary: data.monthlySalary || null,
+      hourly_wage: data.hourlyWage || null,
+      memo: data.memo || null,
+    };
+
+    const { error: staffError } = await supabase
+      .from('staff')
+      .insert(staffRecord);
+
+    if (staffError) {
+      console.error('staffテーブル作成エラー（非致命的）:', staffError.message);
+      // staffテーブルはレガシーなので、エラーでも続行
+    }
+
+    // 4. アクティベーションリンク用のトークンを生成
+    const invitationToken = generateInvitationToken(userId, facilityId);
+
+    return { userId, invitationToken, staffId };
+  } catch (error) {
+    console.error('Error creating proxy account:', error);
     throw error;
   }
 }

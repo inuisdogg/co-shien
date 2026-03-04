@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Zap,
   FileText,
+  FileWarning,
   Clock,
   UserCheck,
   ExternalLink,
@@ -63,9 +64,12 @@ import { getJapaneseHolidays, isJapaneseHoliday } from '@/utils/japaneseHolidays
 import { runDeductionCheck, type DeductionCheckResult } from '@/lib/deductionEngine';
 import { checkQualificationExpiry, type QualificationCheckResult } from '@/lib/qualificationTracker';
 import ComplianceManagement from './ComplianceManagement';
+import { resolveTimeSlots, buildCapacityMap } from '@/utils/slotResolver';
 import { useChangeNotifications, daysUntilDeadline, getDeadlineColor } from '@/hooks/useChangeNotifications';
 import { CHANGE_NOTIFICATION_TYPE_LABELS } from '@/types';
 import OperationsReviewWizard from '@/components/facility/OperationsReviewWizard';
+import MonthlyOperationsPanel from './MonthlyOperationsPanel';
+import EmptyState from '@/components/ui/EmptyState';
 
 const DashboardView: React.FC = () => {
   const { facility } = useAuth();
@@ -80,6 +84,9 @@ const DashboardView: React.FC = () => {
     getManagementTarget,
     timeSlots,
     loadingTimeSlots,
+    loadingChildren,
+    loadingStaff,
+    loadingSettings,
   } = useFacilityData();
 
   // 変更届通知
@@ -92,6 +99,11 @@ const DashboardView: React.FC = () => {
   const [paidLeaveAlerts, setPaidLeaveAlerts] = useState<{ staffName: string; daysTaken: number }[]>([]);
   const [bcpNextReview, setBcpNextReview] = useState<{ title: string; nextDate: string } | null>(null);
   const [widgetsLoading, setWidgetsLoading] = useState(true);
+
+  // 支援計画期限アラート
+  const [expiringSupportPlans, setExpiringSupportPlans] = useState<{ id: string; childName: string; periodEnd: string; isExpired: boolean }[]>([]);
+  // 苦情回答期限超過アラート
+  const [overdueComplaints, setOverdueComplaints] = useState<{ id: string; title: string; daysOverdue: number }[]>([]);
 
   // 管理サマリーウィジェットのデータ取得
   useEffect(() => {
@@ -199,6 +211,67 @@ const DashboardView: React.FC = () => {
             nextDate: bcpData[0].next_review_date!,
           });
         }
+
+        // 6. 支援計画の期限アラート（90日以内に期限切れ + 既に期限切れ）
+        try {
+          const ninetyDaysLater = new Date();
+          ninetyDaysLater.setDate(ninetyDaysLater.getDate() + 90);
+          const ninetyDaysStr = ninetyDaysLater.toISOString().split('T')[0];
+
+          const { data: expiringPlansData } = await supabase
+            .from('support_plan_files')
+            .select('id, child_id, period_end, plan_type')
+            .eq('facility_id', facility.id)
+            .eq('status', 'active')
+            .lte('period_end', ninetyDaysStr);
+
+          if (expiringPlansData && expiringPlansData.length > 0) {
+            const childIds = [...new Set(expiringPlansData.map((p: any) => p.child_id).filter(Boolean))];
+            const { data: childrenData } = await supabase
+              .from('children')
+              .select('id, name')
+              .in('id', childIds);
+
+            const childNameMap: Record<string, string> = {};
+            if (childrenData) {
+              childrenData.forEach((c: any) => { childNameMap[c.id] = c.name; });
+            }
+
+            setExpiringSupportPlans(
+              expiringPlansData.map((p: any) => ({
+                id: p.id,
+                childName: childNameMap[p.child_id] || '不明',
+                periodEnd: p.period_end,
+                isExpired: new Date(p.period_end) < new Date(todayISO),
+              }))
+            );
+          }
+        } catch { /* support_plan_files table may not exist */ }
+
+        // 7. 苦情の回答期限超過（response_due_dateカラムはマイグレーション後に有効）
+        try {
+          const { data: overdueComplaintsData } = await supabase
+            .from('incident_reports')
+            .select('id, title, response_due_date')
+            .eq('facility_id', facility.id)
+            .eq('report_type', 'complaint')
+            .not('status', 'in', '("resolved","closed")')
+            .lt('response_due_date', todayISO);
+
+          if (overdueComplaintsData && overdueComplaintsData.length > 0) {
+            setOverdueComplaints(
+              overdueComplaintsData
+                .filter((c: any) => c.response_due_date)
+                .map((c: any) => ({
+                  id: c.id,
+                  title: c.title,
+                  daysOverdue: Math.abs(Math.ceil(
+                    (new Date(c.response_due_date).getTime() - new Date(todayISO).getTime()) / (1000 * 60 * 60 * 24)
+                  )),
+                }))
+            );
+          }
+        } catch { /* response_due_date column may not exist yet */ }
       } catch (e) {
         // Silently ignore - widgets will show empty state
       } finally {
@@ -228,29 +301,12 @@ const DashboardView: React.FC = () => {
   // 時間枠が設定されているかチェック
   const hasTimeSlots = timeSlots.length > 0;
 
-  // 時間枠の名前と定員を取得
-  const slotInfo = useMemo(() => {
-    if (timeSlots.length >= 2) {
-      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
-      return {
-        AM: { name: sorted[0]?.name || '午前', capacity: sorted[0]?.capacity || 0 },
-        PM: { name: sorted[1]?.name || '午後', capacity: sorted[1]?.capacity || 0 },
-        isConfigured: true,
-      };
-    } else if (timeSlots.length === 1) {
-      return {
-        AM: { name: timeSlots[0].name || '終日', capacity: timeSlots[0].capacity || 0 },
-        PM: null,
-        isConfigured: true,
-      };
-    }
-    // 未設定
-    return {
-      AM: { name: '午前', capacity: 0 },
-      PM: { name: '午後', capacity: 0 },
-      isConfigured: false,
-    };
-  }, [timeSlots]);
+  // 時間枠をリゾルバで正規化
+  const resolvedSlots = useMemo(
+    () => resolveTimeSlots(timeSlots, facilitySettings),
+    [timeSlots, facilitySettings]
+  );
+  const capacityMap = useMemo(() => buildCapacityMap(resolvedSlots), [resolvedSlots]);
 
   const [dashboardMode, setDashboardMode] = useState<'today' | 'operations' | 'compliance'>('today');
   const [isSalesDataExpanded, setIsSalesDataExpanded] = useState(false);
@@ -395,7 +451,16 @@ const DashboardView: React.FC = () => {
   };
 
   // ========== 本日タブ用のデータ ==========
-  const today = useMemo(() => new Date(), []);
+  // 日付跨ぎ対応: 1分ごとにtodayを再評価
+  const [todayDateKey, setTodayDateKey] = useState(() => new Date().toDateString());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newKey = new Date().toDateString();
+      setTodayDateKey(prev => prev !== newKey ? newKey : prev);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  const today = useMemo(() => new Date(), [todayDateKey]);
   const todayStr = useMemo(() => {
     const y = today.getFullYear();
     const m = String(today.getMonth() + 1).padStart(2, '0');
@@ -411,8 +476,9 @@ const DashboardView: React.FC = () => {
     if (!facility?.id || dashboardMode !== 'today') return;
     const run = async () => {
       try {
+        const maxCapacity = Math.max(...resolvedSlots.map(s => s.capacity), 0);
         const [deduction, qualification] = await Promise.all([
-          runDeductionCheck(facility.id, todayStr, Math.max(facilitySettings.capacity.AM, facilitySettings.capacity.PM)),
+          runDeductionCheck(facility.id, todayStr, maxCapacity),
           checkQualificationExpiry(facility.id),
         ]);
         setDeductionResult(deduction);
@@ -422,18 +488,24 @@ const DashboardView: React.FC = () => {
       }
     };
     run();
-  }, [facility?.id, dashboardMode, todayStr, facilitySettings.capacity]);
+  }, [facility?.id, dashboardMode, todayStr, resolvedSlots]);
 
-  // 定員合計（午前・午後の大きい方を基準）
-  const totalCapacity = useMemo(() => Math.max(facilitySettings.capacity.AM, facilitySettings.capacity.PM), [facilitySettings.capacity]);
+  // 定員合計（全スロットの最大定員を基準）
+  const totalCapacity = useMemo(() => Math.max(...resolvedSlots.map(s => s.capacity), 0), [resolvedSlots]);
 
   // 本日のスケジュール
   const todaySchedules = useMemo(() => {
     return schedules.filter((s) => s.date === todayStr);
   }, [schedules, todayStr]);
 
-  const todayAMCount = useMemo(() => todaySchedules.filter((s) => s.slot === 'AM').length, [todaySchedules]);
-  const todayPMCount = useMemo(() => todaySchedules.filter((s) => s.slot === 'PM').length, [todaySchedules]);
+  // スロット別の本日利用数
+  const todaySlotCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const slot of resolvedSlots) {
+      counts[slot.key] = todaySchedules.filter((s) => s.slot === slot.key).length;
+    }
+    return counts;
+  }, [todaySchedules, resolvedSlots]);
   const todayTotalCount = todaySchedules.length;
 
   // アクティブスタッフ数
@@ -461,15 +533,17 @@ const DashboardView: React.FC = () => {
     return dates;
   }, [today, todayStr]);
 
-  // 今週の日別スケジュール集計
+  // 今週の日別スケジュール集計（スロット別）
   const weeklyScheduleData = useMemo(() => {
     return thisWeekDates.map((day) => {
       const daySchedules = schedules.filter((s) => s.date === day.dateStr);
-      const am = daySchedules.filter((s) => s.slot === 'AM').length;
-      const pm = daySchedules.filter((s) => s.slot === 'PM').length;
-      return { ...day, am, pm, total: daySchedules.length };
+      const slotCounts: Record<string, number> = {};
+      for (const slot of resolvedSlots) {
+        slotCounts[slot.key] = daySchedules.filter((s) => s.slot === slot.key).length;
+      }
+      return { ...day, slotCounts, total: daySchedules.length };
     });
-  }, [thisWeekDates, schedules]);
+  }, [thisWeekDates, schedules, resolvedSlots]);
 
   // アラートバナー用の集約
   const alertItems = useMemo(() => {
@@ -564,6 +638,55 @@ const DashboardView: React.FC = () => {
     return occupancyRate.rate > 0 ? 'up' : 'neutral';
   }, [occupancyRate, today]);
 
+  // 初回データ読み込み中のスケルトン表示
+  const initialLoading = loadingChildren && loadingStaff && loadingSettings && children.length === 0 && staff.length === 0;
+
+  if (initialLoading) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {/* タブスケルトン */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
+          <div className="flex gap-1">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-11 w-28 bg-gray-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        </div>
+        {/* 日付ヘッダースケルトン */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <div className="h-8 bg-gray-100 rounded w-48 animate-pulse mb-2" />
+          <div className="h-4 bg-gray-50 rounded w-24 animate-pulse" />
+        </div>
+        {/* KPIカードスケルトン */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 animate-pulse">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-3 bg-gray-100 rounded w-16" />
+                <div className="w-8 h-8 bg-gray-100 rounded-lg" />
+              </div>
+              <div className="h-7 bg-gray-100 rounded w-20 mb-2" />
+              <div className="h-2 bg-gray-50 rounded w-full" />
+            </div>
+          ))}
+        </div>
+        {/* 管理サマリースケルトン */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <div className="h-4 bg-gray-100 rounded w-24 animate-pulse mb-4" />
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="bg-gray-50 rounded-xl p-4 animate-pulse">
+                <div className="h-3 bg-gray-200 rounded w-2/3 mb-3" />
+                <div className="h-6 bg-gray-200 rounded w-1/2 mb-2" />
+                <div className="h-2 bg-gray-200 rounded w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* メインタブ切り替え */}
@@ -579,7 +702,7 @@ const DashboardView: React.FC = () => {
               onClick={() => setDashboardMode(tab.id)}
               className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
                 dashboardMode === tab.id
-                  ? 'bg-[#00c4cc] text-white shadow-md'
+                  ? 'bg-primary text-white shadow-md'
                   : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
               }`}
             >
@@ -610,10 +733,10 @@ const DashboardView: React.FC = () => {
 
           {/* 月次運営確認バナー */}
           {showReviewBanner && (
-            <div className="bg-[#00c4cc]/5 border border-[#00c4cc]/20 rounded-xl p-4 flex items-center justify-between">
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center shrink-0">
-                  <FileText size={20} className="text-[#00c4cc]" />
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <FileText size={20} className="text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800">来月の運営確認を行いましょう</p>
@@ -639,7 +762,7 @@ const DashboardView: React.FC = () => {
                     setShowOperationsWizard(true);
                     setShowReviewBanner(false);
                   }}
-                  className="px-4 py-2 text-xs bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-colors font-bold flex items-center gap-1"
+                  className="px-4 py-2 text-xs bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-bold flex items-center gap-1"
                 >
                   確認を開始
                   <ChevronRight size={14} />
@@ -696,14 +819,110 @@ const DashboardView: React.FC = () => {
             </div>
           )}
 
+          {/* 支援計画期限アラート */}
+          {expiringSupportPlans.length > 0 && (() => {
+            const expiredPlans = expiringSupportPlans.filter(p => p.isExpired);
+            const warningPlans = expiringSupportPlans.filter(p => !p.isExpired);
+            return (
+              <div className="space-y-3">
+                {expiredPlans.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                        <FileWarning size={16} className="text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-red-800">支援計画が期限切れです ({expiredPlans.length}件)</p>
+                        <div className="mt-2 space-y-1">
+                          {expiredPlans.map(p => {
+                            const d = new Date(p.periodEnd);
+                            return (
+                              <p key={p.id} className="text-sm text-red-700">
+                                {p.childName} - {d.getFullYear()}/{(d.getMonth() + 1).toString().padStart(2, '0')}/{d.getDate().toString().padStart(2, '0')} 期限切れ
+                              </p>
+                            );
+                          })}
+                        </div>
+                        <a href="/business?tab=support-plan" className="inline-flex items-center gap-1 mt-2 text-sm text-red-700 font-medium hover:text-red-900 transition-colors">
+                          支援計画を確認 <ChevronRight size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {warningPlans.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                        <FileWarning size={16} className="text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-amber-800">支援計画の更新が必要です ({warningPlans.length}件)</p>
+                        <p className="text-sm text-amber-600 mt-0.5">90日以内に期限を迎える計画があります</p>
+                        <div className="mt-2 space-y-1">
+                          {warningPlans.slice(0, 5).map(p => {
+                            const d = new Date(p.periodEnd);
+                            const daysLeft = Math.ceil((d.getTime() - new Date().getTime()) / 86400000);
+                            return (
+                              <p key={p.id} className="text-sm text-amber-700">
+                                {p.childName} - {d.getFullYear()}/{(d.getMonth() + 1).toString().padStart(2, '0')}/{d.getDate().toString().padStart(2, '0')} (残り{daysLeft}日)
+                              </p>
+                            );
+                          })}
+                          {warningPlans.length > 5 && (
+                            <p className="text-sm text-amber-600">他{warningPlans.length - 5}件...</p>
+                          )}
+                        </div>
+                        <a href="/business?tab=support-plan" className="inline-flex items-center gap-1 mt-2 text-sm text-amber-700 font-medium hover:text-amber-900 transition-colors">
+                          支援計画を確認 <ChevronRight size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 苦情回答期限超過アラート */}
+          {overdueComplaints.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={16} className="text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-red-800">苦情の回答期限を超過しています ({overdueComplaints.length}件)</p>
+                  <p className="text-sm text-red-600 mt-0.5">90日以内の回答義務があります。早急に対応してください</p>
+                  <div className="mt-2 space-y-1">
+                    {overdueComplaints.slice(0, 5).map(c => (
+                      <p key={c.id} className="text-sm text-red-700">
+                        {c.title} ({c.daysOverdue}日超過)
+                      </p>
+                    ))}
+                    {overdueComplaints.length > 5 && (
+                      <p className="text-sm text-red-600">他{overdueComplaints.length - 5}件...</p>
+                    )}
+                  </div>
+                  <a href="/business?tab=incident" className="inline-flex items-center gap-1 mt-2 text-sm text-red-700 font-medium hover:text-red-900 transition-colors">
+                    苦情一覧を確認 <ChevronRight size={14} />
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 月次業務リマインダー */}
+          <MonthlyOperationsPanel />
+
           {/* 4 KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: 本日の利用予定 */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">本日の利用</span>
-                <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
-                  <Users size={16} className="text-[#00c4cc]" />
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users size={16} className="text-primary" />
                 </div>
               </div>
               <div className="flex items-baseline gap-1">
@@ -712,13 +931,17 @@ const DashboardView: React.FC = () => {
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
                 <div
-                  className="bg-[#00c4cc] h-2 rounded-full transition-all"
+                  className="bg-primary h-2 rounded-full transition-all"
                   style={{ width: `${Math.min((todayTotalCount / (totalCapacity || 1)) * 100, 100)}%` }}
                 />
               </div>
               <div className="flex items-center gap-3 mt-2.5 text-xs text-gray-500">
-                <span className="flex items-center gap-1"><Sun size={12} /> {slotInfo.AM.name}: {todayAMCount}</span>
-                {slotInfo.PM && <span className="flex items-center gap-1"><Sunset size={12} /> {slotInfo.PM.name}: {todayPMCount}</span>}
+                {resolvedSlots.map((slot, idx) => (
+                  <span key={slot.key} className="flex items-center gap-1">
+                    {idx === 0 ? <Sun size={12} /> : <Sunset size={12} />}
+                    {slot.name}: {todaySlotCounts[slot.key] ?? 0}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -731,11 +954,11 @@ const DashboardView: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold text-gray-900">{activeStaffCount}</span>
+                <span className="text-3xl font-bold text-gray-900">{attendanceSummary?.clockedIn || 0}</span>
                 <span className="text-sm text-gray-500">名</span>
               </div>
               <div className="mt-3 text-xs text-gray-500">
-                登録スタッフ総数
+                / 登録 {activeStaffCount}名
               </div>
             </div>
 
@@ -799,23 +1022,22 @@ const DashboardView: React.FC = () => {
             {/* Left: 今週の利用予定 (spanning 2 cols) */}
             <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar size={16} className="text-[#00c4cc]" />
+                <Calendar size={16} className="text-primary" />
                 今週の利用予定
               </h3>
               <div className="space-y-2">
                 {weeklyScheduleData.map((day) => {
-                  const amPct = slotInfo.AM.capacity > 0 ? (day.am / slotInfo.AM.capacity) * 100 : 0;
-                  const pmPct = slotInfo.PM && slotInfo.PM.capacity > 0 ? (day.pm / slotInfo.PM.capacity) * 100 : 0;
+                  const slotBarColors = ['bg-primary', 'bg-indigo-400', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400'];
                   return (
                     <div
                       key={day.dateStr}
                       className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${
-                        day.isToday ? 'bg-[#00c4cc]/5 ring-1 ring-[#00c4cc]/20' : 'hover:bg-gray-50'
+                        day.isToday ? 'bg-primary/5 ring-1 ring-primary/20' : 'hover:bg-gray-50'
                       }`}
                     >
                       <div className="w-16 flex items-center gap-2">
-                        {day.isToday && <span className="w-2 h-2 rounded-full bg-[#00c4cc] animate-pulse" />}
-                        <span className={`text-sm font-bold ${day.isToday ? 'text-[#00c4cc]' : 'text-gray-700'}`}>
+                        {day.isToday && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
+                        <span className={`text-sm font-bold ${day.isToday ? 'text-primary' : 'text-gray-700'}`}>
                           {day.label}
                         </span>
                         <span className="text-xs text-gray-400">
@@ -823,34 +1045,24 @@ const DashboardView: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex-1 flex items-center gap-3">
-                        {/* AM Bar */}
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-gray-400">{slotInfo.AM.name}</span>
-                            <span className="text-[10px] font-medium text-gray-600">{day.am}名</span>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-1.5">
-                            <div
-                              className="bg-[#00c4cc] h-1.5 rounded-full transition-all"
-                              style={{ width: `${Math.min(amPct, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                        {/* PM Bar */}
-                        {slotInfo.PM && (
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[10px] text-gray-400">{slotInfo.PM.name}</span>
-                              <span className="text-[10px] font-medium text-gray-600">{day.pm}名</span>
+                        {resolvedSlots.map((slot, idx) => {
+                          const count = day.slotCounts[slot.key] ?? 0;
+                          const pct = slot.capacity > 0 ? (count / slot.capacity) * 100 : 0;
+                          return (
+                            <div key={slot.key} className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] text-gray-400">{slot.name}</span>
+                                <span className="text-[10px] font-medium text-gray-600">{count}名</span>
+                              </div>
+                              <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                <div
+                                  className={`${slotBarColors[idx % slotBarColors.length]} h-1.5 rounded-full transition-all`}
+                                  style={{ width: `${Math.min(pct, 100)}%` }}
+                                />
+                              </div>
                             </div>
-                            <div className="w-full bg-gray-100 rounded-full h-1.5">
-                              <div
-                                className="bg-indigo-400 h-1.5 rounded-full transition-all"
-                                style={{ width: `${Math.min(pmPct, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })}
                       </div>
                       <div className="w-12 text-right">
                         <span className="text-sm font-bold text-gray-900">{day.total}</span>
@@ -868,12 +1080,10 @@ const DashboardView: React.FC = () => {
                 対応が必要
               </h3>
               {actionItems.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Shield size={20} className="text-emerald-500" />
-                  </div>
-                  <p className="text-sm text-gray-500">対応が必要な項目はありません</p>
-                </div>
+                <EmptyState
+                  icon={<Shield size={20} className="text-emerald-500" />}
+                  title="対応が必要な項目はありません"
+                />
               ) : (
                 <div className="space-y-2">
                   {actionItems.map((item, i) => {
@@ -904,16 +1114,16 @@ const DashboardView: React.FC = () => {
           {/* Quick Actions Bar */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Zap size={16} className="text-[#00c4cc]" />
+              <Zap size={16} className="text-primary" />
               <h3 className="text-sm font-bold text-gray-900">クイックアクション</h3>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <a
                 href="/business?tab=daily-log"
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 transition-all group"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
-                  <BookOpen size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <BookOpen size={18} className="text-gray-600 group-hover:text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800">日誌を書く</p>
@@ -922,10 +1132,10 @@ const DashboardView: React.FC = () => {
               </a>
               <a
                 href="/business?tab=daily-log"
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 transition-all group"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
-                  <ClipboardList size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <ClipboardList size={18} className="text-gray-600 group-hover:text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800">実績登録</p>
@@ -934,10 +1144,10 @@ const DashboardView: React.FC = () => {
               </a>
               <a
                 href="/business?tab=daily-log"
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 transition-all group"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
-                  <MessageSquare size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <MessageSquare size={18} className="text-gray-600 group-hover:text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800">連絡帳確認</p>
@@ -946,10 +1156,10 @@ const DashboardView: React.FC = () => {
               </a>
               <a
                 href="/business?tab=staffing"
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 transition-all group"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
-                  <UserCog size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <UserCog size={18} className="text-gray-600 group-hover:text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800">出勤管理</p>
@@ -958,10 +1168,10 @@ const DashboardView: React.FC = () => {
               </a>
               <button
                 onClick={() => setShowOperationsWizard(true)}
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#00c4cc] hover:bg-[#00c4cc]/5 transition-all group text-left"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 transition-all group text-left"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#00c4cc]/10 flex items-center justify-center transition-colors">
-                  <FileText size={18} className="text-gray-600 group-hover:text-[#00c4cc]" />
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <FileText size={18} className="text-gray-600 group-hover:text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800">来月の運営確認</p>
@@ -974,7 +1184,7 @@ const DashboardView: React.FC = () => {
           {/* ========== 管理サマリーウィジェット ========== */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <ClipboardList size={16} className="text-[#00c4cc]" />
+              <ClipboardList size={16} className="text-primary" />
               管理サマリー
             </h3>
             {widgetsLoading ? (
@@ -993,8 +1203,8 @@ const DashboardView: React.FC = () => {
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">出退勤状況</span>
-                    <div className="w-7 h-7 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
-                      <LogIn size={14} className="text-[#00c4cc]" />
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <LogIn size={14} className="text-primary" />
                     </div>
                   </div>
                   <div className="flex items-baseline gap-1">
@@ -1005,7 +1215,7 @@ const DashboardView: React.FC = () => {
                   {attendanceSummary && attendanceSummary.total > 0 && (
                     <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
                       <div
-                        className="bg-[#00c4cc] h-1.5 rounded-full transition-all"
+                        className="bg-primary h-1.5 rounded-full transition-all"
                         style={{ width: `${Math.min((attendanceSummary.clockedIn / attendanceSummary.total) * 100, 100)}%` }}
                       />
                     </div>
@@ -1090,8 +1300,8 @@ const DashboardView: React.FC = () => {
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">BCP見直し</span>
-                    <div className="w-7 h-7 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
-                      <CalendarClock size={14} className="text-[#00c4cc]" />
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <CalendarClock size={14} className="text-primary" />
                     </div>
                   </div>
                   {bcpNextReview ? (
@@ -1146,7 +1356,7 @@ const DashboardView: React.FC = () => {
               onClick={() => setViewPeriod('week')}
               className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
                 viewPeriod === 'week'
-                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -1156,7 +1366,7 @@ const DashboardView: React.FC = () => {
               onClick={() => setViewPeriod('month')}
               className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
                 viewPeriod === 'month'
-                  ? 'bg-white text-[#00c4cc] shadow-sm'
+                  ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -1189,8 +1399,8 @@ const DashboardView: React.FC = () => {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">当月売上見込</span>
-            <div className="w-8 h-8 rounded-lg bg-[#00c4cc]/10 flex items-center justify-center">
-              <DollarSign size={16} className="text-[#00c4cc]" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <DollarSign size={16} className="text-primary" />
             </div>
           </div>
           <div className="text-2xl font-bold text-gray-900">
@@ -1199,7 +1409,7 @@ const DashboardView: React.FC = () => {
           <div className="text-xs text-gray-500 mt-1">
             目標: {targetRevenue !== null ? `¥${targetRevenue.toLocaleString()}` : '未設定'}
             {targetRevenue !== null && (
-              <span className="ml-2 font-medium text-[#00c4cc]">
+              <span className="ml-2 font-medium text-primary">
                 {((totalMonthlyRevenue / targetRevenue) * 100).toFixed(1)}%
               </span>
             )}
@@ -1207,7 +1417,7 @@ const DashboardView: React.FC = () => {
           {targetRevenue !== null && (
             <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
               <div
-                className="bg-[#00c4cc] h-2 rounded-full transition-all"
+                className="bg-primary h-2 rounded-full transition-all"
                 style={{ width: `${Math.min((totalMonthlyRevenue / targetRevenue) * 100, 100)}%` }}
               />
             </div>
@@ -1242,12 +1452,19 @@ const DashboardView: React.FC = () => {
               />
             </div>
           )}
-          {slotInfo.isConfigured ? (
-            <div className="mt-2 flex gap-4 text-xs text-gray-600">
-              <span>{slotInfo.AM.name}: {ampmOccupancyRate.amRate.toFixed(1)}%</span>
-              {slotInfo.PM && (
-                <span>{slotInfo.PM.name}: {ampmOccupancyRate.pmRate.toFixed(1)}%</span>
-              )}
+          {hasTimeSlots ? (
+            <div className="mt-2 flex gap-4 text-xs text-gray-600 flex-wrap">
+              {resolvedSlots.map((slot) => {
+                // Use existing ampmOccupancyRate for legacy AM/PM, otherwise show N/A
+                const rate = slot.key === 'AM' ? ampmOccupancyRate.amRate
+                  : slot.key === 'PM' ? ampmOccupancyRate.pmRate
+                  : null;
+                return (
+                  <span key={slot.key}>
+                    {slot.name}: {rate !== null ? `${rate.toFixed(1)}%` : '-'}
+                  </span>
+                );
+              })}
             </div>
           ) : (
             <div className="mt-2 text-xs text-amber-600">
@@ -1288,7 +1505,7 @@ const DashboardView: React.FC = () => {
       {/* 週別見込み売り上げ */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <TrendingUp size={18} className="text-[#00c4cc]" />
+          <TrendingUp size={18} className="text-primary" />
           週別見込み売り上げ
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
@@ -1314,7 +1531,7 @@ const DashboardView: React.FC = () => {
       {/* 送迎利用率 */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Car size={18} className="text-[#00c4cc]" />
+          <Car size={18} className="text-primary" />
           送迎利用率
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1351,10 +1568,10 @@ const DashboardView: React.FC = () => {
       {/* 曜日別利用率 */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Calendar size={18} className="text-[#00c4cc]" />
+          <Calendar size={18} className="text-primary" />
           曜日別利用率
         </h3>
-        {!slotInfo.isConfigured ? (
+        {!hasTimeSlots ? (
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 text-center">
             <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
             <p className="text-sm font-medium text-gray-700 mb-2">時間枠が設定されていません</p>
@@ -1363,7 +1580,7 @@ const DashboardView: React.FC = () => {
             </p>
             <a
               href="/business?tab=facility"
-              className="inline-flex items-center gap-1 px-4 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white text-xs font-bold rounded-lg transition-colors"
+              className="inline-flex items-center gap-1 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-xs font-bold rounded-lg transition-colors"
             >
               施設情報を設定
             </a>
@@ -1374,16 +1591,12 @@ const DashboardView: React.FC = () => {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-2.5 px-3 text-xs font-semibold text-gray-500">曜日</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500">
-                    {slotInfo.AM.name}
-                    <span className="text-gray-400 font-normal ml-1">(定員{slotInfo.AM.capacity})</span>
-                  </th>
-                  {slotInfo.PM && (
-                    <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500">
-                      {slotInfo.PM.name}
-                      <span className="text-gray-400 font-normal ml-1">(定員{slotInfo.PM.capacity})</span>
+                  {resolvedSlots.map((slot) => (
+                    <th key={slot.key} className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500">
+                      {slot.name}
+                      <span className="text-gray-400 font-normal ml-1">(定員{slot.capacity})</span>
                     </th>
-                  )}
+                  ))}
                   <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500">合計利用率</th>
                 </tr>
               </thead>
@@ -1391,26 +1604,27 @@ const DashboardView: React.FC = () => {
                 {dayOfWeekUtilization.map((day) => (
                   <tr key={day.dayIndex} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="py-2.5 px-3 font-bold text-gray-800">{day.dayOfWeek}</td>
+                    {resolvedSlots.map((slot) => {
+                      // Map slot key to existing dayOfWeekUtilization fields
+                      const util = slot.key === 'AM' ? day.amUtilization
+                        : slot.key === 'PM' ? day.pmUtilization
+                        : 0;
+                      const count = slot.key === 'AM' ? day.amCount
+                        : slot.key === 'PM' ? day.pmCount
+                        : 0;
+                      return (
+                        <td key={slot.key} className="py-2.5 px-3 text-right">
+                          <div className="text-sm font-bold text-gray-800">
+                            {util.toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {count}件
+                          </div>
+                        </td>
+                      );
+                    })}
                     <td className="py-2.5 px-3 text-right">
-                      <div className="text-sm font-bold text-gray-800">
-                        {day.amUtilization.toFixed(1)}%
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {day.amCount}件
-                      </div>
-                    </td>
-                    {slotInfo.PM && (
-                      <td className="py-2.5 px-3 text-right">
-                        <div className="text-sm font-bold text-gray-800">
-                          {day.pmUtilization.toFixed(1)}%
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {day.pmCount}件
-                        </div>
-                      </td>
-                    )}
-                    <td className="py-2.5 px-3 text-right">
-                      <span className="text-sm font-bold text-[#00c4cc]">
+                      <span className="text-sm font-bold text-primary">
                         {day.totalUtilization.toFixed(1)}%
                       </span>
                     </td>
@@ -1427,7 +1641,7 @@ const DashboardView: React.FC = () => {
         {/* 年齢別利用児童 */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Users size={18} className="text-[#00c4cc]" />
+            <Users size={18} className="text-primary" />
             年齢別利用児童
           </h3>
           <div className="space-y-3">
@@ -1441,7 +1655,7 @@ const DashboardView: React.FC = () => {
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
-                    className="bg-[#00c4cc] h-2 rounded-full transition-all"
+                    className="bg-primary h-2 rounded-full transition-all"
                     style={{ width: `${item.percentage}%` }}
                   />
                 </div>
@@ -1453,7 +1667,7 @@ const DashboardView: React.FC = () => {
         {/* 居住地区別利用児童 */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <MapPin size={18} className="text-[#00c4cc]" />
+            <MapPin size={18} className="text-primary" />
             利用児童の居住地区
           </h3>
           <div className="space-y-3">
@@ -1467,7 +1681,7 @@ const DashboardView: React.FC = () => {
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
-                    className="bg-[#00c4cc] h-2 rounded-full transition-all"
+                    className="bg-primary h-2 rounded-full transition-all"
                     style={{ width: `${item.percentage}%` }}
                   />
                 </div>

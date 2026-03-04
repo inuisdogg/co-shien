@@ -1,22 +1,27 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { MessageCircle } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
 
 interface ChatMessage {
   id: string;
+  facility_id: string;
+  client_user_id: string;
   sender_id: string;
   sender_name: string;
   sender_type: 'staff' | 'client';
-  content: string;
-  created_at: string;
+  message: string;
+  is_read: boolean;
   read_at: string | null;
+  created_at: string;
 }
 
 interface ChatViewProps {
   facilityId: string;
   facilityName: string;
-  clientUserId?: string;
+  clientUserId: string;
   currentUserId: string;
   currentUserName: string;
   currentUserType: 'staff' | 'client';
@@ -38,76 +43,101 @@ export default function ChatView({
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const chatRoomId = clientUserId
-    ? `${facilityId}_${clientUserId}`
-    : `${facilityId}_${currentUserId}`;
-
   useEffect(() => {
-    loadMessages();
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .eq('client_user_id', clientUserId)
+          .order('created_at', { ascending: true })
+          .limit(100);
+
+        if (!error && data && !cancelled) {
+          setMessages(data);
+
+          // 相手のメッセージを既読にする
+          if (data.length > 0) {
+            const unreadIds = data
+              .filter((m) => m.sender_id !== currentUserId && !m.is_read)
+              .map((m) => m.id);
+            if (unreadIds.length > 0) {
+              await supabase
+                .from('chat_messages')
+                .update({ is_read: true, read_at: new Date().toISOString() })
+                .in('id', unreadIds);
+            }
+          }
+        }
+      } catch {
+        // chat_messagesテーブルが未作成の場合は空のまま
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
 
     // Supabase Realtime subscription
+    // filter on facility_id; client-side filter on client_user_id
     const channel = supabase
-      .channel(`chat_${chatRoomId}`)
+      .channel(`chat_${facilityId}_${clientUserId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'chat_messages',
-          filter: `room_id=eq.${chatRoomId}`,
+          filter: `facility_id=eq.${facilityId}`,
         },
         (payload) => {
           const newMsg = payload.new as ChatMessage;
-          setMessages((prev) => [...prev, newMsg]);
+          // client-side filter: only messages for this conversation
+          if (newMsg.client_user_id !== clientUserId) return;
+          setMessages((prev) => {
+            // 楽観的追加による重複防止
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
         }
       )
       .subscribe();
 
     return () => {
+      cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [chatRoomId]);
+  }, [facilityId, clientUserId, currentUserId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const loadMessages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('id, sender_id, sender_name, sender_type, content, created_at, read_at')
-        .eq('room_id', chatRoomId)
-        .order('created_at', { ascending: true })
-        .limit(100);
-
-      if (!error && data) {
-        setMessages(data);
-      }
-    } catch {
-      // chat_messagesテーブルが未作成の場合は空のまま
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const sendMessage = async () => {
-    const content = newMessage.trim();
-    if (!content) return;
+    const text = newMessage.trim();
+    if (!text) return;
 
     setNewMessage('');
 
     try {
-      await supabase.from('chat_messages').insert({
-        room_id: chatRoomId,
+      const { error } = await supabase.from('chat_messages').insert({
+        facility_id: facilityId,
+        client_user_id: clientUserId,
         sender_id: currentUserId,
         sender_name: currentUserName,
         sender_type: currentUserType,
-        content,
+        message: text,
       });
+
+      if (error) {
+        console.error('メッセージ送信エラー:', error);
+        setNewMessage(text);
+      }
     } catch {
-      // テーブル未作成時のフォールバック
-      setNewMessage(content);
+      setNewMessage(text);
     }
   };
 
@@ -170,16 +200,14 @@ export default function ChatView({
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c4cc]" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-            <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <p className="text-sm">メッセージはまだありません</p>
-            <p className="text-xs mt-1">最初のメッセージを送信しましょう</p>
-          </div>
+          <EmptyState
+            icon={<MessageCircle className="w-7 h-7 text-gray-400" />}
+            title="メッセージはまだありません"
+            description="最初のメッセージを送信しましょう"
+          />
         ) : (
           groupedMessages.map((group) => (
             <div key={group.date}>
@@ -198,14 +226,14 @@ export default function ChatView({
                     <div
                       className={`max-w-[75%] px-3 py-2 rounded-2xl ${
                         isMine
-                          ? 'bg-[#00c4cc] text-white rounded-br-md'
+                          ? 'bg-primary text-white rounded-br-md'
                           : 'bg-white text-gray-900 border rounded-bl-md'
                       }`}
                     >
                       {!isMine && (
                         <p className="text-xs font-medium text-gray-500 mb-1">{msg.sender_name}</p>
                       )}
-                      <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                       <p
                         className={`text-[10px] mt-1 text-right ${
                           isMine ? 'text-white/60' : 'text-gray-400'
@@ -232,13 +260,13 @@ export default function ChatView({
             onKeyDown={handleKeyDown}
             placeholder="メッセージを入力..."
             rows={1}
-            className="flex-1 resize-none border rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc] focus:border-transparent"
+            className="flex-1 resize-none border rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             style={{ maxHeight: '120px' }}
           />
           <button
             onClick={sendMessage}
             disabled={!newMessage.trim()}
-            className="p-2 bg-[#00c4cc] text-white rounded-full hover:bg-[#00b0b8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="p-2 bg-primary text-white rounded-full hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             aria-label="送信"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

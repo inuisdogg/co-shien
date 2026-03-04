@@ -133,7 +133,7 @@ export function getShiftDisplayBgColor(shift: ShiftWithPattern): string {
     // カスタムカラーの場合は透明度を追加
     return ''; // インラインスタイルで対応
   }
-  return 'bg-[#00c4cc]/5';
+  return 'bg-primary/5';
 }
 
 /**

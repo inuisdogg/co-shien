@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { verifyPassword } from '@/utils/password';
+import { startAuthentication } from '@simplewebauthn/browser';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +24,20 @@ export default function ClientLoginPage() {
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
       try {
+        // セッション有効期限チェック
+        const sessionExpires = localStorage.getItem('session_expires');
+        if (sessionExpires && Date.now() > parseInt(sessionExpires, 10)) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('facility');
+          localStorage.removeItem('session_expires');
+        }
+
         const userStr = localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
@@ -56,6 +67,10 @@ export default function ClientLoginPage() {
       } catch (e) {
         console.error('Session check error:', e);
       }
+      if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+        setPasskeySupported(true);
+      }
+
       setCheckingSession(false);
     };
     checkSession();
@@ -99,6 +114,7 @@ export default function ClientLoginPage() {
         account_status: userData.account_status,
       };
       localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('session_expires', (Date.now() + 8 * 60 * 60 * 1000).toString());
 
       if (rememberMe) {
         const savedData = {
@@ -119,16 +135,80 @@ export default function ClientLoginPage() {
     }
   };
 
+  const handlePasskeyLogin = async () => {
+    if (!email.trim()) {
+      setError('パスキーでログインするにはメールアドレスを入力してください');
+      return;
+    }
+    setError('');
+    setPasskeyLoading(true);
+    try {
+      const beginRes = await fetch('/api/passkey/authenticate/begin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId: email.toLowerCase() }),
+      });
+      if (!beginRes.ok) {
+        const err = await beginRes.json();
+        throw new Error(
+          err.error === 'No passkeys found for this user'
+            ? 'このアカウントにパスキーが登録されていません'
+            : err.error === 'User not found'
+            ? 'ユーザーが見つかりません'
+            : 'パスキー認証を開始できませんでした'
+        );
+      }
+      const options = await beginRes.json();
+      const credential = await startAuthentication({ optionsJSON: options });
+      const finishRes = await fetch('/api/passkey/authenticate/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential, loginId: email.toLowerCase() }),
+      });
+      if (!finishRes.ok) {
+        throw new Error('パスキー認証に失敗しました');
+      }
+      const { userId } = await finishRes.json();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (!userData) throw new Error('ユーザー情報の取得に失敗しました');
+      const user = {
+        id: userData.id,
+        name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
+        lastName: userData.last_name,
+        firstName: userData.first_name,
+        email: userData.email,
+        role: userData.role,
+        userType: 'client',
+        account_status: userData.account_status,
+      };
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('session_expires', (Date.now() + 8 * 60 * 60 * 1000).toString());
+      window.location.href = redirectPath || '/parent';
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError') {
+        setError('パスキー認証がキャンセルされました');
+      } else {
+        setError(err.message || 'パスキー認証に失敗しました');
+      }
+    } finally {
+      setPasskeyLoading(false);
+    }
+  };
+
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55]"></div>
+      <div className="min-h-screen flex items-center justify-center bg-client-light">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-client"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-client-light p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <Image
@@ -140,7 +220,7 @@ export default function ClientLoginPage() {
             priority
           />
           <div className="mb-3">
-            <span className="inline-block bg-[#F6AD55]/10 text-[#F6AD55] text-xs font-bold px-3 py-1 rounded-lg">
+            <span className="inline-block bg-client/10 text-client text-xs font-bold px-3 py-1 rounded-lg">
               保護者
             </span>
           </div>
@@ -172,7 +252,7 @@ export default function ClientLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] transition-all"
+                className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client transition-all"
                 placeholder="example@email.com"
                 disabled={loading}
               />
@@ -193,7 +273,7 @@ export default function ClientLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F6AD55]/30 focus:border-[#F6AD55] transition-all"
+                className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client transition-all"
                 placeholder="パスワードを入力"
                 disabled={loading}
               />
@@ -224,7 +304,7 @@ export default function ClientLoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 text-[#F6AD55] border-gray-300 rounded focus:ring-[#F6AD55]"
+                className="w-4 h-4 text-client border-gray-300 rounded focus:ring-client"
                 disabled={loading}
               />
               <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
@@ -234,7 +314,7 @@ export default function ClientLoginPage() {
             <button
               type="button"
               onClick={() => router.push('/login/forgot-password')}
-              className="text-xs text-[#F6AD55] hover:underline"
+              className="text-xs text-client hover:underline"
             >
               パスワードを忘れた場合
             </button>
@@ -243,7 +323,7 @@ export default function ClientLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
+            className="w-full h-12 bg-client hover:bg-client-dark text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
           >
             {loading ? (
               <>
@@ -252,6 +332,39 @@ export default function ClientLoginPage() {
               </>
             ) : 'ログイン'}
           </button>
+
+          {passkeySupported && (
+            <>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-3 text-gray-400">または</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handlePasskeyLogin}
+                disabled={passkeyLoading || loading}
+                className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-client hover:text-client-dark font-bold rounded-lg transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {passkeyLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-client border-t-transparent rounded-full animate-spin" />
+                    認証中...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33" />
+                    </svg>
+                    Face ID / 指紋でログイン
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </form>
 
         <div className="mt-6 pt-6 border-t border-gray-100">
@@ -261,7 +374,7 @@ export default function ClientLoginPage() {
           <button
             type="button"
             onClick={() => router.push(redirectPath ? `/parent/signup?redirect=${encodeURIComponent(redirectPath)}` : '/parent/signup')}
-            className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-[#F6AD55] hover:text-[#F6AD55] font-bold rounded-lg transition-colors text-sm min-w-[120px]"
+            className="w-full h-12 bg-white border border-gray-200 text-gray-700 hover:border-client hover:text-client font-bold rounded-lg transition-colors text-sm min-w-[120px]"
           >
             保護者として新規登録
           </button>
@@ -270,14 +383,14 @@ export default function ClientLoginPage() {
         <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-4">
           <button
             onClick={() => router.push('/login/forgot-login-id')}
-            className="text-xs text-gray-400 hover:text-[#F6AD55] hover:underline"
+            className="text-xs text-gray-400 hover:text-client hover:underline"
           >
             ログインIDを忘れた場合
           </button>
           <span className="text-xs text-gray-300">|</span>
           <button
             onClick={() => router.push('/career/login')}
-            className="text-xs text-gray-400 hover:text-[#818CF8] hover:underline"
+            className="text-xs text-gray-400 hover:text-personal hover:underline"
           >
             スタッフの方はこちら
           </button>

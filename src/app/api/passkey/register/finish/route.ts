@@ -61,18 +61,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // RP IDを決定
-    const rpID = (() => {
-      const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || '';
-      const hostname = host.split(':')[0];
-      if (hostname.startsWith('biz.') || hostname.includes('biz.Roots')) {
-        return 'biz.Roots.inu.co.jp';
-      }
-      return 'my.Roots.inu.co.jp';
-    })();
+    // RP IDを決定（単一ドメイン roots.inu.co.jp でパスベースルーティング）
+    const rpID = 'roots.inu.co.jp';
 
-    const origin = request.headers.get('origin') || 
-      `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || request.headers.get('x-forwarded-host') || rpID}`;
+    const origin = request.headers.get('origin') || `https://${rpID}`;
 
     // 既存のパスキーを取得（重複チェック用）
     const { data: existingPasskeys } = await supabase

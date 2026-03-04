@@ -1,10 +1,8 @@
 /**
- * Root Page - Roots トップページ
+ * Root Page - ゲートウェイ（振り分けページ）
  *
- * サービス選択ハブとして機能
- * - キャリアアカウント（スタッフ・専門家）への動線
- * - 利用者（保護者）への動線
- * - オーナー未設定の場合は管理者登録への動線
+ * - ログイン済みユーザー → 各ダッシュボードへリダイレクト
+ * - 未ログインユーザー → 施設LP / キャリアLP への振り分け
  */
 
 'use client';
@@ -13,7 +11,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
-import { Briefcase, Users, Shield, LogIn, UserPlus, Building2, ArrowRight } from 'lucide-react';
+import {
+  Shield,
+  ArrowRight,
+  Building2,
+  Award,
+  Users,
+} from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +27,19 @@ export default function RootPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.userType === 'client' || user.userType === 'parent') {
+          window.location.href = '/parent';
+          return;
+        }
+        window.location.href = '/career';
+        return;
+      } catch {}
+    }
+
     const checkOwnerSetup = async () => {
       try {
         const { data: config } = await supabase
@@ -46,40 +63,46 @@ export default function RootPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#00c4cc] border-t-transparent"></div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-800 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-50">
-      {/* ヘッダー */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* ====== Header ====== */}
+      <header className="border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Image
             src="/logo.svg"
             alt="Roots"
-            width={140}
-            height={44}
-            className="h-10 w-auto"
+            width={103}
+            height={28}
+            className="h-7 w-auto"
             priority
           />
-          <button
-            onClick={() => router.push('/career/login')}
-            className="text-sm text-gray-600 hover:text-[#00c4cc] flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <LogIn className="w-4 h-4" />
-            ログイン
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/parent/login')}
+              className="text-xs font-medium text-client hover:text-client-dark transition-colors px-2 py-1.5 hidden sm:block"
+            >
+              保護者の方
+            </button>
+            <button
+              onClick={() => router.push('/career/login')}
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors px-3 py-2"
+            >
+              ログイン
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* メインコンテンツ */}
-      <main className="max-w-5xl mx-auto px-4 py-16">
-        {/* オーナー未設定の警告 */}
-        {ownerSetupNeeded && (
-          <div className="mb-10 bg-amber-50 border border-amber-200 rounded-xl p-4">
+      {/* ====== Owner Setup Warning ====== */}
+      {ownerSetupNeeded && (
+        <div className="max-w-6xl mx-auto px-4 mt-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
             <div className="flex items-start gap-3">
               <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -97,107 +120,84 @@ export default function RootPage() {
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ヒーローセクション */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4 tracking-tight">
-            Rootsへようこそ
+      {/* ====== Main Content ====== */}
+      <main className="flex-1 flex items-center justify-center px-4">
+        <div className="max-w-3xl mx-auto w-full py-20 text-center">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 leading-tight tracking-tight mb-4">
+            障害福祉の現場と、<br className="hidden sm:block" />
+            そこで働く人を、<br className="hidden sm:block" />
+            ひとつのプラットフォームで。
           </h1>
-          <p className="text-lg text-gray-500 max-w-xl mx-auto">
-            障害児通所支援事業所向け統合管理プラットフォーム
+          <p className="text-gray-500 mb-12 text-lg">
+            施設運営も、キャリア管理も。すべて無料。
+          </p>
+
+          {/* 2つの入口 */}
+          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* 施設管理 */}
+            <button
+              onClick={() => router.push('/facility')}
+              className="group bg-white border-2 border-gray-200 hover:border-primary rounded-2xl p-6 text-left transition-all hover:shadow-lg"
+            >
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Building2 className="w-6 h-6 text-primary" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">施設を無料で運営する</h2>
+              <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                勤怠・請求・監査書類——施設運営のすべてを完全無料で。
+              </p>
+              <span className="inline-flex items-center gap-1 text-sm font-bold text-primary group-hover:gap-2 transition-all">
+                詳しく見る <ArrowRight className="w-4 h-4" />
+              </span>
+            </button>
+
+            {/* キャリア */}
+            <button
+              onClick={() => router.push('/career/lp')}
+              className="group bg-white border-2 border-gray-200 hover:border-personal rounded-2xl p-6 text-left transition-all hover:shadow-lg"
+            >
+              <div className="w-12 h-12 bg-personal/10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Award className="w-6 h-6 text-personal" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">キャリアアカウントを作る</h2>
+              <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                履歴書・証明書の自動作成。転職してもキャリアデータが消えない。
+              </p>
+              <span className="inline-flex items-center gap-1 text-sm font-bold text-personal group-hover:gap-2 transition-all">
+                詳しく見る <ArrowRight className="w-4 h-4" />
+              </span>
+            </button>
+          </div>
+
+          {/* 保護者リンク */}
+          <p className="mt-8 text-sm text-gray-400">
+            <button
+              onClick={() => router.push('/parent/login')}
+              className="hover:text-client transition-colors"
+            >
+              保護者の方はこちら
+            </button>
           </p>
         </div>
-
-        {/* 3 Entry Point Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-16">
-          {/* 施設管理者 */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-lg hover:border-[#00c4cc]/30 transition-all group">
-            <div className="w-14 h-14 bg-[#00c4cc]/10 rounded-xl flex items-center justify-center mb-5">
-              <Building2 className="w-7 h-7 text-[#00c4cc]" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">施設管理者</h2>
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-              施設の運営管理、スタッフ・児童管理、経営分析、コンプライアンス管理など
-            </p>
-            <div className="space-y-2.5">
-              <button
-                onClick={() => router.push('/career/signup')}
-                className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[120px]"
-              >
-                <UserPlus className="w-4 h-4" />
-                新規登録
-              </button>
-              <button
-                onClick={() => router.push('/career/login')}
-                className="w-full bg-white border border-gray-200 text-gray-700 hover:border-[#00c4cc] hover:text-[#00c4cc] font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[120px]"
-              >
-                <LogIn className="w-4 h-4" />
-                ログイン
-              </button>
-            </div>
-          </div>
-
-          {/* スタッフ */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-lg hover:border-[#818CF8]/30 transition-all group">
-            <div className="w-14 h-14 bg-[#818CF8]/10 rounded-xl flex items-center justify-center mb-5">
-              <Briefcase className="w-7 h-7 text-[#818CF8]" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">スタッフ</h2>
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-              勤務管理、シフト確認、資格管理、キャリア記録、研修管理など
-            </p>
-            <div className="space-y-2.5">
-              <button
-                onClick={() => router.push('/career/signup')}
-                className="w-full bg-[#818CF8] hover:bg-[#6366F1] text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[120px]"
-              >
-                <UserPlus className="w-4 h-4" />
-                新規登録
-              </button>
-              <button
-                onClick={() => router.push('/career/login')}
-                className="w-full bg-white border border-gray-200 text-gray-700 hover:border-[#818CF8] hover:text-[#818CF8] font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[120px]"
-              >
-                <LogIn className="w-4 h-4" />
-                ログイン
-              </button>
-            </div>
-          </div>
-
-          {/* 保護者 */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-lg hover:border-[#F472B6]/30 transition-all group">
-            <div className="w-14 h-14 bg-[#F472B6]/10 rounded-xl flex items-center justify-center mb-5">
-              <Users className="w-7 h-7 text-[#F472B6]" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">保護者</h2>
-            <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-              お子様の利用状況確認、連絡帳、予約管理、支援計画の閲覧など
-            </p>
-            <div className="space-y-2.5">
-              <button
-                onClick={() => router.push('/parent/signup')}
-                className="w-full bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[120px]"
-              >
-                <UserPlus className="w-4 h-4" />
-                新規登録
-              </button>
-              <button
-                onClick={() => router.push('/parent/login')}
-                className="w-full bg-white border border-gray-200 text-gray-700 hover:border-[#F472B6] hover:text-[#F472B6] font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[120px]"
-              >
-                <LogIn className="w-4 h-4" />
-                ログイン
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* フッター情報 */}
-        <div className="text-center text-sm text-gray-400">
-          <p>&copy; {new Date().getFullYear()} INU Inc. All rights reserved.</p>
-        </div>
       </main>
+
+      {/* ====== Footer ====== */}
+      <footer className="border-t border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <Image src="/logo.svg" alt="Roots" width={80} height={22} className="h-4 w-auto opacity-40" />
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <button onClick={() => router.push('/terms')} className="hover:text-gray-600 transition-colors">
+              利用規約
+            </button>
+            <button onClick={() => router.push('/privacy')} className="hover:text-gray-600 transition-colors">
+              プライバシーポリシー
+            </button>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -32,11 +32,14 @@ import { Child, ChildFormData, ContractStatus, Lead, FacilityIntakeData } from '
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { saveDraft, getDrafts, deleteDraft, loadDraft } from '@/utils/draftStorage';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
+import { resolveTimeSlots, slotDisplayName } from '@/utils/slotResolver';
 import { Target, ChevronRight, Settings } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 import ChildRegistrationWizard from './ChildRegistrationWizard';
 import FacilitySettingsEditor from './FacilitySettingsEditor';
+import EmptyState from '@/components/ui/EmptyState';
 import ChildDocumentsManager from './ChildDocumentsManager';
 import InvitationModal from '@/components/common/InvitationModal';
 import AlertModal from '@/components/common/AlertModal';
@@ -70,24 +73,11 @@ type ChildInvitationStatus = {
 
 const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const { children, addChild, updateChild, getLeadsByChildId, timeSlots, facilitySettings } = useFacilityData();
 
-  // 時間枠の名前を取得
-  const slotInfo = useMemo(() => {
-    if (timeSlots.length >= 2) {
-      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
-      return {
-        AM: sorted[0]?.name || '午前',
-        PM: sorted[1]?.name || '午後',
-      };
-    } else if (timeSlots.length === 1) {
-      return {
-        AM: timeSlots[0].name || '終日',
-        PM: null,
-      };
-    }
-    return { AM: '午前', PM: '午後' };
-  }, [timeSlots]);
+  // 時間枠を解決（動的スロット対応）
+  const resolvedSlots = useMemo(() => resolveTimeSlots(timeSlots, facilitySettings), [timeSlots, facilitySettings]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<'user' | 'facility'>('user');
@@ -169,7 +159,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     const fetchPendingInvitations = async () => {
       try {
         // 現在のユーザーの施設IDを取得
-        const facilityId = localStorage.getItem('selectedFacilityId');
+        const facilityId = facility?.id;
         if (!facilityId) return;
 
         const { data, error } = await supabase
@@ -192,12 +182,12 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     };
 
     fetchPendingInvitations();
-  }, []);
+  }, [facility?.id]);
 
   // 児童ごとの招待ステータスを取得
   useEffect(() => {
     const fetchChildInvitationStatuses = async () => {
-      const facilityId = localStorage.getItem('selectedFacilityId');
+      const facilityId = facility?.id;
       if (!facilityId || children.length === 0) return;
 
       try {
@@ -260,12 +250,113 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       if (error) throw error;
 
       // ローカルの状態も更新
+      const targetChild = selectedChild?.id === childId ? selectedChild : children.find(c => c.id === childId);
       if (selectedChild && selectedChild.id === childId) {
         setSelectedChild({ ...selectedChild, contractStatus: newStatus });
       }
 
-      // リストの再取得（useFacilityDataから）
-      window.location.reload(); // 簡易的なリロード
+      // 契約内容報告書に自動追加
+      if (targetChild) {
+        try {
+          // 行政機関が設定されているか確認
+          const { data: govLink } = await supabase
+            .from('facility_government_links')
+            .select('organization_id')
+            .eq('facility_id', facility?.id || '')
+            .eq('link_type', 'jurisdiction')
+            .limit(1)
+            .maybeSingle();
+
+          if (govLink?.organization_id) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+
+            // 既存の提出レコードを検索
+            let submissionId: string | null = null;
+            const { data: existingSub } = await supabase
+              .from('government_document_submissions')
+              .select('id')
+              .eq('facility_id', facility?.id || '')
+              .eq('target_year', year)
+              .eq('target_month', month)
+              .eq('category_id', 'contract_report')
+              .limit(1)
+              .maybeSingle();
+
+            if (existingSub) {
+              submissionId = existingSub.id;
+            } else {
+              // 新規作成
+              submissionId = `cr_${facility?.id}_${year}_${month}_${Date.now()}`;
+              const nowIso = now.toISOString();
+              await supabase
+                .from('government_document_submissions')
+                .insert({
+                  id: submissionId,
+                  facility_id: facility?.id,
+                  organization_id: govLink.organization_id,
+                  category_id: 'contract_report',
+                  title: `契約内容報告書 ${year}年${month}月分`,
+                  target_year: year,
+                  target_month: month,
+                  status: 'draft',
+                  created_at: nowIso,
+                  updated_at: nowIso,
+                });
+            }
+
+            // 既に同じ児童が登録されていないか確認
+            const { data: existing } = await supabase
+              .from('contract_report_items')
+              .select('id')
+              .eq('submission_id', submissionId)
+              .eq('child_id', childId)
+              .limit(1)
+              .maybeSingle();
+
+            if (!existing) {
+              let reportType: 'new' | 'termination' = 'new';
+              if (newStatus === 'terminated' || newStatus === 'inactive') {
+                reportType = 'termination';
+              } else if (newStatus === 'active') {
+                reportType = 'new';
+              }
+
+              await supabase
+                .from('contract_report_items')
+                .insert({
+                  id: `cri_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                  submission_id: submissionId,
+                  child_id: childId,
+                  report_type: reportType,
+                  child_name: targetChild.name,
+                  child_birthday: targetChild.birthDate || null,
+                  recipient_number: targetChild.beneficiaryNumber || null,
+                  contract_start_date: targetChild.contractStartDate || null,
+                  contract_end_date: targetChild.contractEndDate || null,
+                  days_per_month: targetChild.contractDays || null,
+                  created_at: now.toISOString(),
+                });
+
+              setAlertModal({
+                message: '契約ステータスを更新しました。契約内容報告書に自動追加されました。',
+                type: 'success',
+              });
+            } else {
+              setAlertModal({ message: '契約ステータスを更新しました。', type: 'success' });
+            }
+          }
+        } catch (hookError) {
+          // 報告書フックのエラーは握りつぶす（本体の更新は成功）
+          console.error('契約報告書自動追加エラー:', hookError);
+        }
+      }
+
+      // ローカルのchildrenリストを更新（updateChildで状態を同期）
+      if (targetChild) {
+        updateChild({ ...targetChild, contractStatus: newStatus });
+      }
     } catch (error: any) {
       console.error('契約ステータス更新エラー:', error);
       setAlertModal({ message: '契約ステータスの更新に失敗しました: ' + error.message, type: 'error' });
@@ -306,7 +397,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     childId: string,
     dayIndex: number,
     isChecked: boolean,
-    timeSlot: 'AM' | 'PM' | 'AMPM'
+    timeSlot: string
   ) => {
     if (!selectedChild) return;
 
@@ -360,7 +451,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const handleQuickUpdateTimeSlot = async (
     childId: string,
     dayIndex: number,
-    timeSlot: 'AM' | 'PM' | 'AMPM'
+    timeSlot: string
   ) => {
     if (!selectedChild) return;
 
@@ -568,15 +659,20 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
 
   // ウィザード完了時の処理
   const handleWizardComplete = async (data: ChildFormData) => {
-    if (wizardMode === 'create') {
-      await addChild(data);
-      setAlertModal({ message: '児童を登録しました', type: 'success' });
-    } else if (selectedChild) {
-      await updateChild({ ...selectedChild, ...data });
-      setAlertModal({ message: '児童情報を更新しました', type: 'success' });
+    try {
+      if (wizardMode === 'create') {
+        await addChild(data);
+        setAlertModal({ message: '児童を登録しました', type: 'success' });
+      } else if (selectedChild) {
+        await updateChild({ ...selectedChild, ...data });
+        setAlertModal({ message: '児童情報を更新しました', type: 'success' });
+      }
+      setIsWizardOpen(false);
+      setSelectedChild(null);
+    } catch (error) {
+      console.error('Error in handleWizardComplete:', error);
+      toast.error(wizardMode === 'create' ? '児童の登録に失敗しました' : '児童情報の更新に失敗しました');
     }
-    setIsWizardOpen(false);
-    setSelectedChild(null);
   };
 
   // 施設別設定を開く
@@ -606,7 +702,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       terminated: 0,
     };
     children.forEach((child) => {
-      counts[child.contractStatus]++;
+      const status = child.contractStatus || 'pre-contract';
+      if (status in counts) {
+        counts[status]++;
+      }
     });
     return counts;
   }, [children]);
@@ -694,6 +793,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
         dropoffAddress: selectedChild.dropoffAddress || '',
         dropoffPostalCode: selectedChild.dropoffPostalCode || '',
         characteristics: selectedChild.characteristics || '',
+        income_category: selectedChild.income_category,
         contractStatus: selectedChild.contractStatus,
         contractStartDate: selectedChild.contractStartDate,
         contractEndDate: selectedChild.contractEndDate,
@@ -710,7 +810,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   // 児童情報を更新
   const handleUpdateChild = async () => {
     if (!selectedChild || !formData.name.trim()) {
-      alert('児童名を入力してください');
+      toast.warning('児童名を入力してください');
       return;
     }
 
@@ -727,10 +827,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       setIsModalOpen(false);
       setFormData(initialFormData);
       setSelectedChild(null);
-      alert('児童情報を更新しました');
+      toast.success('児童情報を更新しました');
     } catch (error) {
       console.error('Error updating child:', error);
-      alert('児童情報の更新に失敗しました');
+      toast.error('児童情報の更新に失敗しました');
     }
   };
 
@@ -757,7 +857,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               <button
                 data-tour="add-child-button"
                 onClick={handleOpenWizard}
-                className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-4 sm:px-6 py-2.5 rounded-lg text-xs sm:text-sm font-bold flex items-center shadow-md hover:shadow-lg transition-all flex-1 sm:flex-none justify-center"
+                className="bg-primary hover:bg-primary-dark text-white px-4 sm:px-6 py-2.5 rounded-lg text-xs sm:text-sm font-bold flex items-center shadow-md hover:shadow-lg transition-all flex-1 sm:flex-none justify-center"
               >
                 <UserPlus size={16} className="mr-2 shrink-0" />
                 児童を新規登録
@@ -771,13 +871,13 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-6 text-xs text-gray-500">
               <span className="font-medium text-gray-600">利用開始までの流れ:</span>
               <div className="flex items-center gap-2">
-                <span className="bg-[#00c4cc] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">1</span>
+                <span className="bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">1</span>
                 <span>児童を登録</span>
                 <span className="text-gray-300 mx-1">&rarr;</span>
-                <span className="bg-[#00c4cc] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">2</span>
+                <span className="bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">2</span>
                 <span>保護者に招待メール</span>
                 <span className="text-gray-300 mx-1">&rarr;</span>
-                <span className="bg-[#00c4cc] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">3</span>
+                <span className="bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">3</span>
                 <span>保護者が承認して連携完了</span>
               </div>
             </div>
@@ -849,7 +949,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             </h3>
             <button
               onClick={handleOpenModal}
-              className="text-xs text-[#00c4cc] hover:text-[#00b0b8] font-bold"
+              className="text-xs text-primary hover:text-primary-dark font-bold"
             >
               新規登録で続きを入力
             </button>
@@ -877,7 +977,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                   <div className="flex items-center space-x-2 ml-2">
                     <button
                       onClick={() => handleLoadDraft(draft.name)}
-                      className="text-[#00c4cc] hover:text-[#00b0b8] text-xs font-bold px-2 py-1 rounded transition-colors"
+                      className="text-primary hover:text-primary-dark text-xs font-bold px-2 py-1 rounded transition-colors"
                     >
                       編集
                     </button>
@@ -905,7 +1005,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="児童名、保護者名、受給者証番号で検索..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00c4cc]/30 focus:border-[#00c4cc] transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
 
@@ -915,7 +1015,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             onClick={() => setSortStatus('all')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
               sortStatus === 'all'
-                ? 'bg-[#00c4cc] text-white shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
             }`}
           >
@@ -946,8 +1046,8 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 sm:p-12 text-center">
           {children.length === 0 ? (
             <>
-              <div className="w-20 h-20 bg-[#00c4cc]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users size={36} className="text-[#00c4cc]" />
+              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users size={36} className="text-primary" />
               </div>
               <h3 className="text-lg font-bold text-gray-800 mb-2">まだ児童が登録されていません</h3>
               <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
@@ -956,20 +1056,18 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               </p>
               <button
                 onClick={handleOpenWizard}
-                className="bg-[#00c4cc] hover:bg-[#00b0b8] text-white px-6 py-3 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all inline-flex items-center gap-2"
+                className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all inline-flex items-center gap-2"
               >
                 <UserPlus size={18} />
                 児童を新規登録
               </button>
             </>
           ) : (
-            <>
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search size={28} className="text-gray-400" />
-              </div>
-              <h3 className="text-base font-bold text-gray-700 mb-1">該当する児童が見つかりません</h3>
-              <p className="text-sm text-gray-500">検索条件やフィルターを変更してください</p>
-            </>
+            <EmptyState
+              icon={<Search size={20} className="text-gray-400" />}
+              title="該当する児童が見つかりません"
+              description="検索条件やフィルターを変更してください"
+            />
           )}
         </div>
       ) : (
@@ -982,18 +1080,18 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               <button
                 key={child.id}
                 onClick={() => handleOpenDetail(child)}
-                className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-[#00c4cc]/30 transition-all text-left group"
+                className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-primary/30 transition-all text-left group"
               >
                 <div className="flex items-start gap-3">
                   {/* アバター */}
-                  <div className="w-12 h-12 bg-[#00c4cc]/10 rounded-full flex items-center justify-center shrink-0">
-                    <span className="text-[#00c4cc] font-bold text-sm">{initials}</span>
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                    <span className="text-primary font-bold text-sm">{initials}</span>
                   </div>
 
                   {/* 情報 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-gray-800 text-sm truncate group-hover:text-[#00c4cc] transition-colors">
+                      <h3 className="font-bold text-gray-800 text-sm truncate group-hover:text-primary transition-colors">
                         {child.name}
                       </h3>
                       {child.ownerProfileId && (
@@ -1115,7 +1213,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                         onClick={() => handleLoadDraft(draft.name)}
                         className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
                           selectedDraft === draft.name
-                            ? 'bg-[#00c4cc] text-white'
+                            ? 'bg-primary text-white'
                             : 'bg-white text-blue-700 border border-blue-300 hover:bg-blue-100'
                         }`}
                       >
@@ -1171,7 +1269,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                         placeholder="例: 山田 太郎"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -1183,7 +1281,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] focus:ring-1 focus:ring-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                         placeholder="例: ヤマダ タロウ"
                         value={formData.nameKana || ''}
                         onChange={(e) => setFormData({ ...formData, nameKana: e.target.value })}
@@ -1195,7 +1293,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         value={formData.birthDate || ''}
                         onChange={(e) => {
                           const birthDate = e.target.value;
@@ -1263,7 +1361,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 山田 花子"
                         value={formData.guardianName}
                         onChange={(e) =>
@@ -1277,7 +1375,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         placeholder="例: ヤマダ ハナコ"
                         value={formData.guardianNameKana || ''}
                         onChange={(e) =>
@@ -1289,7 +1387,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       <label className="block text-xs font-bold text-gray-500 mb-1">続柄</label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 母、父、祖母"
                         value={formData.guardianRelationship}
                         onChange={(e) =>
@@ -1310,7 +1408,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] font-mono"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary font-mono"
                         placeholder="10桁の番号"
                         value={formData.beneficiaryNumber}
                         onChange={(e) =>
@@ -1325,7 +1423,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       <input
                         type="number"
                         min="0"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 10"
                         value={formData.grantDays || ''}
                         onChange={(e) =>
@@ -1343,7 +1441,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       <input
                         type="number"
                         min="0"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 8"
                         value={formData.contractDays || ''}
                         onChange={(e) =>
@@ -1361,7 +1459,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       <input
                         type="number"
                         min="0"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 10"
                         value={formData.plannedContractDays || ''}
                         onChange={(e) =>
@@ -1372,6 +1470,25 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                         }
                       />
                     </div>
+                  </div>
+                  <div className="mt-3">
+                    <label className="block text-xs font-bold text-gray-500 mb-1">
+                      所得区分（上限月額）
+                    </label>
+                    <select
+                      className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
+                      value={formData.income_category || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, income_category: e.target.value || undefined })
+                      }
+                    >
+                      <option value="">選択してください</option>
+                      <option value="general">一般2 — 37,200円</option>
+                      <option value="general_low">一般1 — 4,600円</option>
+                      <option value="low_income">低所得 — 0円</option>
+                      <option value="welfare">生活保護 — 0円</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">受給者証の「利用者負担上限月額」欄を確認してください</p>
                   </div>
                 </div>
 
@@ -1386,7 +1503,8 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       <div className="flex flex-wrap gap-2">
                         {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => {
                           const isChecked = formData.patternDays?.includes(index) || false;
-                          const timeSlot = formData.patternTimeSlots?.[index] || 'PM';
+                          const defaultSlotKey = resolvedSlots.length > 0 ? resolvedSlots[resolvedSlots.length - 1].key : 'PM';
+                          const timeSlot = formData.patternTimeSlots?.[index] || defaultSlotKey;
                           return (
                             <div key={index} className="flex flex-col items-start p-1.5 border border-gray-200 rounded-md hover:bg-gray-50 min-w-[80px]">
                               <label className="flex items-center space-x-1 cursor-pointer w-full mb-1">
@@ -1398,11 +1516,11 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                     const newDays = e.target.checked
                                       ? [...currentDays, index]
                                       : currentDays.filter(d => d !== index);
-                                    
+
                                     // パターン文字列も更新（後方互換性のため）
                                     const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
                                     const pattern = newDays.sort((a, b) => a - b).map(d => dayNames[d]).join('・');
-                                    
+
                                     // 時間帯設定も更新
                                     const newTimeSlots = { ...formData.patternTimeSlots };
                                     if (e.target.checked) {
@@ -1410,7 +1528,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                     } else {
                                       delete newTimeSlots[index];
                                     }
-                                    
+
                                     setFormData({
                                       ...formData,
                                       patternDays: newDays,
@@ -1418,7 +1536,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                       patternTimeSlots: newTimeSlots,
                                     });
                                   }}
-                                  className="accent-[#00c4cc] w-3 h-3"
+                                  className="accent-primary w-3 h-3"
                                 />
                                 <span className="text-xs text-gray-700 font-medium">
                                   {day}
@@ -1426,65 +1544,48 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                               </label>
                               {isChecked && (
                                 <div className="flex flex-col items-start space-y-0.5 w-full">
-                                  <label className="flex items-center cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name={`timeSlot-${index}`}
-                                      value="AM"
-                                      checked={timeSlot === 'AM'}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          patternTimeSlots: {
-                                            ...formData.patternTimeSlots,
-                                            [index]: 'AM',
-                                          },
-                                        });
-                                      }}
-                                      className="accent-[#00c4cc] w-2.5 h-2.5"
-                                    />
-                                    <span className="text-[10px] text-gray-600 ml-0.5">{slotInfo.AM}</span>
-                                  </label>
-                                  {slotInfo.PM && (
-                                  <label className="flex items-center cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name={`timeSlot-${index}`}
-                                      value="PM"
-                                      checked={timeSlot === 'PM'}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          patternTimeSlots: {
-                                            ...formData.patternTimeSlots,
-                                            [index]: 'PM',
-                                          },
-                                        });
-                                      }}
-                                      className="accent-[#00c4cc] w-2.5 h-2.5"
-                                    />
-                                    <span className="text-[10px] text-gray-600 ml-0.5">{slotInfo.PM}</span>
-                                  </label>
+                                  {resolvedSlots.map((slot) => (
+                                    <label key={slot.key} className="flex items-center cursor-pointer">
+                                      <input
+                                        type="radio"
+                                        name={`timeSlot-${index}`}
+                                        value={slot.key}
+                                        checked={timeSlot === slot.key}
+                                        onChange={() => {
+                                          setFormData({
+                                            ...formData,
+                                            patternTimeSlots: {
+                                              ...formData.patternTimeSlots,
+                                              [index]: slot.key,
+                                            },
+                                          });
+                                        }}
+                                        className="accent-primary w-2.5 h-2.5"
+                                      />
+                                      <span className="text-[10px] text-gray-600 ml-0.5">{slot.name}</span>
+                                    </label>
+                                  ))}
+                                  {resolvedSlots.length > 1 && (
+                                    <label className="flex items-center cursor-pointer">
+                                      <input
+                                        type="radio"
+                                        name={`timeSlot-${index}`}
+                                        value="ALL"
+                                        checked={timeSlot === 'ALL' || timeSlot === 'AMPM'}
+                                        onChange={() => {
+                                          setFormData({
+                                            ...formData,
+                                            patternTimeSlots: {
+                                              ...formData.patternTimeSlots,
+                                              [index]: 'ALL',
+                                            },
+                                          });
+                                        }}
+                                        className="accent-primary w-2.5 h-2.5"
+                                      />
+                                      <span className="text-[10px] text-gray-600 ml-0.5">終日</span>
+                                    </label>
                                   )}
-                                  <label className="flex items-center cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name={`timeSlot-${index}`}
-                                      value="AMPM"
-                                      checked={timeSlot === 'AMPM'}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          patternTimeSlots: {
-                                            ...formData.patternTimeSlots,
-                                            [index]: 'AMPM',
-                                          },
-                                        });
-                                      }}
-                                      className="accent-[#00c4cc] w-2.5 h-2.5"
-                                    />
-                                    <span className="text-[10px] text-gray-600 ml-0.5">終日</span>
-                                  </label>
                                 </div>
                               )}
                             </div>
@@ -1504,7 +1605,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             onChange={(e) =>
                               setFormData({ ...formData, needsPickup: e.target.checked })
                             }
-                            className="accent-[#00c4cc] w-4 h-4"
+                            className="accent-primary w-4 h-4"
                           />
                           <span className="text-xs md:text-sm text-gray-700 group-hover:text-gray-900 font-bold">
                             お迎え
@@ -1516,7 +1617,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                               乗車地
                             </label>
                             <select
-                              className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                              className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                               value={formData.pickupLocation || ''}
                               onChange={(e) =>
                                 setFormData({ ...formData, pickupLocation: e.target.value, pickupLocationCustom: '' })
@@ -1530,7 +1631,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             {formData.pickupLocation === 'その他' && (
                               <input
                                 type="text"
-                                className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                                className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                                 placeholder="例: 保育所、待ち合わせ場所（駅）など"
                                 value={formData.pickupLocationCustom || ''}
                                 onChange={(e) =>
@@ -1561,7 +1662,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                         ...formData,
                                         pickupAddress: formData.address || ''
                                       })}
-                                      className="text-xs text-[#00c4cc] hover:underline"
+                                      className="text-xs text-primary hover:underline"
                                     >
                                       自宅住所をお迎え場所にコピー
                                     </button>
@@ -1570,7 +1671,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                   <div className="space-y-2">
                                     <input
                                       type="text"
-                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-primary"
                                       placeholder="〒番号（例: 1234567）"
                                       value={formData.pickupPostalCode || ''}
                                       onChange={(e) => setFormData({ ...formData, pickupPostalCode: e.target.value.replace(/-/g, '') })}
@@ -1578,7 +1679,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                     />
                                     <input
                                       type="text"
-                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-primary"
                                       placeholder="住所（例: 東京都○○区1-2-3）"
                                       value={formData.pickupAddress || ''}
                                       onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
@@ -1600,7 +1701,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             onChange={(e) =>
                               setFormData({ ...formData, needsDropoff: e.target.checked })
                             }
-                            className="accent-[#00c4cc] w-4 h-4"
+                            className="accent-primary w-4 h-4"
                           />
                           <span className="text-xs md:text-sm text-gray-700 group-hover:text-gray-900 font-bold">
                             お送り
@@ -1612,7 +1713,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                               降車地
                             </label>
                             <select
-                              className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                              className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                               value={formData.dropoffLocation || ''}
                               onChange={(e) =>
                                 setFormData({ ...formData, dropoffLocation: e.target.value, dropoffLocationCustom: '' })
@@ -1626,7 +1727,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             {formData.dropoffLocation === 'その他' && (
                               <input
                                 type="text"
-                                className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                                className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                                 placeholder="例: 保育所、待ち合わせ場所（駅）など"
                                 value={formData.dropoffLocationCustom || ''}
                                 onChange={(e) =>
@@ -1657,7 +1758,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                         ...formData,
                                         dropoffAddress: formData.address || ''
                                       })}
-                                      className="text-xs text-[#00c4cc] hover:underline"
+                                      className="text-xs text-primary hover:underline"
                                     >
                                       自宅住所をお送り場所にコピー
                                     </button>
@@ -1666,7 +1767,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                   <div className="space-y-2">
                                     <input
                                       type="text"
-                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-primary"
                                       placeholder="〒番号（例: 1234567）"
                                       value={formData.dropoffPostalCode || ''}
                                       onChange={(e) => setFormData({ ...formData, dropoffPostalCode: e.target.value.replace(/-/g, '') })}
@@ -1674,7 +1775,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                     />
                                     <input
                                       type="text"
-                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-[#00c4cc]"
+                                      className="w-full border border-gray-300 rounded-md p-2 text-xs focus:outline-none focus:border-primary"
                                       placeholder="住所（例: 東京都○○区1-2-3）"
                                       value={formData.dropoffAddress || ''}
                                       onChange={(e) => setFormData({ ...formData, dropoffAddress: e.target.value })}
@@ -1698,7 +1799,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       <label className="block text-xs font-bold text-gray-500 mb-1">住所</label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 東京都渋谷区..."
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -1711,7 +1812,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                         </label>
                         <input
                           type="tel"
-                          className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                          className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-primary"
                           placeholder="例: 03-1234-5678"
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -1723,7 +1824,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                         </label>
                         <input
                           type="email"
-                          className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                          className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-primary"
                           placeholder="example@email.com"
                           value={formData.email}
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -1743,7 +1844,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 田中 太郎"
                         value={formData.doctorName}
                         onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })}
@@ -1755,7 +1856,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:border-primary"
                         placeholder="例: 〇〇クリニック"
                         value={formData.doctorClinic}
                         onChange={(e) => setFormData({ ...formData, doctorClinic: e.target.value })}
@@ -1773,7 +1874,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                     </label>
                     <input
                       type="text"
-                      className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                      className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                       placeholder="例: 〇〇小学校、〇〇幼稚園"
                       value={formData.schoolName}
                       onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
@@ -1791,7 +1892,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         value={formData.plannedUsageStartDate || ''}
                         onChange={(e) =>
                           setFormData({
@@ -1807,7 +1908,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                        className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                         value={formData.contractStartDate}
                         onChange={(e) =>
                           setFormData({ ...formData, contractStartDate: e.target.value })
@@ -1820,7 +1921,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                       </label>
                       <input
                         type="date"
-                        className={`w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc] ${
+                        className={`w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary ${
                           formData.birthDate ? 'bg-gray-50' : ''
                         }`}
                         value={formData.contractEndDate}
@@ -1847,7 +1948,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                     </label>
                     <textarea
                       rows={3}
-                      className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-[#00c4cc]"
+                      className="w-full border border-gray-300 rounded-md p-2 text-xs md:text-sm focus:outline-none focus:border-primary"
                       placeholder="児童の特性、配慮事項、その他のメモを記入してください"
                       value={formData.characteristics || ''}
                       onChange={(e) =>
@@ -1877,7 +1978,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="px-6 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold shadow-md transition-colors"
+                  className="px-6 py-2 bg-primary hover:bg-primary-dark text-white rounded-md text-sm font-bold shadow-md transition-colors"
                 >
                   {selectedChild ? '更新' : '登録'}
                 </button>
@@ -1910,7 +2011,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                   onClick={() => setDetailTab('user')}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                     detailTab === 'user'
-                      ? 'border-[#00c4cc] text-[#00c4cc]'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
@@ -1920,7 +2021,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                   onClick={() => setDetailTab('facility')}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                     detailTab === 'facility'
-                      ? 'border-[#00c4cc] text-[#00c4cc]'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
@@ -1942,29 +2043,29 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                           setActiveTab('daily-log');
                           setIsDetailModalOpen(false);
                         }}
-                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-primary/10 rounded-lg transition-colors group"
                       >
-                        <BookOpen size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
-                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">連絡帳</span>
+                        <BookOpen size={24} className="text-gray-400 group-hover:text-primary mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-primary">連絡帳</span>
                       </button>
                       <button
                         onClick={() => {
                           setActiveTab('schedule');
                           setIsDetailModalOpen(false);
                         }}
-                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-primary/10 rounded-lg transition-colors group"
                       >
-                        <CalendarDays size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
-                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">予約</span>
+                        <CalendarDays size={24} className="text-gray-400 group-hover:text-primary mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-primary">予約</span>
                       </button>
                       <button
                         onClick={() => {
                           setIsDocumentsOpen(true);
                         }}
-                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-[#00c4cc]/10 rounded-lg transition-colors group"
+                        className="flex flex-col items-center p-3 bg-gray-50 hover:bg-primary/10 rounded-lg transition-colors group"
                       >
-                        <FileText size={24} className="text-gray-400 group-hover:text-[#00c4cc] mb-1" />
-                        <span className="text-xs font-medium text-gray-600 group-hover:text-[#00c4cc]">書類管理</span>
+                        <FileText size={24} className="text-gray-400 group-hover:text-primary mb-1" />
+                        <span className="text-xs font-medium text-gray-600 group-hover:text-primary">書類管理</span>
                       </button>
                     </div>
                   </div>
@@ -2053,6 +2154,16 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                           </p>
                         </div>
                       </div>
+                      <div className="mt-3">
+                        <label className="text-xs font-bold text-gray-500">所得区分（上限月額）</label>
+                        <p className="text-sm text-gray-800 mt-1">
+                          {selectedChild.income_category === 'general' ? '一般2（37,200円）' :
+                           selectedChild.income_category === 'general_low' ? '一般1（4,600円）' :
+                           selectedChild.income_category === 'low_income' ? '低所得（0円）' :
+                           selectedChild.income_category === 'welfare' ? '生活保護（0円）' :
+                           '-'}
+                        </p>
+                      </div>
                     </div>
 
                     {/* 連絡先 */}
@@ -2134,7 +2245,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             'visit-scheduled': { label: '見学/面談予定', color: 'bg-yellow-100 text-yellow-700' },
                             'considering': { label: '検討中', color: 'bg-orange-100 text-orange-700' },
                             'waiting-benefit': { label: '受給者証待ち', color: 'bg-purple-100 text-purple-700' },
-                            'contract-progress': { label: '契約手続き中', color: 'bg-[#00c4cc]/10 text-[#00c4cc]' },
+                            'contract-progress': { label: '契約手続き中', color: 'bg-primary/10 text-primary' },
                             'contracted': { label: '契約済み', color: 'bg-green-100 text-green-700' },
                             'lost': { label: '失注', color: 'bg-red-100 text-red-700' },
                           };
@@ -2169,7 +2280,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                           </span>
                                         </div>
                                       </div>
-                                      <ChevronRight size={16} className="text-gray-400 group-hover:text-[#00c4cc]" />
+                                      <ChevronRight size={16} className="text-gray-400 group-hover:text-primary" />
                                     </div>
                                   </button>
                                 );
@@ -2204,7 +2315,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             }
                             setIsInvitationModalOpen(true);
                           }}
-                          className="w-full bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold py-2 px-4 rounded-md transition-colors text-sm flex items-center justify-center gap-2"
+                          className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors text-sm flex items-center justify-center gap-2"
                         >
                           <Mail size={16} />
                           招待を送信
@@ -2229,9 +2340,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                           <div className="flex flex-wrap gap-1.5">
                             {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => {
                               const isChecked = selectedChild.patternDays?.includes(index) || false;
-                              const timeSlot = selectedChild.patternTimeSlots?.[index] || 'PM';
+                              const detailDefaultSlotKey = resolvedSlots.length > 0 ? resolvedSlots[resolvedSlots.length - 1].key : 'PM';
+                              const timeSlot = selectedChild.patternTimeSlots?.[index] || detailDefaultSlotKey;
                               return (
-                                <div key={index} className={`flex flex-col items-start p-1.5 border rounded-md min-w-[70px] ${isChecked ? 'border-[#00c4cc] bg-[#e0f7fa]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <div key={index} className={`flex flex-col items-start p-1.5 border rounded-md min-w-[70px] ${isChecked ? 'border-primary bg-[#e0f7fa]' : 'border-gray-200 hover:bg-gray-50'}`}>
                                   <label className="flex items-center space-x-1 cursor-pointer w-full mb-1">
                                     <input
                                       type="checkbox"
@@ -2241,10 +2353,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                           selectedChild.id,
                                           index,
                                           e.target.checked,
-                                          timeSlot as 'AM' | 'PM' | 'AMPM'
+                                          timeSlot
                                         );
                                       }}
-                                      className="accent-[#00c4cc] w-3 h-3"
+                                      className="accent-primary w-3 h-3"
                                     />
                                     <span className={`text-xs font-medium ${isChecked ? 'text-[#006064]' : 'text-gray-700'}`}>
                                       {day}
@@ -2252,23 +2364,40 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                   </label>
                                   {isChecked && (
                                     <div className="flex flex-col items-start space-y-0.5 w-full pl-4">
-                                      {(['AM', 'PM', 'AMPM'] as const).map((slot) => (
-                                        <label key={slot} className="flex items-center cursor-pointer">
+                                      {resolvedSlots.map((slot) => (
+                                        <label key={slot.key} className="flex items-center cursor-pointer">
                                           <input
                                             type="radio"
                                             name={`facility-timeSlot-${index}`}
-                                            value={slot}
-                                            checked={timeSlot === slot}
+                                            value={slot.key}
+                                            checked={timeSlot === slot.key}
                                             onChange={() => {
-                                              handleQuickUpdateTimeSlot(selectedChild.id, index, slot);
+                                              handleQuickUpdateTimeSlot(selectedChild.id, index, slot.key);
                                             }}
-                                            className="accent-[#00c4cc] w-2.5 h-2.5"
+                                            className="accent-primary w-2.5 h-2.5"
                                           />
                                           <span className="text-[10px] text-gray-600 ml-0.5">
-                                            {slot === 'AM' ? slotInfo.AM : slot === 'PM' ? (slotInfo.PM || '午後') : '終日'}
+                                            {slot.name}
                                           </span>
                                         </label>
                                       ))}
+                                      {resolvedSlots.length > 1 && (
+                                        <label className="flex items-center cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`facility-timeSlot-${index}`}
+                                            value="ALL"
+                                            checked={timeSlot === 'ALL' || timeSlot === 'AMPM'}
+                                            onChange={() => {
+                                              handleQuickUpdateTimeSlot(selectedChild.id, index, 'ALL');
+                                            }}
+                                            className="accent-primary w-2.5 h-2.5"
+                                          />
+                                          <span className="text-[10px] text-gray-600 ml-0.5">
+                                            終日
+                                          </span>
+                                        </label>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -2279,7 +2408,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                         {/* 送迎設定（編集可能） */}
                         <div className="bg-gray-50 rounded-lg p-4 mt-4">
                           <div className="flex items-center gap-2 mb-3">
-                            <Truck size={16} className="text-[#00c4cc]" />
+                            <Truck size={16} className="text-primary" />
                             <label className="text-xs font-bold text-gray-700">送迎設定</label>
                           </div>
 
@@ -2291,7 +2420,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                   type="checkbox"
                                   checked={selectedChild.needsPickup || false}
                                   onChange={(e) => handleUpdateTransport(selectedChild.id, { needsPickup: e.target.checked })}
-                                  className="accent-[#00c4cc] w-4 h-4"
+                                  className="accent-primary w-4 h-4"
                                 />
                                 <span className="text-sm font-bold text-gray-700">お迎えあり</span>
                               </label>
@@ -2303,7 +2432,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                   <select
                                     value={selectedChild.pickupLocation || '自宅'}
                                     onChange={(e) => handleUpdateTransport(selectedChild.id, { pickupLocation: e.target.value })}
-                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                                   >
                                     <option value="自宅">自宅</option>
                                     <option value="事業所">事業所</option>
@@ -2321,7 +2450,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                     value={selectedChild.pickupAddress || ''}
                                     onChange={(e) => handleUpdateTransport(selectedChild.id, { pickupAddress: e.target.value })}
                                     placeholder="例: 東京都府中市○○町1-2-3"
-                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                                   />
                                 </div>
                               </div>
@@ -2336,7 +2465,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                   type="checkbox"
                                   checked={selectedChild.needsDropoff || false}
                                   onChange={(e) => handleUpdateTransport(selectedChild.id, { needsDropoff: e.target.checked })}
-                                  className="accent-[#00c4cc] w-4 h-4"
+                                  className="accent-primary w-4 h-4"
                                 />
                                 <span className="text-sm font-bold text-gray-700">お送りあり</span>
                               </label>
@@ -2348,7 +2477,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                   <select
                                     value={selectedChild.dropoffLocation || '自宅'}
                                     onChange={(e) => handleUpdateTransport(selectedChild.id, { dropoffLocation: e.target.value })}
-                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                                   >
                                     <option value="自宅">自宅</option>
                                     <option value="事業所">事業所</option>
@@ -2366,7 +2495,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                                     value={selectedChild.dropoffAddress || ''}
                                     onChange={(e) => handleUpdateTransport(selectedChild.id, { dropoffAddress: e.target.value })}
                                     placeholder="例: 東京都府中市○○町1-2-3"
-                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc]"
+                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                                   />
                                 </div>
                               </div>
@@ -2386,7 +2515,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             <select
                               value={selectedChild.contractStatus}
                               onChange={(e) => handleQuickUpdateContractStatus(selectedChild.id, e.target.value as ContractStatus)}
-                              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00c4cc] focus:border-[#00c4cc]"
+                              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                             >
                               <option value="pre-contract">契約前</option>
                               <option value="active">契約中</option>
@@ -2401,7 +2530,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             type="date"
                             value={selectedChild.contractStartDate || ''}
                             onChange={(e) => handleQuickUpdateContractDate(selectedChild.id, 'contract_start_date', e.target.value)}
-                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 mt-1 focus:outline-none focus:ring-1 focus:ring-[#00c4cc] focus:border-[#00c4cc]"
+                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 mt-1 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                           />
                         </div>
                         <div>
@@ -2410,7 +2539,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                             type="date"
                             value={selectedChild.contractEndDate || ''}
                             onChange={(e) => handleQuickUpdateContractDate(selectedChild.id, 'contract_end_date', e.target.value)}
-                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 mt-1 focus:outline-none focus:ring-1 focus:ring-[#00c4cc] focus:border-[#00c4cc]"
+                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 mt-1 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                           />
                         </div>
                       </div>
@@ -2507,7 +2636,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               </button>
               <button
                 onClick={handleEditChild}
-                className="px-6 py-2 bg-[#00c4cc] hover:bg-[#00b0b8] text-white rounded-md text-sm font-bold shadow-md transition-colors flex items-center space-x-2"
+                className="px-6 py-2 bg-primary hover:bg-primary-dark text-white rounded-md text-sm font-bold shadow-md transition-colors flex items-center space-x-2"
               >
                 <Edit size={16} />
                 <span>編集</span>
@@ -2521,7 +2650,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       <InvitationModal
         isOpen={isInvitationSlotModalOpen}
         onClose={() => setIsInvitationSlotModalOpen(false)}
-        facilityId={facility?.id || localStorage.getItem('selectedFacilityId') || ''}
+        facilityId={facility?.id || ''}
         facilityName={facility?.name || '施設'}
         userId={localStorage.getItem('userId') || ''}
         childList={children}
@@ -2547,15 +2676,35 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             beneficiaryNumber: selectedChild.beneficiaryNumber,
             grantDays: selectedChild.grantDays,
             contractDays: selectedChild.contractDays,
+            postalCode: selectedChild.postalCode,
             address: selectedChild.address,
             phone: selectedChild.phone,
             email: selectedChild.email,
             doctorName: selectedChild.doctorName,
             doctorClinic: selectedChild.doctorClinic,
             schoolName: selectedChild.schoolName,
+            pattern: selectedChild.pattern,
+            patternDays: selectedChild.patternDays,
+            patternTimeSlots: selectedChild.patternTimeSlots,
+            needsPickup: selectedChild.needsPickup,
+            needsDropoff: selectedChild.needsDropoff,
+            pickupLocation: selectedChild.pickupLocation,
+            pickupLocationCustom: selectedChild.pickupLocationCustom,
+            pickupAddress: selectedChild.pickupAddress,
+            pickupPostalCode: selectedChild.pickupPostalCode,
+            dropoffLocation: selectedChild.dropoffLocation,
+            dropoffLocationCustom: selectedChild.dropoffLocationCustom,
+            dropoffAddress: selectedChild.dropoffAddress,
+            dropoffPostalCode: selectedChild.dropoffPostalCode,
             characteristics: selectedChild.characteristics,
+            income_category: selectedChild.income_category,
             contractStatus: selectedChild.contractStatus,
+            contractStartDate: selectedChild.contractStartDate,
             contractEndDate: selectedChild.contractEndDate,
+            registrationType: selectedChild.registrationType,
+            plannedContractDays: selectedChild.plannedContractDays,
+            plannedUsageStartDate: selectedChild.plannedUsageStartDate,
+            plannedUsageDays: selectedChild.plannedUsageDays,
           } : undefined}
           mode={wizardMode}
         />
@@ -2567,7 +2716,8 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
           childId={selectedChild.id}
           childName={selectedChild.name}
           facilityId={facility.id}
-          slotInfo={slotInfo}
+          resolvedSlots={resolvedSlots}
+          transportVehicles={facilitySettings.transportVehicles || []}
           onSave={() => {
             // 必要に応じてデータを再読み込み
           }}

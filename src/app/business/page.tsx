@@ -10,21 +10,51 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamicImport from 'next/dynamic';
-import Sidebar from '@/components/common/Sidebar';
+import Sidebar, { MENU_DESCRIPTIONS } from '@/components/common/Sidebar';
 import Header from '@/components/common/Header';
+import CommandPalette from '@/components/ui/CommandPalette';
+import type { CommandPaletteItem } from '@/components/ui/CommandPalette';
 import { useAuth } from '@/contexts/AuthContext';
 import { SetupGuideProvider, useSetupGuide, SETUP_STEPS } from '@/contexts/SetupGuideContext';
 import { UserPermissions } from '@/types';
 import { supabase } from '@/lib/supabase';
+import {
+  CalendarDays,
+  Users,
+  Settings,
+  BarChart3,
+  CalendarCheck,
+  BookOpen,
+  FileText,
+  FolderOpen,
+  Shield,
+  ListChecks,
+  AlertTriangle,
+  DollarSign,
+  GraduationCap,
+  CalendarMinus,
+  Award,
+  Users2,
+  Car,
+  Calculator,
+  Briefcase,
+  Wallet,
+  MessageCircle,
+  ClipboardCheck,
+  Receipt,
+  Send,
+  FileOutput,
+} from 'lucide-react';
+
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import OnboardingGuide from '@/components/common/OnboardingGuide';
 
 // All view components loaded dynamically to reduce initial bundle size
 const DynamicLoadingSpinner = () => (
-  <div className="flex items-center justify-center py-20">
-    <div className="w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full animate-spin" />
-  </div>
+  <LoadingSpinner size="sm" label="" />
 );
 
 const DashboardView = dynamicImport(() => import('@/components/dashboard/DashboardView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
@@ -53,40 +83,63 @@ const CashflowWizardView = dynamicImport(() => import('@/components/cashflow/Cas
 const BusinessChatView = dynamicImport(() => import('@/components/chat/BusinessChatView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const BillingWizardView = dynamicImport(() => import('@/components/billing/BillingWizardView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 const SelfEvaluationView = dynamicImport(() => import('@/components/evaluation/SelfEvaluationView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const StaffDocumentView = dynamicImport(() => import('@/components/staff/StaffDocumentView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const AnnouncementView = dynamicImport(() => import('@/components/staff/AnnouncementView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
+const ContractReportView = dynamicImport(() => import('@/components/contract-report/ContractReportView'), { ssr: false, loading: () => <DynamicLoadingSpinner /> });
 
 /**
  * Setup guide banner shown at top of dashboard when setup is incomplete.
  * Non-blocking — users can dismiss or ignore and use all features freely.
+ * Dismissible via localStorage per facility.
  */
 function SetupGuideBanner({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const { facility } = useAuth();
   const { isSetupComplete, completedSteps, isLoading, getStepStatus } = useSetupGuide();
-  const [dismissed, setDismissed] = React.useState(false);
+  const [dismissed, setDismissed] = React.useState(() => {
+    if (typeof window === 'undefined' || !facility?.id) return false;
+    return localStorage.getItem(`onboarding_dismissed_${facility.id}`) === 'true';
+  });
 
   if (isLoading || isSetupComplete || dismissed) return null;
 
   const totalSteps = SETUP_STEPS.length;
   const doneCount = completedSteps.length;
+  const progressPercent = Math.round((doneCount / totalSteps) * 100);
+
+  const handleDismiss = () => {
+    if (facility?.id) {
+      localStorage.setItem(`onboarding_dismissed_${facility.id}`, 'true');
+    }
+    setDismissed(true);
+  };
 
   return (
-    <div className="mb-6 bg-gradient-to-r from-[#00c4cc]/5 to-[#00c4cc]/10 border border-[#00c4cc]/20 rounded-xl p-5">
-      <div className="flex items-start justify-between mb-3">
+    <div className="mb-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-5">
+      <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-            <span className="w-5 h-5 bg-[#00c4cc] text-white rounded-full flex items-center justify-center text-[10px]">&#x2713;</span>
-            初期設定ガイド
-            <span className="text-xs font-normal text-gray-500 ml-1">{doneCount}/{totalSteps} 完了</span>
+            <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-[10px]">&#x2713;</span>
+            セットアップ {doneCount}/{totalSteps} 完了
           </h3>
-          <p className="text-xs text-gray-500 mt-1">まだ完了していない設定があります。各項目は後からいつでも設定できます。</p>
+          <p className="text-xs text-gray-500 mt-1">3分で初期設定を完了できます。各項目は後からいつでも設定できます。</p>
         </div>
         <button
-          onClick={() => setDismissed(true)}
+          onClick={handleDismiss}
           className="text-gray-400 hover:text-gray-600 text-lg leading-none p-1"
           title="閉じる"
         >
           &times;
         </button>
       </div>
-      <div className="flex gap-3">
+      {/* Progress bar */}
+      <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+        <div
+          className="bg-primary h-2 rounded-full transition-all duration-500"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+      {/* Step cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {SETUP_STEPS.map((step, i) => {
           const status = getStepStatus(step.id);
           const isCompleted = status === 'completed';
@@ -94,14 +147,14 @@ function SetupGuideBanner({ setActiveTab }: { setActiveTab: (tab: string) => voi
             <button
               key={step.id}
               onClick={() => !isCompleted && setActiveTab(step.menuId)}
-              className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-left transition-all ${
                 isCompleted
                   ? 'bg-white border-gray-200 opacity-60'
-                  : 'bg-white border-[#00c4cc]/30 hover:border-[#00c4cc] hover:shadow-sm cursor-pointer'
+                  : 'bg-white border-primary/30 hover:border-primary hover:shadow-sm cursor-pointer'
               }`}
             >
               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                isCompleted ? 'bg-[#00c4cc] text-white' : 'bg-gray-100 text-gray-500'
+                isCompleted ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'
               }`}>
                 {isCompleted ? '\u2713' : i + 1}
               </div>
@@ -140,10 +193,49 @@ function SetupGateContent({
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
 
+// コマンドパレット用の全メニュー項目定義（権限フィルタは後で適用）
+const ALL_COMMAND_PALETTE_ITEMS: (CommandPaletteItem & { permission: keyof import('@/types').UserPermissions })[] = [
+  // 利用管理
+  { id: 'schedule', label: '利用予約', icon: CalendarDays, category: '利用管理', permission: 'schedule', description: MENU_DESCRIPTIONS['schedule'] },
+  { id: 'children', label: '児童管理', icon: Users, category: '利用管理', permission: 'children', description: MENU_DESCRIPTIONS['children'] },
+  { id: 'daily-log', label: '実績と連絡帳', icon: BookOpen, category: '利用管理', permission: 'dailyLog', description: MENU_DESCRIPTIONS['daily-log'] },
+  { id: 'support-plan', label: '個別支援計画', icon: FileText, category: '利用管理', permission: 'children', description: MENU_DESCRIPTIONS['support-plan'] },
+  { id: 'connect', label: '連絡会議', icon: Users2, category: '利用管理', permission: 'children', description: MENU_DESCRIPTIONS['connect'] },
+  { id: 'transport', label: '送迎管理', icon: Car, category: '利用管理', permission: 'schedule', description: MENU_DESCRIPTIONS['transport'] },
+  { id: 'upper-limit', label: '上限管理', icon: Calculator, category: '利用管理', permission: 'dashboard', description: MENU_DESCRIPTIONS['upper-limit'] },
+  { id: 'chat', label: 'チャット', icon: MessageCircle, category: '利用管理', permission: 'dashboard', description: MENU_DESCRIPTIONS['chat'] },
+  // スタッフ
+  { id: 'staff-master', label: 'スタッフ管理', icon: Users, category: 'スタッフ', permission: 'staff', description: MENU_DESCRIPTIONS['staff-master'] },
+  { id: 'shift', label: 'シフト管理', icon: CalendarCheck, category: 'スタッフ', permission: 'shift', description: MENU_DESCRIPTIONS['shift'] },
+  { id: 'staffing', label: '勤務・配置', icon: Shield, category: 'スタッフ', permission: 'staff', description: MENU_DESCRIPTIONS['staffing'] },
+  { id: 'leave-approval', label: '休暇管理', icon: CalendarMinus, category: 'スタッフ', permission: 'staff', description: MENU_DESCRIPTIONS['leave-approval'] },
+  { id: 'talent-management', label: 'タレントマネジメント', icon: Award, category: 'スタッフ', permission: 'staff', description: MENU_DESCRIPTIONS['talent-management'] },
+  { id: 'staff-documents', label: '書類配布', icon: FileOutput, category: 'スタッフ', permission: 'staff', description: MENU_DESCRIPTIONS['staff-documents'] },
+  { id: 'announcements', label: 'お知らせ', icon: Send, category: 'スタッフ', permission: 'staff', description: MENU_DESCRIPTIONS['announcements'] },
+  // 採用
+  { id: 'recruitment', label: '採用・求人', icon: Briefcase, category: '採用', permission: 'recruitment', description: MENU_DESCRIPTIONS['recruitment'] },
+  // 経営
+  { id: 'dashboard', label: 'ダッシュボード', icon: BarChart3, category: '経営', permission: 'dashboard', description: MENU_DESCRIPTIONS['dashboard'] },
+  { id: 'addition-settings', label: '加算・収益', icon: ListChecks, category: '経営', permission: 'dashboard', description: MENU_DESCRIPTIONS['addition-settings'] },
+  { id: 'finance', label: '財務管理', icon: DollarSign, category: '経営', permission: 'dashboard', description: MENU_DESCRIPTIONS['finance'] },
+  { id: 'cashflow', label: '収支管理', icon: Wallet, category: '経営', permission: 'cashFlow', description: MENU_DESCRIPTIONS['cashflow'] },
+  { id: 'billing', label: '国保連請求', icon: Receipt, category: '経営', permission: 'dashboard', description: MENU_DESCRIPTIONS['billing'] },
+  // 記録・コンプライアンス
+  { id: 'training', label: '研修・委員会', icon: GraduationCap, category: '記録・コンプライアンス', permission: 'staff', description: MENU_DESCRIPTIONS['training'] },
+  { id: 'incident', label: '事故・苦情報告', icon: AlertTriangle, category: '記録・コンプライアンス', permission: 'dashboard', description: MENU_DESCRIPTIONS['incident'] },
+  { id: 'documents', label: '書類・監査', icon: FolderOpen, category: '記録・コンプライアンス', permission: 'children', description: MENU_DESCRIPTIONS['documents'] },
+  { id: 'contract-report', label: '契約内容報告書', icon: FileText, category: '記録・コンプライアンス', permission: 'dashboard', description: MENU_DESCRIPTIONS['contract-report'] },
+  { id: 'regulations', label: '規定管理', icon: BookOpen, category: '記録・コンプライアンス', permission: 'staff', description: MENU_DESCRIPTIONS['regulations'] },
+  { id: 'compliance', label: 'コンプライアンス', icon: Shield, category: '記録・コンプライアンス', permission: 'dashboard', description: MENU_DESCRIPTIONS['compliance'] },
+  { id: 'self-evaluation', label: '自己評価', icon: ClipboardCheck, category: '記録・コンプライアンス', permission: 'dashboard', description: MENU_DESCRIPTIONS['self-evaluation'] },
+  // 設定
+  { id: 'facility', label: '施設情報', icon: Settings, category: '設定', permission: 'facility', description: MENU_DESCRIPTIONS['facility'] },
+];
+
 export default function BusinessPage() {
-  const { isAuthenticated, isAdmin, isFacilityAdmin, hasPermission, facility, user } = useAuth();
+  const { isAuthenticated, isAdmin, isFacilityAdmin, isMaster, hasPermission, facility, user } = useAuth();
   // 施設管理者としてのフルアクセス権限
-  const hasFullAccess = isAdmin || isFacilityAdmin;
+  const hasFullAccess = isAdmin || isFacilityAdmin || isMaster;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>('');
@@ -153,6 +245,25 @@ export default function BusinessPage() {
 
   const facilityIdFromQuery = searchParams?.get('facilityId') || null;
   const tabFromQuery = searchParams?.get('tab') || null;
+
+  // コマンドパレットに渡すメニュー項目（権限でフィルタ）
+  const commandPaletteItems: CommandPaletteItem[] = useMemo(() => {
+    return ALL_COMMAND_PALETTE_ITEMS.filter((item) => {
+      if (hasFullAccess) return true;
+      return hasPermission(item.permission as keyof UserPermissions);
+    }).map(({ permission, ...rest }) => rest);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFullAccess]);
+
+  // カスタムナビゲーションイベント（ドロワー内リンク等から）
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('navigate-tab', handler);
+    return () => window.removeEventListener('navigate-tab', handler);
+  }, []);
 
   // 認証フローチェック
   useEffect(() => {
@@ -205,10 +316,34 @@ export default function BusinessPage() {
           const userData = JSON.parse(userStr);
 
           // 既存の施設選択がある場合、同じ施設IDならスキップ
+          // ただしfacility（AuthContext用）も正しくセットされているか確認
           if (facilityStr) {
             try {
               const existingFacility = JSON.parse(facilityStr);
               if (existingFacility.id === facilityIdFromQuery || existingFacility.facilityId === facilityIdFromQuery) {
+                // facility（AuthContext用）が正しい施設を指しているか確認
+                const authFacilityStr = localStorage.getItem('facility');
+                let authFacilityOk = false;
+                if (authFacilityStr) {
+                  try {
+                    const authFacility = JSON.parse(authFacilityStr);
+                    authFacilityOk = authFacility.id === facilityIdFromQuery;
+                  } catch {}
+                }
+                if (!authFacilityOk) {
+                  // facilityが未設定か別施設 → 正しい施設情報をセットしてリロード
+                  localStorage.setItem('facility', JSON.stringify({
+                    id: existingFacility.id || existingFacility.facilityId,
+                    name: existingFacility.name || existingFacility.facilityName,
+                    code: existingFacility.code || existingFacility.facilityCode || '',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  }));
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('facilityId');
+                  window.location.href = url.toString();
+                  return;
+                }
                 const url = new URL(window.location.href);
                 url.searchParams.delete('facilityId');
                 window.history.replaceState({}, '', url.toString());
@@ -378,7 +513,7 @@ export default function BusinessPage() {
   // 認証確認中はローディング表示
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
       </div>
     );
@@ -387,7 +522,7 @@ export default function BusinessPage() {
   // 未認証の場合はログインページへ（useEffectでリダイレクト済みなのでここには来ないはず）
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00c4cc] to-[#00b0b8]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
       </div>
     );
@@ -397,7 +532,7 @@ export default function BusinessPage() {
   if (!initialTabSet || !activeTab) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div>読み込み中...</div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -456,6 +591,12 @@ export default function BusinessPage() {
         return <BillingWizardView />;
       case 'self-evaluation':
         return <SelfEvaluationView />;
+      case 'staff-documents':
+        return <StaffDocumentView />;
+      case 'announcements':
+        return <AnnouncementView />;
+      case 'contract-report':
+        return <ContractReportView />;
       default:
         return <DashboardView />;
     }
@@ -463,6 +604,8 @@ export default function BusinessPage() {
 
   return (
     <SetupGuideProvider>
+      {/* Onboarding guide modal for first-time admin/manager login */}
+      {hasFullAccess && <OnboardingGuide onNavigate={setActiveTab} />}
       <div className="flex h-screen bg-[#f5f6f8] font-sans text-gray-800">
         <Sidebar
           mode="business"
@@ -471,6 +614,7 @@ export default function BusinessPage() {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
+        <CommandPalette items={commandPaletteItems} setActiveTab={setActiveTab} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header
             mode="business"

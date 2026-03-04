@@ -14,9 +14,13 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
+import { useToast } from '@/components/ui/Toast';
 import type { Child } from '@/types';
+import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_SLOTS = resolveTimeSlots([]);
 
 // カレンダー表示コンポーネント
 function CalendarView({
@@ -108,10 +112,10 @@ function CalendarView({
               <div
                 key={date}
                 className={`min-h-[80px] border-r border-b border-gray-200 p-1 ${
-                  isToday ? 'bg-[#FEF3E2]' : ''
+                  isToday ? 'bg-client-light' : ''
                 } ${dayOfWeek === 0 ? 'bg-red-50' : dayOfWeek === 6 ? 'bg-blue-50' : ''}`}
               >
-                <div className={`text-xs font-bold mb-1 ${isToday ? 'text-[#ED8936]' : ''}`}>
+                <div className={`text-xs font-bold mb-1 ${isToday ? 'text-client-dark' : ''}`}>
                   {date}
                 </div>
                 <div className="space-y-1">
@@ -123,9 +127,9 @@ function CalendarView({
                           ? 'bg-gray-200 text-gray-600'
                           : 'bg-green-100 text-green-800'
                       }`}
-                      title={`${schedule.slot === 'AM' ? '午前' : '午後'} - ${getFacilityName(schedule.facility_id)}`}
+                      title={`${slotDisplayName(DEFAULT_SLOTS, schedule.slot)} - ${getFacilityName(schedule.facility_id)}`}
                     >
-                      {schedule.slot === 'AM' ? '午前' : '午後'}
+                      {slotDisplayName(DEFAULT_SLOTS, schedule.slot)}
                     </div>
                   ))}
                 </div>
@@ -146,7 +150,7 @@ function CalendarView({
           <span>欠席</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-[#FEF3E2] border border-[#F6AD55]/30 rounded"></div>
+          <div className="w-4 h-4 bg-client-light border border-client/30 rounded"></div>
           <span>今日</span>
         </div>
       </div>
@@ -155,6 +159,7 @@ function CalendarView({
 }
 
 export default function ChildDetailPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -394,7 +399,7 @@ export default function ChildDetailPage() {
         beneficiaryCertificateImageUrl: publicUrl,
       } as Child);
 
-      alert('受給者証の画像をアップロードしました');
+      toast.success('受給者証の画像をアップロードしました');
     } catch (err: any) {
       setError(err.message || '画像のアップロードに失敗しました');
     } finally {
@@ -438,7 +443,7 @@ export default function ChildDetailPage() {
           <p className="text-gray-600 mb-4">お子様の情報が見つかりません</p>
           <button
             onClick={() => router.push('/parent')}
-            className="bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md"
+            className="bg-client hover:bg-client-dark text-white font-bold py-2 px-4 rounded-md"
           >
             ダッシュボードに戻る
           </button>
@@ -464,7 +469,7 @@ export default function ChildDetailPage() {
           </button>
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-[#FDEBD0] rounded-full flex items-center justify-center">
-              <User className="w-7 h-7 text-[#F6AD55]" />
+              <User className="w-7 h-7 text-client" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">{child.name}</h1>
@@ -505,7 +510,7 @@ export default function ChildDetailPage() {
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-[#F6AD55] text-[#ED8936] bg-[#FEF3E2]'
+                      ? 'border-client text-client-dark bg-client-light'
                       : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                   }`}
                 >
@@ -535,7 +540,7 @@ export default function ChildDetailPage() {
                           className="w-full h-auto"
                         />
                       </div>
-                      <label className="inline-flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors cursor-pointer">
+                      <label className="inline-flex items-center gap-2 bg-client hover:bg-client-dark text-white font-bold py-2 px-4 rounded-md transition-colors cursor-pointer">
                         <Upload className="w-4 h-4" />
                         {uploading ? 'アップロード中...' : '画像を更新'}
                         <input
@@ -552,7 +557,7 @@ export default function ChildDetailPage() {
                       <p className="text-sm text-gray-600">
                         受給者証の最新版の画像をアップロードしてください。
                       </p>
-                      <label className="inline-flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md transition-colors cursor-pointer">
+                      <label className="inline-flex items-center gap-2 bg-client hover:bg-client-dark text-white font-bold py-2 px-4 rounded-md transition-colors cursor-pointer">
                         <Upload className="w-4 h-4" />
                         {uploading ? 'アップロード中...' : '画像をアップロード'}
                         <input
@@ -657,7 +662,7 @@ export default function ChildDetailPage() {
                   {activeContracts.length > 0 && (
                     <button
                       onClick={() => router.push(`/parent/children/${childId}/usage-request`)}
-                      className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
+                      className="flex items-center gap-2 bg-client hover:bg-client-dark text-white text-sm font-bold py-2 px-4 rounded-md"
                     >
                       <Calendar className="w-4 h-4" />
                       利用曜日を申請
@@ -819,7 +824,7 @@ export default function ChildDetailPage() {
                         return (
                           <div
                             key={schedule.id}
-                            className="border border-gray-200 rounded-lg p-4 hover:border-[#F6AD55]/30 transition-colors"
+                            className="border border-gray-200 rounded-lg p-4 hover:border-client/30 transition-colors"
                           >
                             <div className="flex items-center justify-between">
                               <div>
@@ -830,7 +835,7 @@ export default function ChildDetailPage() {
                                     schedule.service_status === '欠席(加算なし)' ? 'bg-gray-100 text-gray-800' :
                                     'bg-yellow-100 text-yellow-800'
                                   }`}>
-                                    {schedule.slot === 'AM' ? '午前' : '午後'}
+                                    {slotDisplayName(DEFAULT_SLOTS, schedule.slot)}
                                   </span>
                                 </div>
                                 <p className="text-sm text-gray-600">
@@ -891,7 +896,7 @@ export default function ChildDetailPage() {
                     />
                     <button
                       onClick={() => router.push(`/parent/children/${childId}/usage-request`)}
-                      className="w-full bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+                      className="w-full bg-client hover:bg-client-dark text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
                     >
                       <Plus className="w-5 h-5" />
                       利用希望日を申請する

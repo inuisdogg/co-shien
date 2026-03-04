@@ -35,9 +35,11 @@ import {
 } from 'lucide-react';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 import { ScheduleItem, UsageRecord, ContactLog, ContactLogFormData } from '@/types';
 import UsageRecordForm from '@/components/schedule/UsageRecordForm';
 import { supabase } from '@/lib/supabase';
+import { resolveTimeSlots, slotDisplayName } from '@/utils/slotResolver';
 
 // フェーズ設定
 const FEATURE_PHASE = parseInt(process.env.NEXT_PUBLIC_FEATURE_PHASE || '1', 10);
@@ -98,6 +100,7 @@ type DaySummary = {
 
 export default function DailyLogView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const {
     schedules,
     children: facilityChildren,
@@ -114,25 +117,17 @@ export default function DailyLogView() {
     deleteContactLog,
   } = useFacilityData();
 
-  // 時間枠の名前を動的に取得
-  const slotInfo = useMemo(() => {
-    if (timeSlots.length >= 2) {
-      const sorted = [...timeSlots].sort((a, b) => a.displayOrder - b.displayOrder);
-      return {
-        AM: { name: sorted[0]?.name || '午前' },
-        PM: { name: sorted[1]?.name || '午後' },
-      };
-    } else if (timeSlots.length === 1) {
-      return {
-        AM: { name: timeSlots[0].name || '終日' },
-        PM: null,
-      };
-    }
-    return {
-      AM: { name: '午前' },
-      PM: { name: '午後' },
-    };
-  }, [timeSlots]);
+  // 時間枠を動的に解決（施設設定のfacility_time_slotsを使用）
+  const resolvedSlots = useMemo(
+    () => resolveTimeSlots(timeSlots),
+    [timeSlots]
+  );
+
+  // スロットキーの表示順リスト（イテレーション用）
+  const slotKeys = useMemo(
+    () => resolvedSlots.map(s => s.key),
+    [resolvedSlots]
+  );
 
   // UI状態
   const [viewState, setViewState] = useState<ViewState>({ type: 'dashboard' });
@@ -185,18 +180,20 @@ export default function DailyLogView() {
       map[schedule.date].children.push({ schedule, usageRecord, contactLog, hasRecord, hasContact, isSigned });
     });
 
-    // 名前順でソート
+    // スロット表示順 → 名前順でソート
     Object.values(map).forEach(day => {
       day.children.sort((a, b) => {
         if (a.schedule.slot !== b.schedule.slot) {
-          return a.schedule.slot === 'AM' ? -1 : 1;
+          const aIdx = slotKeys.indexOf(a.schedule.slot);
+          const bIdx = slotKeys.indexOf(b.schedule.slot);
+          return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
         }
         return a.schedule.childName.localeCompare(b.schedule.childName, 'ja');
       });
     });
 
     return map;
-  }, [schedules, getUsageRecordByScheduleId, getContactLogByScheduleId]);
+  }, [schedules, getUsageRecordByScheduleId, getContactLogByScheduleId, slotKeys]);
 
   // 今日の概要
   const todayInfo = dayStatusMap[todayStr];
@@ -275,7 +272,7 @@ export default function DailyLogView() {
       }
     } catch (error) {
       console.error('実績保存エラー:', error);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     }
   };
 
@@ -291,7 +288,7 @@ export default function DailyLogView() {
           await deleteUsageRecord(existingRecord.id);
         } catch (error) {
           console.error('削除エラー:', error);
-          alert('削除に失敗しました');
+          toast.error('削除に失敗しました');
         }
       }
     }
@@ -349,7 +346,7 @@ export default function DailyLogView() {
         childId: schedule.childId,
         scheduleId: schedule.id,
         date: schedule.date,
-        slot: schedule.slot as 'AM' | 'PM',
+        slot: schedule.slot,
         status,
         ...contactFormData,
       };
@@ -386,15 +383,15 @@ export default function DailyLogView() {
           console.error('通知作成エラー:', notifErr);
           // Notification failure should not block the save
         }
-        alert('連絡帳を保護者に送信しました');
+        toast.success('連絡帳を保護者に送信しました');
       } else {
-        alert('連絡帳を下書き保存しました');
+        toast.success('連絡帳を下書き保存しました');
       }
       // リストに戻る
       setViewState({ type: 'contact-list', date: schedule.date });
     } catch (error) {
       console.error('連絡帳保存エラー:', error);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -425,7 +422,7 @@ export default function DailyLogView() {
       setSignerName('');
     } catch (error) {
       console.error('署名エラー:', error);
-      alert('署名に失敗しました');
+      toast.error('署名に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -477,11 +474,11 @@ export default function DailyLogView() {
   const SignDialog = () => {
     if (!showSignDialog) return null;
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
         <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <PenLine className="w-5 h-5 text-[#00c4cc]" />
+              <PenLine className="w-5 h-5 text-primary" />
               保護者署名（CloudSign）
             </h3>
           </div>
@@ -495,7 +492,7 @@ export default function DailyLogView() {
                 type="text"
                 value={signerName}
                 onChange={(e) => setSignerName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                 placeholder="保護者のお名前を入力"
                 autoFocus
               />
@@ -510,7 +507,7 @@ export default function DailyLogView() {
               <button
                 onClick={confirmSign}
                 disabled={!signerName.trim() || isSaving}
-                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSaving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -604,7 +601,7 @@ export default function DailyLogView() {
 
         {/* ヘッダー */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-[#00c4cc] to-[#00b0b8] px-6 py-5">
+          <div className="bg-gradient-to-r from-primary to-primary-dark px-6 py-5">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
@@ -672,7 +669,7 @@ export default function DailyLogView() {
               onClick={() => setDashboardTab('usage')}
               className={`flex-1 px-6 py-3.5 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
                 dashboardTab === 'usage'
-                  ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+                  ? 'text-primary border-b-2 border-primary bg-primary/5'
                   : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
@@ -690,7 +687,7 @@ export default function DailyLogView() {
               onClick={() => setDashboardTab('contact')}
               className={`flex-1 px-6 py-3.5 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
                 dashboardTab === 'contact'
-                  ? 'text-[#00c4cc] border-b-2 border-[#00c4cc] bg-[#00c4cc]/5'
+                  ? 'text-primary border-b-2 border-primary bg-primary/5'
                   : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
@@ -727,7 +724,7 @@ export default function DailyLogView() {
               </h3>
               <button
                 onClick={() => dashboardTab === 'usage' ? goToUsageList(todayStr) : goToContactList(todayStr)}
-                className="text-xs font-medium text-[#00c4cc] hover:text-[#00b0b8] transition-colors"
+                className="text-xs font-medium text-primary hover:text-primary-dark transition-colors"
               >
                 一覧を開く →
               </button>
@@ -746,7 +743,7 @@ export default function DailyLogView() {
                   onClick={() => setFilterType(f.key)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     filterType === f.key
-                      ? 'bg-[#00c4cc] text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -769,15 +766,15 @@ export default function DailyLogView() {
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all"
                   >
                     {/* アバター */}
-                    <div className="w-9 h-9 rounded-full bg-[#00c4cc]/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-bold text-[#00c4cc]">{getInitials(schedule.childName)}</span>
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-bold text-primary">{getInitials(schedule.childName)}</span>
                     </div>
 
                     {/* 名前 */}
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-gray-800 truncate">{schedule.childName}</p>
                       <p className="text-[11px] text-gray-400">
-                        {schedule.slot === 'AM' ? slotInfo.AM.name : (slotInfo.PM?.name || '午後')}
+                        {slotDisplayName(resolvedSlots, schedule.slot)}
                       </p>
                     </div>
 
@@ -797,7 +794,7 @@ export default function DailyLogView() {
                           setViewState({ type: 'contact-form', schedule });
                         }
                       }}
-                      className="flex-shrink-0 px-3 py-1.5 text-xs font-medium text-[#00c4cc] bg-[#00c4cc]/10 hover:bg-[#00c4cc]/20 rounded-lg transition-colors"
+                      className="flex-shrink-0 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
                     >
                       {dashboardTab === 'usage'
                         ? (hasRecord ? '編集' : '記録')
@@ -887,7 +884,7 @@ export default function DailyLogView() {
       <div className="space-y-5">
         {/* ヘッダー */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-[#00c4cc] to-[#00b0b8] px-6 py-4">
+          <div className="bg-gradient-to-r from-primary to-primary-dark px-6 py-4">
             <div className="flex items-center gap-3">
               <button onClick={goToDashboard} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
                 <ArrowLeft className="w-5 h-5 text-white" />
@@ -929,7 +926,7 @@ export default function DailyLogView() {
                 onClick={() => setFilterType(f.key)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   filterType === f.key
-                    ? 'bg-[#00c4cc] text-white'
+                    ? 'bg-primary text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
@@ -954,16 +951,16 @@ export default function DailyLogView() {
           ) : (
             <div className="divide-y divide-gray-100">
               {/* スロット別表示 */}
-              {['AM', 'PM'].map(slot => {
+              {slotKeys.map((slot, slotIdx) => {
                 const slotChildren = children.filter(c => c.schedule.slot === slot);
                 if (slotChildren.length === 0) return null;
-                const slotName = slot === 'AM' ? slotInfo.AM.name : (slotInfo.PM?.name || '午後');
+                const SLOT_COLORS = ['text-blue-600', 'text-orange-600', 'text-purple-600', 'text-emerald-600', 'text-rose-600'];
 
                 return (
                   <div key={slot}>
                     <div className="px-5 py-2.5 bg-gray-50 border-b border-gray-100">
-                      <span className={`text-xs font-bold ${slot === 'AM' ? 'text-blue-600' : 'text-orange-600'}`}>
-                        {slotName}
+                      <span className={`text-xs font-bold ${SLOT_COLORS[slotIdx % SLOT_COLORS.length]}`}>
+                        {slotDisplayName(resolvedSlots, slot)}
                       </span>
                       <span className="text-xs text-gray-400 ml-2">({slotChildren.length}名)</span>
                     </div>
@@ -973,8 +970,8 @@ export default function DailyLogView() {
                         onClick={() => setViewState({ type: 'usage-form', schedule })}
                         className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-all text-left"
                       >
-                        <div className="w-9 h-9 rounded-full bg-[#00c4cc]/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-[#00c4cc]">{getInitials(schedule.childName)}</span>
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-bold text-primary">{getInitials(schedule.childName)}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-gray-800 truncate">{schedule.childName}</p>
@@ -1038,7 +1035,7 @@ export default function DailyLogView() {
 
         {/* ヘッダー */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-[#00c4cc] to-[#00b0b8] px-6 py-4">
+          <div className="bg-gradient-to-r from-primary to-primary-dark px-6 py-4">
             <div className="flex items-center gap-3">
               <button onClick={goToDashboard} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
                 <ArrowLeft className="w-5 h-5 text-white" />
@@ -1080,7 +1077,7 @@ export default function DailyLogView() {
                 onClick={() => setFilterType(f.key)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   filterType === f.key
-                    ? 'bg-[#00c4cc] text-white'
+                    ? 'bg-primary text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
@@ -1104,16 +1101,16 @@ export default function DailyLogView() {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {['AM', 'PM'].map(slot => {
+              {slotKeys.map((slot, slotIdx) => {
                 const slotChildren = children.filter(c => c.schedule.slot === slot);
                 if (slotChildren.length === 0) return null;
-                const slotName = slot === 'AM' ? slotInfo.AM.name : (slotInfo.PM?.name || '午後');
+                const SLOT_COLORS = ['text-blue-600', 'text-orange-600', 'text-purple-600', 'text-emerald-600', 'text-rose-600'];
 
                 return (
                   <div key={slot}>
                     <div className="px-5 py-2.5 bg-gray-50 border-b border-gray-100">
-                      <span className={`text-xs font-bold ${slot === 'AM' ? 'text-blue-600' : 'text-orange-600'}`}>
-                        {slotName}
+                      <span className={`text-xs font-bold ${SLOT_COLORS[slotIdx % SLOT_COLORS.length]}`}>
+                        {slotDisplayName(resolvedSlots, slot)}
                       </span>
                       <span className="text-xs text-gray-400 ml-2">({slotChildren.length}名)</span>
                     </div>
@@ -1122,8 +1119,8 @@ export default function DailyLogView() {
                         key={schedule.id}
                         className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-all"
                       >
-                        <div className="w-9 h-9 rounded-full bg-[#00c4cc]/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-[#00c4cc]">{getInitials(schedule.childName)}</span>
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-bold text-primary">{getInitials(schedule.childName)}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-gray-800 truncate">{schedule.childName}</p>
@@ -1140,14 +1137,14 @@ export default function DailyLogView() {
                               initContactForm(schedule);
                               setViewState({ type: 'contact-form', schedule });
                             }}
-                            className="px-3 py-1.5 text-xs font-medium text-[#00c4cc] bg-[#00c4cc]/10 hover:bg-[#00c4cc]/20 rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
                           >
                             {hasContact ? '編集' : '記入'}
                           </button>
                           {hasContact && !isSigned && (
                             <button
                               onClick={() => handleSign(schedule.id)}
-                              className="px-3 py-1.5 text-xs font-bold text-white bg-[#00c4cc] hover:bg-[#00b0b8] rounded-lg transition-colors flex items-center gap-1"
+                              className="px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors flex items-center gap-1"
                             >
                               <PenLine className="w-3 h-3" />
                               署名
@@ -1188,16 +1185,16 @@ export default function DailyLogView() {
 
         <div className="bg-white rounded-b-xl shadow-sm border border-gray-100 overflow-hidden">
           {/* 児童情報ヘッダー */}
-          <div className="bg-gradient-to-r from-[#00c4cc]/10 to-white px-6 py-4 border-b border-gray-100">
+          <div className="bg-gradient-to-r from-primary/10 to-white px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#00c4cc]/15 flex items-center justify-center">
-                <span className="text-base font-bold text-[#00c4cc]">{getInitials(schedule.childName)}</span>
+              <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <span className="text-base font-bold text-primary">{getInitials(schedule.childName)}</span>
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-800">{schedule.childName}</h3>
                 <p className="text-sm text-gray-500">
                   {formatDateFull(schedule.date)}{' '}
-                  {schedule.slot === 'AM' ? slotInfo.AM.name : (slotInfo.PM?.name || '午後')}
+                  {slotDisplayName(resolvedSlots, schedule.slot)}
                 </p>
               </div>
               {existingContactLog && (
@@ -1225,14 +1222,14 @@ export default function DailyLogView() {
             {/* 今日の活動 */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-[#00c4cc]" />
+                <BookOpen className="w-4 h-4 text-primary" />
                 今日の活動内容
               </label>
               <textarea
                 value={contactFormData.activities || ''}
                 onChange={(e) => setContactFormData({ ...contactFormData, activities: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                 placeholder="今日行った活動を記入してください"
               />
             </div>
@@ -1324,7 +1321,7 @@ export default function DailyLogView() {
                     type="checkbox"
                     checked={contactFormData.mealMain || false}
                     onChange={(e) => setContactFormData({ ...contactFormData, mealMain: e.target.checked })}
-                    className="w-4 h-4 text-[#00c4cc] rounded"
+                    className="w-4 h-4 text-primary rounded"
                   />
                   <span className="text-sm text-gray-700">主食</span>
                 </label>
@@ -1333,7 +1330,7 @@ export default function DailyLogView() {
                     type="checkbox"
                     checked={contactFormData.mealSide || false}
                     onChange={(e) => setContactFormData({ ...contactFormData, mealSide: e.target.checked })}
-                    className="w-4 h-4 text-[#00c4cc] rounded"
+                    className="w-4 h-4 text-primary rounded"
                   />
                   <span className="text-sm text-gray-700">副食</span>
                 </label>
@@ -1342,7 +1339,7 @@ export default function DailyLogView() {
                 type="text"
                 value={contactFormData.mealNotes || ''}
                 onChange={(e) => setContactFormData({ ...contactFormData, mealNotes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                 placeholder="食事に関するメモ"
               />
             </div>
@@ -1362,7 +1359,7 @@ export default function DailyLogView() {
                     min={0}
                     value={contactFormData.toiletCount || 0}
                     onChange={(e) => setContactFormData({ ...contactFormData, toiletCount: parseInt(e.target.value) || 0 })}
-                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                   />
                   <span className="text-sm text-gray-600">回</span>
                 </div>
@@ -1370,7 +1367,7 @@ export default function DailyLogView() {
                   type="text"
                   value={contactFormData.toiletNotes || ''}
                   onChange={(e) => setContactFormData({ ...contactFormData, toiletNotes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                   placeholder="排泄に関するメモ"
                 />
               </div>
@@ -1386,21 +1383,21 @@ export default function DailyLogView() {
                     type="time"
                     value={contactFormData.napStartTime || ''}
                     onChange={(e) => setContactFormData({ ...contactFormData, napStartTime: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                   />
                   <span className="text-gray-500">~</span>
                   <input
                     type="time"
                     value={contactFormData.napEndTime || ''}
                     onChange={(e) => setContactFormData({ ...contactFormData, napEndTime: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                   />
                 </div>
                 <input
                   type="text"
                   value={contactFormData.napNotes || ''}
                   onChange={(e) => setContactFormData({ ...contactFormData, napNotes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                   placeholder="睡眠に関するメモ"
                 />
               </div>
@@ -1409,14 +1406,14 @@ export default function DailyLogView() {
             {/* スタッフからのコメント */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-[#00c4cc]" />
+                <MessageSquare className="w-4 h-4 text-primary" />
                 スタッフからのコメント
               </label>
               <textarea
                 value={contactFormData.staffComment || ''}
                 onChange={(e) => setContactFormData({ ...contactFormData, staffComment: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                 placeholder="今日の様子やエピソードなど"
               />
             </div>
@@ -1431,7 +1428,7 @@ export default function DailyLogView() {
                 value={contactFormData.parentMessage || ''}
                 onChange={(e) => setContactFormData({ ...contactFormData, parentMessage: e.target.value })}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00c4cc]/20 focus:border-[#00c4cc] text-[13px]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-[13px]"
                 placeholder="持ち物のお願いなど"
               />
             </div>
@@ -1515,7 +1512,7 @@ export default function DailyLogView() {
                     }
                   }}
                   disabled={isSaving || existingContactLog?.status === 'signed'}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#00c4cc] hover:bg-[#00b0b8] text-white font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"
                 >
                   {isSaving ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

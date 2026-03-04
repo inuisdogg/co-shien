@@ -19,7 +19,11 @@ import {
   Users,
   RefreshCw,
   Trash2,
+  Upload,
 } from 'lucide-react';
+import CSVBulkUploadPanel from './CSVBulkUploadPanel';
+import FacilityInviteLinkPanel from './FacilityInviteLinkPanel';
+import type { ParsedCSVRow, BulkImportResult } from '@/types/bulkImport';
 
 interface StaffInvitation {
   id: string;
@@ -38,6 +42,12 @@ interface StaffInviteModalProps {
   pendingInvitations?: StaffInvitation[];
   onResendInvitation?: (invitation: StaffInvitation) => Promise<void>;
   onCancelInvitation?: (invitation: StaffInvitation) => Promise<void>;
+  onBulkImport?: (
+    rows: ParsedCSVRow[],
+    importType: 'full' | 'minimal',
+    sendEmails: boolean
+  ) => Promise<BulkImportResult | null>;
+  facilityName?: string;
   loading?: boolean;
 }
 
@@ -48,9 +58,11 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
   pendingInvitations = [],
   onResendInvitation,
   onCancelInvitation,
+  onBulkImport,
+  facilityName,
   loading = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'invite' | 'pending'>('invite');
+  const [activeTab, setActiveTab] = useState<'invite' | 'pending' | 'bulk' | 'link'>('invite');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -69,19 +81,35 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
     }
   }, [isOpen]);
 
-  // バリデーション
+  // フィールド単位バリデーション
+  const validateEmail = (value: string): string => {
+    if (!value.trim()) return 'メールアドレスを入力してください';
+    if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/.test(value)) return '有効なメールアドレスを入力してください';
+    return '';
+  };
+
+  const validateName = (value: string): string => {
+    if (!value.trim()) return '氏名を入力してください';
+    return '';
+  };
+
+  const handleFieldBlur = (field: string, errorMsg: string) => {
+    setErrors(prev => {
+      if (errorMsg) return { ...prev, [field]: errorMsg };
+      const { [field]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  // 全フィールドバリデーション（送信時）
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!email.trim()) {
-      newErrors.email = 'メールアドレスを入力してください';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = '有効なメールアドレスを入力してください';
-    }
+    const emailErr = validateEmail(email);
+    if (emailErr) newErrors.email = emailErr;
 
-    if (!name.trim()) {
-      newErrors.name = '名前を入力してください';
-    }
+    const nameErr = validateName(name);
+    if (nameErr) newErrors.name = nameErr;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -162,7 +190,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <UserPlus size={20} className="text-[#00c4cc]" />
+            <UserPlus size={20} className="text-primary" />
             <h2 className="text-lg font-bold text-gray-800">スタッフを招待</h2>
           </div>
           <button
@@ -174,22 +202,42 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
         </div>
 
         {/* タブ */}
-        <div className="flex border-b border-gray-200 px-6">
+        <div className="flex border-b border-gray-200 px-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('invite')}
-            className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            className={`py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'invite'
-                ? 'border-[#00c4cc] text-[#00c4cc]'
+                ? 'border-primary text-primary'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             新規招待
           </button>
           <button
+            onClick={() => setActiveTab('bulk')}
+            className={`py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'bulk'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            一括登録
+          </button>
+          <button
+            onClick={() => setActiveTab('link')}
+            className={`py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'link'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            招待リンク
+          </button>
+          <button
             onClick={() => setActiveTab('pending')}
-            className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            className={`py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'pending'
-                ? 'border-[#00c4cc] text-[#00c4cc]'
+                ? 'border-primary text-primary'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -204,7 +252,19 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
 
         {/* コンテンツ */}
         <div className="flex-1 overflow-y-auto">
-          {activeTab === 'invite' ? (
+          {activeTab === 'bulk' ? (
+            <div className="p-6">
+              {onBulkImport ? (
+                <CSVBulkUploadPanel onImport={onBulkImport} loading={loading} />
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-8">一括登録機能は利用できません</p>
+              )}
+            </div>
+          ) : activeTab === 'link' ? (
+            <div className="p-6">
+              <FacilityInviteLinkPanel facilityName={facilityName} />
+            </div>
+          ) : activeTab === 'invite' ? (
             <div className="p-6">
               {inviteResult ? (
                 // 招待成功
@@ -238,7 +298,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                         className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
                           copied
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-[#00c4cc] text-white hover:bg-[#00b0b8]'
+                            : 'bg-primary text-white hover:bg-primary-dark'
                         }`}
                       >
                         {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -253,7 +313,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                       setEmail('');
                       setName('');
                     }}
-                    className="text-sm text-[#00c4cc] hover:text-[#00b0b8]"
+                    className="text-sm text-primary hover:text-primary-dark"
                   >
                     別のスタッフを招待する
                   </button>
@@ -274,8 +334,9 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                     <input
                       type="text"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] ${
+                      onChange={(e) => { setName(e.target.value); if (errors.name) handleFieldBlur('name', ''); }}
+                      onBlur={() => handleFieldBlur('name', validateName(name))}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
                         errors.name ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder="山田 太郎"
@@ -301,8 +362,9 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                       <input
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c4cc] ${
+                        onChange={(e) => { setEmail(e.target.value); if (errors.email) handleFieldBlur('email', ''); }}
+                        onBlur={() => handleFieldBlur('email', validateEmail(email))}
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
                           errors.email ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="example@email.com"
@@ -324,7 +386,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                         <p className="font-medium text-gray-800">{name}様</p>
                         <p>スタッフとして招待されました。</p>
                         <p>以下のリンクからアカウントを作成してください。</p>
-                        <div className="mt-2 px-3 py-1.5 bg-[#00c4cc]/5 rounded text-[#00c4cc] text-xs font-mono">
+                        <div className="mt-2 px-3 py-1.5 bg-primary/5 rounded text-primary text-xs font-mono">
                           招待URL（7日間有効）
                         </div>
                       </div>
@@ -335,7 +397,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                   <button
                     type="submit"
                     disabled={isSubmitting || loading}
-                    className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-3 bg-[#00c4cc] text-white rounded-lg hover:bg-[#00b0b8] transition-all duration-200 disabled:opacity-50 font-medium"
+                    className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all duration-200 disabled:opacity-50 font-medium"
                   >
                     {isSubmitting ? (
                       <>
@@ -394,7 +456,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
                               {onResendInvitation && (
                                 <button
                                   onClick={() => onResendInvitation(invitation)}
-                                  className="flex items-center gap-1 px-2 py-1 text-xs text-[#00c4cc] hover:bg-[#00c4cc]/5 rounded"
+                                  className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-primary/5 rounded"
                                 >
                                   <RefreshCw size={12} />
                                   再送信

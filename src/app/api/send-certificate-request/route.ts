@@ -38,6 +38,11 @@ function getSupabase() {
 
 export async function POST(req: NextRequest) {
   try {
+    // 認証チェック
+    const { authenticateRequest, unauthorizedResponse } = await import('@/lib/apiAuth');
+    const auth = await authenticateRequest(req);
+    if (!auth) return unauthorizedResponse();
+
     const { to, subject, body, recordId } = await req.json();
 
     // バリデーション
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // メールアドレスの形式チェック
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/;
     if (!emailRegex.test(to)) {
       return NextResponse.json(
         { error: '有効なメールアドレスを入力してください' },
@@ -63,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     // 署名用トークンを生成
     const signatureToken = randomUUID();
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://roots.inu.co.jp';
     const signatureUrl = `${baseUrl}/sign/${signatureToken}`;
 
     // レコードを更新（トークンとステータス）

@@ -57,7 +57,7 @@ export async function checkQualificationExpiry(
 
   if (userIds.length > 0) {
     const { data: careers } = await supabase
-      .from('user_career')
+      .from('user_careers')
       .select('*')
       .in('user_id', userIds)
       .not('expiry_date', 'is', null);

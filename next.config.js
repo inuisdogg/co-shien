@@ -1,31 +1,24 @@
-const { withSentryConfig } = require('@sentry/nextjs');
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 画像最適化設定
   images: {
-    unoptimized: true, // Netlifyで画像最適化を無効化（publicフォルダの画像を直接使用）
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.in',
+      },
+    ],
   },
-  // URL構成（パスベース）
-  // ドメイン: roots.inu.co.jp
-  // - /parent   : 保護者向け
-  // - /career   : スタッフ向け
-  // - /business : 施設管理向け
+  experimental: {
+    serverComponentsExternalPackages: ['web-push'],
+  },
   async rewrites() {
     return [];
   },
 }
 
-module.exports = withSentryConfig(nextConfig, {
-  // Sentry webpack plugin options
-  silent: true,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-}, {
-  // Sentry SDK options
-  widenClientFileUpload: true,
-  tunnelRoute: '/monitoring',
-  hideSourceMaps: true,
-  disableLogger: true,
-});
+module.exports = nextConfig;

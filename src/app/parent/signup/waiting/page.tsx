@@ -15,8 +15,37 @@ export const dynamic = 'force-dynamic';
 export default function ClientEmailWaitingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get('email');
+  const email = searchParams.get('email') || (typeof window !== 'undefined' ? localStorage.getItem('signup_email') : null);
   const [checking, setChecking] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const handleResendEmail = async () => {
+    if (!email || resendCooldown > 0 || resending) return;
+    setResending(true);
+    setResendMessage(null);
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email });
+      if (error) {
+        setResendMessage({ type: 'error', text: '再送信に失敗しました。しばらくしてからもう一度お試しください。' });
+      } else {
+        setResendMessage({ type: 'success', text: '確認メールを再送信しました。' });
+        setResendCooldown(60);
+      }
+    } catch {
+      setResendMessage({ type: 'error', text: '再送信に失敗しました。' });
+    } finally {
+      setResending(false);
+    }
+  };
 
   useEffect(() => {
     // 定期的にメール認証状態をチェック
@@ -84,10 +113,10 @@ export default function ClientEmailWaitingPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-client-light p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 text-center">
-        <div className="w-16 h-16 bg-[#FEF3E2] rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-[#F6AD55]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-16 h-16 bg-client-light rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-client" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
@@ -100,21 +129,48 @@ export default function ClientEmailWaitingPage() {
         </p>
         {checking && (
           <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-4">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#F6AD55]"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-client"></div>
             <span>認証状態を確認中...</span>
           </div>
         )}
-        <div className="bg-[#FEF3E2] border border-[#F6AD55]/30 rounded-md p-4 text-left">
+        <div className="bg-client-light border border-client/30 rounded-md p-4 text-left">
           <p className="text-xs text-[#D97706] mb-2">
             <strong>メールが届かない場合：</strong>
           </p>
-          <ul className="text-xs text-[#ED8936] space-y-1 list-disc list-inside">
+          <ul className="text-xs text-client-dark space-y-1 list-disc list-inside">
             <li>迷惑メールフォルダを確認してください</li>
             <li>メールアドレスが正しいか確認してください</li>
             <li>数分待ってから再度お試しください</li>
           </ul>
         </div>
-        <div className="mt-6 pt-4 border-t border-gray-200">
+        {/* 再送信ボタン */}
+        {email && (
+          <div className="mt-6">
+            <button
+              onClick={handleResendEmail}
+              disabled={resendCooldown > 0 || resending}
+              className={`w-full py-3 px-4 rounded-md font-bold text-sm transition-colors ${
+                resendCooldown > 0 || resending
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-client hover:bg-client-dark text-white'
+              }`}
+            >
+              {resending
+                ? '送信中...'
+                : resendCooldown > 0
+                ? `確認メールを再送信（${resendCooldown}秒後に再試行可能）`
+                : '確認メールを再送信'}
+            </button>
+            {resendMessage && (
+              <p className={`text-xs mt-2 ${
+                resendMessage.type === 'success' ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {resendMessage.text}
+              </p>
+            )}
+          </div>
+        )}
+        <div className="mt-4 pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-500">
             認証が完了すると、自動的にダッシュボードに移動します。
           </p>

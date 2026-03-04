@@ -14,8 +14,11 @@ import {
   BookOpen, Activity, BarChart3
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_SLOTS = resolveTimeSlots([]);
 
 type MonthlyRecord = {
   date: string;
@@ -353,7 +356,7 @@ export default function FacilityRecordsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F6AD55] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-client mx-auto mb-4"></div>
           <p className="text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -375,7 +378,7 @@ export default function FacilityRecordsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center">
-                <FileText className="w-5 h-5 text-[#F6AD55]" />
+                <FileText className="w-5 h-5 text-client" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800">実績記録表</h1>
@@ -413,7 +416,7 @@ export default function FacilityRecordsPage() {
                 <select
                   value={selectedChildId}
                   onChange={(e) => setSelectedChildId(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F6AD55]"
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-client"
                 >
                   {children.map((child) => (
                     <option key={child.id} value={child.id}>
@@ -457,7 +460,7 @@ export default function FacilityRecordsPage() {
                 <button
                   onClick={() => setViewMode('summary')}
                   className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
-                    viewMode === 'summary' ? 'bg-white text-[#F6AD55] shadow-sm' : 'text-gray-500'
+                    viewMode === 'summary' ? 'bg-white text-client shadow-sm' : 'text-gray-500'
                   }`}
                 >
                   サマリー
@@ -465,7 +468,7 @@ export default function FacilityRecordsPage() {
                 <button
                   onClick={() => setViewMode('detail')}
                   className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
-                    viewMode === 'detail' ? 'bg-white text-[#F6AD55] shadow-sm' : 'text-gray-500'
+                    viewMode === 'detail' ? 'bg-white text-client shadow-sm' : 'text-gray-500'
                   }`}
                 >
                   詳細
@@ -482,7 +485,7 @@ export default function FacilityRecordsPage() {
             ) : (
               <button
                 onClick={() => setIsSignatureModalOpen(true)}
-                className="flex items-center gap-2 bg-[#F6AD55] hover:bg-[#ED8936] text-white text-sm font-bold py-2 px-4 rounded-md"
+                className="flex items-center gap-2 bg-client hover:bg-client-dark text-white text-sm font-bold py-2 px-4 rounded-md"
               >
                 <PenTool className="w-4 h-4" />
                 サインする
@@ -512,8 +515,8 @@ export default function FacilityRecordsPage() {
                 <p className="text-xs text-gray-600 mt-1">欠席日数</p>
               </div>
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                <FileText className="w-6 h-6 text-[#F6AD55] mx-auto mb-2" />
-                <p className="text-3xl font-bold text-[#ED8936]">
+                <FileText className="w-6 h-6 text-client mx-auto mb-2" />
+                <p className="text-3xl font-bold text-client-dark">
                   {selectedChild?.grant_days || '-'}
                 </p>
                 <p className="text-xs text-gray-600 mt-1">支給日数</p>
@@ -524,7 +527,7 @@ export default function FacilityRecordsPage() {
             {activitiesSummary.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-[#F6AD55]" />
+                  <BookOpen className="w-4 h-4 text-client" />
                   今月の活動
                 </h3>
                 <div className="space-y-2">
@@ -540,7 +543,7 @@ export default function FacilityRecordsPage() {
                 {contactLogs.length > 0 && (
                   <button
                     onClick={() => router.push(`/parent/facilities/${facilityId}/contact?child=${selectedChildId}`)}
-                    className="mt-3 text-sm text-[#F6AD55] hover:text-[#ED8936] font-medium flex items-center gap-1"
+                    className="mt-3 text-sm text-client hover:text-client-dark font-medium flex items-center gap-1"
                   >
                     連絡帳を全て見る
                     <ChevronRight className="w-4 h-4" />
@@ -606,8 +609,7 @@ export default function FacilityRecordsPage() {
                         </td>
                         <td className="border border-gray-400 px-2 py-1 text-center">
                           {record.serviceStatus === '欠席(加算なし)' ? '欠席' :
-                           record.slot === 'AM' ? '午前' :
-                           record.slot === 'PM' ? '午後' : '-'}
+                           record.slot ? slotDisplayName(DEFAULT_SLOTS, record.slot) : '-'}
                         </td>
                         <td className="border border-gray-400 px-2 py-1 text-center">
                           {record.startTime || '-'}
@@ -648,7 +650,7 @@ export default function FacilityRecordsPage() {
                 <p className="text-xs text-gray-600">送迎（送り）</p>
               </div>
               <div className="bg-amber-50 rounded-lg p-3 text-center print:bg-white print:border print:border-gray-400">
-                <p className="text-2xl font-bold text-[#ED8936] print:text-lg">
+                <p className="text-2xl font-bold text-client-dark print:text-lg">
                   {selectedChild?.grant_days || '-'}
                 </p>
                 <p className="text-xs text-gray-600">支給日数</p>
@@ -729,7 +731,7 @@ export default function FacilityRecordsPage() {
               </button>
               <button
                 onClick={saveSignature}
-                className="flex-1 bg-[#F6AD55] hover:bg-[#ED8936] text-white font-bold py-2 px-4 rounded-md"
+                className="flex-1 bg-client hover:bg-client-dark text-white font-bold py-2 px-4 rounded-md"
               >
                 保存
               </button>
