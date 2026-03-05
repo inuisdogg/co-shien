@@ -16,6 +16,7 @@ import {
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useToast } from '@/components/ui/Toast';
+import { trackEvent } from '@/lib/analytics';
 
 // ============================================================
 // Types
@@ -254,6 +255,7 @@ export default function ResignationClient() {
       const fileName = `${form.documentType}_${form.name || '未入力'}.pdf`;
       pdf.save(fileName);
       setGenerated(true);
+      trackEvent('tool_pdf_generated', { tool: 'resignation' });
       toast.success('PDFをダウンロードしました');
     } catch (err) {
       console.error('PDF generation failed:', err);

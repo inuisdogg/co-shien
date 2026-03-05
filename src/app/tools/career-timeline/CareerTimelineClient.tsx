@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import ConversionModal from '@/components/tools/ConversionModal';
+import { trackEvent } from '@/lib/analytics';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -356,6 +357,7 @@ export default function CareerTimelinePage() {
       }
 
       pdf.save('キャリア年表.pdf');
+      trackEvent('tool_pdf_generated', { tool: 'career-timeline' });
       setTimeout(() => setShowConversion(true), 1500);
     } catch (err) {
       console.error('PDF export error:', err);

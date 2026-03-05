@@ -11,6 +11,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { trackEvent } from '@/lib/analytics';
 import {
   Calculator,
   ArrowRight,
@@ -261,6 +262,8 @@ export default function SalarySimulatorPage() {
     managementTraining: false,
     role: '一般職員',
   });
+
+  useEffect(() => { trackEvent('tool_page_view', { tool: 'salary-simulator' }); }, []);
 
   const result = useMemo(() => calculate(form), [form]);
   const advice = useMemo(() => getAdvice(form, result), [form, result]);

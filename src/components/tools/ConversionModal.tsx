@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { X, Cloud, Shield, Zap, ArrowRight } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics';
 
 interface ConversionModalProps {
   isOpen: boolean;
@@ -21,6 +22,13 @@ export default function ConversionModal({ isOpen, onClose, toolName }: Conversio
       // ignore
     }
   }, []);
+
+  // Track modal impression
+  useEffect(() => {
+    if (isOpen && !isLoggedIn) {
+      trackEvent('tool_conversion_modal_shown', { tool: toolName });
+    }
+  }, [isOpen, isLoggedIn, toolName]);
 
   // Don't show for logged-in users
   if (!isOpen || isLoggedIn) return null;
@@ -66,6 +74,7 @@ export default function ConversionModal({ isOpen, onClose, toolName }: Conversio
         <div className="px-6 pb-6 space-y-3">
           <Link
             href="/career/signup"
+            onClick={() => trackEvent('tool_cta_clicked', { tool: toolName, cta: 'signup' })}
             className="flex items-center justify-center gap-2 w-full bg-personal hover:bg-personal-dark text-white font-bold py-3.5 rounded-xl transition-colors shadow-lg shadow-indigo-200"
           >
             無料でアカウント作成

@@ -12,6 +12,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { trackEvent } from '@/lib/analytics';
 import {
   Calculator,
   ArrowRight,
@@ -263,6 +264,8 @@ export default function IncomeCalculatorClient() {
     weeksPerMonth: 4.33,
     monthlyTransport: 0,
   });
+
+  useEffect(() => { trackEvent('tool_page_view', { tool: 'income-calculator' }); }, []);
 
   const updateField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {

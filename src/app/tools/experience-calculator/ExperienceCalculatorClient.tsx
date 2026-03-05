@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { trackEvent } from '@/lib/analytics';
 import {
   Plus,
   Trash2,
@@ -250,6 +251,7 @@ export default function ExperienceCalculatorClient() {
   }
 
   const [entries, setEntries] = useState<WorkEntry[]>(initialState.current!.entries);
+  useEffect(() => { trackEvent('tool_page_view', { tool: 'experience-calculator' }); }, []);
   const [result, setResult] = useState<TotalResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

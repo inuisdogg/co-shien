@@ -21,6 +21,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useToast } from '@/components/ui/Toast';
 import ConversionModal from '@/components/tools/ConversionModal';
+import { trackEvent } from '@/lib/analytics';
 
 // ============================================================
 // Types
@@ -382,6 +383,7 @@ export default function ResumePage() {
       const fileName = `履歴書_${form.name || '未入力'}.pdf`;
       pdf.save(fileName);
       setGenerated(true);
+      trackEvent('tool_pdf_generated', { tool: 'resume' });
       // Show conversion modal after a short delay
       setTimeout(() => setShowConversion(true), 1500);
     } catch (err) {

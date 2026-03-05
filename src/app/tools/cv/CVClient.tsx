@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/Toast';
 import ConversionModal from '@/components/tools/ConversionModal';
+import { trackEvent } from '@/lib/analytics';
 import {
   Briefcase,
   Plus,
@@ -351,6 +352,7 @@ export default function CvGeneratorPage() {
       }
 
       pdf.save('職務経歴書.pdf');
+      trackEvent('tool_pdf_generated', { tool: 'cv' });
       setTimeout(() => setShowConversion(true), 1500);
     } catch (err) {
       console.error('PDF export error:', err);
