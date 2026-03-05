@@ -16,7 +16,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { ScanFace } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { verifyPassword } from '@/utils/password';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useToast } from '@/components/ui/Toast';
 
@@ -37,9 +36,15 @@ export default function CareerLoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
 
   // 既にログイン済みかチェック、保存されたログイン情報を読み込む
   useEffect(() => {
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) setSessionCheckTimedOut(true);
+    }, 8000);
+
     const checkSession = async () => {
       try {
         // セッション有効期限チェック
@@ -95,9 +100,17 @@ export default function CareerLoginPage() {
         setPasskeySupported(true);
       }
 
-      setCheckingSession(false);
+      if (!cancelled) {
+        setCheckingSession(false);
+        clearTimeout(timeout);
+      }
     };
     checkSession();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -106,30 +119,25 @@ export default function CareerLoginPage() {
     setLoading(true);
 
     try {
-      // usersテーブルからメールアドレスまたはログインIDで検索（スタッフアカウントのみ）
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .or(`email.eq.${email.toLowerCase()},login_id.eq.${email.toLowerCase()}`)
-        .eq('account_status', 'active')
-        .neq('user_type', 'client') // 利用者アカウントは除外
-        .single();
+      // サーバーサイドAPIでパスワード検証（password_hashをクライアントに露出させない）
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facilityCode: '', // 施設コードなし = パーソナルログイン
+          loginId: email,
+          password,
+        }),
+      });
 
-      if (userError || !userData) {
-        throw new Error('メールアドレスまたはパスワードが正しくありません');
-      }
+      const data = await response.json();
 
-      if (!userData.password_hash) {
-        throw new Error('このアカウントにはパスワードが設定されていません');
-      }
-
-      const isValid = await verifyPassword(password, userData.password_hash);
-
-      if (!isValid) {
-        throw new Error('メールアドレスまたはパスワードが正しくありません');
+      if (!response.ok) {
+        throw new Error(data.error || 'ログインに失敗しました');
       }
 
       // ユーザー情報をlocalStorageに保存
+      const userData = data.user;
       const user = {
         id: userData.id,
         name: userData.name || (userData.last_name && userData.first_name ? `${userData.last_name} ${userData.first_name}` : ''),
@@ -199,7 +207,7 @@ export default function CareerLoginPage() {
       const { userId } = await finishRes.json();
       const { data: userData } = await supabase
         .from('users')
-        .select('*')
+        .select('id, email, name, last_name, first_name, user_type, role, account_status')
         .eq('id', userId)
         .single();
       if (!userData) throw new Error('ユーザー情報の取得に失敗しました');
@@ -223,6 +231,10 @@ export default function CareerLoginPage() {
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
         setError('パスキー認証がキャンセルされました');
+      } else if (err.name === 'AbortError') {
+        setError('パスキー認証がタイムアウトしました。もう一度お試しください。');
+      } else if (err.name === 'InvalidStateError') {
+        setError('パスキーが見つかりません。パスワードでログインしてください。');
       } else {
         setError(err.message || 'パスキー認証に失敗しました');
       }
@@ -234,7 +246,20 @@ export default function CareerLoginPage() {
   if (checkingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-personal"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-personal mx-auto"></div>
+          {sessionCheckTimedOut && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-500">接続に時間がかかっています</p>
+              <button
+                onClick={() => setCheckingSession(false)}
+                className="mt-2 text-sm text-personal hover:underline"
+              >
+                ログイン画面を表示
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -279,9 +304,10 @@ export default function CareerLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="username"
                 className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all"
                 placeholder="example@email.com"
-                disabled={loading}
+                disabled={loading || passkeyLoading}
               />
             </div>
           </div>
@@ -300,9 +326,10 @@ export default function CareerLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all"
                 placeholder="パスワードを入力"
-                disabled={loading}
+                disabled={loading || passkeyLoading}
               />
               <button
                 type="button"

@@ -28,6 +28,7 @@ import {
   PERSONNEL_TYPE_LABELS,
   PersonnelType,
 } from '@/types';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   calculateFTE,
   judgeAllSystemAdditions,
@@ -380,16 +381,19 @@ export default function StaffPlanningSimulator() {
             </div>
 
             {plannedStaff.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
-                <Users size={48} className="mx-auto mb-4 opacity-50" />
-                <p>スタッフを追加してシミュレーションを開始</p>
-                <button
-                  onClick={addStaff}
-                  className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
-                >
-                  最初のスタッフを追加
-                </button>
-              </div>
+              <EmptyState
+                icon={<Users className="w-7 h-7 text-gray-400" />}
+                title="スタッフを追加してシミュレーションを開始"
+                description="仮想のスタッフ配置で加算取得と収益を試算できます。"
+                action={
+                  <button
+                    onClick={addStaff}
+                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark text-sm"
+                  >
+                    最初のスタッフを追加
+                  </button>
+                }
+              />
             ) : (
               <div className="divide-y divide-gray-100">
                 {plannedStaff.map((staff, index) => (

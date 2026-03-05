@@ -37,6 +37,7 @@ import {
   generateCertificateRequestEmail,
 } from '@/types';
 import CertificatePdfGenerator from './CertificatePdfGenerator';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface WorkExperienceFormProps {
   userId: string;
@@ -91,6 +92,14 @@ export default function WorkExperienceForm({
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // PDF表示モーダル
   const [showPdfPreview, setShowPdfPreview] = useState(false);
@@ -150,6 +159,7 @@ export default function WorkExperienceForm({
       setRecords(mapped);
     } catch (err) {
       console.error('職歴データの取得エラー:', err);
+      toast.error('職歴データの取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -219,22 +229,29 @@ export default function WorkExperienceForm({
   };
 
   // 削除
-  const handleDelete = async (id: string) => {
-    if (!confirm('この職歴を削除しますか？')) return;
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '削除の確認',
+      message: 'この職歴を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const { error } = await supabase
+            .from('work_experience_records')
+            .delete()
+            .eq('id', id);
 
-    try {
-      const { error } = await supabase
-        .from('work_experience_records')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setRecords(records.filter(r => r.id !== id));
-      onUpdate?.();
-    } catch (err) {
-      console.error('削除エラー:', err);
-      toast.error('削除に失敗しました');
-    }
+          if (error) throw error;
+          setRecords(records.filter(r => r.id !== id));
+          onUpdate?.();
+        } catch (err) {
+          console.error('削除エラー:', err);
+          toast.error('削除に失敗しました');
+        }
+      },
+    });
   };
 
   // フィールド更新
@@ -824,6 +841,15 @@ ${signUrl}
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* PDF生成モーダル */}
       {showPdfPreview && pdfPreviewRecord && (

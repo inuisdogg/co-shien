@@ -364,7 +364,9 @@ export default function RecruitmentView() {
           counts[appId] = (counts[appId] || 0) + 1;
         }
         setUnreadByApp(counts);
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.error('未読メッセージ取得エラー:', err);
+      }
     })();
   }, [user?.id, applications]);
 
@@ -450,14 +452,18 @@ export default function RecruitmentView() {
         publishedAt: publish ? new Date().toISOString() : undefined,
       });
       if (id) {
+        toast.success(publish ? '求人を公開しました' : '求人を下書き保存しました');
         setShowCreateModal(false);
         setCreateStep(1);
         setFormData(INITIAL_FORM);
       }
+    } catch (err) {
+      console.error('求人作成エラー:', err);
+      toast.error('求人の作成に失敗しました');
     } finally {
       setSaving(false);
     }
-  }, [formData, createJobPosting]);
+  }, [formData, createJobPosting, toast]);
 
   const toggleQualification = (code: string, field: 'requiredQualifications' | 'preferredQualifications') => {
     setFormData(prev => {
@@ -553,6 +559,7 @@ export default function RecruitmentView() {
           notes: shiftForm.notes || undefined,
         });
       }
+      toast.success(`シフトを${dates.length > 1 ? dates.length + '件' : ''}追加しました`);
       setShowAddShift(false);
       setShiftForm({
         date: '',
@@ -567,10 +574,13 @@ export default function RecruitmentView() {
       });
       // Refetch
       fetchAllSpotShifts(facilityId, spotMonth);
+    } catch (err) {
+      console.error('シフト追加エラー:', err);
+      toast.error('シフトの追加に失敗しました');
     } finally {
       setSaving(false);
     }
-  }, [spotJobPostingId, shiftForm, createSpotShift, fetchAllSpotShifts, facilityId, spotMonth]);
+  }, [spotJobPostingId, shiftForm, createSpotShift, fetchAllSpotShifts, facilityId, spotMonth, toast]);
 
   // ================================================================
   // Tab 3: Applications Kanban
@@ -603,13 +613,17 @@ export default function RecruitmentView() {
         const jt = result.jobType || 'full_time';
         const { rate } = calculateFee(jt, Number(hireSalary));
         await createPlacement(result.id, Number(hireSalary), rate);
+        toast.success('採用を確定しました');
         setHireModalApp(null);
         fetchPlacements();
       }
+    } catch (err) {
+      console.error('採用確定エラー:', err);
+      toast.error('採用の確定に失敗しました');
     } finally {
       setSaving(false);
     }
-  }, [hireModalApp, hireSalary, hireStartDate, hireApplicant, createPlacement, fetchPlacements]);
+  }, [hireModalApp, hireSalary, hireStartDate, hireApplicant, createPlacement, fetchPlacements, toast]);
 
   // ================================================================
   // Tab 4: Placements & Billing
@@ -640,8 +654,9 @@ export default function RecruitmentView() {
       }
     } catch (e) {
       console.error('Payment error:', e);
+      toast.error('支払い処理の開始に失敗しました');
     }
-  }, []);
+  }, [toast]);
 
   const handleGenerateInvoicePdf = useCallback((placement: Placement) => {
     const doc = new jsPDF();
@@ -1395,7 +1410,11 @@ export default function RecruitmentView() {
               {selectedSpotDate ? `${formatDate(selectedSpotDate)} のシフト` : '今後のシフト'}
             </h3>
             {selectedDateShifts.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">シフトがありません</p>
+              <EmptyState
+                icon={<Clock className="w-7 h-7 text-gray-400" />}
+                title="シフトがありません"
+                description="上の「シフト追加」ボタンからシフトを作成してください"
+              />
             ) : (
               <div className="space-y-2">
                 {selectedDateShifts.map(shift => {
@@ -1642,7 +1661,10 @@ export default function RecruitmentView() {
                                 return next;
                               });
                             }
-                          } catch { /* ignore */ }
+                          } catch (err) {
+                            console.error('メッセージ取得エラー:', err);
+                            toast.error('メッセージの取得に失敗しました');
+                          }
                           setLoadingMessages(false);
                         }}
                         className="w-full bg-white rounded-lg p-3 shadow-sm border border-gray-100 text-left hover:shadow-md transition-shadow relative"
@@ -1881,7 +1903,10 @@ export default function RecruitmentView() {
                                 }]);
                               }
                               setFacilityReply('');
-                            } catch { /* ignore */ }
+                            } catch (err) {
+                              console.error('メッセージ送信エラー:', err);
+                              toast.error('メッセージの送信に失敗しました');
+                            }
                             setSendingReply(false);
                           }
                         }}
@@ -1913,7 +1938,10 @@ export default function RecruitmentView() {
                               }]);
                             }
                             setFacilityReply('');
-                          } catch { /* ignore */ }
+                          } catch (err) {
+                            console.error('メッセージ送信エラー:', err);
+                            toast.error('メッセージの送信に失敗しました');
+                          }
                           setSendingReply(false);
                         }}
                         disabled={sendingReply || !facilityReply.trim()}
@@ -1936,18 +1964,26 @@ export default function RecruitmentView() {
                     {/* Save notes/rating */}
                     <button
                       onClick={async () => {
-                        await updateApplicationStatus(selectedApplication.id, selectedApplication.status, interviewNotesEdit);
-                        // also update rating
-                        const { error: rErr } = await (await import('@/lib/supabase')).supabase
-                          .from('job_applications')
-                          .update({
-                            interview_notes: interviewNotesEdit,
-                            facility_rating: ratingEdit || null,
-                            updated_at: new Date().toISOString(),
-                          })
-                          .eq('id', selectedApplication.id);
-                        if (!rErr) {
-                          fetchApplications();
+                        try {
+                          await updateApplicationStatus(selectedApplication.id, selectedApplication.status, interviewNotesEdit);
+                          // also update rating
+                          const { error: rErr } = await (await import('@/lib/supabase')).supabase
+                            .from('job_applications')
+                            .update({
+                              interview_notes: interviewNotesEdit,
+                              facility_rating: ratingEdit || null,
+                              updated_at: new Date().toISOString(),
+                            })
+                            .eq('id', selectedApplication.id);
+                          if (!rErr) {
+                            fetchApplications();
+                            toast.success('メモ・評価を保存しました');
+                          } else {
+                            toast.error('メモ・評価の保存に失敗しました');
+                          }
+                        } catch (err) {
+                          console.error('メモ保存エラー:', err);
+                          toast.error('メモ・評価の保存に失敗しました');
                         }
                         setShowApplicationDetail(false);
                       }}

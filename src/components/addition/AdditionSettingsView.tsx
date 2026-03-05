@@ -17,6 +17,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useChangeNotifications } from '@/hooks/useChangeNotifications';
+import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 
 interface Addition {
   code: string;
@@ -84,12 +86,14 @@ export default function AdditionSettingsView() {
   const { facility } = useAuth();
   const facilityId = facility?.id || '';
   const { createNotification } = useChangeNotifications();
+  const { toast } = useToast();
 
   const [additions, setAdditions] = useState<Addition[]>([]);
   const [categories, setCategories] = useState<AdditionCategory[]>([]);
   const [settings, setSettings] = useState<FacilityAdditionSetting[]>([]);
   const [requirements, setRequirements] = useState<StaffRequirement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingCode, setSavingCode] = useState<string | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string>('all');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [showAdditionAlert, setShowAdditionAlert] = useState<{ name: string; enabled: boolean } | null>(null);
@@ -154,6 +158,7 @@ export default function AdditionSettingsView() {
         }
       } catch (error) {
         console.error('Error fetching addition data:', error);
+        toast.error('加算データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -193,6 +198,7 @@ export default function AdditionSettingsView() {
     const additionInfo = additions.find(a => a.code === code);
     const additionName = additionInfo?.name || code;
 
+    setSavingCode(code);
     try {
       if (currentSetting) {
         const { error } = await supabase
@@ -238,8 +244,12 @@ export default function AdditionSettingsView() {
       // アラート表示
       setShowAdditionAlert({ name: additionName, enabled: newEnabled });
       setTimeout(() => setShowAdditionAlert(null), 8000);
+      toast.success(`加算「${additionName}」を${newEnabled ? '有効' : '無効'}にしました`);
     } catch (error) {
       console.error('Error toggling addition:', error);
+      toast.error('加算設定の変更に失敗しました');
+    } finally {
+      setSavingCode(null);
     }
   };
 
@@ -326,6 +336,13 @@ export default function AdditionSettingsView() {
 
       {/* Additions by Category */}
       <div className="space-y-3">
+        {filteredAdditions.length === 0 && (
+          <EmptyState
+            icon={<ListChecks className="w-7 h-7 text-gray-400" />}
+            title="加算データがありません"
+            description="加算マスタが登録されていないか、選択したフィルタに該当する加算がありません。"
+          />
+        )}
         {categories.map(cat => {
           const catAdditions = additionsByCategory.get(cat.code) || [];
           if (catAdditions.length === 0) return null;
@@ -367,8 +384,16 @@ export default function AdditionSettingsView() {
                               }
                             </p>
                           </div>
-                          <button onClick={() => handleToggle(addition.code)} className="flex-shrink-0">
-                            {enabled
+                          <button
+                            onClick={() => handleToggle(addition.code)}
+                            disabled={savingCode === addition.code}
+                            className="flex-shrink-0 disabled:opacity-50"
+                          >
+                            {savingCode === addition.code ? (
+                              <div className="w-10 h-6 flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                              </div>
+                            ) : enabled
                               ? <ToggleRight className="w-10 h-6 text-primary" />
                               : <ToggleLeft className="w-10 h-6 text-gray-300" />
                             }

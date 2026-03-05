@@ -23,6 +23,8 @@ import {
   Staff,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import { useToast } from '@/components/ui/Toast';
 
 interface ShiftAvailabilityDashboardProps {
   facilityId: string;
@@ -47,6 +49,7 @@ const formatDate = (date: Date): string => {
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabilityDashboardProps) {
+  const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState(() => {
     // デフォルトは翌月
     const now = new Date();
@@ -64,6 +67,13 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
   const [isSaving, setIsSaving] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState('');
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 月の日付一覧
   const daysInMonth = useMemo(
@@ -161,6 +171,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
       setStaffStatuses(statuses);
     } catch (error) {
       console.error('データ取得エラー:', error);
+      toast.error('希望シフトデータの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -218,33 +229,42 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
       fetchData();
     } catch (error) {
       console.error('締切保存エラー:', error);
+      toast.error('締切の保存に失敗しました');
     } finally {
       setIsSaving(false);
     }
   };
 
   // 締切を閉じる
-  const handleCloseDeadline = async () => {
+  const handleCloseDeadline = () => {
     if (!deadline) return;
 
-    if (!confirm('希望提出の受付を締め切りますか？')) return;
+    setConfirmModal({
+      isOpen: true,
+      title: '締切の確認',
+      message: '希望提出の受付を締め切りますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setIsSaving(true);
+        try {
+          await supabase
+            .from('shift_availability_deadlines')
+            .update({
+              is_open: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', deadline.id);
 
-    setIsSaving(true);
-    try {
-      await supabase
-        .from('shift_availability_deadlines')
-        .update({
-          is_open: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', deadline.id);
-
-      fetchData();
-    } catch (error) {
-      console.error('締切クローズエラー:', error);
-    } finally {
-      setIsSaving(false);
-    }
+          fetchData();
+        } catch (error) {
+          console.error('締切クローズエラー:', error);
+          toast.error('締切のクローズに失敗しました');
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
 
   // 締切を再開
@@ -264,6 +284,7 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
       fetchData();
     } catch (error) {
       console.error('締切再開エラー:', error);
+      toast.error('締切の再開に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -559,6 +580,15 @@ export default function ShiftAvailabilityDashboard({ facilityId }: ShiftAvailabi
           ))}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* 締切設定モーダル */}
       {showDeadlineModal && (

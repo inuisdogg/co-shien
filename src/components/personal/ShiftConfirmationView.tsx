@@ -213,6 +213,7 @@ export default function ShiftConfirmationView({
       setMyShifts(shiftsMap);
     } catch (error) {
       console.error('データ取得エラー:', error);
+      toast.error('データの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }

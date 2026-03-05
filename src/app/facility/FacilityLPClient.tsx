@@ -40,7 +40,9 @@ export default function FacilityLPClient() {
         }
         window.location.href = '/career';
         return;
-      } catch {}
+      } catch {
+        localStorage.removeItem('user');
+      }
     }
     setChecking(false);
   }, []);

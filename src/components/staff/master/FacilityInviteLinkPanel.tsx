@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { useFacilityInviteLink } from '@/hooks/useFacilityInviteLink';
 import type { FacilityInviteLink } from '@/types/bulkImport';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import { useToast } from '@/components/ui/Toast';
 
 interface FacilityInviteLinkPanelProps {
   facilityName?: string;
@@ -32,6 +34,7 @@ interface FacilityInviteLinkPanelProps {
 const FacilityInviteLinkPanel: React.FC<FacilityInviteLinkPanelProps> = ({
   facilityName = '',
 }) => {
+  const { toast } = useToast();
   const {
     inviteLinks,
     loading,
@@ -53,6 +56,13 @@ const FacilityInviteLinkPanel: React.FC<FacilityInviteLinkPanelProps> = ({
   const [emailAddress, setEmailAddress] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const getLinkUrl = (code: string) => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -66,6 +76,7 @@ const FacilityInviteLinkPanel: React.FC<FacilityInviteLinkPanelProps> = ({
       setTimeout(() => setCopiedLinkId(null), 2000);
     } catch (err) {
       console.error('Copy failed:', err);
+      toast.error('リンクのコピーに失敗しました');
     }
   }, []);
 
@@ -119,6 +130,7 @@ const FacilityInviteLinkPanel: React.FC<FacilityInviteLinkPanelProps> = ({
       }
     } catch (err) {
       console.error('Send email failed:', err);
+      toast.error('メールの送信に失敗しました');
     } finally {
       setIsSendingEmail(false);
     }
@@ -286,9 +298,16 @@ const FacilityInviteLinkPanel: React.FC<FacilityInviteLinkPanelProps> = ({
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('このリンクを削除しますか？')) {
-                          deleteLink(link.id);
-                        }
+                        setConfirmModal({
+                          isOpen: true,
+                          title: '削除の確認',
+                          message: 'このリンクを削除しますか？',
+                          isDestructive: true,
+                          onConfirm: () => {
+                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                            deleteLink(link.id);
+                          },
+                        });
                       }}
                       className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                       title="削除"
@@ -337,6 +356,14 @@ const FacilityInviteLinkPanel: React.FC<FacilityInviteLinkPanelProps> = ({
           })}
         </div>
       )}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

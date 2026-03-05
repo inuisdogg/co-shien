@@ -20,6 +20,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import { parseQualifications } from '@/utils/qualifications';
 import type { WorkScheduleReport } from '@/types';
 import type { MonthlyFinancial, ExpenseSummary } from '@/types/expense';
@@ -342,6 +343,7 @@ export default function AuditExportView() {
         setRegulationCount(regulationResult.count ?? 0);
       } catch (err) {
         console.error('Failed to fetch audit data:', err);
+        toast.error('監査データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -964,6 +966,7 @@ export default function AuditExportView() {
         }
       } catch (err) {
         console.error('Export failed:', err);
+        toast.error('エクスポートに失敗しました');
       } finally {
         setExportingId(null);
       }
@@ -1230,9 +1233,12 @@ export default function AuditExportView() {
 
       {/* Empty state */}
       {Object.values(groupedDocuments).every((g) => g.length === 0) && (
-        <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">検索条件に一致する書類がありません</p>
+        <div className="bg-white rounded-xl shadow-sm border">
+          <EmptyState
+            icon={<FileText className="w-7 h-7 text-gray-400" />}
+            title="検索条件に一致する書類がありません"
+            description="検索キーワードやカテゴリフィルターを変更してお試しください"
+          />
         </div>
       )}
     </div>

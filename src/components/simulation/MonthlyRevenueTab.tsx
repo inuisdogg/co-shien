@@ -9,7 +9,9 @@ import {
   Percent,
   DollarSign,
   PieChart,
+  Calculator,
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { SimulationParams, SimulationResult } from '@/hooks/useAdditionSimulator';
 import { REGION_UNIT_RATES } from '@/utils/additionJudgment';
 
@@ -146,6 +148,13 @@ export default function MonthlyRevenueTab({
       </div>
 
       {/* 売上結果 */}
+      {!simulationResult && (
+        <EmptyState
+          icon={<Calculator className="w-7 h-7 text-gray-400" />}
+          title="シミュレーション結果がありません"
+          description="スタッフデータが読み込まれると自動的に売上シミュレーションが実行されます。"
+        />
+      )}
       {simulationResult && (
         <>
           {/* 合計売上 */}

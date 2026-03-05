@@ -25,6 +25,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import { LeaveRequestType, LEAVE_REQUEST_TYPE_LABELS } from '@/types';
 
 // --- 型定義 ---
@@ -125,6 +126,7 @@ export default function LeaveApprovalView() {
 
         if (fallbackError) {
           console.error('休暇申請取得エラー:', fallbackError);
+          toast.error('休暇申請データの取得に失敗しました');
           return;
         }
 
@@ -172,6 +174,7 @@ export default function LeaveApprovalView() {
       }
     } catch (error) {
       console.error('休暇申請取得エラー:', error);
+      toast.error('休暇申請データの取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -230,6 +233,7 @@ export default function LeaveApprovalView() {
         return;
       }
 
+      toast.success('休暇申請を承認しました');
       await fetchRequests();
     } catch (error) {
       console.error('承認エラー:', error);
@@ -265,6 +269,7 @@ export default function LeaveApprovalView() {
 
       setRejectModalId(null);
       setRejectionReason('');
+      toast.success('休暇申請を却下しました');
       await fetchRequests();
     } catch (error) {
       console.error('却下エラー:', error);
@@ -355,13 +360,12 @@ export default function LeaveApprovalView() {
       {/* 申請一覧 */}
       <div className="space-y-3">
         {filteredRequests.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm">
-              {requests.length === 0
-                ? '休暇申請がまだありません'
-                : '条件に一致する申請がありません'}
-            </p>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <EmptyState
+              icon={<Calendar className="w-7 h-7 text-gray-400" />}
+              title={requests.length === 0 ? '休暇申請がまだありません' : '条件に一致する申請がありません'}
+              description={requests.length === 0 ? 'スタッフが休暇申請を行うとここに表示されます' : '検索条件やフィルターを変更してみてください'}
+            />
           </div>
         ) : (
           filteredRequests.map((request) => {

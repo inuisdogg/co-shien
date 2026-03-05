@@ -266,6 +266,7 @@ function AcceptInvitationContent() {
             .eq('id', selectedChildId);
         } catch (err) {
           console.error('Error saving facility intake data:', err);
+          toast.error('施設の受入データの保存に失敗しました');
         }
       }
     }

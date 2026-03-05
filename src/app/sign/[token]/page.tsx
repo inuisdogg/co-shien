@@ -235,6 +235,17 @@ export default function SignaturePage() {
         throw new Error('署名の保存に失敗しました');
       }
 
+      // Send notification email to applicant
+      try {
+        await fetch('/api/certificate-signed-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordId: record.id, signerName }),
+        });
+      } catch {
+        // Non-critical: don't block completion if notification fails
+      }
+
       setCompleted(true);
     } catch (err: any) {
       toast.error(err.message || '処理に失敗しました');

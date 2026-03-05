@@ -322,6 +322,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
       if (!error && data) setDocuments(data);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
+      toast.error('書類の取得に失敗しました');
     } finally {
       setDocsLoading(false);
     }
@@ -361,6 +362,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
       })));
     } catch (err) {
       console.error('Failed to fetch attendance:', err);
+      toast.error('勤怠データの取得に失敗しました');
     } finally {
       setAttendanceLoading(false);
     }
@@ -391,6 +393,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
       }
     } catch (err) {
       console.error('Download error:', err);
+      toast.error('ダウンロードに失敗しました');
     }
   };
 
@@ -610,6 +613,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
       }
     } catch (err) {
       console.error('Invite error:', err);
+      toast.error('招待リンクの発行に失敗しました');
     } finally {
       setInviting(false);
     }
@@ -646,6 +650,7 @@ const StaffDetailDrawer: React.FC<StaffDetailDrawerProps> = ({
       });
     } catch (err) {
       console.error('Email send error:', err);
+      toast.error('招待メールの送信に失敗しました');
     }
   };
 

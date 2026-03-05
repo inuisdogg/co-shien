@@ -29,6 +29,7 @@ import { activateAccount } from '@/utils/staffInvitationService';
 import { supabase } from '@/lib/supabase';
 import { hashPassword } from '@/utils/password';
 import { UserPermissions } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 // 静的生成をスキップ（useSearchParamsを使用するため）
 export const dynamic = 'force-dynamic';
@@ -86,6 +87,7 @@ function ActivatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const { toast } = useToast();
   
   // 画面状態管理
   const [screen, setScreen] = useState<'checking' | 'welcome' | 'login' | 'register' | 'B' | 'complete'>('checking');
@@ -575,6 +577,7 @@ function ActivatePageContent() {
         }
       } catch (err) {
         console.error('郵便番号検索エラー:', err);
+        toast.error('郵便番号から住所を検索できませんでした');
       }
     }
   };

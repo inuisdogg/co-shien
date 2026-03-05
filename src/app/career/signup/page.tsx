@@ -492,6 +492,7 @@ export default function PersonalSignupPage() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
               className={`w-full h-12 px-4 border ${fieldErrors.email ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
+              autoComplete="email"
               placeholder="メールアドレスを入力"
               disabled={loading}
             />
@@ -510,6 +511,7 @@ export default function PersonalSignupPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 minLength={6}
+                autoComplete="new-password"
                 className={`w-full h-12 px-4 pr-10 border ${fieldErrors.password ? 'border-red-400' : 'border-gray-200'} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30 focus:border-personal transition-all`}
                 placeholder="6文字以上で入力"
                 disabled={loading}

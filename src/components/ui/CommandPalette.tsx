@@ -136,6 +136,9 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ items, setActiveTab }) 
     <div
       className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh] bg-black/40 backdrop-blur-sm"
       onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label="コマンドパレット"
     >
       <div
         className="w-full max-w-lg bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
@@ -153,6 +156,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ items, setActiveTab }) 
             className="flex-1 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
             autoComplete="off"
             spellCheck={false}
+            aria-label="メニュー検索"
+            role="combobox"
+            aria-expanded={filteredItems.length > 0}
+            aria-controls="command-palette-list"
+            aria-activedescendant={filteredItems[selectedIndex] ? `command-item-${filteredItems[selectedIndex].id}` : undefined}
           />
           <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-100 border border-gray-200 rounded">
             ESC
@@ -160,7 +168,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ items, setActiveTab }) 
         </div>
 
         {/* 結果リスト */}
-        <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2">
+        <div ref={listRef} id="command-palette-list" role="listbox" className="max-h-[50vh] overflow-y-auto py-2">
           {filteredItems.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-gray-400">
               「{query}」に一致するメニューがありません
@@ -174,7 +182,10 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ items, setActiveTab }) 
               return (
                 <button
                   key={item.id}
+                  id={`command-item-${item.id}`}
                   data-index={index}
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => {
                     setActiveTab(item.id);
                     setIsOpen(false);

@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
+import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 import type { Child } from '@/types';
 
 // フェーズ管理: フェーズ3以上でチャット・メッセージ機能を有効化
@@ -144,6 +146,7 @@ type ActiveTransport = {
 
 export default function ClientDashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [children, setChildren] = useState<Child[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -173,6 +176,9 @@ export default function ClientDashboardPage() {
   // 児童選択モーダル用の状態
   const [showChildSelector, setShowChildSelector] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'facilities' | 'calendar' | 'message' | 'usage-request'; } | null>(null);
+
+  // ログアウト確認モーダル
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -507,6 +513,7 @@ export default function ClientDashboardPage() {
 
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
+        toast.error('データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -566,6 +573,7 @@ export default function ClientDashboardPage() {
         setActiveTransports(matched);
       } catch (err) {
         console.error('Transport session check error:', err);
+        toast.error('送迎情報の取得に失敗しました');
       }
     };
 
@@ -576,11 +584,15 @@ export default function ClientDashboardPage() {
     return () => clearInterval(interval);
   }, [children, facilities]);
 
-  const handleLogout = async () => {
+  const confirmLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('user');
     localStorage.removeItem('selectedFacility');
     router.push('/parent/login');
+  };
+
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
   };
 
   // 契約ステータスのラベルを取得
@@ -2001,6 +2013,21 @@ export default function ClientDashboardPage() {
           </p>
         </div>
       </main>
+
+      {/* ログアウト確認モーダル */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        title="ログアウト"
+        message="ログアウトしますか？"
+        confirmLabel="ログアウト"
+        cancelLabel="キャンセル"
+        isDestructive
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          confirmLogout();
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
 
       {/* 児童選択モーダル */}
       {showChildSelector && (

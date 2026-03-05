@@ -118,6 +118,7 @@ const ShiftManagementView: React.FC = () => {
         setAvailabilityStatuses(statuses);
       } catch (error) {
         console.error('Failed to fetch availability data:', error);
+        toast.error('希望シフトデータの取得に失敗しました');
       }
     };
 
@@ -182,6 +183,7 @@ const ShiftManagementView: React.FC = () => {
         setPrevMonthShifts(mapped);
       } catch (error) {
         console.error('Failed to fetch previous month shifts:', error);
+        toast.error('前月シフトデータの取得に失敗しました');
       }
     };
 

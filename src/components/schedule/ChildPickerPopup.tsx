@@ -6,10 +6,11 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, Check, CheckSquare } from 'lucide-react';
+import { Search, X, Check, CheckSquare, UserX } from 'lucide-react';
 import { Child, TimeSlot, ResolvedSlotInfo, TransportVehicle } from '@/types';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import { resolveTimeSlots, slotDisplayName } from '@/utils/slotResolver';
+import EmptyState from '@/components/ui/EmptyState';
 
 // 選択された児童の情報（送迎オプション付き）
 export interface SelectedChildWithTransport {
@@ -314,13 +315,11 @@ export default function ChildPickerPopup({
         {/* 児童カードグリッド */}
         <div className="flex-1 overflow-y-auto p-4">
           {availableChildren.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              {searchQuery ? (
-                <p>「{searchQuery}」に一致する児童が見つかりません</p>
-              ) : (
-                <p>登録可能な児童がいません</p>
-              )}
-            </div>
+            <EmptyState
+              icon={<UserX className="w-7 h-7 text-gray-400" />}
+              title={searchQuery ? `「${searchQuery}」に一致する児童が見つかりません` : '登録可能な児童がいません'}
+              description={searchQuery ? '検索条件を変えてお試しください' : 'すべての児童が既に登録されています'}
+            />
           ) : (
             <div className="space-y-4">
               {/* パターン一致セクション */}

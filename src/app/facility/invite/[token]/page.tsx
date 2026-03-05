@@ -16,6 +16,7 @@ import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { hashPassword } from '@/utils/password';
 import { Building2, User, Lock, Mail, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,7 @@ export default function FacilityInvitePage() {
   const router = useRouter();
   const params = useParams();
   const token = params?.token as string;
+  const { toast } = useToast();
 
   const [step, setStep] = useState<Step>('loading');
   const [facility, setFacility] = useState<FacilityInfo | null>(null);
@@ -99,6 +101,7 @@ export default function FacilityInvitePage() {
         }
       } catch (err) {
         console.error('Token validation error:', err);
+        toast.error('招待リンクの検証に失敗しました');
         setStep('invalid');
       }
     };

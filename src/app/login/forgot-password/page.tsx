@@ -170,6 +170,7 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
                 onBlur={handleEmailBlur}
                 required
+                autoComplete="email"
                 className={`w-full px-4 py-2 border ${emailError ? 'border-red-400' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 ${theme.focusRing} focus:border-transparent`}
                 placeholder="登録時のメールアドレスを入力"
                 disabled={loading}
@@ -182,7 +183,12 @@ export default function ForgotPasswordPage() {
               disabled={loading}
               className={`w-full ${theme.button} text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {loading ? '送信中...' : 'パスワードリセットリンクを送信'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  送信中...
+                </span>
+              ) : 'パスワードリセットリンクを送信'}
             </button>
           </form>
         )}

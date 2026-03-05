@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 // ---- Local types ----
 
@@ -70,6 +71,7 @@ function getOvertimeTextColor(ratio: number): string {
 
 export default function OvertimeDashboardPanel() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -185,6 +187,7 @@ export default function OvertimeDashboardPanel() {
         setOvertimeData(combined);
       } catch (err) {
         console.error('Error fetching overtime data:', err);
+        toast.error('残業データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -271,8 +274,10 @@ export default function OvertimeDashboardPanel() {
         }
       }
       setShowSettings(false);
+      toast.success('36協定設定を保存しました');
     } catch (err) {
       console.error('Error saving agreement:', err);
+      toast.error('36協定設定の保存に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -368,7 +373,11 @@ export default function OvertimeDashboardPanel() {
         </div>
 
         {sortedData.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">スタッフデータがありません</div>
+          <EmptyState
+            icon={<Clock className="w-7 h-7 text-gray-400" />}
+            title="スタッフデータがありません"
+            description="スタッフの勤怠データが登録されると残業時間が表示されます"
+          />
         ) : (
           <div className="p-4 space-y-3">
             {sortedData.map(item => {

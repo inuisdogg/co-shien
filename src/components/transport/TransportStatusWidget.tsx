@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Bus, MapPin, Clock, CheckCircle2, Radio } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
 type SessionRow = {
   id: string; mode: 'pickup' | 'dropoff';
@@ -43,6 +44,7 @@ export default function TransportStatusWidget({ facilityId }: TransportStatusWid
   const [sessions, setSessions] = useState<WidgetSession[]>([]);
   const [loading, setLoading] = useState(true);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const { toast } = useToast();
   const today = new Date().toISOString().split('T')[0];
 
   // Fetch active/preparing sessions + resolve driver names
@@ -50,34 +52,40 @@ export default function TransportStatusWidget({ facilityId }: TransportStatusWid
     if (!facilityId) return;
     (async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from('transport_sessions')
-        .select('id, mode, status, driver_staff_id, route_stops, current_stop_index, started_at')
-        .eq('facility_id', facilityId).eq('date', today)
-        .in('status', ['active', 'preparing']);
-      if (!data) { setSessions([]); setLoading(false); return; }
+      try {
+        const { data } = await supabase
+          .from('transport_sessions')
+          .select('id, mode, status, driver_staff_id, route_stops, current_stop_index, started_at')
+          .eq('facility_id', facilityId).eq('date', today)
+          .in('status', ['active', 'preparing']);
+        if (!data) { setSessions([]); setLoading(false); return; }
 
-      const mapped = (data as SessionRow[]).map(mapRow);
-      const driverIds = [...new Set(mapped.map(s => s.driverStaffId).filter(Boolean))] as string[];
-      let driverMap: Record<string, string> = {};
-      if (driverIds.length > 0) {
-        // staffテーブルから取得
-        const staffIds = driverIds.filter(id => !id.startsWith('emp-'));
-        const empIds = driverIds.filter(id => id.startsWith('emp-')).map(id => id.replace('emp-', ''));
-        if (staffIds.length > 0) {
-          const { data: staffRows } = await supabase.from('staff').select('id, name').in('id', staffIds);
-          if (staffRows) staffRows.forEach(u => { driverMap[u.id] = u.name; });
+        const mapped = (data as SessionRow[]).map(mapRow);
+        const driverIds = [...new Set(mapped.map(s => s.driverStaffId).filter(Boolean))] as string[];
+        let driverMap: Record<string, string> = {};
+        if (driverIds.length > 0) {
+          // staffテーブルから取得
+          const staffIds = driverIds.filter(id => !id.startsWith('emp-'));
+          const empIds = driverIds.filter(id => id.startsWith('emp-')).map(id => id.replace('emp-', ''));
+          if (staffIds.length > 0) {
+            const { data: staffRows } = await supabase.from('staff').select('id, name').in('id', staffIds);
+            if (staffRows) staffRows.forEach(u => { driverMap[u.id] = u.name; });
+          }
+          // employment_records経由のスタッフ
+          if (empIds.length > 0) {
+            const { data: empRows } = await supabase.from('employment_records').select('id, users!inner(last_name, first_name)').in('id', empIds);
+            if (empRows) empRows.forEach((r: any) => { driverMap[`emp-${r.id}`] = `${r.users?.last_name || ''}${r.users?.first_name || ''}`; });
+          }
         }
-        // employment_records経由のスタッフ
-        if (empIds.length > 0) {
-          const { data: empRows } = await supabase.from('employment_records').select('id, users!inner(last_name, first_name)').in('id', empIds);
-          if (empRows) empRows.forEach((r: any) => { driverMap[`emp-${r.id}`] = `${r.users?.last_name || ''}${r.users?.first_name || ''}`; });
-        }
+        setSessions(mapped.map(s => ({
+          ...s, driverName: s.driverStaffId ? (driverMap[s.driverStaffId] || null) : null,
+        })));
+      } catch (err) {
+        console.error('送迎ステータス取得エラー:', err);
+        toast.error('送迎ステータスの取得に失敗しました');
+      } finally {
+        setLoading(false);
       }
-      setSessions(mapped.map(s => ({
-        ...s, driverName: s.driverStaffId ? (driverMap[s.driverStaffId] || null) : null,
-      })));
-      setLoading(false);
     })();
   }, [facilityId, today]);
 

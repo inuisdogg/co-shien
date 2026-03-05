@@ -33,6 +33,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import DocumentPreviewModal from '@/components/common/DocumentPreviewModal';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import EmptyState from '@/components/ui/EmptyState';
 
 type Props = {
   childId: string;
@@ -87,6 +89,13 @@ export const ChildDocumentsManager: React.FC<Props> = ({
   });
   const [saving, setSaving] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<ChildDocument | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,6 +127,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
       }
     } catch (error) {
       console.error('Error fetching documents:', error);
+      toast.error('書類の読み込みに失敗しました');
     } finally {
       setLoading(false);
     }
@@ -195,7 +205,14 @@ export const ChildDocumentsManager: React.FC<Props> = ({
 
   // アップロード処理
   const handleUpload = async () => {
-    if (!uploadFile || !uploadForm.documentType || !user?.id) return;
+    if (!uploadFile || !uploadForm.documentType) {
+      toast.warning('書類タイプを選択してください');
+      return;
+    }
+    if (!user?.id) {
+      toast.error('ログインが必要です');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -207,6 +224,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
 
       if (uploadError) {
         console.error('Storage upload error:', uploadError);
+        toast.warning('ファイルの保存に失敗しましたが、書類情報は登録されます');
       }
 
       // メタデータをDBに保存
@@ -234,6 +252,7 @@ export const ChildDocumentsManager: React.FC<Props> = ({
       await fetchData();
       setShowUploadModal(false);
       setUploadFile(null);
+      toast.success('書類を登録しました');
     } catch (err) {
       console.error('アップロードエラー:', err);
       toast.error('アップロードに失敗しました');
@@ -269,19 +288,27 @@ export const ChildDocumentsManager: React.FC<Props> = ({
   };
 
   // 削除
-  const handleDelete = async (doc: ChildDocument) => {
-    if (!confirm(`「${doc.documentName}」を削除しますか？`)) return;
-
-    try {
-      if (doc.filePath) {
-        await supabase.storage.from('child-documents').remove([doc.filePath]);
-      }
-      await supabase.from('child_documents').delete().eq('id', doc.id);
-      await fetchData();
-    } catch (err) {
-      console.error('削除エラー:', err);
-      toast.error('削除に失敗しました');
-    }
+  const handleDelete = (doc: ChildDocument) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '書類の削除',
+      message: `「${doc.documentName}」を削除しますか？`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          if (doc.filePath) {
+            await supabase.storage.from('child-documents').remove([doc.filePath]);
+          }
+          await supabase.from('child_documents').delete().eq('id', doc.id);
+          await fetchData();
+          toast.success('書類を削除しました');
+        } catch (err) {
+          console.error('削除エラー:', err);
+          toast.error('削除に失敗しました');
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -493,13 +520,11 @@ export const ChildDocumentsManager: React.FC<Props> = ({
             })}
 
             {categoryDocuments.length === 0 && (
-              <div className="text-center py-10 text-gray-400">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FileText className="w-8 h-8 text-gray-300" />
-                </div>
-                <p className="text-sm font-medium text-gray-500 mb-1">書類がまだ登録されていません</p>
-                <p className="text-xs text-gray-400">上のドロップゾーンにPDFをドラッグするか、「ファイルを選択」をクリックしてください</p>
-              </div>
+              <EmptyState
+                icon={<FileText className="w-7 h-7 text-gray-400" />}
+                title="書類がまだ登録されていません"
+                description="上のドロップゾーンにPDFをドラッグするか、「ファイルを選択」をクリックしてください"
+              />
             )}
           </div>
         </div>
@@ -526,6 +551,15 @@ export const ChildDocumentsManager: React.FC<Props> = ({
           bucket="child-documents"
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* アップロードモーダル */}
       {showUploadModal && (

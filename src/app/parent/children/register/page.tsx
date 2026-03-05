@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { AlertCircle, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
+import { useToast } from '@/components/ui/Toast';
 
 // 静的生成をスキップ
 export const dynamic = 'force-dynamic';
@@ -39,6 +40,7 @@ type ChildFormData = {
 
 export default function ChildRegisterPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -216,6 +218,7 @@ export default function ChildRegisterPage() {
       }
 
       setSuccess(true);
+      toast.success('お子様の情報を登録しました');
 
       // 2秒後にダッシュボードにリダイレクト
       setTimeout(() => {
@@ -223,6 +226,7 @@ export default function ChildRegisterPage() {
       }, 2000);
     } catch (err: any) {
       setError(err.message || '児童登録に失敗しました');
+      toast.error(err.message || '児童登録に失敗しました');
     } finally {
       setLoading(false);
     }

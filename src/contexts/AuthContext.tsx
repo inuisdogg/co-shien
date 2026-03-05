@@ -268,15 +268,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = `/business?facilityId=${facilityId}`;
   }, []);
 
-  // セッションタイムアウト（2時間操作なしでログアウト）
+  // セッションタイムアウト（2時間操作なしでログアウト、5分前に警告）
   useEffect(() => {
     if (!user) return;
 
     const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2時間
+    const WARNING_BEFORE = 5 * 60 * 1000; // 5分前
     let timeoutId: ReturnType<typeof setTimeout>;
+    let warningId: ReturnType<typeof setTimeout>;
 
     const resetTimer = () => {
       clearTimeout(timeoutId);
+      clearTimeout(warningId);
+      warningId = setTimeout(() => {
+        toast.warning('5分間操作がないと自動ログアウトされます。');
+      }, SESSION_TIMEOUT - WARNING_BEFORE);
       timeoutId = setTimeout(() => {
         logout();
         window.location.href = '/';
@@ -289,15 +295,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       clearTimeout(timeoutId);
+      clearTimeout(warningId);
       events.forEach(event => window.removeEventListener(event, resetTimer));
     };
-  }, [user, logout]);
+  }, [user, logout, toast]);
 
-  // セッション有効期限の定期チェック（5分ごと）
+  // セッション有効期限の定期チェック（1分ごと）+ 事前警告
   useEffect(() => {
     if (!user) return;
 
-    const SESSION_EXPIRY_CHECK_INTERVAL = 5 * 60 * 1000; // 5分
+    const SESSION_EXPIRY_CHECK_INTERVAL = 60 * 1000; // 1分
+    const WARNING_THRESHOLD = 15 * 60 * 1000; // 15分前に警告
+    let warningShown = false;
 
     const checkExpiry = () => {
       const sessionStartedAt = localStorage.getItem('sessionStartedAt');
@@ -313,6 +322,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast.warning('セッションの有効期限（8時間）が切れました。再度ログインしてください。');
         logout();
         window.location.href = '/';
+        return;
+      }
+
+      // 15分前に事前警告
+      if (!warningShown && sessionExpires) {
+        const expiresAt = parseInt(sessionExpires, 10);
+        const remaining = expiresAt - Date.now();
+        if (remaining > 0 && remaining <= WARNING_THRESHOLD) {
+          warningShown = true;
+          const mins = Math.ceil(remaining / 60000);
+          toast.warning(`セッションがあと約${mins}分で期限切れになります。作業を保存してください。`);
+        }
       }
     };
 

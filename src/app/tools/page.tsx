@@ -21,6 +21,9 @@ import {
   ScrollText,
   Briefcase,
   Lock,
+  FileSignature,
+  Calculator,
+  CalendarCheck,
 } from 'lucide-react';
 import ToolsAuthCTA from './ToolsAuthCTA';
 
@@ -31,11 +34,11 @@ import ToolsAuthCTA from './ToolsAuthCTA';
 export const metadata: Metadata = {
   title: '保育・福祉の専門職のための無料ツール | Roots',
   description:
-    '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行、キャリア年表の可視化など、保育士・福祉専門職のキャリアを支える無料ツール集。',
+    '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行、キャリア年表の可視化など。保育士・幼稚園教諭・児童指導員・PT/OT/STのキャリアを支える無料ツール集。',
   openGraph: {
     title: '保育・福祉の専門職のための無料ツール | Roots',
     description:
-      '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行など、保育士・福祉専門職のキャリアを支える無料ツール集。',
+      '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行など。保育士・幼稚園教諭・児童指導員・PT/OT/STのキャリアを支える無料ツール集。',
     type: 'website',
     locale: 'ja_JP',
     siteName: 'Roots',
@@ -44,7 +47,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: '保育・福祉の専門職のための無料ツール | Roots',
     description:
-      '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行。保育士・福祉専門職向け無料ツール。',
+      '履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行。保育士・幼稚園教諭・児童指導員向け無料ツール。',
   },
 };
 
@@ -102,6 +105,30 @@ const tools: PremiumTool[] = [
     premium: true,
     badge: 'Premium',
   },
+  {
+    title: '退職届・退職願ジェネレーター',
+    description:
+      '保育士・幼稚園教諭・児童指導員向け。必要事項を入力するだけで正式な退職届・退職願PDFを作成',
+    href: '/tools/resignation',
+    icon: <FileSignature className="h-7 w-7" />,
+    badge: 'NEW',
+  },
+  {
+    title: '扶養内パート年収計算',
+    description:
+      '時給と勤務時間から年収を自動計算。103万・130万の壁との比較で、扶養内で最適な働き方がわかる',
+    href: '/tools/income-calculator',
+    icon: <Calculator className="h-7 w-7" />,
+    badge: 'NEW',
+  },
+  {
+    title: '実務経験年数計算',
+    description:
+      '職歴から実務経験年数を自動計算。保育士試験・社会福祉士・児発管の受験資格との比較も表示',
+    href: '/tools/experience-calculator',
+    icon: <CalendarCheck className="h-7 w-7" />,
+    badge: 'NEW',
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -140,8 +167,32 @@ const features: Feature[] = [
 /* ------------------------------------------------------------------ */
 
 export default function ToolsPage() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "保育・福祉の専門職のための無料キャリアツール",
+    "description":
+      "履歴書・職務経歴書の自動生成、実務経験証明書のデジタル発行、キャリア年表の可視化など、保育士・福祉専門職のキャリアを支える無料ツール集。",
+    "url": "https://roots.inu.co.jp/tools",
+    "numberOfItems": 8,
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "履歴書自動生成ツール", "url": "https://roots.inu.co.jp/tools/resume" },
+      { "@type": "ListItem", "position": 2, "name": "職務経歴書自動生成ツール", "url": "https://roots.inu.co.jp/tools/cv" },
+      { "@type": "ListItem", "position": 3, "name": "キャリア年表メーカー", "url": "https://roots.inu.co.jp/tools/career-timeline" },
+      { "@type": "ListItem", "position": 4, "name": "処遇改善加算シミュレーター", "url": "https://roots.inu.co.jp/tools/salary-simulator" },
+      { "@type": "ListItem", "position": 5, "name": "実務経験証明書デジタル発行", "url": "https://roots.inu.co.jp/tools/career-certificate" },
+      { "@type": "ListItem", "position": 6, "name": "退職届・退職願ジェネレーター", "url": "https://roots.inu.co.jp/tools/resignation" },
+      { "@type": "ListItem", "position": 7, "name": "扶養内パート年収計算ツール", "url": "https://roots.inu.co.jp/tools/income-calculator" },
+      { "@type": "ListItem", "position": 8, "name": "実務経験年数計算ツール", "url": "https://roots.inu.co.jp/tools/experience-calculator" },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ============================================================ */}
       {/*  Header                                                      */}
       {/* ============================================================ */}
@@ -202,7 +253,7 @@ export default function ToolsPage() {
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl">
               履歴書・職務経歴書の自動生成から実務経験証明書のデジタル発行まで。
               <br className="hidden sm:block" />
-              保育士・児童指導員・社会福祉士のキャリア形成をサポートします。
+              保育士・幼稚園教諭・児童指導員・PT/OT/STのキャリア形成をサポートします。
             </p>
 
             {/* Stats */}

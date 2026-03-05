@@ -12,6 +12,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
+import ConfirmModal from '@/components/common/ConfirmModal';
 import {
   ChevronLeft,
   ChevronRight,
@@ -139,6 +140,7 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
   const [showCopyPreview, setShowCopyPreview] = useState(false);
   const [showAvailability, setShowAvailability] = useState(true);
   const [tooltipStaffId, setTooltipStaffId] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean; title: string; message: string; isDestructive?: boolean; onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const today = todayStr();
 
@@ -355,9 +357,15 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
       // Fallback: simple confirmation
       const prevM = month === 1 ? 12 : month - 1;
       const prevY = month === 1 ? year - 1 : year;
-      if (window.confirm(`${prevY}年${prevM}月のシフトを今月にコピーしますか？\n※前月シフトデータを読み込んでいない場合、コピーできません。`)) {
-        // Copy previous month's shifts to current month
-      }
+      setConfirmModal({
+        isOpen: true,
+        title: '前月シフトコピー',
+        message: `${prevY}年${prevM}月のシフトを今月にコピーしますか？\n※前月シフトデータを読み込んでいない場合、コピーできません。`,
+        onConfirm: () => {
+          setConfirmModal(prev => ({...prev, isOpen: false}));
+          // Copy previous month's shifts to current month
+        },
+      });
     }
   }, [year, month, onCopyPrevMonth, copyPreviewData]);
 
@@ -960,6 +968,15 @@ const MonthlyShiftCalendar: React.FC<MonthlyShiftCalendarProps> = ({
           }
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+      />
 
       {/* ===== Copy Preview Modal ===== */}
       {showCopyPreview && (

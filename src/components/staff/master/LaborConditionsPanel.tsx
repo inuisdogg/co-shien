@@ -213,6 +213,7 @@ const LaborConditionsPanel: React.FC<LaborConditionsPanelProps> = ({
       setContracts(data || []);
     } catch (err) {
       console.error('Failed to fetch contracts:', err);
+      toast.error('労働条件通知書の取得に失敗しました');
     } finally {
       setLoading(false);
     }

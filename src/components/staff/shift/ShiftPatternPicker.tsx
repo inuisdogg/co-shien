@@ -6,9 +6,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Settings } from 'lucide-react';
+import { ChevronDown, Check, Settings, Clock } from 'lucide-react';
 import { ShiftPattern } from '@/types';
 import { formatPatternTimeRange, patternColorToRgba } from '@/utils/shiftDisplayFormatter';
+import EmptyState from '@/components/ui/EmptyState';
 
 interface ShiftPatternPickerProps {
   patterns: ShiftPattern[];
@@ -105,6 +106,17 @@ const ShiftPatternPicker: React.FC<ShiftPatternPickerProps> = ({
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
           <div className="max-h-72 overflow-y-auto">
+            {/* パターンが無い場合の空表示 */}
+            {patterns.length === 0 && (
+              <div className="p-2">
+                <EmptyState
+                  icon={<Clock size={24} className="text-gray-400" />}
+                  title="パターンがありません"
+                  description="シフトパターン設定から作成してください"
+                />
+              </div>
+            )}
+
             {/* 勤務パターン - ビジュアルカード */}
             {workPatterns.length > 0 && (
               <div className="p-1.5">

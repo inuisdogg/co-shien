@@ -17,8 +17,10 @@ import {
   Check,
   ArrowRight,
   Mail,
+  Loader2,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useToast } from '@/components/ui/Toast';
 import type { AppNotification } from '@/types';
 
 interface NotificationBellProps {
@@ -135,9 +137,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
   const {
     notifications,
     unreadCount,
+    loading,
     markAsRead,
     markAllAsRead,
   } = useNotifications(userId);
+  const { toast } = useToast();
 
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -153,16 +157,30 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
 
   // 通知をクリック
   const handleNotificationClick = useCallback(
-    (notification: AppNotification) => {
+    async (notification: AppNotification) => {
       // 未読なら既読にする
       if (!notification.read) {
-        markAsRead(notification.id);
+        try {
+          await markAsRead(notification.id);
+        } catch {
+          toast.error('既読の更新に失敗しました。');
+        }
       }
 
       // ナビゲーション先があればページ遷移
@@ -172,13 +190,17 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
         setIsOpen(false);
       }
     },
-    [markAsRead]
+    [markAsRead, toast]
   );
 
   // 「すべて既読にする」をクリック
-  const handleMarkAllAsRead = useCallback(() => {
-    markAllAsRead();
-  }, [markAllAsRead]);
+  const handleMarkAllAsRead = useCallback(async () => {
+    try {
+      await markAllAsRead();
+    } catch {
+      toast.error('既読の更新に失敗しました。');
+    }
+  }, [markAllAsRead, toast]);
 
   // 表示する通知は最大20件
   const visibleNotifications = notifications.slice(0, 20);
@@ -229,7 +251,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
 
           {/* 通知リスト */}
           <div className="max-h-[400px] overflow-y-auto">
-            {visibleNotifications.length === 0 ? (
+            {loading ? (
+              <div className="p-8 flex items-center justify-center">
+                <Loader2 size={24} className="animate-spin text-gray-300" />
+              </div>
+            ) : visibleNotifications.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">
                 <Bell size={32} className="mx-auto mb-2 text-gray-300" />
                 通知はありません

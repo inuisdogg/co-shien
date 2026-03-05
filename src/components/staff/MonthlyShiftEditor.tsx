@@ -27,6 +27,7 @@ import {
 } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface MonthlyShiftEditorProps {
   facilityId: string;
@@ -64,6 +65,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [availabilities, setAvailabilities] = useState<Map<string, Set<string>>>(new Map()); // staffId -> 希望日Set
   const [showAvailabilityOverlay, setShowAvailabilityOverlay] = useState(true);
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean; title: string; message: string; isDestructive?: boolean; onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 月の日付一覧
   const daysInMonth = useMemo(
@@ -210,6 +212,7 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
       setAvailabilities(availMap);
     } catch (error) {
       console.error('データ取得エラー:', error);
+      toast.error('シフトデータの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -317,85 +320,109 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
 
   // 公開
   const handlePublish = async () => {
-    if (!schedule || !confirm('シフトを公開しますか？スタッフに通知されます。')) return;
+    if (!schedule) return;
 
-    setIsSaving(true);
-    try {
-      // まず保存
-      await handleSave();
+    setConfirmModal({
+      isOpen: true,
+      title: 'シフト公開',
+      message: 'シフトを公開しますか？スタッフに通知されます。',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({...prev, isOpen: false}));
+        setIsSaving(true);
+        try {
+          // まず保存
+          await handleSave();
 
-      // ステータス更新
-      const { error } = await supabase
-        .from('monthly_shift_schedules')
-        .update({
-          status: 'published',
-          published_at: new Date().toISOString(),
-        })
-        .eq('id', schedule.id);
+          // ステータス更新
+          const { error } = await supabase
+            .from('monthly_shift_schedules')
+            .update({
+              status: 'published',
+              published_at: new Date().toISOString(),
+            })
+            .eq('id', schedule.id);
 
-      if (error) throw error;
+          if (error) throw error;
 
-      fetchData();
-    } catch (error) {
-      console.error('公開エラー:', error);
-      toast.error('公開に失敗しました');
-    } finally {
-      setIsSaving(false);
-    }
+          fetchData();
+        } catch (error) {
+          console.error('公開エラー:', error);
+          toast.error('公開に失敗しました');
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
 
   // 確定
   const handleConfirm = async () => {
-    if (!schedule || !confirm('シフトを確定しますか？確定後は編集できません。')) return;
+    if (!schedule) return;
 
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('monthly_shift_schedules')
-        .update({
-          status: 'confirmed',
-          confirmed_at: new Date().toISOString(),
-        })
-        .eq('id', schedule.id);
+    setConfirmModal({
+      isOpen: true,
+      title: 'シフト確定',
+      message: 'シフトを確定しますか？確定後は編集できません。',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({...prev, isOpen: false}));
+        setIsSaving(true);
+        try {
+          const { error } = await supabase
+            .from('monthly_shift_schedules')
+            .update({
+              status: 'confirmed',
+              confirmed_at: new Date().toISOString(),
+            })
+            .eq('id', schedule.id);
 
-      if (error) throw error;
+          if (error) throw error;
 
-      fetchData();
-    } catch (error) {
-      console.error('確定エラー:', error);
-      toast.error('確定に失敗しました');
-    } finally {
-      setIsSaving(false);
-    }
+          fetchData();
+        } catch (error) {
+          console.error('確定エラー:', error);
+          toast.error('確定に失敗しました');
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
 
   // 再周知
   const handleRepublish = async () => {
-    if (!schedule || !confirm('シフトを再周知しますか？\n変更があったスタッフに再度確認を求めます。')) return;
+    if (!schedule) return;
 
-    setIsSaving(true);
-    try {
-      // まず保存
-      await handleSave();
+    setConfirmModal({
+      isOpen: true,
+      title: 'シフト再周知',
+      message: 'シフトを再周知しますか？\n変更があったスタッフに再度確認を求めます。',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({...prev, isOpen: false}));
+        setIsSaving(true);
+        try {
+          // まず保存
+          await handleSave();
 
-      // 再周知を実行（トリガーが変更箇所をリセット）
-      const { error } = await supabase
-        .from('monthly_shift_schedules')
-        .update({
-          republished_at: new Date().toISOString(),
-          republish_count: (schedule.republishCount || 0) + 1,
-        })
-        .eq('id', schedule.id);
+          // 再周知を実行（トリガーが変更箇所をリセット）
+          const { error } = await supabase
+            .from('monthly_shift_schedules')
+            .update({
+              republished_at: new Date().toISOString(),
+              republish_count: (schedule.republishCount || 0) + 1,
+            })
+            .eq('id', schedule.id);
 
-      if (error) throw error;
+          if (error) throw error;
 
-      fetchData();
-    } catch (error) {
-      console.error('再周知エラー:', error);
-      toast.error('再周知に失敗しました');
-    } finally {
-      setIsSaving(false);
-    }
+          fetchData();
+        } catch (error) {
+          console.error('再周知エラー:', error);
+          toast.error('再周知に失敗しました');
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
 
   if (isLoading) {
@@ -634,6 +661,15 @@ export default function MonthlyShiftEditor({ facilityId }: MonthlyShiftEditorPro
           </div>
         ))}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+      />
     </div>
   );
 }

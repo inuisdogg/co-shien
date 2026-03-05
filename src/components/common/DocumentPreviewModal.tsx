@@ -78,6 +78,21 @@ export default function DocumentPreviewModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Escape key to close
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    },
+    [onClose]
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, handleKeyDown]);
+
   // Normalize mimeType: handle short values like "pdf" from DB as well as proper MIME strings
   const normalizedMime = (() => {
     if (!mimeType) return getMimeFromFileName(fileName);
@@ -167,18 +182,24 @@ export default function DocumentPreviewModal({
   };
 
   const handleOpenInNewTab = async () => {
-    const { data } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(cleanFilePath, 300, { download: false });
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank');
+    try {
+      const { data, error: urlError } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(cleanFilePath, 300, { download: false });
+      if (urlError) throw urlError;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Open in new tab error:', err);
+      toast.error('ファイルを開けませんでした');
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex flex-col z-[9999]" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 bg-black/60 flex flex-col z-[9999]" role="dialog" aria-modal="true" aria-label={title || fileName}>
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-900/90 text-white flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -197,6 +218,7 @@ export default function DocumentPreviewModal({
             onClick={handleOpenInNewTab}
             className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             title="別タブで開く"
+            aria-label="別タブで開く"
           >
             <ExternalLink className="w-4 h-4" />
           </button>
@@ -210,6 +232,7 @@ export default function DocumentPreviewModal({
           <button
             onClick={onClose}
             className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            aria-label="閉じる"
           >
             <X className="w-5 h-5" />
           </button>

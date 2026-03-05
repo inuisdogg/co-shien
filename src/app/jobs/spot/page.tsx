@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QUALIFICATION_CODES } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -98,6 +99,7 @@ const MONTH_NAMES = [
 
 export default function SpotWorkPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   // Data
   const [shifts, setShifts] = useState<SpotShift[]>([]);
@@ -139,6 +141,7 @@ export default function SpotWorkPage() {
       }
     } catch (err) {
       console.error('Unexpected error:', err);
+      toast.error('シフト情報の取得に失敗しました');
       setShifts([]);
     } finally {
       setLoading(false);

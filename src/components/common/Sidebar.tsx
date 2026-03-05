@@ -198,8 +198,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
     };
 
     fetchFacilityCode();
-    // 定期的に更新（30秒ごと）
-    const interval = setInterval(fetchFacilityCode, 30000);
+    // 定期的に更新（5分ごと — 施設コードはほぼ変更されない）
+    const interval = setInterval(fetchFacilityCode, 300000);
     return () => clearInterval(interval);
   }, [facility?.id]);
 
@@ -398,7 +398,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') clearSearch(); }}
             placeholder="メニューを検索..."
+            aria-label="メニューを検索"
             className="w-full pl-8 pr-8 py-2 text-[13px] bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary placeholder-gray-400 transition-colors"
           />
           {searchQuery && (
@@ -471,6 +473,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = fal
                 {/* カテゴリヘッダー（クリックで展開/折りたたみ） */}
                 <button
                   onClick={() => toggleCategory(category.category)}
+                  aria-expanded={isExpanded}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 ${
                     hasActiveItem
                       ? `${isCareer ? 'bg-purple-50 text-purple-700' : 'bg-primary/5 text-primary'}`

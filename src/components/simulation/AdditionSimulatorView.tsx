@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calculator,
   Users,
@@ -9,6 +9,7 @@ import {
   RefreshCw,
   AlertCircle,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 import { useAdditionSimulator } from '@/hooks/useAdditionSimulator';
 import SystemAdditionsTab from './SystemAdditionsTab';
 import MonthlyRevenueTab from './MonthlyRevenueTab';
@@ -25,6 +26,8 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 export default function AdditionSimulatorView() {
   const [activeTab, setActiveTab] = useState<TabId>('system');
 
+  const { toast } = useToast();
+
   const {
     staff,
     children,
@@ -36,6 +39,13 @@ export default function AdditionSimulatorView() {
     error,
     refresh,
   } = useAdditionSimulator();
+
+  // Show toast when error changes
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   // サマリーカードのデータ
   const eligibleCount = simulationResult?.selectedAdditions.filter(a => a.isEligible).length || 0;

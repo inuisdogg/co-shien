@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface MonthlyTask {
   id: string;
@@ -41,6 +42,8 @@ const MonthlyOperationsPanel: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [taskStatuses, setTaskStatuses] = useState<Record<string, 'pending' | 'done' | 'overdue'>>({});
   const [loading, setLoading] = useState(true);
+  const [statusCheckError, setStatusCheckError] = useState(false);
+  const [undoConfirmTaskId, setUndoConfirmTaskId] = useState<string | null>(null);
 
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -167,7 +170,9 @@ const MonthlyOperationsPanel: React.FC = () => {
 
     const checkAll = async () => {
       setLoading(true);
+      setStatusCheckError(false);
       const statuses: Record<string, 'pending' | 'done' | 'overdue'> = {};
+      let hadError = false;
 
       // localStorage の手動完了チェック
       const manualKey = `monthly_ops_${currentYear}-${String(currentMonth).padStart(2, '0')}`;
@@ -185,10 +190,12 @@ const MonthlyOperationsPanel: React.FC = () => {
             statuses[task.id] = 'pending';
           }
         } catch {
+          hadError = true;
           statuses[task.id] = currentDay > task.deadlineDay ? 'overdue' : 'pending';
         }
       }
       setTaskStatuses(statuses);
+      setStatusCheckError(hadError);
       setLoading(false);
     };
 
@@ -196,7 +203,16 @@ const MonthlyOperationsPanel: React.FC = () => {
   }, [facility?.id, monthlyTasks, currentDay, currentYear, currentMonth]);
 
   // 手動で完了/未完了を切り替え
-  const toggleTaskDone = (taskId: string) => {
+  const handleToggleTask = (taskId: string) => {
+    if (taskStatuses[taskId] === 'done') {
+      // Un-completing requires confirmation
+      setUndoConfirmTaskId(taskId);
+      return;
+    }
+    applyToggle(taskId);
+  };
+
+  const applyToggle = (taskId: string) => {
     const manualKey = `monthly_ops_${currentYear}-${String(currentMonth).padStart(2, '0')}`;
     const manualDone = JSON.parse(localStorage.getItem(manualKey) || '{}');
 
@@ -284,6 +300,14 @@ const MonthlyOperationsPanel: React.FC = () => {
         </div>
       </button>
 
+      {/* ステータスチェックエラー */}
+      {statusCheckError && isExpanded && (
+        <div className="mx-4 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+          <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+          <p className="text-xs text-amber-700">一部のステータスを自動確認できませんでした。手動で更新してください。</p>
+        </div>
+      )}
+
       {/* タスク一覧 */}
       {isExpanded && (
         <div className="px-4 pb-4 space-y-2">
@@ -305,7 +329,7 @@ const MonthlyOperationsPanel: React.FC = () => {
               >
                 {/* 完了チェック */}
                 <button
-                  onClick={() => toggleTaskDone(task.id)}
+                  onClick={() => handleToggleTask(task.id)}
                   className="shrink-0 focus:outline-none"
                   title={status === 'done' ? '未完了に戻す' : '完了にする'}
                 >
@@ -366,6 +390,22 @@ const MonthlyOperationsPanel: React.FC = () => {
           })}
         </div>
       )}
+      {/* 完了取消し確認モーダル */}
+      <ConfirmModal
+        isOpen={undoConfirmTaskId !== null}
+        title="完了を取り消しますか？"
+        message={`「${monthlyTasks.find(t => t.id === undoConfirmTaskId)?.label ?? ''}」の完了マークを外します。`}
+        confirmLabel="取り消す"
+        cancelLabel="やめる"
+        isDestructive
+        onConfirm={() => {
+          if (undoConfirmTaskId) {
+            applyToggle(undoConfirmTaskId);
+          }
+          setUndoConfirmTaskId(null);
+        }}
+        onCancel={() => setUndoConfirmTaskId(null)}
+      />
     </div>
   );
 };

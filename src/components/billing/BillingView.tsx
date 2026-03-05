@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBilling } from '@/hooks/useBilling';
+import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import { BillingRecord, BillingDetail, ServiceCode, BillingAddition, BillingStatus } from '@/types';
 
 // ─── ステータスバッジ設定 ───
@@ -42,6 +44,7 @@ const TAB_ITEMS: Array<{ id: TabId; label: string; icon: React.ElementType }> = 
 
 const BillingView: React.FC = () => {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
   const {
     billingRecords,
@@ -72,7 +75,6 @@ const BillingView: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [codeSearch, setCodeSearch] = useState('');
   const [codeCategory, setCodeCategory] = useState<string>('all');
-  const [successMessage, setSuccessMessage] = useState<string>('');
 
   // 初期データ取得
   useEffect(() => {
@@ -81,14 +83,6 @@ const BillingView: React.FC = () => {
       fetchServiceCodes();
     }
   }, [facilityId, yearMonth, fetchBillingRecords, fetchServiceCodes]);
-
-  // 成功メッセージ自動クリア
-  useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => setSuccessMessage(''), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMessage]);
 
   // ─── 月変更 ───
   const changeMonth = useCallback(
@@ -112,41 +106,67 @@ const BillingView: React.FC = () => {
   const handleGenerate = useCallback(async () => {
     if (!facilityId) return;
     setIsGenerating(true);
-    const records = await generateMonthlyBilling(facilityId, yearMonth);
-    setIsGenerating(false);
-    if (records.length > 0) {
-      setSuccessMessage(`${records.length}件の請求データを生成しました`);
+    try {
+      const records = await generateMonthlyBilling(facilityId, yearMonth);
+      if (records.length > 0) {
+        toast.success(`${records.length}件の請求データを生成しました`);
+      } else {
+        toast.warning('生成対象の利用実績がありません');
+      }
+    } catch (err) {
+      console.error('Error generating billing:', err);
+      toast.error('請求データの生成中にエラーが発生しました');
+    } finally {
+      setIsGenerating(false);
     }
-  }, [facilityId, yearMonth, generateMonthlyBilling]);
+  }, [facilityId, yearMonth, generateMonthlyBilling, toast]);
 
   // ─── 一括確定 ───
   const handleConfirm = useCallback(async () => {
     if (!facilityId) return;
     setIsConfirming(true);
-    const ok = await confirmBilling(facilityId, yearMonth);
-    if (ok) {
-      await fetchBillingRecords(facilityId, yearMonth);
-      setSuccessMessage('全件を確定しました');
+    try {
+      const ok = await confirmBilling(facilityId, yearMonth);
+      if (ok) {
+        await fetchBillingRecords(facilityId, yearMonth);
+        toast.success('全件を確定しました');
+      } else {
+        toast.error('確定処理に失敗しました');
+      }
+    } catch (err) {
+      console.error('Error confirming billing:', err);
+      toast.error('確定処理中にエラーが発生しました');
+    } finally {
+      setIsConfirming(false);
     }
-    setIsConfirming(false);
-  }, [facilityId, yearMonth, confirmBilling, fetchBillingRecords]);
+  }, [facilityId, yearMonth, confirmBilling, fetchBillingRecords, toast]);
 
   // ─── 行クリック → 明細モーダル ───
   const handleRowClick = useCallback(
     async (record: BillingRecord) => {
       setSelectedRecord(record);
-      await fetchBillingDetails(record.id);
-      setShowDetailModal(true);
+      try {
+        await fetchBillingDetails(record.id);
+        setShowDetailModal(true);
+      } catch (err) {
+        console.error('Error fetching billing details:', err);
+        toast.error('明細データの取得に失敗しました');
+      }
     },
-    [fetchBillingDetails]
+    [fetchBillingDetails, toast]
   );
 
   // ─── CSV出力 ───
   const handleExportCSV = useCallback(async () => {
     if (!facilityId) return;
-    const csv = await exportCSV(facilityId, yearMonth);
-    setCsvPreview(csv);
-  }, [facilityId, yearMonth, exportCSV]);
+    try {
+      const csv = await exportCSV(facilityId, yearMonth);
+      setCsvPreview(csv);
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+      toast.error('CSV出力中にエラーが発生しました');
+    }
+  }, [facilityId, yearMonth, exportCSV, toast]);
 
   const handleDownloadCSV = useCallback(() => {
     if (!csvPreview) return;
@@ -198,59 +218,77 @@ const BillingView: React.FC = () => {
   // ─── 明細編集ハンドラ ───
   const handleDetailUnitChange = useCallback(
     async (detail: BillingDetail, newUnits: number) => {
-      await updateBillingDetail(detail.id, { unitCount: newUnits });
-      // 合計を再計算
-      if (selectedChildRecord) {
-        const allDetails = billingDetails.map((d) =>
-          d.id === detail.id ? { ...d, unitCount: newUnits } : d
-        );
-        const newTotal = allDetails.reduce((sum, d) => sum + d.unitCount, 0);
-        const totalAmount = newTotal * selectedChildRecord.unitPrice;
-        const copayAmount = Math.min(
-          Math.floor(totalAmount * 0.1),
-          selectedChildRecord.upperLimitAmount > 0 ? selectedChildRecord.upperLimitAmount : totalAmount
-        );
-        await updateBillingRecord(selectedChildRecord.id, {
-          totalUnits: newTotal,
-          totalAmount,
-          copayAmount,
-          insuranceAmount: totalAmount - copayAmount,
-        });
-        fetchBillingRecords(facilityId, yearMonth);
+      try {
+        await updateBillingDetail(detail.id, { unitCount: newUnits });
+        // 合計を再計算
+        if (selectedChildRecord) {
+          const allDetails = billingDetails.map((d) =>
+            d.id === detail.id ? { ...d, unitCount: newUnits } : d
+          );
+          const newTotal = allDetails.reduce((sum, d) => sum + d.unitCount, 0);
+          const totalAmount = newTotal * selectedChildRecord.unitPrice;
+          const copayAmount = Math.min(
+            Math.floor(totalAmount * 0.1),
+            selectedChildRecord.upperLimitAmount > 0 ? selectedChildRecord.upperLimitAmount : totalAmount
+          );
+          await updateBillingRecord(selectedChildRecord.id, {
+            totalUnits: newTotal,
+            totalAmount,
+            copayAmount,
+            insuranceAmount: totalAmount - copayAmount,
+          });
+          fetchBillingRecords(facilityId, yearMonth);
+        }
+        toast.success('単位数を更新しました');
+      } catch (err) {
+        console.error('Error updating billing detail:', err);
+        toast.error('単位数の更新に失敗しました');
       }
     },
-    [billingDetails, selectedChildRecord, updateBillingDetail, updateBillingRecord, facilityId, yearMonth, fetchBillingRecords]
+    [billingDetails, selectedChildRecord, updateBillingDetail, updateBillingRecord, facilityId, yearMonth, fetchBillingRecords, toast]
   );
 
   const handleAddAddition = useCallback(
     async (detail: BillingDetail, addition: BillingAddition) => {
-      const newAdditions = [...(detail.additions ?? []), addition];
-      const additionUnitsTotal = newAdditions.reduce((s, a) => s + a.units, 0);
-      const baseUnits = detail.unitCount - (detail.additions ?? []).reduce((s, a) => s + a.units, 0);
-      const newUnitCount = baseUnits + additionUnitsTotal;
-      await updateBillingDetail(detail.id, { additions: newAdditions, unitCount: newUnitCount });
-      if (selectedChildRecord) {
-        await fetchBillingDetails(selectedChildRecord.id);
-        fetchBillingRecords(facilityId, yearMonth);
+      try {
+        const newAdditions = [...(detail.additions ?? []), addition];
+        const additionUnitsTotal = newAdditions.reduce((s, a) => s + a.units, 0);
+        const baseUnits = detail.unitCount - (detail.additions ?? []).reduce((s, a) => s + a.units, 0);
+        const newUnitCount = baseUnits + additionUnitsTotal;
+        await updateBillingDetail(detail.id, { additions: newAdditions, unitCount: newUnitCount });
+        if (selectedChildRecord) {
+          await fetchBillingDetails(selectedChildRecord.id);
+          fetchBillingRecords(facilityId, yearMonth);
+        }
+        toast.success('加算を追加しました');
+      } catch (err) {
+        console.error('Error adding addition:', err);
+        toast.error('加算の追加に失敗しました');
       }
     },
-    [updateBillingDetail, selectedChildRecord, fetchBillingDetails, facilityId, yearMonth, fetchBillingRecords]
+    [updateBillingDetail, selectedChildRecord, fetchBillingDetails, facilityId, yearMonth, fetchBillingRecords, toast]
   );
 
   const handleRemoveAddition = useCallback(
     async (detail: BillingDetail, index: number) => {
       const additions = detail.additions ?? [];
       if (index < 0 || index >= additions.length) return;
-      const removed = additions[index];
-      const newAdditions = additions.filter((_, i) => i !== index);
-      const newUnitCount = detail.unitCount - removed.units;
-      await updateBillingDetail(detail.id, { additions: newAdditions, unitCount: newUnitCount });
-      if (selectedChildRecord) {
-        await fetchBillingDetails(selectedChildRecord.id);
-        fetchBillingRecords(facilityId, yearMonth);
+      try {
+        const removed = additions[index];
+        const newAdditions = additions.filter((_, i) => i !== index);
+        const newUnitCount = detail.unitCount - removed.units;
+        await updateBillingDetail(detail.id, { additions: newAdditions, unitCount: newUnitCount });
+        if (selectedChildRecord) {
+          await fetchBillingDetails(selectedChildRecord.id);
+          fetchBillingRecords(facilityId, yearMonth);
+        }
+        toast.success('加算を削除しました');
+      } catch (err) {
+        console.error('Error removing addition:', err);
+        toast.error('加算の削除に失敗しました');
       }
     },
-    [updateBillingDetail, selectedChildRecord, fetchBillingDetails, facilityId, yearMonth, fetchBillingRecords]
+    [updateBillingDetail, selectedChildRecord, fetchBillingDetails, facilityId, yearMonth, fetchBillingRecords, toast]
   );
 
   // ─── サービスコードフィルタ ───
@@ -312,14 +350,6 @@ const BillingView: React.FC = () => {
           <p className="text-sm text-gray-500 mt-1">障害児通所支援 介護給付費等明細書</p>
         </div>
       </div>
-
-      {/* 成功メッセージ */}
-      {successMessage && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 flex items-center gap-2">
-          <CheckCircle size={16} className="text-emerald-600" />
-          <span className="text-sm text-emerald-700">{successMessage}</span>
-        </div>
-      )}
 
       {/* エラーメッセージ */}
       {error && (
@@ -408,11 +438,11 @@ const BillingView: React.FC = () => {
                     <div className="w-6 h-6 border-2 border-t-transparent border-primary rounded-full animate-spin" />
                   </div>
                 ) : billingRecords.length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
-                    <Receipt size={40} className="mx-auto mb-3 opacity-30" />
-                    <p className="text-sm">請求データがありません</p>
-                    <p className="text-xs mt-1">「自動生成」ボタンで利用実績から生成できます</p>
-                  </div>
+                  <EmptyState
+                    icon={<Receipt size={28} className="text-gray-400" />}
+                    title="請求データがありません"
+                    description="「自動生成」ボタンで利用実績から生成できます"
+                  />
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
@@ -511,11 +541,11 @@ const BillingView: React.FC = () => {
               )}
 
               {billingDetails.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <FileText size={40} className="mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">明細データがありません</p>
-                  {!selectedChildId && <p className="text-xs mt-1">児童を選択してください</p>}
-                </div>
+                <EmptyState
+                  icon={<FileText size={28} className="text-gray-400" />}
+                  title="明細データがありません"
+                  description={!selectedChildId ? '児童を選択してください' : undefined}
+                />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

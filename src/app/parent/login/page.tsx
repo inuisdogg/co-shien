@@ -8,7 +8,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
-import { verifyPassword } from '@/utils/password';
 import { startAuthentication } from '@simplewebauthn/browser';
 
 export const dynamic = 'force-dynamic';
@@ -26,8 +25,14 @@ export default function ClientLoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) setSessionCheckTimedOut(true);
+    }, 8000);
+
     const checkSession = async () => {
       try {
         // セッション有効期限チェック
@@ -71,9 +76,17 @@ export default function ClientLoginPage() {
         setPasskeySupported(true);
       }
 
-      setCheckingSession(false);
+      if (!cancelled) {
+        setCheckingSession(false);
+        clearTimeout(timeout);
+      }
     };
     checkSession();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -82,25 +95,28 @@ export default function ClientLoginPage() {
     setLoading(true);
 
     try {
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .or(`email.eq.${email.toLowerCase()},login_id.eq.${email.toLowerCase()}`)
-        .eq('account_status', 'active')
-        .eq('user_type', 'client')
-        .single();
+      // サーバーサイドAPIでパスワード検証（password_hashをクライアントに露出させない）
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facilityCode: '',
+          loginId: email,
+          password,
+        }),
+      });
 
-      if (userError || !userData) {
-        throw new Error('メールアドレスまたはパスワードが正しくありません');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'ログインに失敗しました');
       }
 
-      if (!userData.password_hash) {
-        throw new Error('このアカウントにはパスワードが設定されていません。パスワードリセットを行ってください。');
-      }
+      const userData = data.user;
 
-      const isValid = await verifyPassword(password, userData.password_hash);
-      if (!isValid) {
-        throw new Error('メールアドレスまたはパスワードが正しくありません');
+      // 保護者アカウント以外はブロック
+      if (userData.user_type !== 'client') {
+        throw new Error('このアカウントは保護者アカウントではありません。スタッフの方はキャリアログインをご利用ください。');
       }
 
       const user = {
@@ -191,6 +207,10 @@ export default function ClientLoginPage() {
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
         setError('パスキー認証がキャンセルされました');
+      } else if (err.name === 'AbortError') {
+        setError('パスキー認証がタイムアウトしました。もう一度お試しください。');
+      } else if (err.name === 'InvalidStateError') {
+        setError('パスキーが見つかりません。パスワードでログインしてください。');
       } else {
         setError(err.message || 'パスキー認証に失敗しました');
       }
@@ -202,7 +222,20 @@ export default function ClientLoginPage() {
   if (checkingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-client-light">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-client"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-client mx-auto"></div>
+          {sessionCheckTimedOut && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-500">接続に時間がかかっています</p>
+              <button
+                onClick={() => setCheckingSession(false)}
+                className="mt-2 text-sm text-client hover:underline"
+              >
+                ログイン画面を表示
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -252,9 +285,10 @@ export default function ClientLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="username"
                 className="w-full h-12 pl-10 pr-4 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client transition-all"
                 placeholder="example@email.com"
-                disabled={loading}
+                disabled={loading || passkeyLoading}
               />
             </div>
           </div>
@@ -273,9 +307,10 @@ export default function ClientLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="w-full h-12 pl-10 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client transition-all"
                 placeholder="パスワードを入力"
-                disabled={loading}
+                disabled={loading || passkeyLoading}
               />
               <button
                 type="button"

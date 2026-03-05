@@ -165,6 +165,7 @@ export default function ShiftConfirmationDashboard({ facilityId }: ShiftConfirma
       setSummaries(staffSummaries);
     } catch (error) {
       console.error('データ取得エラー:', error);
+      toast.error('シフト確認データの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }

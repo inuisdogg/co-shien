@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import EmptyState from '@/components/ui/EmptyState';
+import { useToast } from '@/components/ui/Toast';
 import CommitteeView from '@/components/committee/CommitteeView';
 
 type TrainingType = 'internal' | 'external' | 'online' | 'oj_training';
@@ -146,6 +148,7 @@ function SkeletonCard() {
 
 function TrainingRecordContent() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [records, setRecords] = useState<TrainingRecord[]>([]);
@@ -166,11 +169,13 @@ function TrainingRecordContent() {
           .order('training_date', { ascending: false });
         if (error) {
           console.error('Error fetching training records:', error);
+          toast.error('研修記録の取得に失敗しました');
           return;
         }
         if (data) setRecords(data.map(mapRow));
       } catch (error) {
         console.error('Error in fetchRecords:', error);
+        toast.error('研修記録の取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -365,20 +370,17 @@ function TrainingRecordContent() {
       {/* Record List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center">
-              <BookOpen className="w-8 h-8 text-gray-300" />
-            </div>
-            <p className="text-gray-500 mb-2">
-              {records.length === 0 ? '研修記録がまだ登録されていません' : '条件に一致する研修記録がありません'}
-            </p>
-            {records.length === 0 && (
-              <button className="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors mt-2">
+          <EmptyState
+            icon={<BookOpen className="w-7 h-7 text-gray-400" />}
+            title={records.length === 0 ? '研修記録がまだ登録されていません' : '条件に一致する研修記録がありません'}
+            description={records.length === 0 ? '「記録を追加」ボタンから研修記録を追加してください' : undefined}
+            action={records.length === 0 ? (
+              <button className="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
                 <Plus className="w-4 h-4" />
                 記録を追加
               </button>
-            )}
-          </div>
+            ) : undefined}
+          />
         ) : (
           <div className="divide-y divide-gray-100">
             {filtered.map(record => {

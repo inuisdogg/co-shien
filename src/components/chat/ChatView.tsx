@@ -3,7 +3,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
+import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+
+const MAX_MESSAGE_LENGTH = 1000;
 
 interface ChatMessage {
   id: string;
@@ -38,9 +41,11 @@ export default function ChatView({
   currentUserType,
   onBack,
 }: ChatViewProps) {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,8 +77,9 @@ export default function ChatView({
             }
           }
         }
-      } catch {
-        // chat_messagesテーブルが未作成の場合は空のまま
+      } catch (err) {
+        console.error('チャット読み込みエラー:', err);
+        if (!cancelled) toast.error('メッセージの読み込みに失敗しました');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -118,9 +124,10 @@ export default function ChatView({
 
   const sendMessage = async () => {
     const text = newMessage.trim();
-    if (!text) return;
+    if (!text || sending) return;
 
     setNewMessage('');
+    setSending(true);
 
     try {
       const { error } = await supabase.from('chat_messages').insert({
@@ -134,10 +141,15 @@ export default function ChatView({
 
       if (error) {
         console.error('メッセージ送信エラー:', error);
+        toast.error('メッセージの送信に失敗しました');
         setNewMessage(text);
       }
-    } catch {
+    } catch (err) {
+      console.error('メッセージ送信エラー:', err);
+      toast.error('メッセージの送信に失敗しました');
       setNewMessage(text);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -254,24 +266,44 @@ export default function ChatView({
       {/* Input */}
       <div className="bg-white border-t px-4 py-3">
         <div className="flex items-end gap-2">
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="メッセージを入力..."
-            rows={1}
-            className="flex-1 resize-none border rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            style={{ maxHeight: '120px' }}
-          />
+          <div className="flex-1 relative">
+            <textarea
+              value={newMessage}
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_MESSAGE_LENGTH) {
+                  setNewMessage(e.target.value);
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="メッセージを入力..."
+              rows={1}
+              maxLength={MAX_MESSAGE_LENGTH}
+              className="w-full resize-none border rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              style={{ maxHeight: '120px' }}
+            />
+            {newMessage.length > MAX_MESSAGE_LENGTH * 0.8 && (
+              <span
+                className={`absolute bottom-1 right-2 text-[10px] ${
+                  newMessage.length >= MAX_MESSAGE_LENGTH ? 'text-red-500' : 'text-gray-400'
+                }`}
+              >
+                {newMessage.length}/{MAX_MESSAGE_LENGTH}
+              </span>
+            )}
+          </div>
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim()}
+            disabled={!newMessage.trim() || sending}
             className="p-2 bg-primary text-white rounded-full hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             aria-label="送信"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
+            {sending ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            )}
           </button>
         </div>
       </div>

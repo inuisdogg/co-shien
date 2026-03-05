@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ---- Local types ----
 type PlanType = 'earthquake' | 'flood' | 'pandemic' | 'fire';
@@ -100,6 +102,7 @@ const STATUS_CONFIG: Record<PlanStatus, { label: string; color: string; bg: stri
 
 const BcpManagementPanel: React.FC = () => {
   const { facility, user } = useAuth();
+  const { toast } = useToast();
 
   const [plans, setPlans] = useState<BcpPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,6 +144,15 @@ const BcpManagementPanel: React.FC = () => {
     notes: '',
   });
 
+  // Confirm modal
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
   // ---- Fetch plans ----
   const fetchPlans = useCallback(async () => {
     if (!facility?.id) return;
@@ -169,10 +181,11 @@ const BcpManagementPanel: React.FC = () => {
       );
     } catch (err) {
       console.error('Error fetching BCP plans:', err);
+      toast.error('BCP計画の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [facility?.id]);
+  }, [facility?.id, toast]);
 
   useEffect(() => {
     fetchPlans();
@@ -279,19 +292,35 @@ const BcpManagementPanel: React.FC = () => {
         });
       }
       setShowPlanModal(false);
+      toast.success(editingPlanId ? 'BCP計画を更新しました' : 'BCP計画を作成しました');
       fetchPlans();
     } catch (err) {
       console.error('Error saving BCP plan:', err);
+      toast.error('BCP計画の保存に失敗しました');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeletePlan = async (id: string) => {
-    if (!confirm('このBCP計画を削除してもよろしいですか？')) return;
-    await supabase.from('bcp_plans').delete().eq('id', id);
-    if (expandedPlanId === id) setExpandedPlanId(null);
-    fetchPlans();
+  const handleDeletePlan = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'BCP計画の削除',
+      message: 'このBCP計画を削除してもよろしいですか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.from('bcp_plans').delete().eq('id', id);
+          if (expandedPlanId === id) setExpandedPlanId(null);
+          toast.success('BCP計画を削除しました');
+          fetchPlans();
+        } catch (err) {
+          console.error('Error deleting BCP plan:', err);
+          toast.error('BCP計画の削除に失敗しました');
+        }
+      },
+    });
   };
 
   // ---- Contact CRUD ----
@@ -332,16 +361,32 @@ const BcpManagementPanel: React.FC = () => {
         await supabase.from('bcp_emergency_contacts').insert(payload);
       }
       setShowContactModal(false);
+      toast.success(editingContactId ? '連絡先を更新しました' : '連絡先を追加しました');
       fetchPlanDetails(expandedPlanId);
     } catch (err) {
       console.error('Error saving contact:', err);
+      toast.error('連絡先の保存に失敗しました');
     }
   };
 
-  const handleDeleteContact = async (id: string) => {
-    if (!confirm('この連絡先を削除しますか？')) return;
-    await supabase.from('bcp_emergency_contacts').delete().eq('id', id);
-    if (expandedPlanId) fetchPlanDetails(expandedPlanId);
+  const handleDeleteContact = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '連絡先の削除',
+      message: 'この連絡先を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.from('bcp_emergency_contacts').delete().eq('id', id);
+          toast.success('連絡先を削除しました');
+          if (expandedPlanId) fetchPlanDetails(expandedPlanId);
+        } catch (err) {
+          console.error('Error deleting contact:', err);
+          toast.error('連絡先の削除に失敗しました');
+        }
+      },
+    });
   };
 
   // ---- Drill CRUD ----
@@ -374,16 +419,32 @@ const BcpManagementPanel: React.FC = () => {
         created_by: user?.id || null,
       });
       setShowDrillModal(false);
+      toast.success('訓練記録を保存しました');
       fetchPlanDetails(expandedPlanId);
     } catch (err) {
       console.error('Error saving drill record:', err);
+      toast.error('訓練記録の保存に失敗しました');
     }
   };
 
-  const handleDeleteDrill = async (id: string) => {
-    if (!confirm('この訓練記録を削除しますか？')) return;
-    await supabase.from('bcp_plans').delete().eq('id', id);
-    if (expandedPlanId) fetchPlanDetails(expandedPlanId);
+  const handleDeleteDrill = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '訓練記録の削除',
+      message: 'この訓練記録を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.from('bcp_plans').delete().eq('id', id);
+          toast.success('訓練記録を削除しました');
+          if (expandedPlanId) fetchPlanDetails(expandedPlanId);
+        } catch (err) {
+          console.error('Error deleting drill record:', err);
+          toast.error('訓練記録の削除に失敗しました');
+        }
+      },
+    });
   };
 
   // ---- Helpers ----
@@ -790,6 +851,16 @@ const BcpManagementPanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmModal.isDestructive}
+      />
 
       {/* Drill Create Modal */}
       {showDrillModal && (

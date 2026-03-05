@@ -10,6 +10,7 @@ import { X, Save, Calendar, Truck, Users, FileText } from 'lucide-react';
 import { FacilityChildrenSettings, Staff, ResolvedSlotInfo, TransportVehicle } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 
 const DEFAULT_RESOLVED_SLOTS: ResolvedSlotInfo[] = [
   { key: 'AM', name: '午前', startTime: '09:00', endTime: '12:00', capacity: 10, displayOrder: 1 },
@@ -110,6 +111,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+        toast.error('設定の読み込みに失敗しました');
       } finally {
         setLoading(false);
       }
@@ -227,6 +229,7 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
         .update(childUpdate)
         .eq('id', childId);
 
+      toast.success('設定を保存しました');
       onSave();
       onClose();
     } catch (error) {
@@ -466,12 +469,12 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
           </div>
 
           {/* 担当職員 */}
-          {staffList.length > 0 && (
-            <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <Users size={18} className="text-primary" />
-                <h3 className="font-bold text-sm text-gray-700">担当職員</h3>
-              </div>
+          <div>
+            <div className="flex items-center space-x-2 mb-3">
+              <Users size={18} className="text-primary" />
+              <h3 className="font-bold text-sm text-gray-700">担当職員</h3>
+            </div>
+            {staffList.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {staffList.map((staff) => {
                   const isSelected = settings.assignedStaffIds?.includes(staff.id);
@@ -490,8 +493,14 @@ export const FacilitySettingsEditor: React.FC<Props> = ({
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <EmptyState
+                icon={<Users size={24} className="text-gray-400" />}
+                title="職員が登録されていません"
+                description="職員管理から職員を登録すると、担当職員を割り当てできます"
+              />
+            )}
+          </div>
         </div>
 
         {/* フッター */}

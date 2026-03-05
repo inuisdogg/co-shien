@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { UsageRecordFormData, UsageRecord, ScheduleItem, ResolvedSlotInfo } from '@/types';
 import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
+import { useToast } from '@/components/ui/Toast';
 
 interface UsageRecordFormProps {
   scheduleItem: ScheduleItem;
@@ -244,7 +245,9 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
   onCopyPrevious,
   resolvedSlots: resolvedSlotsProp,
 }) => {
+  const { toast } = useToast();
   const defaultSlots = resolvedSlotsProp || resolveTimeSlots([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<ExtendedFormData>(() => ({
     scheduleId: scheduleItem.id,
     childId: scheduleItem.childId,
@@ -421,11 +424,51 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
     return formData.additionDetails?.find((d) => d.additionId === additionId)?.fields || {};
   };
 
+  // バリデーション
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (formData.serviceStatus === '利用') {
+      if (!formData.actualStartTime) {
+        errors.actualStartTime = '実績開始時間を入力してください';
+      }
+      if (!formData.actualEndTime) {
+        errors.actualEndTime = '実績終了時間を入力してください';
+      }
+      if (formData.actualStartTime && formData.actualEndTime && formData.actualStartTime >= formData.actualEndTime) {
+        errors.actualEndTime = '終了時間は開始時間より後にしてください';
+      }
+    }
+
+    // 選択済み加算の必須フィールドチェック
+    for (const additionId of formData.addonItems) {
+      const addition = IMPLEMENTATION_ADDITIONS.find(a => a.id === additionId);
+      if (!addition) continue;
+      const detail = getAdditionDetail(additionId);
+      for (const field of addition.requiredFields) {
+        if (field.required && !detail[field.id]?.trim()) {
+          errors[`addition_${additionId}_${field.id}`] = `${addition.name}の「${field.label}」は必須です`;
+        }
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   // フォーム送信
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      toast.error('入力内容に不備があります。赤字の項目を確認してください。');
+      return;
+    }
     setIsSaving(true);
     try {
       await onSave(formData);
+      toast.success('利用実績を保存しました');
+    } catch (err) {
+      console.error('Error saving usage record:', err);
+      toast.error('保存に失敗しました。もう一度お試しください。');
     } finally {
       setIsSaving(false);
     }
@@ -628,18 +671,29 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                 <div className="flex items-center gap-3">
                   <input
                     type="time"
-                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base"
+                    className={`flex-1 h-12 px-4 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base ${validationErrors.actualStartTime ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
                     value={formData.actualStartTime || ''}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, actualStartTime: e.target.value }))}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, actualStartTime: e.target.value }));
+                      setValidationErrors((prev) => { const { actualStartTime, ...rest } = prev; return rest; });
+                    }}
                   />
                   <span className="text-gray-400 text-lg">〜</span>
                   <input
                     type="time"
-                    className="flex-1 h-12 px-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base"
+                    className={`flex-1 h-12 px-4 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary text-base ${validationErrors.actualEndTime ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
                     value={formData.actualEndTime || ''}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, actualEndTime: e.target.value }))}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, actualEndTime: e.target.value }));
+                      setValidationErrors((prev) => { const { actualEndTime, ...rest } = prev; return rest; });
+                    }}
                   />
                 </div>
+                {(validationErrors.actualStartTime || validationErrors.actualEndTime) && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {validationErrors.actualStartTime || validationErrors.actualEndTime}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -782,7 +836,11 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                                   <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                                   <span>{addition.notes}</span>
                                 </div>
-                                {addition.requiredFields.map((field) => (
+                                {addition.requiredFields.map((field) => {
+                                  const fieldErrorKey = `addition_${addition.id}_${field.id}`;
+                                  const fieldError = validationErrors[fieldErrorKey];
+                                  const errorBorder = fieldError ? 'border-red-400 bg-red-50' : 'border-gray-200';
+                                  return (
                                   <div key={field.id}>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">
                                       {field.label}
@@ -790,17 +848,23 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                                     </label>
                                     {field.type === 'textarea' ? (
                                       <textarea
-                                        className="w-full h-12 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                                        className={`w-full h-12 px-3 py-2 border ${errorBorder} rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none`}
                                         rows={2}
                                         placeholder={field.placeholder}
                                         value={detail[field.id] || ''}
-                                        onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                        onChange={(e) => {
+                                          updateAdditionField(addition.id, field.id, e.target.value);
+                                          if (fieldError) setValidationErrors((prev) => { const { [fieldErrorKey]: _, ...rest } = prev; return rest; });
+                                        }}
                                       />
                                     ) : field.type === 'select' ? (
                                       <select
-                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        className={`w-full h-12 px-3 border ${errorBorder} rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                                         value={detail[field.id] || ''}
-                                        onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                        onChange={(e) => {
+                                          updateAdditionField(addition.id, field.id, e.target.value);
+                                          if (fieldError) setValidationErrors((prev) => { const { [fieldErrorKey]: _, ...rest } = prev; return rest; });
+                                        }}
                                       >
                                         <option value="">選択してください</option>
                                         {field.options?.map((opt) => (
@@ -810,14 +874,19 @@ const UsageRecordForm: React.FC<UsageRecordFormProps> = ({
                                     ) : (
                                       <input
                                         type={field.type}
-                                        className="w-full h-12 px-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        className={`w-full h-12 px-3 border ${errorBorder} rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                                         placeholder={field.placeholder}
                                         value={detail[field.id] || ''}
-                                        onChange={(e) => updateAdditionField(addition.id, field.id, e.target.value)}
+                                        onChange={(e) => {
+                                          updateAdditionField(addition.id, field.id, e.target.value);
+                                          if (fieldError) setValidationErrors((prev) => { const { [fieldErrorKey]: _, ...rest } = prev; return rest; });
+                                        }}
                                       />
                                     )}
+                                    {fieldError && <p className="text-xs text-red-500 mt-0.5">{fieldError}</p>}
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}

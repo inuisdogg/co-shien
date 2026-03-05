@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { parseQualifications } from '@/utils/qualifications';
 import { exportWorkScheduleToExcel } from '@/lib/excelEngine';
 import {
@@ -54,6 +55,7 @@ function mapRowToReport(row: any): WorkScheduleReport {
 
 export default function WorkScheduleView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [reports, setReports] = useState<WorkScheduleReport[]>([]);
@@ -83,6 +85,7 @@ export default function WorkScheduleView() {
 
         if (error) {
           console.error('Error fetching work schedule reports:', error);
+          toast.error('勤務体制一覧表の取得に失敗しました');
           return;
         }
         if (data) {
@@ -92,6 +95,7 @@ export default function WorkScheduleView() {
         }
       } catch (error) {
         console.error('Error in fetchReports:', error);
+        toast.error('勤務体制一覧表の取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -203,8 +207,10 @@ export default function WorkScheduleView() {
           setSelectedReport(mapped);
         }
       }
+      toast.success('勤務体制一覧表を生成しました');
     } catch (error) {
       console.error('Error generating report:', error);
+      toast.error('勤務体制一覧表の生成に失敗しました');
     } finally {
       setGenerating(false);
     }
@@ -240,8 +246,11 @@ export default function WorkScheduleView() {
       if (selectedReport?.id === report.id) {
         setSelectedReport(updated);
       }
+      const statusLabel = newStatus === 'submitted' ? '提出' : newStatus === 'approved' ? '承認' : newStatus;
+      toast.success(`${statusLabel}しました`);
     } catch (error) {
       console.error('Error updating report status:', error);
+      toast.error('ステータスの更新に失敗しました');
     } finally {
       setUpdatingStatus(null);
     }
@@ -315,10 +324,12 @@ export default function WorkScheduleView() {
 
       {/* Report List */}
       {reports.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
-          <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="font-medium">勤務体制一覧表がありません</p>
-          <p className="text-sm mt-1">「今月分を生成」ボタンで現在の人員配置から一覧表を作成できます</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <EmptyState
+            icon={<ClipboardList className="w-7 h-7 text-gray-400" />}
+            title="勤務体制一覧表がありません"
+            description="上部の「生成」ボタンで現在の人員配置から一覧表を作成できます"
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -388,7 +399,11 @@ export default function WorkScheduleView() {
                 </div>
 
                 {selectedReport.staffAssignments.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">スタッフ配置データがありません</div>
+                  <EmptyState
+                    icon={<Users className="w-7 h-7 text-gray-400" />}
+                    title="スタッフ配置データがありません"
+                    description="人員配置を設定してから再生成してください"
+                  />
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">

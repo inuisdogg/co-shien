@@ -307,6 +307,7 @@ export default function ChildDetailPage() {
         }
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
+        toast.error('データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -402,6 +403,7 @@ export default function ChildDetailPage() {
       toast.success('受給者証の画像をアップロードしました');
     } catch (err: any) {
       setError(err.message || '画像のアップロードに失敗しました');
+      toast.error(err.message || '画像のアップロードに失敗しました');
     } finally {
       setUploading(false);
     }

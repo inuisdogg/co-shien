@@ -118,6 +118,7 @@ export default function InvitationModal({
         });
       } catch (emailError) {
         console.error('メール再送エラー:', emailError);
+        toast.error('招待メールの再送に失敗しました');
       }
 
       handleClose();
@@ -184,6 +185,7 @@ export default function InvitationModal({
         });
       } catch (emailError) {
         console.error('メール送信エラー:', emailError);
+        toast.error('招待メールの送信に失敗しました（招待自体は作成済みです）');
         // メール送信に失敗しても招待は作成済み
       }
 

@@ -99,6 +99,7 @@ const DashboardView: React.FC = () => {
   const [paidLeaveAlerts, setPaidLeaveAlerts] = useState<{ staffName: string; daysTaken: number }[]>([]);
   const [bcpNextReview, setBcpNextReview] = useState<{ title: string; nextDate: string } | null>(null);
   const [widgetsLoading, setWidgetsLoading] = useState(true);
+  const [widgetsError, setWidgetsError] = useState<string | null>(null);
 
   // 支援計画期限アラート
   const [expiringSupportPlans, setExpiringSupportPlans] = useState<{ id: string; childName: string; periodEnd: string; isExpired: boolean }[]>([]);
@@ -110,6 +111,7 @@ const DashboardView: React.FC = () => {
     if (!facility?.id) return;
     const fetchWidgets = async () => {
       setWidgetsLoading(true);
+      setWidgetsError(null);
       try {
         const todayISO = new Date().toISOString().split('T')[0];
         const thirtyDaysLater = new Date();
@@ -273,7 +275,7 @@ const DashboardView: React.FC = () => {
           }
         } catch { /* response_due_date column may not exist yet */ }
       } catch (e) {
-        // Silently ignore - widgets will show empty state
+        setWidgetsError('管理サマリーの読み込みに失敗しました。再読み込みしてください。');
       } finally {
         setWidgetsLoading(false);
       }
@@ -1197,6 +1199,11 @@ const DashboardView: React.FC = () => {
                   </div>
                 ))}
               </div>
+            ) : widgetsError ? (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+                <AlertCircle size={18} className="text-red-500 shrink-0" />
+                <p className="text-sm text-red-700">{widgetsError}</p>
+              </div>
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* 本日の出退勤状況 */}
@@ -1508,24 +1515,32 @@ const DashboardView: React.FC = () => {
           <TrendingUp size={18} className="text-primary" />
           週別見込み売り上げ
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {weeklyRevenue.map((week) => (
-            <div
-              key={week.week}
-              className="bg-gray-50 rounded-xl p-4 border border-gray-100"
-            >
-              <div className="text-xs font-semibold text-gray-500 mb-2">
-                {week.week}週目
+        {weeklyRevenue.length === 0 ? (
+          <EmptyState
+            icon={<TrendingUp size={20} className="text-gray-400" />}
+            title="週別データがありません"
+            description="当月のスケジュール・利用実績が登録されると表示されます"
+          />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {weeklyRevenue.map((week) => (
+              <div
+                key={week.week}
+                className="bg-gray-50 rounded-xl p-4 border border-gray-100"
+              >
+                <div className="text-xs font-semibold text-gray-500 mb-2">
+                  {week.week}週目
+                </div>
+                <div className="text-lg font-bold text-gray-900 mb-1">
+                  ¥{week.revenue.toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-500">
+                  予定: {week.scheduledCount} / 実績: {week.actualCount}
+                </div>
               </div>
-              <div className="text-lg font-bold text-gray-900 mb-1">
-                ¥{week.revenue.toLocaleString()}
-              </div>
-              <div className="text-xs text-gray-500">
-                予定: {week.scheduledCount} / 実績: {week.actualCount}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 送迎利用率 */}
@@ -1644,24 +1659,32 @@ const DashboardView: React.FC = () => {
             <Users size={18} className="text-primary" />
             年齢別利用児童
           </h3>
-          <div className="space-y-3">
-            {ageDistribution.map((item) => (
-              <div key={item.age}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-medium text-gray-700">{item.age}</span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {item.count}名 ({item.percentage.toFixed(1)}%)
-                  </span>
+          {ageDistribution.length === 0 ? (
+            <EmptyState
+              icon={<Users size={20} className="text-gray-400" />}
+              title="年齢別データがありません"
+              description="利用児童が登録されると表示されます"
+            />
+          ) : (
+            <div className="space-y-3">
+              {ageDistribution.map((item) => (
+                <div key={item.age}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">{item.age}</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {item.count}名 ({item.percentage.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all"
+                      style={{ width: `${item.percentage}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all"
-                    style={{ width: `${item.percentage}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 居住地区別利用児童 */}
@@ -1670,24 +1693,32 @@ const DashboardView: React.FC = () => {
             <MapPin size={18} className="text-primary" />
             利用児童の居住地区
           </h3>
-          <div className="space-y-3">
-            {areaDistribution.slice(0, 10).map((item) => (
-              <div key={item.area}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-medium text-gray-700">{item.area}</span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {item.count}名 ({item.percentage.toFixed(1)}%)
-                  </span>
+          {areaDistribution.length === 0 ? (
+            <EmptyState
+              icon={<MapPin size={20} className="text-gray-400" />}
+              title="地区別データがありません"
+              description="利用児童の住所情報が登録されると表示されます"
+            />
+          ) : (
+            <div className="space-y-3">
+              {areaDistribution.slice(0, 10).map((item) => (
+                <div key={item.area}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">{item.area}</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {item.count}名 ({item.percentage.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all"
+                      style={{ width: `${item.percentage}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all"
-                    style={{ width: `${item.percentage}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

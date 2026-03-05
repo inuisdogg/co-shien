@@ -103,6 +103,7 @@ const RegulationAcknowledgmentPanel: React.FC<RegulationAcknowledgmentPanelProps
       setStaffList(list);
     } catch (err) {
       console.error('Error fetching acknowledgment data:', err);
+      toast.error('確認状況データの取得に失敗しました');
     } finally {
       setLoading(false);
     }

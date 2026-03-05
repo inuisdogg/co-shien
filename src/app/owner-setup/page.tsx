@@ -18,6 +18,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import { Shield, Check, AlertTriangle, LogIn, UserPlus } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,7 @@ interface UserData {
 }
 
 export default function OwnerSetupPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [alreadySetup, setAlreadySetup] = useState(false);
@@ -72,6 +74,7 @@ export default function OwnerSetupPage() {
         }
       } catch (err) {
         console.error('ステータス確認エラー:', err);
+        toast.error('ステータスの確認に失敗しました');
         setAlreadySetup(false);
       } finally {
         setChecking(false);
@@ -121,6 +124,7 @@ export default function OwnerSetupPage() {
 
       if (configError) {
         console.error('system_config更新エラー:', configError);
+        toast.error('システム設定の更新に失敗しました');
       }
 
       // ローカルストレージのユーザー情報を更新

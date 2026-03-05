@@ -5,6 +5,7 @@ import { MessageCircle, ArrowLeft, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import EmptyState from '@/components/ui/EmptyState';
+import { useToast } from '@/components/ui/Toast';
 import ChatView from './ChatView';
 
 interface ClientConversation {
@@ -26,6 +27,7 @@ const BusinessChatView: React.FC = () => {
   const [selectedClientUserId, setSelectedClientUserId] = useState<string | null>(null);
   const [selectedClientName, setSelectedClientName] = useState('');
 
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
   const facilityName = facility?.name || '施設';
   const currentUserId = user?.id || '';
@@ -100,8 +102,9 @@ const BusinessChatView: React.FC = () => {
           );
           setConversations(sorted);
         }
-      } catch {
-        // テーブル未作成時は空
+      } catch (err) {
+        console.error('チャット一覧読み込みエラー:', err);
+        if (!cancelled) toast.error('チャット一覧の読み込みに失敗しました');
       } finally {
         if (!cancelled) setLoading(false);
       }

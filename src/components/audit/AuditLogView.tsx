@@ -5,6 +5,7 @@ import { Shield, Download, ChevronLeft, ChevronRight, Filter, Calendar, User } f
 import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 
 interface AuditLog {
   id: string;
@@ -66,6 +67,7 @@ const PAGE_SIZE = 50;
 
 export default function AuditLogView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -129,12 +131,14 @@ export default function AuditLogView() {
       const { data, count, error } = await query;
       if (error) {
         console.error('Failed to fetch audit logs:', error);
+        toast.error('監査ログの取得に失敗しました');
         return;
       }
       setLogs(data || []);
       setTotalCount(count || 0);
     } catch (e) {
       console.error('Failed to fetch audit logs:', e);
+      toast.error('監査ログの取得に失敗しました');
     } finally {
       setLoading(false);
     }

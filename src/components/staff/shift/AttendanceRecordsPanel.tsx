@@ -20,6 +20,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Staff } from '@/types';
+import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 
 type AttendanceType = 'start' | 'end' | 'break_start' | 'break_end';
 
@@ -61,6 +63,7 @@ const AttendanceRecordsPanel: React.FC<AttendanceRecordsPanelProps> = ({
   month,
 }) => {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -119,6 +122,7 @@ const AttendanceRecordsPanel: React.FC<AttendanceRecordsPanelProps> = ({
         );
       } catch (err) {
         console.error('勤怠データの取得に失敗:', err);
+        toast.error('勤怠データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -282,6 +286,16 @@ const AttendanceRecordsPanel: React.FC<AttendanceRecordsPanelProps> = ({
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
+    );
+  }
+
+  if (staffList.length === 0) {
+    return (
+      <EmptyState
+        icon={<User className="w-7 h-7 text-gray-400" />}
+        title="スタッフがいません"
+        description="スタッフを登録すると勤怠記録が表示されます"
+      />
     );
   }
 

@@ -96,9 +96,34 @@ const benefits = [
   },
 ];
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "実務経験証明書デジタル発行ツール",
+  "description":
+    "キャリア情報から実務経験証明書を自動作成。メールで先方に送付し、クラウドサインで完結。印刷・郵送不要のデジタルワークフロー。保育士・福祉専門職向け。",
+  "url": "https://roots.inu.co.jp/tools/career-certificate",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "All",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "JPY",
+  },
+  "creator": {
+    "@type": "Organization",
+    "name": "Roots",
+    "url": "https://roots.inu.co.jp",
+  },
+};
+
 export default function CareerCertificatePage() {
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">

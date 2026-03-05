@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   calculateEntitlement,
   calculateExpiryDate,
@@ -67,6 +69,7 @@ interface LedgerEntry {
 
 export default function PaidLeaveManagementPanel() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -173,6 +176,7 @@ export default function PaidLeaveManagementPanel() {
       }
     } catch (err) {
       console.error('Error fetching paid leave data:', err);
+      toast.error('有給休暇データの取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -275,8 +279,10 @@ export default function PaidLeaveManagementPanel() {
       setShowGrantModal(false);
       setSelectedStaffIds([]);
       await fetchData();
+      toast.success('有給休暇を付与しました');
     } catch (err) {
       console.error('Error granting leave:', err);
+      toast.error('有給休暇の付与に失敗しました');
     } finally {
       setGranting(false);
     }
@@ -447,6 +453,7 @@ export default function PaidLeaveManagementPanel() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Excel export error:', err);
+      toast.error('Excelエクスポートに失敗しました。CSVで出力します。');
       // Fallback to CSV
       exportCSV();
     }
@@ -499,7 +506,11 @@ export default function PaidLeaveManagementPanel() {
           </div>
 
           {ledgerEntries.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">履歴がありません</div>
+            <EmptyState
+              icon={<FileText className="w-7 h-7 text-gray-400" />}
+              title="履歴がありません"
+              description="有給休暇の付与・取得履歴がまだありません"
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -605,7 +616,11 @@ export default function PaidLeaveManagementPanel() {
         </div>
 
         {staffOverview.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">スタッフが登録されていません</div>
+          <EmptyState
+            icon={<Users className="w-7 h-7 text-gray-400" />}
+            title="スタッフが登録されていません"
+            description="スタッフを登録すると有給休暇一覧が表示されます"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

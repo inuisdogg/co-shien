@@ -29,6 +29,8 @@ import {
   Eye,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   useBillingWizard,
   ValidationItem,
@@ -286,6 +288,7 @@ function ValidationPanel({ validations }: { validations: ValidationItem[] }) {
 // ============================================================
 export default function BillingWizardView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const {
@@ -467,24 +470,33 @@ export default function BillingWizardView() {
   const handleGenerate = useCallback(async () => {
     if (!facilityId) return;
     setIsGenerating(true);
-    const records = await generateMonthlyBilling(facilityId, yearMonth);
-    setIsGenerating(false);
+    try {
+      const records = await generateMonthlyBilling(facilityId, yearMonth);
 
-    if (records.length > 0) {
-      const totalUnits = records.reduce((s, r) => s + r.totalUnits, 0);
-      const totalAmount = records.reduce((s, r) => s + r.totalAmount, 0);
-      const insuranceAmount = records.reduce((s, r) => s + r.insuranceAmount, 0);
-      const copayAmount = records.reduce((s, r) => s + r.copayAmount, 0);
-      setGenerationSummary({
-        childCount: records.length,
-        totalUnits,
-        totalAmount,
-        insuranceAmount,
-        copayAmount,
-      });
-      setIsGenerated(true);
+      if (records.length > 0) {
+        const totalUnits = records.reduce((s, r) => s + r.totalUnits, 0);
+        const totalAmount = records.reduce((s, r) => s + r.totalAmount, 0);
+        const insuranceAmount = records.reduce((s, r) => s + r.insuranceAmount, 0);
+        const copayAmount = records.reduce((s, r) => s + r.copayAmount, 0);
+        setGenerationSummary({
+          childCount: records.length,
+          totalUnits,
+          totalAmount,
+          insuranceAmount,
+          copayAmount,
+        });
+        setIsGenerated(true);
+        toast.success(`${records.length}名分の請求データを生成しました`);
+      } else {
+        toast.warning('生成対象の利用実績がありません');
+      }
+    } catch (err) {
+      console.error('Error generating billing:', err);
+      toast.error('請求データの生成中にエラーが発生しました');
+    } finally {
+      setIsGenerating(false);
     }
-  }, [facilityId, yearMonth, generateMonthlyBilling]);
+  }, [facilityId, yearMonth, generateMonthlyBilling, toast]);
 
   // ============================================================
   // Step 3: Expand child details
@@ -497,11 +509,16 @@ export default function BillingWizardView() {
       }
       setExpandedChildId(record.id);
       if (!childDetails[record.id]) {
-        const details = await fetchBillingDetails(record.id);
-        setChildDetails((prev) => ({ ...prev, [record.id]: details }));
+        try {
+          const details = await fetchBillingDetails(record.id);
+          setChildDetails((prev) => ({ ...prev, [record.id]: details }));
+        } catch (err) {
+          console.error('Error fetching billing details:', err);
+          toast.error('明細データの取得に失敗しました');
+        }
       }
     },
-    [expandedChildId, childDetails, fetchBillingDetails]
+    [expandedChildId, childDetails, fetchBillingDetails, toast]
   );
 
   // ============================================================
@@ -510,22 +527,36 @@ export default function BillingWizardView() {
   const handleConfirm = useCallback(async () => {
     if (!facilityId) return;
     setIsConfirming(true);
-    const ok = await confirmBilling(facilityId, yearMonth);
-    if (ok) {
-      setIsConfirmed(true);
-      await fetchBillingRecords(facilityId, yearMonth);
+    try {
+      const ok = await confirmBilling(facilityId, yearMonth);
+      if (ok) {
+        setIsConfirmed(true);
+        await fetchBillingRecords(facilityId, yearMonth);
+        toast.success('全件を確定しました');
+      } else {
+        toast.error('確定処理に失敗しました');
+      }
+    } catch (err) {
+      console.error('Error confirming billing:', err);
+      toast.error('確定処理中にエラーが発生しました');
+    } finally {
+      setIsConfirming(false);
     }
-    setIsConfirming(false);
-  }, [facilityId, yearMonth, confirmBilling, fetchBillingRecords]);
+  }, [facilityId, yearMonth, confirmBilling, fetchBillingRecords, toast]);
 
   // ============================================================
   // Step 5: Export CSV
   // ============================================================
   const handleExportCSV = useCallback(async () => {
     if (!facilityId) return;
-    const csv = await exportCSV(facilityId, yearMonth);
-    setCsvPreview(csv);
-  }, [facilityId, yearMonth, exportCSV]);
+    try {
+      const csv = await exportCSV(facilityId, yearMonth);
+      setCsvPreview(csv);
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+      toast.error('CSV出力中にエラーが発生しました');
+    }
+  }, [facilityId, yearMonth, exportCSV, toast]);
 
   const handleDownloadCSV = useCallback(() => {
     if (!csvPreview) return;
@@ -570,156 +601,195 @@ export default function BillingWizardView() {
   const handleDashboardGenerate = useCallback(async () => {
     if (!facilityId) return;
     setIsGenerating(true);
-    await generateMonthlyBilling(facilityId, yearMonth);
-    setIsGenerating(false);
-    await fetchBillingRecords(facilityId, yearMonth);
-  }, [facilityId, yearMonth, generateMonthlyBilling, fetchBillingRecords]);
+    try {
+      const records = await generateMonthlyBilling(facilityId, yearMonth);
+      await fetchBillingRecords(facilityId, yearMonth);
+      if (records.length > 0) {
+        toast.success(`${records.length}件の請求データを生成しました`);
+      } else {
+        toast.warning('生成対象の利用実績がありません');
+      }
+    } catch (err) {
+      console.error('Error generating billing:', err);
+      toast.error('請求データの生成中にエラーが発生しました');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [facilityId, yearMonth, generateMonthlyBilling, fetchBillingRecords, toast]);
 
   const handleDashboardConfirm = useCallback(async () => {
     if (!facilityId) return;
     setIsConfirming(true);
-    const ok = await confirmBilling(facilityId, yearMonth);
-    if (ok) {
-      await fetchBillingRecords(facilityId, yearMonth);
+    try {
+      const ok = await confirmBilling(facilityId, yearMonth);
+      if (ok) {
+        await fetchBillingRecords(facilityId, yearMonth);
+        toast.success('全件を確定しました');
+      } else {
+        toast.error('確定処理に失敗しました');
+      }
+    } catch (err) {
+      console.error('Error confirming billing:', err);
+      toast.error('確定処理中にエラーが発生しました');
+    } finally {
+      setIsConfirming(false);
     }
-    setIsConfirming(false);
-  }, [facilityId, yearMonth, confirmBilling, fetchBillingRecords]);
+  }, [facilityId, yearMonth, confirmBilling, fetchBillingRecords, toast]);
 
   const handleDashboardExportCSV = useCallback(async () => {
     if (!facilityId) return;
-    const csv = await exportCSV(facilityId, yearMonth);
-    if (csv) {
-      const bom = '\uFEFF';
-      const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `国保連請求_${yearMonth}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+    try {
+      const csv = await exportCSV(facilityId, yearMonth);
+      if (csv) {
+        const bom = '\uFEFF';
+        const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `国保連請求_${yearMonth}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('CSVファイルをダウンロードしました');
+      } else {
+        toast.warning('出力するデータがありません');
+      }
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+      toast.error('CSV出力中にエラーが発生しました');
     }
-  }, [facilityId, yearMonth, exportCSV]);
+  }, [facilityId, yearMonth, exportCSV, toast]);
 
   // 代理受領通知書の一括印刷
   const handleProxyReceipt = useCallback(async () => {
     if (!facilityId || billingRecords.length === 0) return;
-    // 児童情報を取得
-    const childIds = billingRecords.map(r => r.childId);
-    const { data: children } = await supabase
-      .from('children')
-      .select('id, name, guardian_name, beneficiary_number')
-      .in('id', childIds);
-    const childMap = new Map((children || []).map((c: Record<string, unknown>) => [c.id as string, c]));
+    try {
+      // 児童情報を取得
+      const childIds = billingRecords.map(r => r.childId);
+      const { data: children } = await supabase
+        .from('children')
+        .select('id, name, guardian_name, beneficiary_number')
+        .in('id', childIds);
+      const childMap = new Map((children || []).map((c: Record<string, unknown>) => [c.id as string, c]));
 
-    const { data: facilityData } = await supabase
-      .from('facilities')
-      .select('name, code, address')
-      .eq('id', facilityId)
-      .single();
+      const { data: facilityData } = await supabase
+        .from('facilities')
+        .select('name, code, address')
+        .eq('id', facilityId)
+        .single();
 
-    const receipts: ProxyReceiptData[] = billingRecords.map(rec => {
-      const child = childMap.get(rec.childId) as Record<string, unknown> | undefined;
-      return {
-        facilityName: (facilityData?.name as string) || '',
-        facilityCode: (facilityData?.code as string) || '',
-        facilityAddress: facilityData?.address as string | undefined,
-        yearMonth,
-        childName: (child?.name as string) || rec.childName || '',
-        guardianName: (child?.guardian_name as string) || '',
-        beneficiaryNumber: (child?.beneficiary_number as string) || '',
-        serviceType: rec.serviceType,
-        totalUnits: rec.totalUnits,
-        unitPrice: rec.unitPrice,
-        totalAmount: rec.totalAmount,
-        copayAmount: rec.copayAmount,
-        insuranceAmount: rec.insuranceAmount,
-        upperLimitAmount: rec.upperLimitAmount,
-        usageDays: 0, // will be calculated below
-      };
-    });
+      const receipts: ProxyReceiptData[] = billingRecords.map(rec => {
+        const child = childMap.get(rec.childId) as Record<string, unknown> | undefined;
+        return {
+          facilityName: (facilityData?.name as string) || '',
+          facilityCode: (facilityData?.code as string) || '',
+          facilityAddress: facilityData?.address as string | undefined,
+          yearMonth,
+          childName: (child?.name as string) || rec.childName || '',
+          guardianName: (child?.guardian_name as string) || '',
+          beneficiaryNumber: (child?.beneficiary_number as string) || '',
+          serviceType: rec.serviceType,
+          totalUnits: rec.totalUnits,
+          unitPrice: rec.unitPrice,
+          totalAmount: rec.totalAmount,
+          copayAmount: rec.copayAmount,
+          insuranceAmount: rec.insuranceAmount,
+          upperLimitAmount: rec.upperLimitAmount,
+          usageDays: 0, // will be calculated below
+        };
+      });
 
-    // 利用日数を取得
-    for (const receipt of receipts) {
-      const rec = billingRecords.find(r => r.childName === receipt.childName || childMap.get(r.childId)?.name === receipt.childName);
-      if (rec) {
-        const { count } = await supabase
-          .from('billing_details')
-          .select('id', { count: 'exact', head: true })
-          .eq('billing_record_id', rec.id)
-          .eq('is_absence', false);
-        receipt.usageDays = count || 0;
+      // 利用日数を取得
+      for (const receipt of receipts) {
+        const rec = billingRecords.find(r => r.childName === receipt.childName || childMap.get(r.childId)?.name === receipt.childName);
+        if (rec) {
+          const { count } = await supabase
+            .from('billing_details')
+            .select('id', { count: 'exact', head: true })
+            .eq('billing_record_id', rec.id)
+            .eq('is_absence', false);
+          receipt.usageDays = count || 0;
+        }
       }
-    }
 
-    printProxyReceiptBatch(receipts);
-  }, [facilityId, billingRecords, yearMonth]);
+      printProxyReceiptBatch(receipts);
+    } catch (err) {
+      console.error('Error generating proxy receipts:', err);
+      toast.error('代理受領通知書の生成に失敗しました');
+    }
+  }, [facilityId, billingRecords, yearMonth, toast]);
 
   // 国保連CSV（詳細版）エクスポート
   const handleKokuhorenExport = useCallback(async () => {
     if (!facilityId || billingRecords.length === 0) return;
 
-    const { data: facilityData } = await supabase
-      .from('facilities')
-      .select('name, code')
-      .eq('id', facilityId)
-      .single();
+    try {
+      const { data: facilityData } = await supabase
+        .from('facilities')
+        .select('name, code')
+        .eq('id', facilityId)
+        .single();
 
-    const childIds = billingRecords.map(r => r.childId);
-    const { data: children } = await supabase
-      .from('children')
-      .select('id, name, beneficiary_number, city_code')
-      .in('id', childIds);
-    const childMap = new Map((children || []).map((c: Record<string, unknown>) => [c.id as string, c]));
+      const childIds = billingRecords.map(r => r.childId);
+      const { data: children } = await supabase
+        .from('children')
+        .select('id, name, beneficiary_number, city_code')
+        .in('id', childIds);
+      const childMap = new Map((children || []).map((c: Record<string, unknown>) => [c.id as string, c]));
 
-    const kokuhorenRecords: KokuhorenRecord[] = [];
+      const kokuhorenRecords: KokuhorenRecord[] = [];
 
-    for (const rec of billingRecords) {
-      const child = childMap.get(rec.childId) as Record<string, unknown> | undefined;
+      for (const rec of billingRecords) {
+        const child = childMap.get(rec.childId) as Record<string, unknown> | undefined;
 
-      // 日別明細を取得
-      const { data: details } = await supabase
-        .from('billing_details')
-        .select('*')
-        .eq('billing_record_id', rec.id)
-        .order('service_date', { ascending: true });
+        // 日別明細を取得
+        const { data: details } = await supabase
+          .from('billing_details')
+          .select('*')
+          .eq('billing_record_id', rec.id)
+          .order('service_date', { ascending: true });
 
-      const { count: usageDays } = await supabase
-        .from('billing_details')
-        .select('id', { count: 'exact', head: true })
-        .eq('billing_record_id', rec.id)
-        .eq('is_absence', false);
+        const { count: usageDays } = await supabase
+          .from('billing_details')
+          .select('id', { count: 'exact', head: true })
+          .eq('billing_record_id', rec.id)
+          .eq('is_absence', false);
 
-      kokuhorenRecords.push({
-        childName: (child?.name as string) || rec.childName || '',
-        beneficiaryNumber: (child?.beneficiary_number as string) || '',
-        serviceType: rec.serviceType,
-        cityCode: child?.city_code as string | undefined,
-        totalUnits: rec.totalUnits,
-        unitPrice: rec.unitPrice,
-        totalAmount: rec.totalAmount,
-        copayAmount: rec.copayAmount,
-        insuranceAmount: rec.insuranceAmount,
-        upperLimitAmount: rec.upperLimitAmount,
-        usageDays: usageDays || 0,
-        details: (details || []).map((d: Record<string, unknown>) => ({
-          serviceDate: d.service_date as string,
-          serviceCode: d.service_code as string,
-          units: d.unit_count as number,
-          isAbsence: d.is_absence as boolean,
-          additions: d.additions as { code: string; name: string; units: number }[] | undefined,
-        })),
-      });
+        kokuhorenRecords.push({
+          childName: (child?.name as string) || rec.childName || '',
+          beneficiaryNumber: (child?.beneficiary_number as string) || '',
+          serviceType: rec.serviceType,
+          cityCode: child?.city_code as string | undefined,
+          totalUnits: rec.totalUnits,
+          unitPrice: rec.unitPrice,
+          totalAmount: rec.totalAmount,
+          copayAmount: rec.copayAmount,
+          insuranceAmount: rec.insuranceAmount,
+          upperLimitAmount: rec.upperLimitAmount,
+          usageDays: usageDays || 0,
+          details: (details || []).map((d: Record<string, unknown>) => ({
+            serviceDate: d.service_date as string,
+            serviceCode: d.service_code as string,
+            units: d.unit_count as number,
+            isAbsence: d.is_absence as boolean,
+            additions: d.additions as { code: string; name: string; units: number }[] | undefined,
+          })),
+        });
+      }
+
+      const exportData: KokuhorenExportData = {
+        facilityName: (facilityData?.name as string) || '',
+        facilityCode: (facilityData?.code as string) || '',
+        yearMonth,
+        records: kokuhorenRecords,
+      };
+
+      exportKokuhorenCSV(exportData);
+      toast.success('国保連CSVをダウンロードしました');
+    } catch (err) {
+      console.error('Error exporting Kokuhoren CSV:', err);
+      toast.error('国保連CSV出力中にエラーが発生しました');
     }
-
-    const exportData: KokuhorenExportData = {
-      facilityName: (facilityData?.name as string) || '',
-      facilityCode: (facilityData?.code as string) || '',
-      yearMonth,
-      records: kokuhorenRecords,
-    };
-
-    exportKokuhorenCSV(exportData);
-  }, [facilityId, billingRecords, yearMonth]);
+  }, [facilityId, billingRecords, yearMonth, toast]);
 
   // ============================================================
   // Loading state

@@ -12,6 +12,7 @@ import {
   ArrowUpRight, ArrowDownRight, Minus, Eye, ExternalLink,
   Zap, Target, Award, Activity
 } from 'lucide-react';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ============================================================
 // Helper Functions
@@ -237,6 +238,14 @@ export default function PlatformDashboardPage() {
 
   // Company names for filters
   const [companyNames, setCompanyNames] = useState<{ id: string; name: string }[]>([]);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // ── Permission Check ──
   useEffect(() => {
@@ -773,16 +782,24 @@ export default function PlatformDashboardPage() {
     }
   };
 
-  const handleDeleteCompany = async (id: string) => {
-    if (!confirm('この法人を削除しますか？関連する施設の法人紐付けが解除されます。')) return;
-    try {
-      const { error } = await supabase.from('companies').delete().eq('id', id);
-      if (error) throw error;
-      loadCompaniesData();
-    } catch (err) {
-      console.error('法人削除エラー:', err);
-      toast.error('削除に失敗しました');
-    }
+  const handleDeleteCompany = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '削除の確認',
+      message: 'この法人を削除しますか？関連する施設の法人紐付けが解除されます。',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const { error } = await supabase.from('companies').delete().eq('id', id);
+          if (error) throw error;
+          loadCompaniesData();
+        } catch (err) {
+          console.error('法人削除エラー:', err);
+          toast.error('削除に失敗しました');
+        }
+      },
+    });
   };
 
   const handleExpandCompany = async (companyId: string) => {
@@ -2243,6 +2260,15 @@ export default function PlatformDashboardPage() {
       {/* Modals */}
       {renderFacilityModal()}
       {renderCompanyModal()}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

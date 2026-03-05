@@ -36,6 +36,7 @@ import {
   AdditionLevelStatus,
   ADDITION_RATES,
 } from '@/hooks/useTalentManagement';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ------------------------------------------------------------------ constants
 
@@ -501,6 +502,13 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
   const [grades, setGrades] = useState<JobGrade[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [editingGrade, setEditingGrade] = useState<Partial<JobGrade> | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const loadGrades = useCallback(async () => {
     setDataLoading(true);
@@ -519,10 +527,18 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
     loadGrades();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('この職位を削除しますか？')) return;
-    await tm.deleteJobGrade(id);
-    loadGrades();
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '削除の確認',
+      message: 'この職位を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await tm.deleteJobGrade(id);
+        loadGrades();
+      },
+    });
   };
 
   if (dataLoading) return <LoadingSpinner />;
@@ -728,6 +744,15 @@ function JobGradesTab({ facilityId }: { facilityId: string }) {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

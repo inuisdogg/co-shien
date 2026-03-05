@@ -434,6 +434,7 @@ export default function ClientSignupPage() {
               onBlur={() => handleFieldBlur('email', validateEmail(formData.email))}
               required
               className={`w-full px-4 py-3 border ${fieldErrors.email ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
+              autoComplete="email"
               placeholder="example@email.com"
               disabled={loading}
             />
@@ -453,6 +454,7 @@ export default function ClientSignupPage() {
                 onBlur={() => handleFieldBlur('password', validatePassword(formData.password))}
                 required
                 minLength={8}
+                autoComplete="new-password"
                 className={`w-full px-4 py-3 pr-12 border ${fieldErrors.password ? 'border-red-400' : 'border-gray-200'} rounded-lg focus:outline-none focus:ring-2 focus:ring-client/30 focus:border-client text-base`}
                 placeholder="8文字以上のパスワード"
                 disabled={loading}
@@ -550,7 +552,12 @@ export default function ClientSignupPage() {
             disabled={loading}
             className="w-full bg-client hover:bg-client-dark text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg text-base"
           >
-            {loading ? '登録中...' : 'アカウントを作成する'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                登録中...
+              </span>
+            ) : 'アカウントを作成する'}
           </button>
         </form>
 

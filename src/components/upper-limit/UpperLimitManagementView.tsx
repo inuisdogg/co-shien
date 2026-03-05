@@ -223,6 +223,7 @@ export default function UpperLimitManagementView() {
       }
     } catch (err) {
       console.error('Error fetching upper limit records:', err);
+      toast.error('上限管理データの取得に失敗しました');
     } finally {
       setLoading(false);
     }

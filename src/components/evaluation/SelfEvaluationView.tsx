@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSelfEvaluation } from '@/hooks/useSelfEvaluation';
 import { useToast } from '@/components/ui/Toast';
 import type { SelfEvaluation, SelfEvaluationStatus } from '@/types';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // --- 評価タブの定義 ---
 type EvaluationTab = 'self' | 'parent' | 'improvement' | 'history';
@@ -286,6 +287,13 @@ const SelfEvaluationView: React.FC = () => {
     publishEvaluation,
   } = useSelfEvaluation();
 
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const [activeTab, setActiveTab] = useState<EvaluationTab>('self');
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>(() => {
     const now = new Date();
@@ -423,11 +431,18 @@ const SelfEvaluationView: React.FC = () => {
   };
 
   // Publish evaluation
-  const handlePublish = async () => {
+  const handlePublish = () => {
     if (!currentEvalId) return;
-    if (!confirm('評価結果を公開します。公開後も編集は可能です。よろしいですか？')) return;
-    await publishEvaluation(currentEvalId);
-    toast.success('評価結果を公開しました');
+    setConfirmModal({
+      isOpen: true,
+      title: '公開の確認',
+      message: '評価結果を公開します。公開後も編集は可能です。よろしいですか？',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await publishEvaluation(currentEvalId);
+        toast.success('評価結果を公開しました');
+      },
+    });
   };
 
   // Add action item
@@ -889,6 +904,15 @@ const SelfEvaluationView: React.FC = () => {
       {(activeTab === 'self' || activeTab === 'parent') && renderEvaluationForm()}
       {activeTab === 'improvement' && renderImprovementPlan()}
       {activeTab === 'history' && renderHistory()}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

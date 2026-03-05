@@ -17,6 +17,7 @@ import StaffDetailDrawer from './StaffDetailDrawer';
 import StaffEditForm, { ProxyFormData } from './StaffEditForm';
 import StaffInviteModal from './StaffInviteModal';
 import StaffLeavePanel from './StaffLeavePanel';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface StaffWithRelations extends Staff {
   personnelSettings?: StaffPersonnelSettings;
@@ -211,13 +212,29 @@ const StaffMasterView: React.FC = () => {
     link.click();
   }, [staffList]);
 
+  // 確認ダイアログ
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
   // 児発管クイックトグル
   const handleQuickAction = useCallback(
-    async (staff: StaffWithRelations, action: string) => {
+    (staff: StaffWithRelations, action: string) => {
       if (action === 'toggleServiceManager') {
         const current = staff.personnelSettings?.isServiceManager || false;
-        if (!confirm(`${staff.name}を児発管${current ? 'から解除' : 'に設定'}しますか？`)) return;
-        await updatePersonnelSettings(staff.id, { isServiceManager: !current });
+        setConfirmModal({
+          isOpen: true,
+          title: '児発管の設定変更',
+          message: `${staff.name}を児発管${current ? 'から解除' : 'に設定'}しますか？`,
+          onConfirm: async () => {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            await updatePersonnelSettings(staff.id, { isServiceManager: !current });
+          },
+        });
       }
     },
     [updatePersonnelSettings]
@@ -314,6 +331,15 @@ const StaffMasterView: React.FC = () => {
           loading={loading}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

@@ -18,6 +18,8 @@ import {
 import { ShiftPattern } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import EmptyState from '@/components/ui/EmptyState';
 
 interface ShiftPatternSettingsProps {
   facilityId: string;
@@ -63,6 +65,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState<PatternFormData>(defaultFormData);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean; title: string; message: string; isDestructive?: boolean; onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // データ取得
   useEffect(() => {
@@ -100,6 +103,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
       setPatterns(mapped);
     } catch (error) {
       console.error('シフトパターン取得エラー:', error);
+      toast.error('シフトパターンの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +133,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
 
       if (error) throw error;
 
+      toast.success('シフトパターンを追加しました');
       setShowAddForm(false);
       setFormData(defaultFormData);
       fetchPatterns();
@@ -162,6 +167,7 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
 
       if (error) throw error;
 
+      toast.success('シフトパターンを更新しました');
       setEditingId(null);
       setFormData(defaultFormData);
       fetchPatterns();
@@ -175,21 +181,29 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
 
   // パターン削除（論理削除）
   const handleDelete = async (id: string) => {
-    if (!confirm('このパターンを削除しますか？')) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'パターン削除',
+      message: 'このパターンを削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({...prev, isOpen: false}));
+        try {
+          const { error } = await supabase
+            .from('shift_patterns')
+            .update({ is_active: false, updated_at: new Date().toISOString() })
+            .eq('id', id);
 
-    try {
-      const { error } = await supabase
-        .from('shift_patterns')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('id', id);
+          if (error) throw error;
 
-      if (error) throw error;
-
-      fetchPatterns();
-    } catch (error) {
-      console.error('パターン削除エラー:', error);
-      toast.error('削除に失敗しました');
-    }
+          toast.success('シフトパターンを削除しました');
+          fetchPatterns();
+        } catch (error) {
+          console.error('パターン削除エラー:', error);
+          toast.error('削除に失敗しました');
+        }
+      },
+    });
   };
 
   // 編集開始
@@ -366,11 +380,11 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
       {/* パターン一覧 */}
       <div className="space-y-2">
         {patterns.length === 0 && !showAddForm ? (
-          <div className="text-center py-8 text-gray-500">
-            <Clock className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-            <p>シフトパターンがありません</p>
-            <p className="text-sm">「パターン追加」から作成してください</p>
-          </div>
+          <EmptyState
+            icon={<Clock className="w-7 h-7 text-gray-400" />}
+            title="シフトパターンがありません"
+            description="「パターン追加」から作成してください"
+          />
         ) : (
           patterns.map((pattern) => (
             <div key={pattern.id}>
@@ -431,6 +445,15 @@ export default function ShiftPatternSettings({ facilityId }: ShiftPatternSetting
           ))
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+      />
     </div>
   );
 }

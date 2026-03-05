@@ -43,6 +43,8 @@ import {
 import { useTransportSession } from '@/hooks/useTransportSession';
 import TransportAssignmentPanel from '@/components/schedule/TransportAssignmentPanel';
 import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ============================================================
 // Types
@@ -135,6 +137,14 @@ const TransportManagementView: React.FC = () => {
   const [optimizedStops, setOptimizedStops] = useState<OptimizedStop[]>([]);
   const [calculating, setCalculating] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // リアルタイムセッション管理
   const {
@@ -469,6 +479,7 @@ const TransportManagementView: React.FC = () => {
     } catch (err) {
       console.error('Route calculation error:', err);
       setRouteError('ルート計算中にエラーが発生しました');
+      toast.error('ルート計算中にエラーが発生しました');
     } finally {
       setCalculating(false);
     }
@@ -752,10 +763,16 @@ const TransportManagementView: React.FC = () => {
                     </button>
                   ) : (
                     <button
-                      onClick={async () => {
-                        if (confirm('送迎を完了しますか？保護者に通知が送信されます。')) {
-                          await completeSession();
-                        }
+                      onClick={() => {
+                        setConfirmModal({
+                          isOpen: true,
+                          title: '送迎完了の確認',
+                          message: '送迎を完了しますか？保護者に通知が送信されます。',
+                          onConfirm: async () => {
+                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                            await completeSession();
+                          },
+                        });
                       }}
                       className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
                     >
@@ -1033,19 +1050,24 @@ const TransportManagementView: React.FC = () => {
 
             {/* Empty state */}
             {transportChildren.length === 0 && (
-              <div className="text-center py-16 text-gray-400">
-                <Car className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                <p className="text-sm font-medium">
-                  本日の{mode === 'pickup' ? '迎え' : '送り'}対象はありません
-                </p>
-                <p className="text-xs mt-1">
-                  利用予約で送迎の有無を設定してください
-                </p>
-              </div>
+              <EmptyState
+                icon={<Car className="w-7 h-7 text-gray-400" />}
+                title={`本日の${mode === 'pickup' ? '迎え' : '送り'}対象はありません`}
+                description="利用予約で送迎の有無を設定してください"
+              />
             )}
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

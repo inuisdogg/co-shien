@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QUALIFICATION_CODES } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -111,6 +112,7 @@ function qualificationLabel(code: string): string {
 
 export default function JobsPageClient() {
   const router = useRouter();
+  const { toast } = useToast();
 
   // Data
   const [jobs, setJobs] = useState<JobPosting[]>([]);
@@ -177,6 +179,7 @@ export default function JobsPageClient() {
       setJobs(postings);
     } catch (err) {
       console.error('Unexpected error:', err);
+      toast.error('求人情報の取得に失敗しました');
       setJobs([]);
     } finally {
       setLoading(false);

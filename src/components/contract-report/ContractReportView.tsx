@@ -29,6 +29,8 @@ import { ContractReportItem } from '@/types';
 import { printContractReport } from '@/lib/regulatoryDocuments';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import EmptyState from '@/components/ui/EmptyState';
 
 const REPORT_TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   new: { label: '新規', color: 'text-blue-700', bg: 'bg-blue-100' },
@@ -63,6 +65,13 @@ const ContractReportView: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addingChanges, setAddingChanges] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const [manualForm, setManualForm] = useState({
     childName: '',
     reportType: 'new' as 'new' | 'change' | 'termination',
@@ -118,8 +127,10 @@ const ContractReportView: React.FC = () => {
 
       await addDetectedChanges(submissionId, reportData.detectedChanges);
       await fetchContractReport(selectedYear, selectedMonth);
+      toast.success(`${reportData.detectedChanges.length}件の変更を追加しました`);
     } catch (error) {
       console.error('一括追加エラー:', error);
+      toast.error('一括追加に失敗しました');
     } finally {
       setAddingChanges(false);
     }
@@ -164,26 +175,42 @@ const ContractReportView: React.FC = () => {
         terminationReason: '',
       });
       await fetchContractReport(selectedYear, selectedMonth);
+      toast.success('報告項目を追加しました');
     } catch (error) {
       console.error('手動追加エラー:', error);
+      toast.error('項目の追加に失敗しました');
     }
   };
 
   // 項目を削除
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('この項目を削除しますか？')) return;
-    await deleteReportItem(itemId);
-    await fetchContractReport(selectedYear, selectedMonth);
+  const handleDeleteItem = (itemId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '項目の削除',
+      message: 'この項目を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        await deleteReportItem(itemId);
+        await fetchContractReport(selectedYear, selectedMonth);
+      },
+    });
   };
 
   // ステータスを更新
-  const handleStatusUpdate = async (status: 'submitted' | 'completed') => {
+  const handleStatusUpdate = (status: 'submitted' | 'completed') => {
     if (!reportData.submission) return;
     const labels = { submitted: '提出済み', completed: '完了' };
-    if (!confirm(`この報告書を「${labels[status]}」にしますか？`)) return;
-
-    await updateSubmissionStatus(reportData.submission.id, status);
-    await fetchContractReport(selectedYear, selectedMonth);
+    setConfirmModal({
+      isOpen: true,
+      title: 'ステータスの変更',
+      message: `この報告書を「${labels[status]}」にしますか？`,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        await updateSubmissionStatus(reportData.submission!.id, status);
+        await fetchContractReport(selectedYear, selectedMonth);
+      },
+    });
   };
 
   // 印刷
@@ -318,15 +345,11 @@ const ContractReportView: React.FC = () => {
         <>
           {/* 報告項目一覧 */}
           {items.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-100">
-              <FileText size={32} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-sm text-gray-500 font-medium">
-                {selectedYear}年{selectedMonth}月の報告項目はまだありません
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                自動検出された変更を追加するか、手動で項目を追加してください
-              </p>
-            </div>
+            <EmptyState
+              icon={<FileText className="w-7 h-7 text-gray-400" />}
+              title={`${selectedYear}年${selectedMonth}月の報告項目はまだありません`}
+              description="自動検出された変更を追加するか、手動で項目を追加してください"
+            />
           ) : (
             <div className="space-y-3">
               {items.map((item, index) => {
@@ -455,6 +478,15 @@ const ContractReportView: React.FC = () => {
           </div>
         </>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* 手動追加モーダル */}
       {isAddModalOpen && (

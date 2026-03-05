@@ -178,6 +178,7 @@ export default function LeaveRequestForm({
       }
     } catch (error) {
       console.error('データ取得エラー:', error);
+      toast.error('データの取得に失敗しました');
     } finally {
       setLoading(false);
     }

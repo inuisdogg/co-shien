@@ -57,6 +57,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
+      aria-describedby="confirm-modal-message"
     >
       <div
         className="relative w-full max-w-sm mx-4 bg-white rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 p-6"
@@ -65,13 +66,14 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <button
           onClick={onCancel}
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="閉じる"
         >
           <X className="w-4 h-4" />
         </button>
 
         <div className="text-center">
           <h3 id="confirm-modal-title" className="text-lg font-bold text-gray-800">{title}</h3>
-          <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{message}</p>
+          <p id="confirm-modal-message" className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{message}</p>
         </div>
 
         <div className="mt-5 flex gap-3 justify-center">

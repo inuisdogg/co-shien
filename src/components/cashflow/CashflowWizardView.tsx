@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CashflowEntry, PLStatement } from '@/types';
 import { useToast } from '@/components/ui/Toast';
 import { useCashflowManagement, CashflowStatement } from '@/hooks/useCashflowManagement';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ============================================================
 // Helper: format yen
@@ -212,6 +213,14 @@ export default function CashflowWizardView() {
   // Track if data has been loaded
   const dataLoadedRef = useRef(false);
 
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
   // ============================================================
   // Data loading
   // ============================================================
@@ -343,15 +352,23 @@ export default function CashflowWizardView() {
   // ============================================================
   // Copy from previous month
   // ============================================================
-  const handleCopyPrevious = useCallback(async () => {
+  const handleCopyPrevious = useCallback(() => {
     if (!facilityId || !yearMonth) return;
-    if (!confirm('前月のデータを今月にコピーしますか？現在の入力内容は上書きされます。')) return;
-    const copied = await copyFromPreviousMonth(facilityId, yearMonth);
-    if (copied.length > 0) {
-      setLocalEntries(copied);
-    } else {
-      toast.warning('前月のデータが見つかりませんでした。');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'コピーの確認',
+      message: '前月のデータを今月にコピーしますか？現在の入力内容は上書きされます。',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        const copied = await copyFromPreviousMonth(facilityId, yearMonth);
+        if (copied.length > 0) {
+          setLocalEntries(copied);
+        } else {
+          toast.warning('前月のデータが見つかりませんでした。');
+        }
+      },
+    });
   }, [facilityId, yearMonth, copyFromPreviousMonth]);
 
   // ============================================================
@@ -1325,6 +1342,15 @@ export default function CashflowWizardView() {
           }
         }
       `}</style>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

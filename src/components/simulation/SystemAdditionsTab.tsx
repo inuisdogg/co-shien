@@ -44,8 +44,12 @@ export default function SystemAdditionsTab({ staff, simulationResult }: Props) {
             <StaffCard key={s.id} staff={s} />
           ))}
           {staff.length === 0 && (
-            <div className="col-span-full text-center py-8 text-gray-400">
-              スタッフデータがありません
+            <div className="col-span-full">
+              <EmptyState
+                icon={<Users className="w-7 h-7 text-gray-400" />}
+                title="スタッフデータがありません"
+                description="スタッフを登録すると配置状況が表示されます。"
+              />
             </div>
           )}
         </div>

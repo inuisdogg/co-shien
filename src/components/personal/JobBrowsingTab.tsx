@@ -421,6 +421,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       setAllJobs((data || []).map((r) => mapJob(r as Record<string, unknown>)));
     } catch (err) {
       console.error('Unexpected error fetching jobs:', err);
+      toast.error('求人データの取得に失敗しました');
       setAllJobs([]);
     } finally {
       setLoadingJobs(false);
@@ -445,6 +446,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       );
     } catch (err) {
       console.error('Unexpected error fetching favorites:', err);
+      toast.error('お気に入りの取得に失敗しました');
     }
   }, [userId]);
 
@@ -471,6 +473,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       );
     } catch (err) {
       console.error('Unexpected error fetching applications:', err);
+      toast.error('応募データの取得に失敗しました');
       setApplications([]);
     } finally {
       setLoadingApplications(false);
@@ -506,6 +509,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       setUserExperienceYears(expYears);
     } catch (err) {
       console.error('Error fetching user profile:', err);
+      toast.error('プロフィールの取得に失敗しました');
     } finally {
       setLoadingRecommended(false);
     }
@@ -533,6 +537,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       );
     } catch (err) {
       console.error('Unexpected error fetching spot shifts:', err);
+      toast.error('スポットシフトの取得に失敗しました');
     }
   }, []);
 
@@ -558,6 +563,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       setUnreadTotal((msgData || []).length);
     } catch (err) {
       console.error('Error fetching unread counts:', err);
+      toast.error('未読メッセージの取得に失敗しました');
     }
   }, [userId]);
 
@@ -818,6 +824,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         }
       } catch (err) {
         console.error('Error toggling favorite:', err);
+        toast.error('お気に入りの更新に失敗しました');
       } finally {
         setTogglingFavorite(null);
       }
@@ -889,6 +896,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       }, 2000);
     } catch (err) {
       console.error('Error applying:', err);
+      toast.error('応募に失敗しました');
     } finally {
       setApplying(false);
     }
@@ -928,6 +936,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
         }
       } catch (err) {
         console.error('Error fetching messages:', err);
+        toast.error('メッセージの取得に失敗しました');
         setAppMessages([]);
       } finally {
         setLoadingMessages(false);
@@ -968,6 +977,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       }, 100);
     } catch (err) {
       console.error('Error sending message:', err);
+      toast.error('メッセージの送信に失敗しました');
     } finally {
       setSendingMessage(false);
     }
@@ -1026,6 +1036,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       }, 2000);
     } catch (err) {
       console.error('Error sending inquiry:', err);
+      toast.error('問い合わせの送信に失敗しました');
     } finally {
       setSendingInquiry(false);
     }
@@ -1097,6 +1108,7 @@ export default function JobBrowsingTab({ userId }: JobBrowsingTabProps) {
       }, 2000);
     } catch (err) {
       console.error('Error in quick apply:', err);
+      toast.error('かんたん応募に失敗しました');
     } finally {
       setQuickApplying(false);
     }

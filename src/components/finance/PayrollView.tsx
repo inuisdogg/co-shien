@@ -11,6 +11,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
+import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { calculatePayrollSummary } from '@/lib/payrollCalculator';
@@ -39,6 +40,7 @@ function formatNumber(n: number): string {
 
 export default function PayrollView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const now = new Date();
@@ -172,6 +174,7 @@ export default function PayrollView() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'データの取得に失敗しました';
       setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

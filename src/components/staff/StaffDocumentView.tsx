@@ -7,8 +7,10 @@ import {
   FileText, Upload, Search, Filter, Eye, Download, Trash2,
   CheckCircle, Clock, ChevronDown, Users, X, AlertCircle, ArrowUpDown,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 import EmptyState from '@/components/ui/EmptyState';
 import DocumentPreviewModal from '@/components/common/DocumentPreviewModal';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface StaffMember {
   id: string;
@@ -48,6 +50,7 @@ const DOCUMENT_TYPES = [
 
 export default function StaffDocumentView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -75,6 +78,13 @@ export default function StaffDocumentView() {
 
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<StaffDocument | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const fetchData = useCallback(async () => {
     if (!facilityId) return;
@@ -247,15 +257,23 @@ export default function StaffDocumentView() {
   };
 
   // 書類削除
-  const handleDelete = async (doc: StaffDocument) => {
-    if (!confirm(`「${doc.title}」を削除しますか？`)) return;
-    try {
-      await supabase.storage.from('documents').remove([doc.fileUrl]);
-      await supabase.from('staff_documents').delete().eq('id', doc.id);
-      fetchData();
-    } catch (err) {
-      console.error('Delete error:', err);
-    }
+  const handleDelete = (doc: StaffDocument) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '書類の削除',
+      message: `「${doc.title}」を削除しますか？`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.storage.from('documents').remove([doc.fileUrl]);
+          await supabase.from('staff_documents').delete().eq('id', doc.id);
+          fetchData();
+        } catch (err) {
+          console.error('Delete error:', err);
+        }
+      },
+    });
   };
 
   // ダウンロード
@@ -594,6 +612,15 @@ export default function StaffDocumentView() {
           })
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* プレビューモーダル */}
       {previewDoc && (

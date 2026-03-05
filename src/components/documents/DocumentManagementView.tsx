@@ -188,11 +188,13 @@ function DocumentManagementContent() {
           .order('updated_at', { ascending: false });
         if (error) {
           console.error('Error fetching documents:', error);
+          toast.error('書類の取得に失敗しました');
           return;
         }
         if (data) setDocuments(data.map(mapRowToDocument));
       } catch (error) {
         console.error('Error in fetchDocuments:', error);
+        toast.error('書類の取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -267,8 +269,10 @@ function DocumentManagementContent() {
       const { error } = await supabase.from('child_documents').update(updates).eq('id', docId);
       if (error) throw error;
       setDocuments(prev => prev.map(d => d.id === docId ? { ...d, status: newStatus } : d));
+      toast.success(newStatus === 'approved' ? '書類を承認しました' : 'ステータスを更新しました');
     } catch (error) {
       console.error('Error updating document status:', error);
+      toast.error('ステータスの更新に失敗しました');
     }
   };
 
@@ -334,6 +338,7 @@ function DocumentManagementContent() {
 
       if (uploadError) {
         console.error('Storage upload error:', uploadError);
+        toast.warning('ファイルストレージへの保存に失敗しましたが、メタデータは登録されます');
       }
 
       // Save metadata to child_documents table
@@ -368,6 +373,7 @@ function DocumentManagementContent() {
 
       setShowUploadModal(false);
       setUploadFile(null);
+      toast.success('書類をアップロードしました');
     } catch (err) {
       console.error('Upload error:', err);
       toast.error('アップロードに失敗しました。再試行してください。');

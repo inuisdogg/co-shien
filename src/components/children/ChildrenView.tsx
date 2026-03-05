@@ -42,7 +42,6 @@ import FacilitySettingsEditor from './FacilitySettingsEditor';
 import EmptyState from '@/components/ui/EmptyState';
 import ChildDocumentsManager from './ChildDocumentsManager';
 import InvitationModal from '@/components/common/InvitationModal';
-import AlertModal from '@/components/common/AlertModal';
 import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface ChildrenViewProps {
@@ -97,9 +96,8 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
   const [isFacilitySettingsOpen, setIsFacilitySettingsOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
 
-  // アラート・確認モーダル用の状態
-  const [alertModal, setAlertModal] = useState<{ message: string; type?: 'success' | 'error' | 'info' | 'warning' } | null>(null);
-  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  // 確認モーダル用の状態
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; isDestructive?: boolean } | null>(null);
 
   // 招待枠作成モーダル用の状態
   const [isInvitationSlotModalOpen, setIsInvitationSlotModalOpen] = useState(false);
@@ -212,8 +210,9 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
           };
         }
         setChildInvitationStatuses(statusMap);
-      } catch {
-        // silently fail
+      } catch (error) {
+        console.error('招待ステータス取得エラー:', error);
+        toast.error('招待ステータスの取得に失敗しました');
       }
     };
 
@@ -339,12 +338,9 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
                   created_at: now.toISOString(),
                 });
 
-              setAlertModal({
-                message: '契約ステータスを更新しました。契約内容報告書に自動追加されました。',
-                type: 'success',
-              });
+              toast.success('契約ステータスを更新しました。契約内容報告書に自動追加されました。');
             } else {
-              setAlertModal({ message: '契約ステータスを更新しました。', type: 'success' });
+              toast.success('契約ステータスを更新しました。');
             }
           }
         } catch (hookError) {
@@ -359,7 +355,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       }
     } catch (error: any) {
       console.error('契約ステータス更新エラー:', error);
-      setAlertModal({ message: '契約ステータスの更新に失敗しました: ' + error.message, type: 'error' });
+      toast.error('契約ステータスの更新に失敗しました: ' + error.message);
     }
   };
 
@@ -388,7 +384,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       }
     } catch (error: any) {
       console.error('契約日付更新エラー:', error);
-      setAlertModal({ message: '契約日付の更新に失敗しました: ' + error.message, type: 'error' });
+      toast.error('契約日付の更新に失敗しました: ' + error.message);
     }
   };
 
@@ -443,7 +439,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       });
     } catch (error: any) {
       console.error('利用パターン更新エラー:', error);
-      setAlertModal({ message: '利用パターンの更新に失敗しました: ' + error.message, type: 'error' });
+      toast.error('利用パターンの更新に失敗しました: ' + error.message);
     }
   };
 
@@ -478,7 +474,7 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       });
     } catch (error: any) {
       console.error('時間帯更新エラー:', error);
-      setAlertModal({ message: '時間帯の更新に失敗しました: ' + error.message, type: 'error' });
+      toast.error('時間帯の更新に失敗しました: ' + error.message);
     }
   };
 
@@ -522,14 +518,16 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       });
     } catch (error: any) {
       console.error('送迎設定更新エラー:', error);
-      setAlertModal({ message: '送迎設定の更新に失敗しました: ' + error.message, type: 'error' });
+      toast.error('送迎設定の更新に失敗しました: ' + error.message);
     }
   };
 
   // 招待をキャンセルする関数
   const handleCancelInvitation = (invitationId: string) => {
     setConfirmModal({
+      title: '招待キャンセル',
       message: 'この招待をキャンセルしますか？',
+      isDestructive: true,
       onConfirm: () => {
         setConfirmModal(null);
         performCancelInvitation(invitationId);
@@ -547,10 +545,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       if (error) throw error;
 
       setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
-      setAlertModal({ message: '招待をキャンセルしました', type: 'success' });
+      toast.success('招待をキャンセルしました');
     } catch (error: any) {
       console.error('招待キャンセルエラー:', error);
-      setAlertModal({ message: '招待のキャンセルに失敗しました', type: 'error' });
+      toast.error('招待のキャンセルに失敗しました');
     }
   };
 
@@ -568,34 +566,43 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
 
   // 下書きを削除
   const handleDeleteDraft = (childName: string) => {
-    deleteDraft(childName);
-    setDrafts(getDrafts());
-    if (selectedDraft === childName) {
-      setFormData(initialFormData);
-      setSelectedDraft(null);
-    }
+    setConfirmModal({
+      title: '下書き削除',
+      message: `「${childName}」の下書きを削除しますか？`,
+      isDestructive: true,
+      onConfirm: () => {
+        setConfirmModal(null);
+        deleteDraft(childName);
+        setDrafts(getDrafts());
+        if (selectedDraft === childName) {
+          setFormData(initialFormData);
+          setSelectedDraft(null);
+        }
+        toast.success('下書きを削除しました');
+      },
+    });
   };
 
   // 下書き保存
   const handleSaveDraft = () => {
     if (!formData.name.trim()) {
-      setAlertModal({ message: '児童名を入力してください', type: 'warning' });
+      toast.error('児童名を入力してください');
       return;
     }
     saveDraft(formData);
     setDrafts(getDrafts());
-    setAlertModal({ message: '下書きを保存しました', type: 'success' });
+    toast.success('下書きを保存しました');
   };
 
   // フォーム送信
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      setAlertModal({ message: '児童名を入力してください', type: 'warning' });
+      toast.error('児童名を入力してください');
       return;
     }
 
     if (!formData.birthDate) {
-      setAlertModal({ message: '生年月日を入力してください', type: 'warning' });
+      toast.error('生年月日を入力してください');
       return;
     }
 
@@ -619,10 +626,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
       setFormData(initialFormData);
       setSelectedDraft(null);
       setSelectedChild(null);
-      setAlertModal({ message: '児童を登録しました', type: 'success' });
+      toast.success('児童を登録しました');
     } catch (error) {
       console.error('Error adding child:', error);
-      setAlertModal({ message: '児童の登録に失敗しました', type: 'error' });
+      toast.error('児童の登録に失敗しました');
     }
   };
 
@@ -662,10 +669,10 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
     try {
       if (wizardMode === 'create') {
         await addChild(data);
-        setAlertModal({ message: '児童を登録しました', type: 'success' });
+        toast.success('児童を登録しました');
       } else if (selectedChild) {
         await updateChild({ ...selectedChild, ...data });
-        setAlertModal({ message: '児童情報を更新しました', type: 'success' });
+        toast.success('児童情報を更新しました');
       }
       setIsWizardOpen(false);
       setSelectedChild(null);
@@ -1005,8 +1012,17 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="児童名、保護者名、受給者証番号で検索..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="検索をクリア"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {/* ステータスタブ */}
@@ -1067,6 +1083,19 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
               icon={<Search size={20} className="text-gray-400" />}
               title="該当する児童が見つかりません"
               description="検索条件やフィルターを変更してください"
+              action={
+                (searchQuery || sortStatus !== 'all') ? (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSortStatus('all');
+                    }}
+                    className="px-4 py-2 text-sm font-bold text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                  >
+                    フィルターをクリア
+                  </button>
+                ) : undefined
+              }
             />
           )}
         </div>
@@ -2734,6 +2763,16 @@ const ChildrenView: React.FC<ChildrenViewProps> = ({ setActiveTab }) => {
           onClose={() => setIsDocumentsOpen(false)}
         />
       )}
+
+      {/* 確認モーダル */}
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        title={confirmModal?.title || '確認'}
+        message={confirmModal?.message || ''}
+        onConfirm={() => confirmModal?.onConfirm()}
+        onCancel={() => setConfirmModal(null)}
+        isDestructive={confirmModal?.isDestructive}
+      />
     </div>
   );
 };

@@ -10,6 +10,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 import {
   Upload, X, Building2, FileText, AlertCircle, CheckCircle,
   Briefcase, MapPin, ChevronRight, ChevronLeft, Users, Clock,
@@ -42,6 +43,7 @@ const COMPANY_TYPES = [
 ] as const;
 
 export default function FacilityRegisterPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -190,9 +192,9 @@ export default function FacilityRegisterPage() {
         setFacilityAddress(`${r.address1}${r.address2}${r.address3}`);
       }
     } catch {
-      // 検索失敗時は何もしない
+      toast.error('住所の検索に失敗しました');
     }
-  }, []);
+  }, [toast]);
 
   const handlePostalCodeChange = (value: string) => {
     const cleaned = value.replace(/[^\d-]/g, '').slice(0, 8);
@@ -294,8 +296,12 @@ export default function FacilityRegisterPage() {
         const { error: uploadError } = await supabase.storage
           .from('facility-documents')
           .upload(fileName, designationFile);
-        if (uploadError) console.error('Upload error:', uploadError);
-        else designationFileUrl = fileName;
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast.error('指定通知書のアップロードに失敗しました');
+        } else {
+          designationFileUrl = fileName;
+        }
       }
 
       // --- 2. facility_applications に申請を作成 ---
@@ -353,7 +359,10 @@ export default function FacilityRegisterPage() {
           created_at: new Date().toISOString(),
         }));
         const { error: notifError } = await supabase.from('notifications').insert(notifications);
-        if (notifError) console.error('Notification error:', notifError);
+        if (notifError) {
+          console.error('Notification error:', notifError);
+          toast.error('管理者への通知送信に失敗しました');
+        }
       }
 
       setCompleted(true);

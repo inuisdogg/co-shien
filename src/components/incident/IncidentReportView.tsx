@@ -244,11 +244,13 @@ export default function IncidentReportView() {
           .order('occurred_at', { ascending: false });
         if (error) {
           console.error('Error fetching incident reports:', error);
+          toast.error('報告データの取得に失敗しました');
           return;
         }
         if (data) setReports(data.map(mapRow));
       } catch (error) {
         console.error('Error:', error);
+        toast.error('報告データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -259,13 +261,23 @@ export default function IncidentReportView() {
   // Load children for selector when form opens
   useEffect(() => {
     if (!showForm || !facilityId) return;
-    supabase
-      .from('children')
-      .select('id, name')
-      .eq('facility_id', facilityId)
-      .order('name')
-      .then(({ data }) => {
+    Promise.resolve(
+      supabase
+        .from('children')
+        .select('id, name')
+        .eq('facility_id', facilityId)
+        .order('name')
+    ).then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching children:', error);
+          toast.error('児童データの取得に失敗しました');
+          return;
+        }
         if (data) setChildren(data);
+      })
+      .catch((err: unknown) => {
+        console.error('Error fetching children:', err);
+        toast.error('児童データの取得に失敗しました');
       });
   }, [showForm, facilityId]);
 
@@ -701,6 +713,7 @@ export default function IncidentReportView() {
           <EmptyState
             icon={<AlertTriangle className="w-7 h-7 text-gray-400" />}
             title={reports.length === 0 ? '報告がまだ登録されていません' : '条件に一致する報告がありません'}
+            description={reports.length === 0 ? '「記録を追加」ボタンから報告を追加してください' : undefined}
             action={reports.length === 0 ? (
               <button
                 onClick={openCreateForm}

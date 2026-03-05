@@ -8,6 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 // 静的生成をスキップ（useSearchParamsを使用するため）
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 export default function PersonalSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
@@ -111,6 +113,7 @@ export default function PersonalSetupPage() {
           }
         } catch (emailError) {
           console.error('ウェルカムメール送信エラー:', emailError);
+          toast.error('ウェルカムメールの送信に失敗しました');
           // メール送信エラーは無視
         }
 
@@ -147,6 +150,7 @@ export default function PersonalSetupPage() {
       router.push('/career');
     } catch (err: any) {
       console.error('自動ログインエラー:', err);
+      toast.error('自動ログインに失敗しました。手動でログインしてください');
       // エラーでも続行（手動ログインを促す）
     }
   };

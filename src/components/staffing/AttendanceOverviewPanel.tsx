@@ -17,6 +17,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ---- Monthly Closing Types ----
 
@@ -110,6 +111,15 @@ export default function AttendanceOverviewPanel() {
   });
   const [selectedCell, setSelectedCell] = useState<{ userId: string; date: string } | null>(null);
 
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
   // Monthly closing state
   const [monthlyClosing, setMonthlyClosing] = useState<MonthlyClosing | null>(null);
   const [closingLoading, setClosingLoading] = useState(false);
@@ -181,6 +191,7 @@ export default function AttendanceOverviewPanel() {
         }
       } catch (err) {
         console.error('Error fetching attendance data:', err);
+        toast.error('出退勤データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -227,6 +238,7 @@ export default function AttendanceOverviewPanel() {
       }
     } catch (err) {
       console.error('Error fetching monthly closing:', err);
+      toast.error('月次締め情報の取得に失敗しました');
     } finally {
       setClosingLoading(false);
     }
@@ -237,61 +249,73 @@ export default function AttendanceOverviewPanel() {
   }, [fetchMonthlyClosing]);
 
   // Close the month
-  const handleCloseMonth = async () => {
+  const handleCloseMonth = () => {
     if (!facilityId || !user?.id) return;
-    if (!confirm(`${year}年${month}月の勤怠を締めますか？締め後は勤怠データの編集が制限されます。`)) return;
+    setConfirmModal({
+      isOpen: true,
+      title: '月次締めの実行',
+      message: `${year}年${month}月の勤怠を締めますか？締め後は勤怠データの編集が制限されます。`,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setClosingActionLoading(true);
+        try {
+          const { error } = await supabase
+            .from('attendance_monthly_closings')
+            .upsert({
+              facility_id: facilityId,
+              year,
+              month,
+              status: 'closed',
+              closed_at: new Date().toISOString(),
+              closed_by: user!.id,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'facility_id,year,month' });
 
-    setClosingActionLoading(true);
-    try {
-      const { error } = await supabase
-        .from('attendance_monthly_closings')
-        .upsert({
-          facility_id: facilityId,
-          year,
-          month,
-          status: 'closed',
-          closed_at: new Date().toISOString(),
-          closed_by: user.id,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'facility_id,year,month' });
-
-      if (error) throw error;
-      await fetchMonthlyClosing();
-    } catch (err) {
-      console.error('Error closing month:', err);
-      toast.error('月次締めに失敗しました。');
-    } finally {
-      setClosingActionLoading(false);
-    }
+          if (error) throw error;
+          await fetchMonthlyClosing();
+        } catch (err) {
+          console.error('Error closing month:', err);
+          toast.error('月次締めに失敗しました。');
+        } finally {
+          setClosingActionLoading(false);
+        }
+      },
+    });
   };
 
   // Reopen the month (admin only)
-  const handleReopenMonth = async () => {
+  const handleReopenMonth = () => {
     if (!facilityId || !isAdmin) return;
-    if (!confirm(`${year}年${month}月の締めを解除しますか？`)) return;
+    setConfirmModal({
+      isOpen: true,
+      title: '締めの解除',
+      message: `${year}年${month}月の締めを解除しますか？`,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setClosingActionLoading(true);
+        try {
+          const { error } = await supabase
+            .from('attendance_monthly_closings')
+            .update({
+              status: 'open',
+              closed_at: null,
+              closed_by: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('facility_id', facilityId)
+            .eq('year', year)
+            .eq('month', month);
 
-    setClosingActionLoading(true);
-    try {
-      const { error } = await supabase
-        .from('attendance_monthly_closings')
-        .update({
-          status: 'open',
-          closed_at: null,
-          closed_by: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('facility_id', facilityId)
-        .eq('year', year)
-        .eq('month', month);
-
-      if (error) throw error;
-      await fetchMonthlyClosing();
-    } catch (err) {
-      console.error('Error reopening month:', err);
-      toast.error('締め解除に失敗しました。');
-    } finally {
-      setClosingActionLoading(false);
-    }
+          if (error) throw error;
+          await fetchMonthlyClosing();
+        } catch (err) {
+          console.error('Error reopening month:', err);
+          toast.error('締め解除に失敗しました。');
+        } finally {
+          setClosingActionLoading(false);
+        }
+      },
+    });
   };
 
   // Build daily summaries for all staff
@@ -675,6 +699,15 @@ export default function AttendanceOverviewPanel() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Cell Detail Modal */}
       {selectedCell && (() => {

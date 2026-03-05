@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useInterviewScheduling } from '@/hooks/useInterviewScheduling';
 import { InterviewSlot } from '@/types';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ------------------------------------------------------------------ Props
 
@@ -97,6 +98,13 @@ export default function InterviewScheduler({
   const [formNotes, setFormNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 初回データ取得
   useEffect(() => {
@@ -138,11 +146,19 @@ export default function InterviewScheduler({
   }, [applicationId, formDatetime, formDuration, formFormat, formLocation, formMeetingUrl, formNotes, proposeSlot, resetForm]);
 
   // キャンセル
-  const handleCancel = useCallback(async (slotId: string) => {
-    if (!confirm('この日程提案をキャンセルしますか？')) return;
-    setCancelling(slotId);
-    await cancelSlot(slotId);
-    setCancelling(null);
+  const handleCancel = useCallback((slotId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'キャンセルの確認',
+      message: 'この日程提案をキャンセルしますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setCancelling(slotId);
+        await cancelSlot(slotId);
+        setCancelling(null);
+      },
+    });
   }, [cancelSlot]);
 
   // 承認済みスロット
@@ -453,6 +469,15 @@ export default function InterviewScheduler({
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

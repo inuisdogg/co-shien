@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import { parseQualifications } from '@/utils/qualifications';
 import WorkScheduleView from './WorkScheduleView';
 import AttendanceOverviewPanel from './AttendanceOverviewPanel';
@@ -56,6 +58,7 @@ function calculateFTE(workStyle: WorkStyle, contractedHours: number | undefined,
 
 function StaffingContent() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [staffList, setStaffList] = useState<StaffRow[]>([]);
@@ -159,6 +162,7 @@ function StaffingContent() {
         }
       } catch (error) {
         console.error('Error fetching staffing data:', error);
+        toast.error('人員配置データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -270,7 +274,11 @@ function StaffingContent() {
           </h2>
         </div>
         {staffList.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">スタッフが登録されていません</div>
+          <EmptyState
+            icon={<Users className="w-7 h-7 text-gray-400" />}
+            title="スタッフが登録されていません"
+            description="スタッフを登録すると人員区分が表示されます"
+          />
         ) : (
           <div className="divide-y divide-gray-100">
             {staffList.map(staff => {
@@ -480,6 +488,7 @@ function classifyStaff(staffList: StaffRow[]): OrgGroup[] {
 
 function OrgChartContent() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [staffList, setStaffList] = useState<StaffRow[]>([]);
@@ -529,6 +538,7 @@ function OrgChartContent() {
         })));
       } catch (error) {
         console.error('Error fetching staff for org chart:', error);
+        toast.error('組織図データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -548,8 +558,12 @@ function OrgChartContent() {
 
   if (staffList.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
-        スタッフが登録されていません
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+        <EmptyState
+          icon={<Users className="w-7 h-7 text-gray-400" />}
+          title="スタッフが登録されていません"
+          description="スタッフを登録すると組織図が表示されます"
+        />
       </div>
     );
   }

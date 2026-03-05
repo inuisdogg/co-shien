@@ -24,6 +24,8 @@ import {
   ShiftAvailabilityDeadline,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface ShiftAvailabilityFormProps {
   userId: string;
@@ -56,6 +58,7 @@ export default function ShiftAvailabilityForm({
   facilityName,
   onClose,
 }: ShiftAvailabilityFormProps) {
+  const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState(() => {
     // デフォルトは翌月
     const now = new Date();
@@ -74,6 +77,13 @@ export default function ShiftAvailabilityForm({
   const [existingSubmission, setExistingSubmission] = useState<ShiftAvailabilitySubmission | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 月の日付一覧
   const daysInMonth = useMemo(
@@ -162,6 +172,7 @@ export default function ShiftAvailabilityForm({
       }
     } catch (error) {
       console.error('データ取得エラー:', error);
+      toast.error('データの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -252,52 +263,60 @@ export default function ShiftAvailabilityForm({
       fetchData();
     } catch (error) {
       console.error('保存エラー:', error);
+      toast.error('保存に失敗しました');
     } finally {
       setIsSaving(false);
     }
   };
 
   // 提出
-  const handleSubmit = async () => {
-    if (!confirm('希望シフトを提出しますか？\n提出後も締切までは修正できます。')) return;
+  const handleSubmit = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: '提出の確認',
+      message: '希望シフトを提出しますか？\n提出後も締切までは修正できます。',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setIsSaving(true);
+        try {
+          const availableDates = Array.from(selectedDates).sort();
+          const now = new Date().toISOString();
 
-    setIsSaving(true);
-    try {
-      const availableDates = Array.from(selectedDates).sort();
-      const now = new Date().toISOString();
+          if (existingSubmission) {
+            // 更新
+            await supabase
+              .from('shift_availability_submissions')
+              .update({
+                available_dates: availableDates,
+                notes: notes || null,
+                submitted_at: now,
+                updated_at: now,
+              })
+              .eq('id', existingSubmission.id);
+          } else {
+            // 新規作成
+            await supabase
+              .from('shift_availability_submissions')
+              .insert({
+                facility_id: facilityId,
+                user_id: userId,
+                year: currentYear,
+                month: currentMonth,
+                available_dates: availableDates,
+                notes: notes || null,
+                submitted_at: now,
+              });
+          }
 
-      if (existingSubmission) {
-        // 更新
-        await supabase
-          .from('shift_availability_submissions')
-          .update({
-            available_dates: availableDates,
-            notes: notes || null,
-            submitted_at: now,
-            updated_at: now,
-          })
-          .eq('id', existingSubmission.id);
-      } else {
-        // 新規作成
-        await supabase
-          .from('shift_availability_submissions')
-          .insert({
-            facility_id: facilityId,
-            user_id: userId,
-            year: currentYear,
-            month: currentMonth,
-            available_dates: availableDates,
-            notes: notes || null,
-            submitted_at: now,
-          });
-      }
-
-      fetchData();
-    } catch (error) {
-      console.error('提出エラー:', error);
-    } finally {
-      setIsSaving(false);
-    }
+          fetchData();
+        } catch (error) {
+          console.error('提出エラー:', error);
+          toast.error('提出に失敗しました');
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
 
   // 締切状態の判定
@@ -527,6 +546,15 @@ export default function ShiftAvailabilityForm({
             </div>
           </div>
         </motion.div>
+
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          isDestructive={confirmModal.isDestructive}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        />
       </motion.div>
     </AnimatePresence>
   );

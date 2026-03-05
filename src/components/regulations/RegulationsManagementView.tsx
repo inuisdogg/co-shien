@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 import RegulationAcknowledgmentPanel from './RegulationAcknowledgmentPanel';
 
 // ---- Local types ----
@@ -104,6 +105,15 @@ const RegulationsManagementView: React.FC = () => {
 
   // Acknowledgment panel
   const [ackPanelRegulation, setAckPanelRegulation] = useState<{ id: string; title: string } | null>(null);
+
+  // Confirm modal
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Version history panel
   const [versionHistory, setVersionHistory] = useState<VersionHistoryItem[] | null>(null);
@@ -214,10 +224,11 @@ const RegulationsManagementView: React.FC = () => {
       );
     } catch (err) {
       console.error('Error fetching regulations:', err);
+      toast.error('規定の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [facility?.id, activeCategory]);
+  }, [facility?.id, activeCategory, toast]);
 
   useEffect(() => {
     fetchCategories();
@@ -331,6 +342,7 @@ const RegulationsManagementView: React.FC = () => {
       }
 
       setShowModal(false);
+      toast.success(editingId ? '規定を更新しました' : '規定を追加しました');
       fetchRegulations();
     } catch (err) {
       console.error('Error saving regulation:', err);
@@ -340,10 +352,24 @@ const RegulationsManagementView: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この規定を削除してもよろしいですか？')) return;
-    await supabase.from('company_regulations').delete().eq('id', id);
-    fetchRegulations();
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '規定の削除',
+      message: 'この規定を削除してもよろしいですか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.from('company_regulations').delete().eq('id', id);
+          toast.success('規定を削除しました');
+          fetchRegulations();
+        } catch (err) {
+          console.error('Error deleting regulation:', err);
+          toast.error('規定の削除に失敗しました');
+        }
+      },
+    });
   };
 
   const handleSendReminder = async (reg: Regulation) => {
@@ -383,6 +409,7 @@ const RegulationsManagementView: React.FC = () => {
       toast.success(`${unacked.length}名にリマインダーを送信しました。`);
     } catch (err) {
       console.error('Error sending reminders:', err);
+      toast.error('リマインダーの送信に失敗しました');
     }
   };
 
@@ -608,6 +635,16 @@ const RegulationsManagementView: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmModal.isDestructive}
+      />
 
       {/* Create/Edit Modal */}
       {showModal && (

@@ -14,12 +14,14 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '@/lib/pushNotifications';
+import { useToast } from '@/components/ui/Toast';
 
 type Props = {
   userId: string;
 };
 
 export default function PushNotificationToggle({ userId }: Props) {
+  const { toast } = useToast();
   const [supported, setSupported] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -63,6 +65,7 @@ export default function PushNotificationToggle({ userId }: Props) {
       }
     } catch (error) {
       console.error('Push notification enable failed:', error);
+      toast.error('プッシュ通知の有効化に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -75,6 +78,7 @@ export default function PushNotificationToggle({ userId }: Props) {
       setIsSubscribed(false);
     } catch (error) {
       console.error('Push notification disable failed:', error);
+      toast.error('プッシュ通知の無効化に失敗しました');
     } finally {
       setLoading(false);
     }

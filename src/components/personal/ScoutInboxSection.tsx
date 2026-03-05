@@ -20,7 +20,9 @@ import {
   Inbox,
 } from 'lucide-react';
 import { useScout } from '@/hooks/useScout';
+import { useToast } from '@/components/ui/Toast';
 import { ScoutMessage } from '@/types';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ------------------------------------------------------------------ Props
 
@@ -65,6 +67,7 @@ function truncateText(text: string, maxLines: number = 2): string {
 // ------------------------------------------------------------------ Component
 
 export default function ScoutInboxSection({ userId }: ScoutInboxSectionProps) {
+  const { toast } = useToast();
   const {
     scouts,
     loading,
@@ -80,6 +83,13 @@ export default function ScoutInboxSection({ userId }: ScoutInboxSectionProps) {
   const [replyMessage, setReplyMessage] = useState('');
   const [replying, setReplying] = useState(false);
   const [declining, setDeclining] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 初回取得
   useEffect(() => {
@@ -133,18 +143,27 @@ export default function ScoutInboxSection({ userId }: ScoutInboxSectionProps) {
       setReplyMessage('');
     } catch (err) {
       console.error('返信エラー:', err);
+      toast.error('返信の送信に失敗しました');
     } finally {
       setReplying(false);
     }
   }, [replyScoutId, userId, scouts, replyToScout, replyMessage]);
 
   // 辞退
-  const handleDecline = useCallback(async (scoutId: string) => {
-    if (!confirm('このスカウトを辞退しますか？')) return;
-    setDeclining(scoutId);
-    await declineScout(scoutId);
-    setDeclining(null);
-    setExpandedId(null);
+  const handleDecline = useCallback((scoutId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '辞退の確認',
+      message: 'このスカウトを辞退しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setDeclining(scoutId);
+        await declineScout(scoutId);
+        setDeclining(null);
+        setExpandedId(null);
+      },
+    });
   }, [declineScout]);
 
   // 未読数
@@ -311,6 +330,15 @@ export default function ScoutInboxSection({ userId }: ScoutInboxSectionProps) {
           })
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* 返信モーダル */}
       {showReplyModal && replyScoutId && (

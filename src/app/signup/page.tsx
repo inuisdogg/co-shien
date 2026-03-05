@@ -255,6 +255,7 @@ export default function SignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
+              autoComplete="email"
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="メールアドレスを入力"
               disabled={loading}
@@ -298,7 +299,12 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? '登録中...' : 'アカウントを作成'}
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2" />
+                登録中...
+              </>
+            ) : 'アカウントを作成'}
           </button>
         </form>
 

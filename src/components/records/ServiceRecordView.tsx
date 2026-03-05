@@ -30,6 +30,7 @@ import type {
 } from '@/lib/serviceRecordGenerator';
 import { openPrintWindow } from '@/lib/wordEngine';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
 
 // ---------- Types ----------
 
@@ -43,6 +44,7 @@ interface ChildOption {
 
 export default function ServiceRecordView() {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   // Date selection
@@ -84,6 +86,7 @@ export default function ServiceRecordView() {
 
         if (error) {
           console.error('Error fetching children:', error);
+          toast.error('児童データの取得に失敗しました');
           return;
         }
 
@@ -99,6 +102,7 @@ export default function ServiceRecordView() {
         }
       } catch (err) {
         console.error('Error fetching children:', err);
+        toast.error('児童データの取得に失敗しました');
       } finally {
         setLoadingChildren(false);
       }
@@ -157,6 +161,7 @@ export default function ServiceRecordView() {
       setSingleRecord(record);
     } catch (err) {
       console.error('Error generating service record:', err);
+      toast.error('サービス提供記録の生成に失敗しました');
     } finally {
       setGenerating(false);
     }
@@ -176,6 +181,7 @@ export default function ServiceRecordView() {
       setSummary(result);
     } catch (err) {
       console.error('Error generating all service records:', err);
+      toast.error('一括記録の生成に失敗しました');
     } finally {
       setGeneratingAll(false);
     }
@@ -189,6 +195,7 @@ export default function ServiceRecordView() {
       exportServiceRecordToExcel(singleRecord);
     } catch (err) {
       console.error('Export error:', err);
+      toast.error('Excelエクスポートに失敗しました');
     } finally {
       setExporting(false);
     }
@@ -202,6 +209,7 @@ export default function ServiceRecordView() {
       exportAllServiceRecordsToExcel(summary, selectedYear, selectedMonth);
     } catch (err) {
       console.error('Export error:', err);
+      toast.error('Excelエクスポートに失敗しました');
     } finally {
       setExporting(false);
     }

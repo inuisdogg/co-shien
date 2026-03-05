@@ -36,6 +36,7 @@ import { supabase } from '@/lib/supabase';
 import { useFacilityData } from '@/hooks/useFacilityData';
 import { useToast } from '@/components/ui/Toast';
 import EmptyState from '@/components/ui/EmptyState';
+import ConfirmModal from '@/components/common/ConfirmModal';
 import {
   SupportPlanFile,
   SupportPlanFileStatus,
@@ -376,6 +377,13 @@ function PlanEditor({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Local form state
   const [planType, setPlanType] = useState<SupportPlanType>(plan.planType);
@@ -508,7 +516,19 @@ function PlanEditor({
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                if (dirty && !confirm('未保存の変更があります。破棄しますか？')) return;
+                if (dirty) {
+                  setConfirmModal({
+                    isOpen: true,
+                    title: '未保存の変更',
+                    message: '未保存の変更があります。破棄しますか？',
+                    isDestructive: true,
+                    onConfirm: () => {
+                      setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                      onBack();
+                    },
+                  });
+                  return;
+                }
                 onBack();
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -616,9 +636,16 @@ function PlanEditor({
             <div className="border-t border-gray-100 mt-4 pt-4">
               <button
                 onClick={() => {
-                  if (confirm('この計画を削除しますか？この操作は取り消せません。')) {
-                    onDelete(plan.id);
-                  }
+                  setConfirmModal({
+                    isOpen: true,
+                    title: '削除の確認',
+                    message: 'この計画を削除しますか？この操作は取り消せません。',
+                    isDestructive: true,
+                    onConfirm: () => {
+                      setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                      onDelete(plan.id);
+                    },
+                  });
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
               >
@@ -1160,6 +1187,15 @@ function PlanEditor({
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
@@ -1251,11 +1287,13 @@ export default function SupportPlanView() {
           .order('created_at', { ascending: false });
         if (error) {
           console.error('Error fetching support plans:', error);
+          toast.error('支援計画の取得に失敗しました');
           return;
         }
         if (data) setPlans(data.map((row: Record<string, unknown>) => mapRowToPlan(row)));
       } catch (error) {
         console.error('Error in fetchPlans:', error);
+        toast.error('支援計画の取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -1403,6 +1441,7 @@ export default function SupportPlanView() {
       }
     } catch (error) {
       console.error('Error updating status:', error);
+      toast.error('ステータスの更新に失敗しました');
     }
   };
 

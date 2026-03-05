@@ -531,7 +531,18 @@ const NotionLikeEditor: React.FC<NotionLikeEditorProps> = ({
 
       {/* リンク入力モーダル */}
       {showLinkInput && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-label="リンクを設定"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLinkInput(false);
+              setLinkUrl('');
+            }
+          }}
+        >
           <div className="bg-white rounded-xl p-4 w-96 shadow-xl">
             <h3 className="font-bold text-gray-900 mb-3">リンクを設定</h3>
             <input
@@ -539,7 +550,13 @@ const NotionLikeEditor: React.FC<NotionLikeEditorProps> = ({
               placeholder="https://..."
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && setLink()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setLink();
+                if (e.key === 'Escape') {
+                  setShowLinkInput(false);
+                  setLinkUrl('');
+                }
+              }}
               autoFocus
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 mb-3"
             />
@@ -765,6 +782,8 @@ const ToolbarButton: React.FC<{
   <button
     onClick={onClick}
     title={title}
+    aria-label={title}
+    aria-pressed={isActive}
     className={`p-1.5 rounded transition-colors ${
       isActive
         ? 'bg-purple-100 text-purple-700'

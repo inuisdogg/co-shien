@@ -61,6 +61,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="閉じる"
         >
           <X className="w-4 h-4" />
         </button>

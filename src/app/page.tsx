@@ -25,20 +25,29 @@ export default function RootPage() {
   const router = useRouter();
   const [ownerSetupNeeded, setOwnerSetupNeeded] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
         if (user.userType === 'client' || user.userType === 'parent') {
-          window.location.href = '/parent';
+          router.push('/parent');
           return;
         }
-        window.location.href = '/career';
+        router.push('/career');
         return;
-      } catch {}
+      } catch {
+        localStorage.removeItem('user');
+      }
     }
+
+    const timeout = setTimeout(() => {
+      if (!cancelled) setTimedOut(true);
+    }, 10000);
 
     const checkOwnerSetup = async () => {
       try {
@@ -48,23 +57,40 @@ export default function RootPage() {
           .eq('key', 'owner_setup_completed')
           .maybeSingle();
 
-        if (!config || config.value !== 'true') {
-          setOwnerSetupNeeded(true);
+        if (!cancelled) {
+          if (!config || config.value !== 'true') {
+            setOwnerSetupNeeded(true);
+          }
         }
       } catch (err) {
         console.error('Owner setup check error:', err);
       } finally {
-        setChecking(false);
+        if (!cancelled) {
+          setChecking(false);
+          clearTimeout(timeout);
+        }
       }
     };
 
     checkOwnerSetup();
-  }, []);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [router]);
 
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-800 border-t-transparent" />
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-800 border-t-transparent mx-auto" />
+          {timedOut && (
+            <p className="mt-4 text-sm text-gray-500">
+              接続に時間がかかっています。ネットワーク環境をご確認ください。
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -85,7 +111,7 @@ export default function RootPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/parent/login')}
-              className="text-xs font-medium text-client hover:text-client-dark transition-colors px-2 py-1.5 hidden sm:block"
+              className="text-xs font-medium text-client hover:text-client-dark transition-colors px-2 py-1.5"
             >
               保護者の方
             </button>

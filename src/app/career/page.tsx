@@ -42,6 +42,7 @@ import {
   Megaphone,
   Search,
   ChevronRight,
+  Lock,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { User as UserType, EmploymentRecord, FacilitySettings, WorkToolId, QUALIFICATION_CODES, type QualificationCode } from '@/types';
@@ -64,6 +65,7 @@ import type { CareerTimelineEvent } from '@/hooks/useCareerAccumulation';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 const DEFAULT_SLOTS = resolveTimeSlots([]);
 
@@ -74,6 +76,13 @@ function PasskeySection({ userId, userEmail }: { userId?: string; userEmail?: st
   const [registering, setRegistering] = useState(false);
   const [supported, setSupported] = useState(false);
   const [message, setMessage] = useState('');
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.PublicKeyCredential) {
@@ -91,7 +100,10 @@ function PasskeySection({ userId, userEmail }: { userId?: string; userEmail?: st
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       setPasskeys(data || []);
-    } catch {}
+    } catch (err) {
+      console.error('Failed to fetch passkeys:', err);
+      setMessage('パスキーの取得に失敗しました');
+    }
     setLoading(false);
   };
 
@@ -128,10 +140,18 @@ function PasskeySection({ userId, userEmail }: { userId?: string; userEmail?: st
     }
   };
 
-  const handleDelete = async (passkeyId: string) => {
-    if (!confirm('このパスキーを削除しますか？')) return;
-    await supabase.from('passkeys').delete().eq('id', passkeyId);
-    fetchPasskeys();
+  const handleDelete = (passkeyId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '削除の確認',
+      message: 'このパスキーを削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await supabase.from('passkeys').delete().eq('id', passkeyId);
+        fetchPasskeys();
+      },
+    });
   };
 
   if (!supported) return null;
@@ -193,6 +213,15 @@ function PasskeySection({ userId, userEmail }: { userId?: string; userEmail?: st
           </button>
         </>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
@@ -260,6 +289,7 @@ function AdminAccessLink({ userId }: { userId?: string }) {
 
 // ========== スタッフ書類閲覧セクション ==========
 function StaffDocumentsSection({ userId, facilities }: { userId: string; facilities: FacilityWorkData[] }) {
+  const { toast } = useToast();
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [docSearch, setDocSearch] = useState('');
@@ -320,7 +350,8 @@ function StaffDocumentsSection({ userId, facilities }: { userId: string; facilit
           })));
         }
       } catch (err) {
-        // silently ignore
+        console.error('書類取得エラー:', err);
+        if (!cancelled) toast.error('書類の取得に失敗しました');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -512,6 +543,7 @@ function StaffDocumentsSection({ userId, facilities }: { userId: string; facilit
 
 // ========== 規定確認セクション ==========
 function CareerRegulationSection({ userId, activeEmployments }: { userId?: string; activeEmployments: EmploymentRecord[] }) {
+  const { toast } = useToast();
   const [regulations, setRegulations] = useState<{ id: string; title: string; facilityId: string; facilityName: string; acknowledged: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
@@ -556,7 +588,8 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
         });
         if (!cancelled) setRegulations(result);
       } catch (e) {
-        // silently ignore
+        console.error('規定取得エラー:', e);
+        if (!cancelled) toast.error('規定の取得に失敗しました');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -576,8 +609,10 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
         acknowledged_at: new Date().toISOString(),
       });
       setRegulations(prev => prev.map(r => r.id === regId ? { ...r, acknowledged: true } : r));
+      toast.success('規定を確認しました');
     } catch (e) {
-      // silently ignore
+      console.error('規定確認エラー:', e);
+      toast.error('規定の確認に失敗しました');
     } finally {
       setAcknowledging(null);
     }
@@ -648,6 +683,7 @@ function CareerRegulationSection({ userId, activeEmployments }: { userId?: strin
 
 // ========== 資格期限通知セクション ==========
 function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: string; activeEmployments: EmploymentRecord[] }) {
+  const { toast } = useToast();
   const [qualifications, setQualifications] = useState<{ id: string; name: string; expiryDate: string; daysLeft: number; status: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -687,7 +723,8 @@ function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: str
           );
         }
       } catch (e) {
-        // silently ignore
+        console.error('資格取得エラー:', e);
+        if (!cancelled) toast.error('資格情報の取得に失敗しました');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -781,6 +818,7 @@ function CareerQualificationAlerts({ userId, activeEmployments }: { userId?: str
 
 // ========== 有給残日数表示セクション ==========
 function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string; activeEmployments: EmploymentRecord[] }) {
+  const { toast } = useToast();
   const [balances, setBalances] = useState<{ facilityName: string; totalDays: number; usedDays: number; remainingDays: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -816,7 +854,8 @@ function CareerPaidLeaveBalance({ userId, activeEmployments }: { userId?: string
           );
         }
       } catch (e) {
-        // silently ignore
+        console.error('有給残日数取得エラー:', e);
+        if (!cancelled) toast.error('有給残日数の取得に失敗しました');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -949,6 +988,17 @@ export default function PersonalDashboardPage() {
   const [currentFacility, setCurrentFacility] = useState<EmploymentRecord | null>(null);
   const [activeTab, setActiveTab] = useState<'home' | 'work' | 'career' | 'docs' | 'settings'>('home');
 
+  // パスワード変更
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [passwordChanging, setPasswordChanging] = useState(false);
+
+  // アカウント削除
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [accountDeleting, setAccountDeleting] = useState(false);
 
   // 通知・アクション用の状態
   interface PersonalNotification {
@@ -1340,6 +1390,7 @@ export default function PersonalDashboardPage() {
       }
     } catch (err) {
       console.error('アップロード済み履歴書取得エラー:', err);
+      toast.error('アップロード済み履歴書の取得に失敗しました');
     }
   };
 
@@ -2114,9 +2165,53 @@ export default function PersonalDashboardPage() {
             </motion.div>
           );
         }) : (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-            <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">所属施設がありません</p>
+          <div className="space-y-3">
+            {/* キャリア情報のオンボーディング */}
+            <div className="bg-gradient-to-br from-personal/5 to-teal-50 rounded-xl border border-personal/20 p-6">
+              <h3 className="font-bold text-gray-900 mb-1">キャリア情報を整理しましょう</h3>
+              <p className="text-sm text-gray-600 mb-4">資格証や職歴をRootsに登録すると、履歴書の自動作成や実務経験証明書の発行がワンタップで完了します。</p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setActiveTab('career')}
+                  className="w-full flex items-center gap-3 bg-white rounded-lg border border-gray-200 p-3 hover:border-personal/40 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 bg-personal/10 rounded-lg flex items-center justify-center shrink-0">
+                    <Award className="w-4 h-4 text-personal" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-900">資格情報を登録</p>
+                    <p className="text-xs text-gray-500">保有資格をデジタル管理</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+                <button
+                  onClick={() => setActiveTab('career')}
+                  className="w-full flex items-center gap-3 bg-white rounded-lg border border-gray-200 p-3 hover:border-personal/40 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                    <Briefcase className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-900">職歴を登録</p>
+                    <p className="text-xs text-gray-500">実務経験証明書を自動生成</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+                <button
+                  onClick={() => setActiveTab('work')}
+                  className="w-full flex items-center gap-3 bg-white rounded-lg border border-gray-200 p-3 hover:border-personal/40 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center shrink-0">
+                    <Search className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-900">求人を探す</p>
+                    <p className="text-xs text-gray-500">あなたに合った施設を見つける</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -3337,6 +3432,56 @@ export default function PersonalDashboardPage() {
             </div>
           </div>
 
+          {/* パスワード変更 */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+            <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <Lock className="w-5 h-5 text-personal" />
+              パスワード変更
+            </h3>
+            {showPasswordChange ? (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (newPassword !== newPasswordConfirm) {
+                  toast.error('新しいパスワードが一致しません');
+                  return;
+                }
+                if (newPassword.length < 8) {
+                  toast.error('パスワードは8文字以上で設定してください');
+                  return;
+                }
+                setPasswordChanging(true);
+                try {
+                  const res = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user?.id, currentPassword, newPassword }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error);
+                  toast.success('パスワードを変更しました');
+                  setShowPasswordChange(false);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setNewPasswordConfirm('');
+                } catch (err: any) {
+                  toast.error(err.message || 'パスワード変更に失敗しました');
+                } finally {
+                  setPasswordChanging(false);
+                }
+              }} className="space-y-3">
+                <input type="password" placeholder="現在のパスワード" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required autoComplete="current-password" className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30" />
+                <input type="password" placeholder="新しいパスワード（8文字以上）" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30" />
+                <input type="password" placeholder="新しいパスワード（確認）" value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} required minLength={8} autoComplete="new-password" className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-personal/30" />
+                <div className="flex gap-2">
+                  <button type="submit" disabled={passwordChanging} className="flex-1 h-10 bg-personal text-white font-bold rounded-lg text-sm disabled:opacity-50">{passwordChanging ? '変更中...' : '変更する'}</button>
+                  <button type="button" onClick={() => { setShowPasswordChange(false); setCurrentPassword(''); setNewPassword(''); setNewPasswordConfirm(''); }} className="h-10 px-4 bg-gray-100 text-gray-600 rounded-lg text-sm">キャンセル</button>
+                </div>
+              </form>
+            ) : (
+              <button onClick={() => setShowPasswordChange(true)} className="text-sm text-personal hover:underline">パスワードを変更する</button>
+            )}
+          </div>
+
           {/* パスキー管理 */}
           <PasskeySection userId={user?.id} userEmail={user?.email} />
 
@@ -3350,11 +3495,46 @@ export default function PersonalDashboardPage() {
               localStorage.removeItem('selectedFacility');
               router.push('/career/login');
             }}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors mb-4"
           >
             <LogOut className="w-5 h-5" />
             ログアウト
           </button>
+
+          {/* アカウント削除 */}
+          <div className="border-t border-gray-200 pt-4">
+            {showDeleteAccount ? (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <h4 className="font-bold text-red-700 mb-2">アカウントを削除</h4>
+                <p className="text-xs text-red-600 mb-3">この操作は取り消せません。すべてのデータが削除されます。</p>
+                <input type="password" placeholder="パスワードを入力して確認" value={deletePassword} onChange={e => setDeletePassword(e.target.value)} autoComplete="current-password" className="w-full h-10 px-3 border border-red-200 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-300" />
+                <div className="flex gap-2">
+                  <button onClick={async () => {
+                    if (!deletePassword) { toast.error('パスワードを入力してください'); return; }
+                    setAccountDeleting(true);
+                    try {
+                      const res = await fetch('/api/auth/delete-account', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: user?.id, password: deletePassword }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error);
+                      localStorage.clear();
+                      window.location.href = '/career/lp';
+                    } catch (err: any) {
+                      toast.error(err.message || 'アカウント削除に失敗しました');
+                    } finally {
+                      setAccountDeleting(false);
+                    }
+                  }} disabled={accountDeleting} className="flex-1 h-10 bg-red-600 text-white font-bold rounded-lg text-sm disabled:opacity-50">{accountDeleting ? '削除中...' : '完全に削除する'}</button>
+                  <button onClick={() => { setShowDeleteAccount(false); setDeletePassword(''); }} className="h-10 px-4 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm">キャンセル</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowDeleteAccount(true)} className="text-xs text-gray-400 hover:text-red-500">アカウントを削除する</button>
+            )}
+          </div>
         </div>
       )}
 

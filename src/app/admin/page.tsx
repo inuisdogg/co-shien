@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   Building2,
   Plus,
@@ -31,6 +32,7 @@ import {
   AlertCircle,
   Eye,
 } from 'lucide-react';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,6 +114,14 @@ export default function AdminPage() {
 
   // 招待履歴の展開
   const [showInvitationHistory, setShowInvitationHistory] = useState(false);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 権限チェック
   useEffect(() => {
@@ -293,6 +303,7 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error('データ読み込みエラー:', err);
+      toast.error('データの読み込みに失敗しました');
     } finally {
       setLoading(false);
     }
@@ -323,6 +334,8 @@ export default function AdminPage() {
       const baseUrl = window.location.origin;
       setGeneratedLink(`${baseUrl}/facility/register?token=${token}`);
 
+      toast.success('招待リンクを生成しました');
+
       // フォームリセット
       setShowInviteForm(false);
       setMemoCompanyName('');
@@ -344,13 +357,24 @@ export default function AdminPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback
+      toast.error('クリップボードへのコピーに失敗しました');
     }
   };
 
   // 申請を承認（法人・施設・設定・雇用記録を作成）
-  const approveApplication = async (app: FacilityApplication) => {
-    if (!confirm(`「${app.companyName} / ${app.facilityName}」の申請を承認しますか？`)) return;
+  const approveApplication = (app: FacilityApplication) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '申請の承認',
+      message: `「${app.companyName} / ${app.facilityName}」の申請を承認しますか？`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await doApproveApplication(app);
+      },
+    });
+  };
+
+  const doApproveApplication = async (app: FacilityApplication) => {
     setAppProcessing(true);
 
     try {
@@ -454,6 +478,7 @@ export default function AdminPage() {
         created_at: new Date().toISOString(),
       });
 
+      toast.success('施設申請を承認しました');
       setSelectedApp(null);
       loadData();
     } catch (err: any) {
@@ -494,6 +519,7 @@ export default function AdminPage() {
         created_at: new Date().toISOString(),
       });
 
+      toast.success('施設申請を却下しました');
       setSelectedApp(null);
       setShowRejectForm(false);
       setRejectionReason('');
@@ -1082,11 +1108,24 @@ export default function AdminPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-gray-500 py-8">まだ施設がありません</p>
+              <EmptyState
+                icon={<Building2 className="w-7 h-7 text-gray-400" />}
+                title="まだ施設がありません"
+                description="招待リンクを発行して施設を登録しましょう"
+              />
             )}
           </div>
         </div>
       </main>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

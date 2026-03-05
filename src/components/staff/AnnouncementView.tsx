@@ -7,7 +7,9 @@ import {
   Send, Plus, Eye, Edit2, Trash2, CheckCircle, Clock,
   AlertCircle, X, Users, ChevronDown,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 import EmptyState from '@/components/ui/EmptyState';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 interface Announcement {
   id: string;
@@ -24,6 +26,7 @@ interface Announcement {
 
 export default function AnnouncementView() {
   const { user: authUser, facility } = useAuth();
+  const { toast } = useToast();
   const facilityId = facility?.id || '';
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -38,6 +41,13 @@ export default function AnnouncementView() {
   const [formPriority, setFormPriority] = useState<'high' | 'normal' | 'low'>('normal');
   const [formExpiresAt, setFormExpiresAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const fetchData = useCallback(async () => {
     if (!facilityId) return;
@@ -84,10 +94,11 @@ export default function AnnouncementView() {
       }
     } catch (err) {
       console.error('Error:', err);
+      toast.error('お知らせの取得に失敗しました。');
     } finally {
       setLoading(false);
     }
-  }, [facilityId]);
+  }, [facilityId, toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -114,10 +125,12 @@ export default function AnnouncementView() {
         await supabase.from('facility_announcements').insert(data);
       }
 
+      toast.success(editId ? 'お知らせを更新しました。' : 'お知らせを公開しました。');
       resetForm();
       fetchData();
     } catch (err) {
       console.error('Error:', err);
+      toast.error('お知らせの保存に失敗しました。');
     } finally {
       setSubmitting(false);
     }
@@ -132,11 +145,25 @@ export default function AnnouncementView() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('このお知らせを削除しますか？')) return;
-    await supabase.from('facility_announcement_reads').delete().eq('announcement_id', id);
-    await supabase.from('facility_announcements').delete().eq('id', id);
-    fetchData();
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'お知らせの削除',
+      message: 'このお知らせを削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.from('facility_announcement_reads').delete().eq('announcement_id', id);
+          await supabase.from('facility_announcements').delete().eq('id', id);
+          toast.success('お知らせを削除しました。');
+          fetchData();
+        } catch (err) {
+          console.error('Delete error:', err);
+          toast.error('お知らせの削除に失敗しました。');
+        }
+      },
+    });
   };
 
   const resetForm = () => {
@@ -259,6 +286,15 @@ export default function AnnouncementView() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* 一覧 */}
       <div className="space-y-3">

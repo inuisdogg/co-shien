@@ -124,6 +124,7 @@ const CSVBulkUploadPanel: React.FC<CSVBulkUploadPanelProps> = ({
       setTimeout(() => setCopiedAll(false), 2000);
     } catch (err) {
       console.error('Copy failed:', err);
+      toast.error('URLのコピーに失敗しました');
     }
   }, [importResult]);
 

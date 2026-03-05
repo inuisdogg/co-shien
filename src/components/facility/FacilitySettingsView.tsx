@@ -28,6 +28,7 @@ import { useChangeNotifications, detectSettingsChanges, daysUntilDeadline, getDe
 import { geocodeAddress } from '@/utils/googleMaps';
 import ChangeNotificationList from './ChangeNotificationList';
 import OperationsReviewWizard from './OperationsReviewWizard';
+import ConfirmModal from '@/components/common/ConfirmModal';
 // タブの種類
 type SettingsTab = 'basic' | 'operation' | 'designation' | 'change_notifications' | 'notification_preferences' | 'data_management' | 'homepage';
 
@@ -142,6 +143,15 @@ const FacilitySettingsView: React.FC = () => {
   const [homepageCopied, setHomepageCopied] = useState(false);
   const [homepageSaving, setHomepageSaving] = useState(false);
   const [homepageSaved, setHomepageSaved] = useState(false);
+
+  // 確認モーダル
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 指定情報
   const [designationDate, setDesignationDate] = useState('');
@@ -397,41 +407,48 @@ const FacilitySettingsView: React.FC = () => {
   };
 
   // 写真削除
-  const handlePhotoDelete = async (photoUrl: string) => {
+  const handlePhotoDelete = (photoUrl: string) => {
     if (!facility?.id) return;
-    if (!confirm('この写真を削除しますか？')) return;
+    setConfirmModal({
+      isOpen: true,
+      title: '写真削除の確認',
+      message: 'この写真を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const newPhotos = facilityPhotos.filter((url) => url !== photoUrl);
 
-    try {
-      const newPhotos = facilityPhotos.filter((url) => url !== photoUrl);
+          const { error: updateError } = await supabase
+            .from('facilities')
+            .update({ photos: newPhotos })
+            .eq('id', facility!.id);
 
-      const { error: updateError } = await supabase
-        .from('facilities')
-        .update({ photos: newPhotos })
-        .eq('id', facility.id);
+          if (updateError) {
+            console.error('写真の削除に失敗しました:', updateError);
+            toast.error('写真の削除に失敗しました');
+            return;
+          }
 
-      if (updateError) {
-        console.error('写真の削除に失敗しました:', updateError);
-        toast.error('写真の削除に失敗しました');
-        return;
-      }
+          setFacilityPhotos(newPhotos);
 
-      setFacilityPhotos(newPhotos);
-
-      // ストレージからも削除を試みる（エラーがあっても無視）
-      try {
-        const url = new URL(photoUrl);
-        const pathParts = url.pathname.split('/facility-photos/');
-        if (pathParts.length > 1) {
-          const storagePath = decodeURIComponent(pathParts[1]);
-          await supabase.storage.from('facility-photos').remove([storagePath]);
+          // ストレージからも削除を試みる（エラーがあっても無視）
+          try {
+            const url = new URL(photoUrl);
+            const pathParts = url.pathname.split('/facility-photos/');
+            if (pathParts.length > 1) {
+              const storagePath = decodeURIComponent(pathParts[1]);
+              await supabase.storage.from('facility-photos').remove([storagePath]);
+            }
+          } catch {
+            // ストレージ削除のエラーは無視
+          }
+        } catch (err) {
+          console.error('写真削除時にエラーが発生しました:', err);
+          toast.error('写真の削除に失敗しました');
         }
-      } catch {
-        // ストレージ削除のエラーは無視
-      }
-    } catch (err) {
-      console.error('写真削除時にエラーが発生しました:', err);
-      toast.error('写真の削除に失敗しました');
-    }
+      },
+    });
   };
 
   // 郵便番号から住所を検索（+ ジオコーディングで緯度経度も取得）
@@ -517,6 +534,7 @@ const FacilitySettingsView: React.FC = () => {
       // 事業所番号の変更、サービス種別の変更は届出対象
       setDesignationSaved(true);
       setTimeout(() => setDesignationSaved(false), 3000);
+      toast.success('指定情報を保存しました');
       refetchNotifications();
     } catch (error: any) {
       console.error('指定情報の保存に失敗:', error);
@@ -592,6 +610,7 @@ const FacilitySettingsView: React.FC = () => {
         }
       }
       setEditingInstitution(null);
+      toast.success('医療機関を保存しました');
     } catch (error: any) {
       console.error('医療機関の保存に失敗:', error);
       toast.error(`保存に失敗しました: ${error.message || '不明なエラー'}`);
@@ -601,19 +620,27 @@ const FacilitySettingsView: React.FC = () => {
   };
 
   // 協力医療機関の削除
-  const handleDeleteInstitution = async (id: string) => {
-    if (!confirm('この医療機関を削除しますか？')) return;
-    try {
-      const { error } = await supabase
-        .from('cooperative_medical_institutions')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-      setMedicalInstitutions(prev => prev.filter(inst => inst.id !== id));
-    } catch (error: any) {
-      console.error('医療機関の削除に失敗:', error);
-      toast.error(`削除に失敗しました: ${error.message || '不明なエラー'}`);
-    }
+  const handleDeleteInstitution = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '医療機関削除の確認',
+      message: 'この医療機関を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const { error } = await supabase
+            .from('cooperative_medical_institutions')
+            .delete()
+            .eq('id', id);
+          if (error) throw error;
+          setMedicalInstitutions(prev => prev.filter(inst => inst.id !== id));
+        } catch (error: any) {
+          console.error('医療機関の削除に失敗:', error);
+          toast.error(`削除に失敗しました: ${error.message || '不明なエラー'}`);
+        }
+      },
+    });
   };
 
   // チェックリストステータス更新
@@ -661,6 +688,7 @@ const FacilitySettingsView: React.FC = () => {
       }
     } catch (error: any) {
       console.error('チェックリスト更新に失敗:', error);
+      toast.error('チェックリストの更新に失敗しました');
     }
   };
 
@@ -711,6 +739,7 @@ const FacilitySettingsView: React.FC = () => {
       }
     } catch (error: any) {
       console.error('チェックリストファイル更新に失敗:', error);
+      toast.error('チェックリストファイルの更新に失敗しました');
     }
   };
 
@@ -780,9 +809,10 @@ const FacilitySettingsView: React.FC = () => {
       
       if (error) {
         console.error('Error fetching history:', error);
+        toast.error('変更履歴の取得に失敗しました');
         return;
       }
-      
+
       if (data) {
         setHistoryData(data.map((row: any) => ({
           id: row.id,
@@ -797,6 +827,7 @@ const FacilitySettingsView: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching history:', error);
+      toast.error('変更履歴の取得に失敗しました');
     }
   };
 
@@ -2011,10 +2042,17 @@ const FacilitySettingsView: React.FC = () => {
                       編集
                     </button>
                     <button
-                      onClick={async () => {
-                        if (confirm(`「${slot.name}」を削除しますか？`)) {
-                          await deleteTimeSlot(slot.id);
-                        }
+                      onClick={() => {
+                        setConfirmModal({
+                          isOpen: true,
+                          title: '時間枠削除の確認',
+                          message: `「${slot.name}」を削除しますか？`,
+                          isDestructive: true,
+                          onConfirm: async () => {
+                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                            await deleteTimeSlot(slot.id);
+                          },
+                        });
                       }}
                       className="text-sm text-red-500 hover:underline"
                     >
@@ -3749,6 +3787,15 @@ const FacilitySettingsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

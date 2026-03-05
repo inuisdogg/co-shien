@@ -161,11 +161,13 @@ export default function CommitteeView() {
         .order('meeting_date', { ascending: false });
       if (error) {
         console.error('Error fetching committee meetings:', error);
+        toast.error('委員会記録の取得に失敗しました');
         return;
       }
       if (data) setMeetings(data.map(mapRow));
     } catch (error) {
       console.error('Error:', error);
+      toast.error('委員会データの取得に失敗しました');
     } finally {
       setLoading(false);
     }

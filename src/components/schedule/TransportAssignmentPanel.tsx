@@ -177,19 +177,27 @@ const TransportAssignmentPanel: React.FC = () => {
   useEffect(() => {
     if (!facilityId) return;
     (async () => {
-      const { data } = await supabase
-        .from('facility_settings')
-        .select('settings')
-        .eq('facility_id', facilityId)
-        .single();
-      if (data?.settings) {
-        const s = data.settings as Record<string, unknown>;
-        setFacilitySettings({
-          regularHolidays: (s.regularHolidays as number[]) || [],
-          customHolidays: (s.customHolidays as string[]) || [],
-          includeHolidays: s.includeHolidays as boolean | undefined,
-          holidayPeriods: s.holidayPeriods as typeof facilitySettings.holidayPeriods,
-        });
+      try {
+        const { data, error } = await supabase
+          .from('facility_settings')
+          .select('settings')
+          .eq('facility_id', facilityId)
+          .single();
+        if (error) {
+          console.error('Error fetching facility settings:', error);
+          return;
+        }
+        if (data?.settings) {
+          const s = data.settings as Record<string, unknown>;
+          setFacilitySettings({
+            regularHolidays: (s.regularHolidays as number[]) || [],
+            customHolidays: (s.customHolidays as string[]) || [],
+            includeHolidays: s.includeHolidays as boolean | undefined,
+            holidayPeriods: s.holidayPeriods as typeof facilitySettings.holidayPeriods,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching facility settings:', err);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,29 +207,39 @@ const TransportAssignmentPanel: React.FC = () => {
   useEffect(() => {
     if (!facilityId) return;
     (async () => {
-      // staffテーブルから取得
-      const { data: staffData } = await supabase
-        .from('staff')
-        .select('id, name')
-        .eq('facility_id', facilityId)
-        .order('name');
-      const staffList = (staffData || []).map((s: { id: string; name: string }) => ({ id: s.id, name: s.name }));
+      try {
+        // staffテーブルから取得
+        const { data: staffData, error: staffError } = await supabase
+          .from('staff')
+          .select('id, name')
+          .eq('facility_id', facilityId)
+          .order('name');
+        if (staffError) {
+          console.error('Error fetching staff:', staffError);
+          toast.error('スタッフ一覧の取得に失敗しました');
+          return;
+        }
+        const staffList = (staffData || []).map((s: { id: string; name: string }) => ({ id: s.id, name: s.name }));
 
-      // employment_records + users からemp-スタッフも取得
-      const { data: empData } = await supabase
-        .from('employment_records')
-        .select('id, user_id, users!inner(name)')
-        .eq('facility_id', facilityId)
-        .eq('status', 'active');
-      const empList = (empData || []).map((e: any) => ({
-        id: `emp-${e.id}`,
-        name: e.users?.name || '不明',
-      }));
+        // employment_records + users からemp-スタッフも取得
+        const { data: empData } = await supabase
+          .from('employment_records')
+          .select('id, user_id, users!inner(name)')
+          .eq('facility_id', facilityId)
+          .eq('status', 'active');
+        const empList = (empData || []).map((e: any) => ({
+          id: `emp-${e.id}`,
+          name: e.users?.name || '不明',
+        }));
 
-      // マージ（重複排除）
-      const staffIds = new Set(staffList.map((s: { id: string }) => s.id));
-      const merged = [...staffList, ...empList.filter((e: { id: string }) => !staffIds.has(e.id))];
-      setStaffList(merged);
+        // マージ（重複排除）
+        const staffIds = new Set(staffList.map((s: { id: string }) => s.id));
+        const merged = [...staffList, ...empList.filter((e: { id: string }) => !staffIds.has(e.id))];
+        setStaffList(merged);
+      } catch (err) {
+        console.error('Error fetching staff list:', err);
+        toast.error('スタッフ一覧の取得に失敗しました');
+      }
     })();
   }, [facilityId]);
 
@@ -230,12 +248,18 @@ const TransportAssignmentPanel: React.FC = () => {
     if (!facilityId || weekDates.length === 0) return;
     setLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('daily_transport_assignments')
         .select('*')
         .eq('facility_id', facilityId)
         .gte('date', weekDates[0])
         .lte('date', weekDates[6]);
+
+      if (error) {
+        console.error('Error fetching transport assignments:', error);
+        toast.error('送迎体制データの取得に失敗しました');
+        return;
+      }
 
       if (data) {
         const mapped: DailyTransportAssignment[] = data.map((row: Record<string, unknown>) => ({
@@ -257,6 +281,9 @@ const TransportAssignmentPanel: React.FC = () => {
         }));
         setAssignments(mapped);
       }
+    } catch (err) {
+      console.error('Error fetching transport assignments:', err);
+      toast.error('送迎体制データの取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -270,26 +297,37 @@ const TransportAssignmentPanel: React.FC = () => {
   useEffect(() => {
     if (!facilityId || weekDates.length === 0) return;
     (async () => {
-      const { data } = await supabase
-        .from('schedules')
-        .select('date, has_pickup, has_dropoff')
-        .eq('facility_id', facilityId)
-        .gte('date', weekDates[0])
-        .lte('date', weekDates[6]);
+      try {
+        const { data, error } = await supabase
+          .from('schedules')
+          .select('date, has_pickup, has_dropoff')
+          .eq('facility_id', facilityId)
+          .gte('date', weekDates[0])
+          .lte('date', weekDates[6]);
 
-      if (data) {
-        const countMap = new Map<string, { pickupCount: number; dropoffCount: number }>();
-        for (const row of data as Array<{ date: string; has_pickup: boolean; has_dropoff: boolean }>) {
-          const existing = countMap.get(row.date) || { pickupCount: 0, dropoffCount: 0 };
-          if (row.has_pickup) existing.pickupCount++;
-          if (row.has_dropoff) existing.dropoffCount++;
-          countMap.set(row.date, existing);
+        if (error) {
+          console.error('Error fetching schedule counts:', error);
+          toast.error('スケジュールデータの取得に失敗しました');
+          return;
         }
-        const counts: ScheduleCountPerDay[] = Array.from(countMap.entries()).map(([date, c]) => ({
-          date,
-          ...c,
-        }));
-        setScheduleCounts(counts);
+
+        if (data) {
+          const countMap = new Map<string, { pickupCount: number; dropoffCount: number }>();
+          for (const row of data as Array<{ date: string; has_pickup: boolean; has_dropoff: boolean }>) {
+            const existing = countMap.get(row.date) || { pickupCount: 0, dropoffCount: 0 };
+            if (row.has_pickup) existing.pickupCount++;
+            if (row.has_dropoff) existing.dropoffCount++;
+            countMap.set(row.date, existing);
+          }
+          const counts: ScheduleCountPerDay[] = Array.from(countMap.entries()).map(([date, c]) => ({
+            date,
+            ...c,
+          }));
+          setScheduleCounts(counts);
+        }
+      } catch (err) {
+        console.error('Error fetching schedule counts:', err);
+        toast.error('スケジュールデータの取得に失敗しました');
       }
     })();
   }, [facilityId, weekDates]);
@@ -298,52 +336,61 @@ const TransportAssignmentPanel: React.FC = () => {
   useEffect(() => {
     if (!facilityId) return;
     (async () => {
-      const { start, end } = getMonthRange(baseDate);
-      const { data } = await supabase
-        .from('daily_transport_assignments')
-        .select('*')
-        .eq('facility_id', facilityId)
-        .gte('date', start)
-        .lte('date', end);
+      try {
+        const { start, end } = getMonthRange(baseDate);
+        const { data, error } = await supabase
+          .from('daily_transport_assignments')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .gte('date', start)
+          .lte('date', end);
 
-      if (data && staffList.length > 0) {
-        const countsMap = new Map<string, { driver: number; attendant: number }>();
-
-        for (const row of data as Array<Record<string, unknown>>) {
-          const hasNewColumns = row.pickup_driver_staff_id || row.dropoff_driver_staff_id || row.pickup_attendant_staff_id || row.dropoff_attendant_staff_id;
-          const ids = [
-            { id: row.pickup_driver_staff_id as string | null, role: 'driver' as const },
-            { id: row.dropoff_driver_staff_id as string | null, role: 'driver' as const },
-            { id: row.pickup_attendant_staff_id as string | null, role: 'attendant' as const },
-            { id: row.dropoff_attendant_staff_id as string | null, role: 'attendant' as const },
-            // legacy — 新カラムがある場合はスキップ（二重カウント防止）
-            ...(!hasNewColumns ? [
-              { id: row.driver_staff_id as string | null, role: 'driver' as const },
-              { id: row.attendant_staff_id as string | null, role: 'attendant' as const },
-            ] : []),
-          ];
-          for (const { id, role } of ids) {
-            if (!id) continue;
-            const existing = countsMap.get(id) || { driver: 0, attendant: 0 };
-            existing[role]++;
-            countsMap.set(id, existing);
-          }
+        if (error) {
+          console.error('Error fetching monthly staff counts:', error);
+          return;
         }
 
-        const result: MonthlyStaffCount[] = [];
-        for (const [staffId, counts] of countsMap.entries()) {
-          const staff = staffList.find((s) => s.id === staffId);
-          if (staff) {
-            result.push({
-              staffId,
-              staffName: staff.name,
-              driverCount: counts.driver,
-              attendantCount: counts.attendant,
-            });
+        if (data && staffList.length > 0) {
+          const countsMap = new Map<string, { driver: number; attendant: number }>();
+
+          for (const row of data as Array<Record<string, unknown>>) {
+            const hasNewColumns = row.pickup_driver_staff_id || row.dropoff_driver_staff_id || row.pickup_attendant_staff_id || row.dropoff_attendant_staff_id;
+            const ids = [
+              { id: row.pickup_driver_staff_id as string | null, role: 'driver' as const },
+              { id: row.dropoff_driver_staff_id as string | null, role: 'driver' as const },
+              { id: row.pickup_attendant_staff_id as string | null, role: 'attendant' as const },
+              { id: row.dropoff_attendant_staff_id as string | null, role: 'attendant' as const },
+              // legacy — 新カラムがある場合はスキップ（二重カウント防止）
+              ...(!hasNewColumns ? [
+                { id: row.driver_staff_id as string | null, role: 'driver' as const },
+                { id: row.attendant_staff_id as string | null, role: 'attendant' as const },
+              ] : []),
+            ];
+            for (const { id, role } of ids) {
+              if (!id) continue;
+              const existing = countsMap.get(id) || { driver: 0, attendant: 0 };
+              existing[role]++;
+              countsMap.set(id, existing);
+            }
           }
+
+          const result: MonthlyStaffCount[] = [];
+          for (const [staffId, counts] of countsMap.entries()) {
+            const staff = staffList.find((s) => s.id === staffId);
+            if (staff) {
+              result.push({
+                staffId,
+                staffName: staff.name,
+                driverCount: counts.driver,
+                attendantCount: counts.attendant,
+              });
+            }
+          }
+          result.sort((a, b) => b.driverCount + b.attendantCount - (a.driverCount + a.attendantCount));
+          setMonthlyStaffCounts(result);
         }
-        result.sort((a, b) => b.driverCount + b.attendantCount - (a.driverCount + a.attendantCount));
-        setMonthlyStaffCounts(result);
+      } catch (err) {
+        console.error('Error fetching monthly staff counts:', err);
       }
     })();
   }, [facilityId, baseDate, staffList, assignments]);
@@ -447,15 +494,18 @@ const TransportAssignmentPanel: React.FC = () => {
 
       const existing = getAssignment(editingDate);
       if (existing) {
-        await supabase
+        const { error } = await supabase
           .from('daily_transport_assignments')
           .update(upsertData)
           .eq('id', existing.id);
+        if (error) throw error;
       } else {
-        await supabase.from('daily_transport_assignments').insert(upsertData);
+        const { error } = await supabase.from('daily_transport_assignments').insert(upsertData);
+        if (error) throw error;
       }
 
       await fetchAssignments();
+      toast.success('送迎体制を保存しました');
       closeEditModal();
     } catch (err) {
       console.error('Error saving transport assignment:', err);

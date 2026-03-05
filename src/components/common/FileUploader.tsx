@@ -103,6 +103,14 @@ export default function FileUploader({
     setError(null);
     setUploadProgress(0);
 
+    // Simulate progress since Supabase JS SDK doesn't expose upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 15;
+      });
+    }, 200);
+
     try {
       // Generate unique filename
       const timestamp = Date.now();
@@ -140,6 +148,7 @@ export default function FileUploader({
       setError(errorMessage);
       onError?.(errorMessage);
     } finally {
+      clearInterval(progressInterval);
       setUploading(false);
     }
   };
@@ -194,6 +203,7 @@ export default function FileUploader({
               onClick={handleRemove}
               className="p-2 text-gray-400 hover:text-red-500 transition-colors"
               title="削除"
+              aria-label="ファイルを削除"
             >
               <X className="w-5 h-5" />
             </button>
@@ -226,6 +236,7 @@ export default function FileUploader({
           onChange={handleFileSelect}
           className="hidden"
           disabled={uploading}
+          aria-label={label}
         />
 
         {uploading ? (

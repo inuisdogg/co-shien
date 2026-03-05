@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ---- Local types ----
 interface Qualification {
@@ -72,6 +74,7 @@ type ExpiryFilter = 'all' | 'expired' | 'expiring_30' | 'expiring_60' | 'expirin
 
 const QualificationManagementPanel: React.FC = () => {
   const { facility } = useAuth();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [qualifications, setQualifications] = useState<Qualification[]>([]);
@@ -95,6 +98,15 @@ const QualificationManagementPanel: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [showQualDropdown, setShowQualDropdown] = useState(false);
+
+  // Confirm modal
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // ---- Fetch ----
   const fetchData = useCallback(async () => {
@@ -179,10 +191,11 @@ const QualificationManagementPanel: React.FC = () => {
       );
     } catch (err) {
       console.error('Error fetching qualifications:', err);
+      toast.error('資格情報の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [facility?.id]);
+  }, [facility?.id, toast]);
 
   useEffect(() => {
     fetchData();
@@ -325,18 +338,34 @@ const QualificationManagementPanel: React.FC = () => {
       }
 
       setShowModal(false);
+      toast.success(editingId ? '資格情報を更新しました' : '資格情報を登録しました');
       fetchData();
     } catch (err) {
       console.error('Error saving qualification:', err);
+      toast.error('資格情報の保存に失敗しました');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この資格情報を削除しますか？')) return;
-    await supabase.from('staff_qualifications').delete().eq('id', id);
-    fetchData();
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '資格情報の削除',
+      message: 'この資格情報を削除しますか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.from('staff_qualifications').delete().eq('id', id);
+          toast.success('資格情報を削除しました');
+          fetchData();
+        } catch (err) {
+          console.error('Error deleting qualification:', err);
+          toast.error('資格情報の削除に失敗しました');
+        }
+      },
+    });
   };
 
   return (
@@ -512,6 +541,16 @@ const QualificationManagementPanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmModal.isDestructive}
+      />
 
       {/* Create/Edit Modal */}
       {showModal && (

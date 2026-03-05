@@ -174,6 +174,7 @@ export default function FinanceView() {
         if (finRes.data) setFinancials(finRes.data.map(mapFinancialRow));
       } catch (error) {
         console.error('Error fetching finance data:', error);
+        toast.error('財務データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -258,6 +259,7 @@ export default function FinanceView() {
       setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, status: 'approved' as ExpenseStatus, approvedAt: new Date().toISOString() } : e));
     } catch (error) {
       console.error('Error approving expense:', error);
+      toast.error('経費の承認に失敗しました');
     }
   };
 

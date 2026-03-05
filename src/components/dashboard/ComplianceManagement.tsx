@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Info
 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
 // Types
 interface Addition {
@@ -126,6 +127,7 @@ function getDaysUntilDeadline(deadlineStr: string): number {
 }
 
 export default function ComplianceManagement({ facilityId }: ComplianceManagementProps) {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'lifecycle' | 'alerts' | 'documents' | 'history' | 'deduction'>('lifecycle');
   const [additionSettings, setAdditionSettings] = useState<FacilityAdditionSetting[]>([]);
   const [allAdditions, setAllAdditions] = useState<Addition[]>([]);
@@ -197,6 +199,7 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
 
     } catch (error) {
       console.error('Error fetching compliance data:', error);
+      toast.error('コンプライアンスデータの取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -228,6 +231,7 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
       setCommitteeResult(committee);
     } catch (error) {
       console.error('Error fetching deduction risks:', error);
+      toast.error('減算リスクデータの取得に失敗しました');
     } finally {
       setDeductionLoading(false);
     }
@@ -284,6 +288,7 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
       fetchData();
     } catch (error) {
       console.error('Error updating addition status:', error);
+      toast.error('加算ステータスの更新に失敗しました');
     }
   };
 
@@ -301,6 +306,7 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
       fetchData();
     } catch (error) {
       console.error('Error adding addition setting:', error);
+      toast.error('加算設定の追加に失敗しました');
     }
   };
 
@@ -314,6 +320,7 @@ export default function ComplianceManagement({ facilityId }: ComplianceManagemen
       fetchData();
     } catch (error) {
       console.error('Error dismissing alert:', error);
+      toast.error('アラートの非表示に失敗しました');
     }
   };
 

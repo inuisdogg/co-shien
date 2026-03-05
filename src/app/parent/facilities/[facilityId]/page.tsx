@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { slotDisplayName, resolveTimeSlots } from '@/utils/slotResolver';
+import { useToast } from '@/components/ui/Toast';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,7 @@ type MonthlyRecord = {
 };
 
 export default function FacilityDetailPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -135,6 +137,7 @@ export default function FacilityDetailPage() {
         }
       } catch (err: any) {
         setError(err.message || 'データの取得に失敗しました');
+        toast.error('データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
@@ -325,7 +328,9 @@ export default function FacilityDetailPage() {
 
       if (error) {
         setError('サインの保存に失敗しました');
+        toast.error('サインの保存に失敗しました');
       } else {
+        toast.success('サインを保存しました');
         setIsSignatureModalOpen(false);
         // 再取得
         const year = selectedMonth.getFullYear();

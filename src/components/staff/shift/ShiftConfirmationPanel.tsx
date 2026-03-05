@@ -18,9 +18,11 @@ import {
   Users,
   Eye,
   CheckCheck,
+  Loader2,
 } from 'lucide-react';
 import { Staff } from '@/types';
 import { useToast } from '@/components/ui/Toast';
+import EmptyState from '@/components/ui/EmptyState';
 
 interface StaffConfirmation {
   staff: Staff;
@@ -213,11 +215,19 @@ const ShiftConfirmationPanel: React.FC<ShiftConfirmationPanelProps> = ({
       </div>
 
       {/* スタッフリスト */}
-      <div className="max-h-96 overflow-y-auto">
+      <div className="max-h-96 overflow-y-auto relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10">
+            <Loader2 size={24} className="animate-spin text-primary" />
+          </div>
+        )}
         {confirmations.length === 0 ? (
-          <div className="px-5 py-8 text-center text-gray-500">
-            <Users size={32} className="mx-auto mb-2 text-gray-300" />
-            <p>スタッフがいません</p>
+          <div className="px-5">
+            <EmptyState
+              icon={<Users size={24} className="text-gray-400" />}
+              title="スタッフがいません"
+              description="スタッフを登録するとシフト確認状況が表示されます"
+            />
           </div>
         ) : (
           <div className="divide-y divide-gray-100">

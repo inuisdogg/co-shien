@@ -172,6 +172,7 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
+                  autoComplete="new-password"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="6文字以上で入力"
                   disabled={loading}
@@ -237,7 +238,12 @@ export default function ResetPasswordPage() {
               disabled={loading}
               className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? '更新中...' : 'パスワードを更新'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  更新中...
+                </span>
+              ) : 'パスワードを更新'}
             </button>
           </form>
         )}

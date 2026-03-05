@@ -20,6 +20,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import EmptyState from '@/components/ui/EmptyState';
 import {
   ConnectMeeting,
   ConnectMeetingStatus,
@@ -148,6 +150,13 @@ export default function ConnectMeetingView() {
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [children, setChildren] = useState<ChildOption[]>([]);
   const [saving, setSaving] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // フォームデータ
   const [formData, setFormData] = useState<ConnectMeetingFormData>({
@@ -191,6 +200,7 @@ export default function ConnectMeetingView() {
 
       if (error) {
         console.error('Fetch meetings error:', error);
+        toast.error('会議データの取得に失敗しました。');
         return;
       }
       setMeetings((data || []).map((row: Record<string, unknown>) => mapMeetingRow(row)));
@@ -337,6 +347,7 @@ export default function ConnectMeetingView() {
 
       if (dateError) {
         console.error('Date options insert error:', dateError);
+        toast.error('日程候補の登録に失敗しました。');
       }
 
       // 3. 参加者を作成
@@ -356,7 +367,10 @@ export default function ConnectMeetingView() {
 
       if (partError) {
         console.error('Participants insert error:', partError);
+        toast.error('参加者の登録に失敗しました。');
       }
+
+      toast.success('連絡会議を作成しました。');
 
       // リセット
       setFormData({
@@ -463,9 +477,21 @@ export default function ConnectMeetingView() {
   };
 
   // ===== 日程確定 =====
-  const handleConfirmDate = async (dateOptionId: string) => {
+  const handleConfirmDate = (dateOptionId: string) => {
     if (!selectedMeeting || !user?.id || !facility) return;
-    if (!confirm('この日程で確定しますか？確定通知メールが全参加者に送信されます。')) return;
+    setConfirmModal({
+      isOpen: true,
+      title: '日程の確定',
+      message: 'この日程で確定しますか？確定通知メールが全参加者に送信されます。',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        await handleConfirmDateExecute(dateOptionId);
+      },
+    });
+  };
+
+  const handleConfirmDateExecute = async (dateOptionId: string) => {
+    if (!selectedMeeting || !user?.id || !facility) return;
 
     await supabase
       .from('connect_meetings')
@@ -511,6 +537,7 @@ export default function ConnectMeetingView() {
             .eq('id', p.id);
         } catch (err) {
           console.error('Confirmation email error:', err);
+          toast.error(`${p.organizationName}への確定通知メール送信に失敗しました。`);
         }
       }
     }
@@ -520,54 +547,88 @@ export default function ConnectMeetingView() {
   };
 
   // ===== ステータス変更 =====
-  const handleStatusChange = async (newStatus: ConnectMeetingStatus) => {
+  const handleStatusChange = (newStatus: ConnectMeetingStatus) => {
     if (!selectedMeeting) return;
     const labels: Record<string, string> = { completed: '完了', cancelled: 'キャンセル' };
-    if (!confirm(`この会議を「${labels[newStatus] || newStatus}」にしますか？`)) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'ステータスの変更',
+      message: `この会議を「${labels[newStatus] || newStatus}」にしますか？`,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        await supabase
+          .from('connect_meetings')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', selectedMeeting!.id);
 
-    await supabase
-      .from('connect_meetings')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', selectedMeeting.id);
-
-    refreshSelectedMeeting(selectedMeeting.id);
-    fetchMeetings();
+        refreshSelectedMeeting(selectedMeeting!.id);
+        fetchMeetings();
+      },
+    });
   };
 
   // ===== 議題保存 =====
   const saveAgendaItems = async () => {
     if (!selectedMeeting) return;
-    await supabase
-      .from('connect_meetings')
-      .update({ agenda_items: agendaItems, updated_at: new Date().toISOString() })
-      .eq('id', selectedMeeting.id);
+    try {
+      const { error } = await supabase
+        .from('connect_meetings')
+        .update({ agenda_items: agendaItems, updated_at: new Date().toISOString() })
+        .eq('id', selectedMeeting.id);
+      if (error) throw error;
+      toast.success('議題を保存しました。');
+    } catch (err) {
+      console.error('Save agenda error:', err);
+      toast.error('議題の保存に失敗しました。');
+    }
   };
 
   // ===== 議事録保存 =====
   const saveMinutes = async () => {
     if (!selectedMeeting) return;
-    await supabase
-      .from('connect_meetings')
-      .update({ minutes, updated_at: new Date().toISOString() })
-      .eq('id', selectedMeeting.id);
+    try {
+      const { error } = await supabase
+        .from('connect_meetings')
+        .update({ minutes, updated_at: new Date().toISOString() })
+        .eq('id', selectedMeeting.id);
+      if (error) throw error;
+      toast.success('議事録を保存しました。');
+    } catch (err) {
+      console.error('Save minutes error:', err);
+      toast.error('議事録の保存に失敗しました。');
+    }
   };
 
   // ===== 決定事項保存 =====
   const saveDecisions = async () => {
     if (!selectedMeeting) return;
-    await supabase
-      .from('connect_meetings')
-      .update({ decisions, updated_at: new Date().toISOString() })
-      .eq('id', selectedMeeting.id);
+    try {
+      const { error } = await supabase
+        .from('connect_meetings')
+        .update({ decisions, updated_at: new Date().toISOString() })
+        .eq('id', selectedMeeting.id);
+      if (error) throw error;
+      toast.success('決定事項を保存しました。');
+    } catch (err) {
+      console.error('Save decisions error:', err);
+      toast.error('決定事項の保存に失敗しました。');
+    }
   };
 
   // ===== アクションアイテム保存 =====
   const saveActionItems = async () => {
     if (!selectedMeeting) return;
-    await supabase
-      .from('connect_meetings')
-      .update({ action_items: actionItems, updated_at: new Date().toISOString() })
-      .eq('id', selectedMeeting.id);
+    try {
+      const { error } = await supabase
+        .from('connect_meetings')
+        .update({ action_items: actionItems, updated_at: new Date().toISOString() })
+        .eq('id', selectedMeeting.id);
+      if (error) throw error;
+      toast.success('アクションアイテムを保存しました。');
+    } catch (err) {
+      console.error('Save action items error:', err);
+      toast.error('アクションアイテムの保存に失敗しました。');
+    }
   };
 
   // ===== 回答取得ヘルパー =====
@@ -678,9 +739,12 @@ export default function ConnectMeetingView() {
           <Loader2 size={24} className="animate-spin text-primary" />
         </div>
       ) : filteredMeetings.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-          <Users size={48} className="mx-auto mb-3 opacity-50" />
-          <p>連絡会議がありません</p>
+        <div className="bg-white rounded-xl border border-gray-100">
+          <EmptyState
+            icon={<Users className="w-7 h-7 text-gray-400" />}
+            title="連絡会議がありません"
+            description="新規作成ボタンから会議を作成できます"
+          />
         </div>
       ) : (
         <div className="space-y-3">
@@ -1586,6 +1650,15 @@ export default function ConnectMeetingView() {
       {view === 'list' && renderListView()}
       {view === 'create' && renderCreateView()}
       {view === 'detail' && renderDetailView()}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

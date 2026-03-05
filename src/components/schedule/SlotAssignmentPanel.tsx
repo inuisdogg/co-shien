@@ -13,6 +13,7 @@ import ChildPickerPopup, { SelectedChildWithTransport } from './ChildPickerPopup
 import { calculateAgeWithMonths } from '@/utils/ageCalculation';
 import { useToast } from '@/components/ui/Toast';
 import { resolveTimeSlots, slotDisplayName, expandSlotKeys } from '@/utils/slotResolver';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // レガシー時間枠情報の型（後方互換性のため維持）
 interface LegacySlotInfoType {
@@ -107,6 +108,14 @@ export default function SlotAssignmentPanel({
   const { toast } = useToast();
   const [pickerSlot, setPickerSlot] = useState<TimeSlot | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 動的スロット解決
   const slots: ResolvedSlotInfo[] = useMemo(() => {
@@ -196,14 +205,27 @@ export default function SlotAssignmentPanel({
   };
 
   // 児童削除
-  const handleRemoveChild = async (scheduleId: string) => {
-    if (!confirm('この児童の予約を削除しますか？')) return;
-    setProcessing(true);
-    try {
-      await onDeleteSchedule(scheduleId);
-    } finally {
-      setProcessing(false);
-    }
+  const handleRemoveChild = (scheduleId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '予約の削除',
+      message: 'この児童の予約を削除しますか？',
+      confirmLabel: '削除',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setProcessing(true);
+        try {
+          await onDeleteSchedule(scheduleId);
+          toast.success('予約を削除しました');
+        } catch (err) {
+          console.error('Error deleting schedule:', err);
+          toast.error('削除に失敗しました。もう一度お試しください。');
+        } finally {
+          setProcessing(false);
+        }
+      },
+    });
   };
 
   // 送迎バッジサイクルクリック
@@ -230,6 +252,9 @@ export default function SlotAssignmentPanel({
           newMethod,
         );
       }
+    } catch (err) {
+      console.error('Error updating transport:', err);
+      toast.error('送迎情報の更新に失敗しました');
     } finally {
       setProcessing(false);
     }
@@ -250,21 +275,34 @@ export default function SlotAssignmentPanel({
   };
 
   // この日をリセット
-  const handleResetDay = async () => {
+  const handleResetDay = () => {
     const schedulesWithoutRecord = allDaySchedules.filter(s => !getUsageRecordByScheduleId(s.id));
     if (schedulesWithoutRecord.length === 0) {
       toast.warning('削除可能な予約がありません（実績登録済みの予約は削除できません）');
       return;
     }
-    if (!confirm(`この日の予約${schedulesWithoutRecord.length}件を削除しますか？\n※実績登録済みの予約は除外されます`)) return;
-    setProcessing(true);
-    try {
-      for (const s of schedulesWithoutRecord) {
-        await onDeleteSchedule(s.id);
-      }
-    } finally {
-      setProcessing(false);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'この日の予約をリセット',
+      message: `この日の予約${schedulesWithoutRecord.length}件を削除しますか？\n※実績登録済みの予約は除外されます`,
+      confirmLabel: '削除',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setProcessing(true);
+        try {
+          for (const s of schedulesWithoutRecord) {
+            await onDeleteSchedule(s.id);
+          }
+          toast.success(`${schedulesWithoutRecord.length}件の予約を削除しました`);
+        } catch (err) {
+          console.error('Error resetting day:', err);
+          toast.error('リセットに失敗しました。もう一度お試しください。');
+        } finally {
+          setProcessing(false);
+        }
+      },
+    });
   };
 
   // スロットカラー
@@ -581,6 +619,18 @@ export default function SlotAssignmentPanel({
           pickerSlot!
         )}
         onSelectWithTransport={(children) => handleAddChildrenWithTransport(children, pickerSlot!)}
+      />
+
+      {/* 確認モーダル */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel="キャンセル"
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
       />
 
       {/* 処理中オーバーレイ */}

@@ -25,6 +25,7 @@ import {
 import { Staff } from '@/types';
 import { parseQualifications } from '@/utils/qualifications';
 import { isValidEmail } from '@/utils/validation';
+import { useToast } from '@/components/ui/Toast';
 
 interface StaffEditFormProps {
   staff?: Staff | null; // null = 新規作成
@@ -71,6 +72,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
   loading = false,
 }) => {
   const isNew = !staff;
+  const { toast } = useToast();
 
   // フォーム状態
   const [formData, setFormData] = useState<ProxyFormData>({
@@ -259,6 +261,7 @@ const StaffEditForm: React.FC<StaffEditFormProps> = ({
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
+      toast.error('URLのコピーに失敗しました');
     }
   };
 

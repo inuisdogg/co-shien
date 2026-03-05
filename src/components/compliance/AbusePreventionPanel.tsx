@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 // ---- Local types ----
 type RecordType = 'committee_meeting' | 'restraint_committee' | 'self_check' | 'annual_plan';
@@ -88,6 +90,7 @@ const SECTIONS: { id: SectionId; label: string; recordType: RecordType; icon: Re
 
 const AbusePreventionPanel: React.FC = () => {
   const { facility, user } = useAuth();
+  const { toast } = useToast();
 
   const [records, setRecords] = useState<AbuseRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +114,15 @@ const AbusePreventionPanel: React.FC = () => {
     responsiblePersons: '',
   });
   const [saving, setSaving] = useState(false);
+
+  // Confirm modal
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // ---- Fetch ----
   const fetchRecords = useCallback(async () => {
@@ -138,10 +150,11 @@ const AbusePreventionPanel: React.FC = () => {
       );
     } catch (err) {
       console.error('Error fetching abuse prevention records:', err);
+      toast.error('記録の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [facility?.id]);
+  }, [facility?.id, toast]);
 
   useEffect(() => {
     fetchRecords();
@@ -251,18 +264,34 @@ const AbusePreventionPanel: React.FC = () => {
         });
       }
       setShowModal(false);
+      toast.success(editingId ? '記録を更新しました' : '記録を作成しました');
       fetchRecords();
     } catch (err) {
       console.error('Error saving record:', err);
+      toast.error('記録の保存に失敗しました');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この記録を削除してもよろしいですか？')) return;
-    await supabase.from('abuse_prevention_records').delete().eq('id', id);
-    fetchRecords();
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '記録の削除',
+      message: 'この記録を削除してもよろしいですか？',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await supabase.from('abuse_prevention_records').delete().eq('id', id);
+          toast.success('記録を削除しました');
+          fetchRecords();
+        } catch (err) {
+          console.error('Error deleting record:', err);
+          toast.error('記録の削除に失敗しました');
+        }
+      },
+    });
   };
 
   const formatDate = (d: string | null) => {
@@ -491,6 +520,16 @@ const AbusePreventionPanel: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmModal.isDestructive}
+      />
 
       {/* Create/Edit Modal */}
       {showModal && (

@@ -40,6 +40,8 @@ import { ScheduleItem, UsageRecord, ContactLog, ContactLogFormData } from '@/typ
 import UsageRecordForm from '@/components/schedule/UsageRecordForm';
 import { supabase } from '@/lib/supabase';
 import { resolveTimeSlots, slotDisplayName } from '@/utils/slotResolver';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import EmptyState from '@/components/ui/EmptyState';
 
 // フェーズ設定
 const FEATURE_PHASE = parseInt(process.env.NEXT_PUBLIC_FEATURE_PHASE || '1', 10);
@@ -138,6 +140,13 @@ export default function DailyLogView() {
   const [signerName, setSignerName] = useState('');
   const [showSignDialog, setShowSignDialog] = useState(false);
   const [signTargetScheduleId, setSignTargetScheduleId] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 今日の日付文字列
   const todayStr = useMemo(() => {
@@ -283,14 +292,21 @@ export default function DailyLogView() {
 
     const existingRecord = getUsageRecordByScheduleId(schedule.id);
     if (existingRecord) {
-      if (confirm('この実績を削除しますか？')) {
-        try {
-          await deleteUsageRecord(existingRecord.id);
-        } catch (error) {
-          console.error('削除エラー:', error);
-          toast.error('削除に失敗しました');
-        }
-      }
+      setConfirmModal({
+        isOpen: true,
+        title: '実績削除',
+        message: 'この実績を削除しますか？',
+        isDestructive: true,
+        onConfirm: async () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          try {
+            await deleteUsageRecord(existingRecord.id);
+          } catch (error) {
+            console.error('削除エラー:', error);
+            toast.error('削除に失敗しました');
+          }
+        },
+      });
     }
   };
 
@@ -382,6 +398,7 @@ export default function DailyLogView() {
         } catch (notifErr) {
           console.error('通知作成エラー:', notifErr);
           // Notification failure should not block the save
+          toast.warning('連絡帳は保存されましたが、通知の送信に失敗しました');
         }
         toast.success('連絡帳を保護者に送信しました');
       } else {
@@ -754,10 +771,10 @@ export default function DailyLogView() {
 
             {/* 児童グリッド */}
             {todayTotal === 0 ? (
-              <div className="text-center py-10 text-gray-400">
-                <Users className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">本日の利用予約はありません</p>
-              </div>
+              <EmptyState
+                icon={<Users className="w-7 h-7 text-gray-400" />}
+                title="本日の利用予約はありません"
+              />
             ) : (
               <div className="space-y-2">
                 {getFilteredChildren(todayStr).map(({ schedule, hasRecord, hasContact, isSigned, contactLog }) => (
@@ -939,15 +956,15 @@ export default function DailyLogView() {
         {/* 児童一覧 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {!dayInfo || dayInfo.total === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p>この日の利用予約はありません</p>
-            </div>
+            <EmptyState
+              icon={<Users className="w-7 h-7 text-gray-400" />}
+              title="この日の利用予約はありません"
+            />
           ) : children.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">
-              <CheckCircle className="w-10 h-10 mx-auto mb-2 text-emerald-300" />
-              <p className="text-sm">条件に該当する児童はいません</p>
-            </div>
+            <EmptyState
+              icon={<CheckCircle className="w-7 h-7 text-emerald-400" />}
+              title="条件に該当する児童はいません"
+            />
           ) : (
             <div className="divide-y divide-gray-100">
               {/* スロット別表示 */}
@@ -998,6 +1015,14 @@ export default function DailyLogView() {
     return (
       <div className="space-y-0">
         <SignDialog />
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          isDestructive={confirmModal.isDestructive}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        />
 
         {/* 戻るボタン */}
         <div className="bg-white rounded-t-xl shadow-sm border border-gray-100 border-b-0 px-5 py-3">
@@ -1090,15 +1115,15 @@ export default function DailyLogView() {
         {/* 児童一覧 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {!dayInfo || dayInfo.total === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p>この日の利用予約はありません</p>
-            </div>
+            <EmptyState
+              icon={<Users className="w-7 h-7 text-gray-400" />}
+              title="この日の利用予約はありません"
+            />
           ) : children.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">
-              <CheckCircle className="w-10 h-10 mx-auto mb-2 text-emerald-300" />
-              <p className="text-sm">条件に該当する児童はいません</p>
-            </div>
+            <EmptyState
+              icon={<CheckCircle className="w-7 h-7 text-emerald-400" />}
+              title="条件に該当する児童はいません"
+            />
           ) : (
             <div className="divide-y divide-gray-100">
               {slotKeys.map((slot, slotIdx) => {
@@ -1171,6 +1196,14 @@ export default function DailyLogView() {
     return (
       <div className="space-y-0">
         <SignDialog />
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          isDestructive={confirmModal.isDestructive}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        />
 
         {/* 戻るボタン + ヘッダー */}
         <div className="bg-white rounded-t-xl shadow-sm border border-gray-100 border-b-0 px-5 py-3">
@@ -1507,9 +1540,15 @@ export default function DailyLogView() {
                 {/* 保護者に送信 */}
                 <button
                   onClick={() => {
-                    if (confirm('この連絡帳を保護者に送信しますか？送信後、保護者の署名が必要になります。')) {
-                      handleSaveContactLog('submit');
-                    }
+                    setConfirmModal({
+                      isOpen: true,
+                      title: '連絡帳送信',
+                      message: 'この連絡帳を保護者に送信しますか？送信後、保護者の署名が必要になります。',
+                      onConfirm: () => {
+                        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                        handleSaveContactLog('submit');
+                      },
+                    });
                   }}
                   disabled={isSaving || existingContactLog?.status === 'signed'}
                   className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"

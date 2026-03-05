@@ -240,6 +240,7 @@ export default function AttendanceCalendar({
         }
       } catch (error) {
         console.error('施設設定取得エラー:', error);
+        toast.error('施設設定の取得に失敗しました');
       }
     };
 
@@ -282,6 +283,7 @@ export default function AttendanceCalendar({
         }
       } catch (error) {
         console.error('勤怠記録取得エラー:', error);
+        toast.error('勤怠記録の取得に失敗しました');
       }
 
       // 休暇申請を取得
@@ -300,6 +302,7 @@ export default function AttendanceCalendar({
         }
       } catch (error) {
         console.error('休暇申請取得エラー:', error);
+        toast.error('休暇申請の取得に失敗しました');
       }
 
       // 有給残日数を取得
@@ -348,6 +351,7 @@ export default function AttendanceCalendar({
         }
       } catch (error) {
         console.error('シフトパターン取得エラー:', error);
+        toast.error('シフトパターンの取得に失敗しました');
       }
 
       // 自分のシフトを取得
@@ -386,6 +390,7 @@ export default function AttendanceCalendar({
         }
       } catch (error) {
         console.error('シフト取得エラー:', error);
+        toast.error('シフトの取得に失敗しました');
       }
 
       // 休暇設定を取得

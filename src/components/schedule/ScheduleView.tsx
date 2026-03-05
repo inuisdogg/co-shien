@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import SlotAssignmentPanel from './SlotAssignmentPanel';
 import TransportAssignmentPanel from './TransportAssignmentPanel';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmModal from '@/components/common/ConfirmModal';
 import { isJapaneseHoliday } from '@/utils/japaneseHolidays';
 import { resolveTimeSlots, slotDisplayName, expandSlotKeys } from '@/utils/slotResolver';
 
@@ -214,6 +215,15 @@ const ScheduleView: React.FC = () => {
 
   // 一括操作用の状態
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  // 確認ダイアログ用の状態
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // 日別計画モーダル用の状態
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
@@ -546,45 +556,54 @@ const ScheduleView: React.FC = () => {
   };
 
   // パターン一括登録
-  const handleBulkRegister = async () => {
+  const handleBulkRegister = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
 
-    if (!confirm(`${year}年${month}月の利用パターンに基づいて一括登録します。よろしいですか？`)) {
-      return;
-    }
-
-    setIsBulkProcessing(true);
-    try {
-      const result = await bulkRegisterFromPatterns(year, month);
-      toast.success(`一括登録が完了しました。\n追加: ${result.added}件\nスキップ: ${result.skipped}件`);
-    } catch (error) {
-      console.error('Error in bulk register:', error);
-      toast.error('一括登録に失敗しました。もう一度お試しください。');
-    } finally {
-      setIsBulkProcessing(false);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: '一括登録の確認',
+      message: `${year}年${month}月の利用パターンに基づいて一括登録します。よろしいですか？`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setIsBulkProcessing(true);
+        try {
+          const result = await bulkRegisterFromPatterns(year, month);
+          toast.success(`一括登録が完了しました。\n追加: ${result.added}件\nスキップ: ${result.skipped}件`);
+        } catch (error) {
+          console.error('Error in bulk register:', error);
+          toast.error('一括登録に失敗しました。もう一度お試しください。');
+        } finally {
+          setIsBulkProcessing(false);
+        }
+      },
+    });
   };
 
   // 月次リセット
-  const handleMonthReset = async () => {
+  const handleMonthReset = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
 
-    if (!confirm(`${year}年${month}月の予約をすべて削除します。\n※実績登録済みの予約は除外されます。\n\nよろしいですか？`)) {
-      return;
-    }
-
-    setIsBulkProcessing(true);
-    try {
-      const deleted = await resetMonthSchedules(year, month);
-      toast.success(`${deleted}件の予約を削除しました。`);
-    } catch (error) {
-      console.error('Error in month reset:', error);
-      toast.error('リセットに失敗しました。もう一度お試しください。');
-    } finally {
-      setIsBulkProcessing(false);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: '月次予約リセット',
+      message: `${year}年${month}月の予約をすべて削除します。\n※実績登録済みの予約は除外されます。\n\nよろしいですか？`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setIsBulkProcessing(true);
+        try {
+          const deleted = await resetMonthSchedules(year, month);
+          toast.success(`${deleted}件の予約を削除しました。`);
+        } catch (error) {
+          console.error('Error in month reset:', error);
+          toast.error('リセットに失敗しました。もう一度お試しください。');
+        } finally {
+          setIsBulkProcessing(false);
+        }
+      },
+    });
   };
 
   // スロットパネル内でのスケジュールアイテムクリック
@@ -658,14 +677,21 @@ const ScheduleView: React.FC = () => {
       toast.warning('実績登録済みのため削除できません。\n業務日誌から実績を削除してください。');
       return;
     }
-    if (confirm(`${item.childName}さんの予約を削除しますか？`)) {
-      try {
-        await deleteSchedule(item.id);
-      } catch (error) {
-        console.error('Error deleting schedule:', error);
-        toast.error('予約の削除に失敗しました。もう一度お試しください。');
-      }
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: '予約の削除',
+      message: `${item.childName}さんの予約を削除しますか？`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          await deleteSchedule(item.id);
+        } catch (error) {
+          console.error('Error deleting schedule:', error);
+          toast.error('予約の削除に失敗しました。もう一度お試しください。');
+        }
+      },
+    });
   };
 
   // 月を変更
@@ -1458,6 +1484,15 @@ const ScheduleView: React.FC = () => {
 
       </>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDestructive={confirmModal.isDestructive}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

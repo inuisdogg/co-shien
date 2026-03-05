@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getPersonalBaseUrl } from '@/utils/domain';
 import { supabase } from '@/lib/supabase';
 import { Notification } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -32,6 +33,7 @@ interface UserFacility {
 const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'business' }) => {
   const { requests } = useFacilityData();
   const { user, logout, facility, switchFacility } = useAuth();
+  const { toast } = useToast();
   const router = useRouter();
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
 
@@ -83,6 +85,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
         }
       } catch (err) {
         console.error('通知取得エラー:', err);
+        toast.error('通知の取得に失敗しました');
       }
     };
 
@@ -123,6 +126,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
         }
       } catch (err) {
         console.error('施設一覧取得エラー:', err);
+        toast.error('施設一覧の取得に失敗しました');
       }
     };
 
@@ -161,6 +165,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('既読更新エラー:', err);
+      toast.error('既読更新に失敗しました');
     }
   };
 
@@ -180,6 +185,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
       setUnreadCount(0);
     } catch (err) {
       console.error('全既読更新エラー:', err);
+      toast.error('全既読更新に失敗しました');
     }
   };
   
@@ -196,6 +202,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onLogoClick, mode = 'busin
       await switchFacility(targetFacility.id);
     } catch (err) {
       console.error('施設切替エラー:', err);
+      toast.error('施設の切り替えに失敗しました');
     }
   };
 

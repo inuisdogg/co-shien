@@ -10,7 +10,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamicImport from 'next/dynamic';
 import Sidebar, { MENU_DESCRIPTIONS } from '@/components/common/Sidebar';
@@ -242,9 +242,29 @@ export default function BusinessPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [initialTabSet, setInitialTabSet] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authTimeout, setAuthTimeout] = useState(false);
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const prevTabRef = useRef<string>('');
 
   const facilityIdFromQuery = searchParams?.get('facilityId') || null;
   const tabFromQuery = searchParams?.get('tab') || null;
+
+  // Wrap setActiveTab with transition animation
+  const handleSetActiveTab = useCallback((tab: string) => {
+    if (tab === prevTabRef.current) return;
+    setIsTabTransitioning(true);
+    // Brief fade-out before switching content
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        setActiveTab(tab);
+        prevTabRef.current = tab;
+        // Allow fade-in on next frame
+        requestAnimationFrame(() => {
+          setIsTabTransitioning(false);
+        });
+      }, 120);
+    });
+  }, []);
 
   // コマンドパレットに渡すメニュー項目（権限でフィルタ）
   const commandPaletteItems: CommandPaletteItem[] = useMemo(() => {
@@ -259,21 +279,23 @@ export default function BusinessPage() {
   useEffect(() => {
     const handler = (e: Event) => {
       const tab = (e as CustomEvent).detail;
-      if (tab) setActiveTab(tab);
+      if (tab) handleSetActiveTab(tab);
     };
     window.addEventListener('navigate-tab', handler);
     return () => window.removeEventListener('navigate-tab', handler);
-  }, []);
+  }, [handleSetActiveTab]);
 
   // 認証フローチェック
   useEffect(() => {
+    let cancelled = false;
+
     const checkAuthFlow = async () => {
       const userStr = localStorage.getItem('user');
       const facilityStr = localStorage.getItem('selectedFacility');
 
       if (!userStr) {
         // 未ログイン → /career/login へ（キャリアアカウントでログイン）
-        router.push('/career/login');
+        if (!cancelled) router.push('/career/login');
         return;
       }
 
@@ -281,7 +303,7 @@ export default function BusinessPage() {
       try {
         const userData = JSON.parse(userStr);
         if (userData?.userType === 'client') {
-          router.push('/parent');
+          if (!cancelled) router.push('/parent');
           return;
         }
         // facilityIdクエリパラメータがない場合のみ、スタッフ権限チェック
@@ -293,20 +315,20 @@ export default function BusinessPage() {
               const selectedFacility = JSON.parse(facilityStr);
               // 施設での役割が管理者またはマネージャーでなければリダイレクト
               if (selectedFacility.role !== '管理者' && selectedFacility.role !== 'マネージャー') {
-                router.push('/career');
+                if (!cancelled) router.push('/career');
                 return;
               }
             } catch (e) {
-              router.push('/career');
+              if (!cancelled) router.push('/career');
               return;
             }
           } else {
-            router.push('/career');
+            if (!cancelled) router.push('/career');
             return;
           }
         }
       } catch (e) {
-        router.push('/career/login');
+        if (!cancelled) router.push('/career/login');
         return;
       }
 
@@ -347,7 +369,7 @@ export default function BusinessPage() {
                 const url = new URL(window.location.href);
                 url.searchParams.delete('facilityId');
                 window.history.replaceState({}, '', url.toString());
-                setCheckingAuth(false);
+                if (!cancelled) setCheckingAuth(false);
                 return;
               }
             } catch (e) {
@@ -355,12 +377,16 @@ export default function BusinessPage() {
             }
           }
 
+          if (cancelled) return;
+
           // 施設情報を取得
           const { data: facilityData, error: facilityError } = await supabase
             .from('facilities')
             .select('*')
             .eq('id', facilityIdFromQuery)
             .single();
+
+          if (cancelled) return;
 
           if (facilityError || !facilityData) {
             console.error('施設情報の取得に失敗:', facilityError);
@@ -380,6 +406,8 @@ export default function BusinessPage() {
             .eq('facility_id', facilityIdFromQuery)
             .is('end_date', null)
             .single();
+
+          if (cancelled) return;
 
           if (!employmentError && empData) {
             employmentData = empData;
@@ -416,22 +444,32 @@ export default function BusinessPage() {
           const url = new URL(window.location.href);
           url.searchParams.delete('facilityId');
           window.history.replaceState({}, '', url.toString());
-          router.push('/career');
+          if (!cancelled) router.push('/career');
           return;
         }
       }
 
       if (!facilityStr) {
         // ログイン済みだが施設未選択 → キャリアダッシュボードへ
-        router.push('/career');
+        if (!cancelled) router.push('/career');
         return;
       }
 
-      setCheckingAuth(false);
+      if (!cancelled) setCheckingAuth(false);
     };
 
     const timer = setTimeout(checkAuthFlow, 100);
-    return () => clearTimeout(timer);
+
+    // Auth timeout: if still checking after 15s, show timeout feedback
+    const authTimeoutTimer = setTimeout(() => {
+      if (!cancelled) setAuthTimeout(true);
+    }, 15000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      clearTimeout(authTimeoutTimer);
+    };
   }, [router, isAuthenticated, facilityIdFromQuery]);
 
   // 認証後に初期タブを設定
@@ -482,6 +520,7 @@ export default function BusinessPage() {
         }
       }
       setActiveTab(defaultTab);
+      prevTabRef.current = defaultTab;
       setInitialTabSet(true);
     }
   }, [isAuthenticated, hasFullAccess, hasPermission, initialTabSet, tabFromQuery]);
@@ -510,11 +549,26 @@ export default function BusinessPage() {
     }
   }, [isAuthenticated, hasFullAccess, activeTab, hasPermission, initialTabSet]);
 
-  // 認証確認中はローディング表示
+  // 認証確認中はローディング表示（タイムアウト時はフィードバックを表示）
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary-dark gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+        <p className="text-white/80 text-sm">認証を確認中...</p>
+        {authTimeout && (
+          <div className="mt-2 text-center max-w-xs">
+            <p className="text-white/70 text-xs leading-relaxed">
+              読み込みに時間がかかっています。
+              <br />ネットワーク接続をご確認ください。
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-3 px-4 py-1.5 text-xs font-medium text-primary bg-white rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              ページを再読み込み
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -522,8 +576,9 @@ export default function BusinessPage() {
   // 未認証の場合はログインページへ（useEffectでリダイレクト済みなのでここには来ないはず）
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-dark">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary-dark gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+        <p className="text-white/80 text-sm">リダイレクト中...</p>
       </div>
     );
   }
@@ -532,7 +587,7 @@ export default function BusinessPage() {
   if (!initialTabSet || !activeTab) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <LoadingSpinner />
+        <LoadingSpinner label="ダッシュボードを準備中..." />
       </div>
     );
   }
@@ -544,7 +599,7 @@ export default function BusinessPage() {
       case 'schedule':
         return <ScheduleView />;
       case 'children':
-        return <ChildrenView setActiveTab={setActiveTab} />;
+        return <ChildrenView setActiveTab={handleSetActiveTab} />;
       case 'staff-master':
         return <StaffMasterView />;
       case 'shift':
@@ -605,28 +660,32 @@ export default function BusinessPage() {
   return (
     <SetupGuideProvider>
       {/* Onboarding guide modal for first-time admin/manager login */}
-      {hasFullAccess && <OnboardingGuide onNavigate={setActiveTab} />}
+      {hasFullAccess && <OnboardingGuide onNavigate={handleSetActiveTab} />}
       <div className="flex h-screen bg-[#f5f6f8] font-sans text-gray-800">
         <Sidebar
           mode="business"
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleSetActiveTab}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
-        <CommandPalette items={commandPaletteItems} setActiveTab={setActiveTab} />
+        <CommandPalette items={commandPaletteItems} setActiveTab={handleSetActiveTab} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header
             mode="business"
             onMenuClick={() => setIsSidebarOpen(true)}
             onLogoClick={() => {
               const homeTab = hasFullAccess ? 'dashboard' : 'schedule';
-              setActiveTab(homeTab);
+              handleSetActiveTab(homeTab);
             }}
           />
           <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 md:p-8">
-            <div className="max-w-[1600px] mx-auto h-full flex flex-col">
-              <SetupGateContent activeTab={activeTab} setActiveTab={setActiveTab} renderContent={renderContent} />
+            <div
+              className={`max-w-[1600px] mx-auto h-full flex flex-col transition-opacity duration-150 ${
+                isTabTransitioning ? 'opacity-0' : 'opacity-100'
+              }`}
+            >
+              <SetupGateContent activeTab={activeTab} setActiveTab={handleSetActiveTab} renderContent={renderContent} />
             </div>
           </main>
         </div>

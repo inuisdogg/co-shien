@@ -24,6 +24,7 @@ import {
 import CSVBulkUploadPanel from './CSVBulkUploadPanel';
 import FacilityInviteLinkPanel from './FacilityInviteLinkPanel';
 import type { ParsedCSVRow, BulkImportResult } from '@/types/bulkImport';
+import { useToast } from '@/components/ui/Toast';
 
 interface StaffInvitation {
   id: string;
@@ -62,6 +63,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
   facilityName,
   loading = false,
 }) => {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'invite' | 'pending' | 'bulk' | 'link'>('invite');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -145,6 +147,7 @@ const StaffInviteModal: React.FC<StaffInviteModalProps> = ({
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
+      toast.error('URLのコピーに失敗しました');
     }
   };
 
